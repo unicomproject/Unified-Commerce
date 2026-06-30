@@ -1,0 +1,10 @@
+﻿using E_POS.Domain.Common.Entities;
+
+namespace E_POS.Domain.Modules.Customer.Entities;
+
+public class CustomerRefreshToken : AuditableEntity
+{
+    public Guid TenantId { get; protected set; }
+    public Guid CustomerAuthSessionId { get; protected set; }
+    public string TokenHash { get; protected set; } = string.Empty;
+}

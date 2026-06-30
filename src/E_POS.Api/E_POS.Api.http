@@ -1,0 +1,4 @@
+@E_POS.Api_HostAddress = http://localhost:5187
+
+GET {{E_POS.Api_HostAddress}}/api/v1/health
+Accept: application/json
