@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.PlatformAdministration.Entities;
+using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -36,6 +36,12 @@ public sealed class PlatformUserConfiguration : IEntityTypeConfiguration<Platfor
             .HasColumnName("normalized_email")
             .HasColumnType("citext");
 
+        builder.Property(x => x.PasswordHash)
+            .HasColumnName("password_hash")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255)
+            .IsRequired();
+
         builder.Property(x => x.Status)
             .HasColumnName("status")
             .HasColumnType("varchar(30)")
@@ -49,7 +55,6 @@ public sealed class PlatformUserConfiguration : IEntityTypeConfiguration<Platfor
             .IsUnique()
             .HasDatabaseName("uq_platform_users_normalized_email");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_users_status", "status IN ('ACTIVE', 'INACTIVE', 'LOCKED', 'DELETED')")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_platform_users_status", "status IN ('ACTIVE', 'INACTIVE', 'LOCKED', 'DELETED')"));
     }
 }
-
