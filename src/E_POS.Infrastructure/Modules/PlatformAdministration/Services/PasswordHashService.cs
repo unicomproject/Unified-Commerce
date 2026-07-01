@@ -21,7 +21,6 @@ public sealed class PasswordHashService : IPasswordHashService
             Iterations,
             HashAlgorithmName.SHA256,
             HashSize);
-
         // Store algorithm parameters with the salt and hash so verification is self-contained.
         return $"{Algorithm}:{Iterations}:{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
     }

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace E_POS.Api.Controllers;
 
 [ApiController]
+// Platform login stays anonymous because authentication starts at this endpoint.
 [AllowAnonymous]
 [Route("api/v1/platform-auth")]
 public sealed class PlatformAuthController : ControllerBase

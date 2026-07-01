@@ -1,3 +1,4 @@
+using E_POS.Api.Middleware;
 using E_POS.Application;
 using E_POS.Infrastructure;
 using E_POS.Infrastructure.Modules.PlatformAdministration.Options;
@@ -71,6 +72,9 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Convert unexpected runtime failures into safe standard API errors.
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
