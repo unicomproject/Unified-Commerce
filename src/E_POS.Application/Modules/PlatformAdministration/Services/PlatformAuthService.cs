@@ -9,6 +9,7 @@ namespace E_POS.Application.Modules.PlatformAdministration.Services;
 
 public sealed class PlatformAuthService : IPlatformAuthService
 {
+    // Coordinates platform admin credential validation, token creation, and login auditing.
     private static readonly ApplicationError InvalidCredentials = new(
         "platform_auth.invalid_credentials",
         "Invalid email or password.");
@@ -53,16 +54,19 @@ public sealed class PlatformAuthService : IPlatformAuthService
 
         if (user is null)
         {
+            // Return the same failure for missing users to avoid account enumeration.
             await SaveFailedAuditAsync(null, PlatformAuthConstants.FailedLoginResult, now, cancellationToken);
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
         if (user.Status == PlatformAuthConstants.LockedStatus)
         {
+            // Keep locked-account responses generic so attackers cannot identify valid accounts.
             await SaveFailedAuditAsync(user.Id, PlatformAuthConstants.LockedLoginResult, now, cancellationToken);
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
+        // Deny inactive users and bad passwords with the same safe credential failure.
         if (user.Status != PlatformAuthConstants.ActiveStatus ||
             string.IsNullOrWhiteSpace(user.PasswordHash) ||
             !_passwordHashService.VerifyPassword(request.Password, user.PasswordHash))
@@ -71,6 +75,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
+        // Issue platform tokens only after at least one active platform permission is found.
         var permissions = await _repository.GetActivePermissionCodesAsync(user.Id, cancellationToken);
         if (permissions.Count == 0)
         {
@@ -85,6 +90,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
         var accessToken = _jwtTokenService.CreateAccessToken(user, sessionId, jwtId, permissions);
         var refreshToken = _refreshTokenService.CreateRefreshToken();
 
+        // Persist only token identifiers and hashes, never raw access or refresh tokens.
         var session = PlatformAuthSession.Create(
             sessionId,
             user.Id,

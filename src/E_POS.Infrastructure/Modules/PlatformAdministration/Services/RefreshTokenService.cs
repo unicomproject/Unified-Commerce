@@ -20,6 +20,7 @@ public sealed class RefreshTokenService : IRefreshTokenService
 
     public RefreshTokenResult CreateRefreshToken()
     {
+        // Generate a high-entropy refresh token for server-side session renewal.
         var token = Base64Url.Encode(RandomNumberGenerator.GetBytes(64));
         return new RefreshTokenResult(token, _dateTimeProvider.UtcNow.AddDays(_options.RefreshTokenDays));
     }

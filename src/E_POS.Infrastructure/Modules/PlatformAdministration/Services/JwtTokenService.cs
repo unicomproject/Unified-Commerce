@@ -37,7 +37,6 @@ public sealed class JwtTokenService : IJwtTokenService
             ["alg"] = "HS256",
             ["typ"] = "JWT"
         };
-
         // Platform JWTs carry identity, session, token id, and permission claims.
         var payload = new Dictionary<string, object>
         {
