@@ -10,6 +10,12 @@ public interface IPlatformAuthRepository
 
     Task SaveFailedLoginAuditAsync(PlatformLoginAudit audit, CancellationToken cancellationToken);
 
+    Task SaveFailedCredentialAttemptAsync(
+        PlatformLoginAudit audit,
+        DateTimeOffset failedAttemptWindowStart,
+        int maxFailedAttempts,
+        CancellationToken cancellationToken);
+
     Task SaveSuccessfulLoginAsync(
         PlatformAuthSession session,
         PlatformRefreshToken refreshToken,

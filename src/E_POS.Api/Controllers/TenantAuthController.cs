@@ -1,7 +1,7 @@
 using E_POS.Api.Extensions;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Application.Modules.PlatformAdministration.Dtos;
+using E_POS.Application.Modules.AuthSecurity.Contracts;
+using E_POS.Application.Modules.AuthSecurity.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -9,31 +9,31 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace E_POS.Api.Controllers;
 
 [ApiController]
-// Platform login stays anonymous because authentication starts at this endpoint.
+// Tenant login stays anonymous because authentication starts at this endpoint.
 [AllowAnonymous]
-[Route("api/v1/platform-auth")]
-public sealed class PlatformAuthController : ControllerBase
+[Route("api/v1/tenant-auth")]
+public sealed class TenantAuthController : ControllerBase
 {
-    private const string RefreshTokenCookieName = "platform_refresh_token";
-    private readonly IPlatformAuthService _platformAuthService;
+    private const string RefreshTokenCookieName = "tenant_refresh_token";
+    private readonly ITenantAuthService _tenantAuthService;
 
-    public PlatformAuthController(IPlatformAuthService platformAuthService)
+    public TenantAuthController(ITenantAuthService tenantAuthService)
     {
-        _platformAuthService = platformAuthService;
+        _tenantAuthService = tenantAuthService;
     }
 
     [HttpPost("login")]
     [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
-    [ProducesResponseType(typeof(PlatformAdminLoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(TenantLoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login(
-        [FromBody] PlatformAdminLoginRequest request,
+        [FromBody] TenantLoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _platformAuthService.LoginAsync(request, cancellationToken);
+        var result = await _tenantAuthService.LoginAsync(request, cancellationToken);
 
         if (result.IsSuccess && result.Value is not null)
         {
@@ -43,22 +43,22 @@ public sealed class PlatformAuthController : ControllerBase
 
         return result.Error.Code switch
         {
-            "platform_auth.validation_failed" => BadRequest(CreateError(result.Error)),
-            "platform_auth.platform_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(result.Error)),
+            "tenant_auth.validation_failed" => BadRequest(CreateError(result.Error)),
+            "tenant_auth.tenant_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(result.Error)),
             _ => Unauthorized(CreateError(result.Error))
         };
     }
 
-    private void AppendRefreshTokenCookie(PlatformAdminLoginResponse response)
+    private void AppendRefreshTokenCookie(TenantLoginResponse response)
     {
-        // Keep the refresh token out of JavaScript-readable storage.
+        // Browser clients use the HttpOnly cookie; native POS/mobile clients use secure app storage.
         Response.Cookies.Append(RefreshTokenCookieName, response.RefreshToken, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Strict,
             Expires = response.RefreshTokenExpiresAt,
-            Path = "/api/v1/platform-auth"
+            Path = "/api/v1/tenant-auth"
         });
     }
 

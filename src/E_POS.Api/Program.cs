@@ -1,11 +1,16 @@
+using System.Text;
+using E_POS.Api.Extensions;
 using E_POS.Api.Middleware;
 using E_POS.Application;
 using E_POS.Infrastructure;
+using E_POS.Infrastructure.Modules.AuthSecurity.Options;
 using E_POS.Infrastructure.Modules.PlatformAdministration.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
+
+const string PlatformIdentityType = "platform_user";
+const string TenantIdentityType = "tenant_user";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +22,23 @@ builder.Services.AddInfrastructure(builder.Configuration);
 var platformJwtOptions = builder.Configuration
     .GetSection(PlatformJwtOptions.SectionName)
     .Get<PlatformJwtOptions>() ?? new PlatformJwtOptions();
+var tenantJwtOptions = builder.Configuration
+    .GetSection(TenantJwtOptions.SectionName)
+    .Get<TenantJwtOptions>() ?? new TenantJwtOptions();
 
-// Validates platform JWT access tokens issued by the platform login endpoint.
+var signingKeys = new[]
+    {
+        platformJwtOptions.SigningKey,
+        tenantJwtOptions.SigningKey
+    }
+    .Where(key => !string.IsNullOrWhiteSpace(key))
+    .Distinct(StringComparer.Ordinal)
+    .Select(key => new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)))
+    .ToArray();
+
+builder.Services.AddApiRateLimiting();
+
+// Validates JWT access tokens issued by platform and tenant login endpoints.
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -26,17 +46,32 @@ builder.Services
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = platformJwtOptions.Issuer,
+            ValidIssuers = new[] { platformJwtOptions.Issuer, tenantJwtOptions.Issuer }
+                .Where(issuer => !string.IsNullOrWhiteSpace(issuer)),
             ValidateAudience = true,
-            ValidAudience = platformJwtOptions.Audience,
+            ValidAudiences = new[] { platformJwtOptions.Audience, tenantJwtOptions.Audience }
+                .Where(audience => !string.IsNullOrWhiteSpace(audience)),
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(platformJwtOptions.SigningKey)),
+            IssuerSigningKeys = signingKeys,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Keep platform and tenant JWTs from being accepted interchangeably by future APIs.
+    options.AddPolicy("PlatformOnly", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireClaim("identity_type", PlatformIdentityType)
+        .RequireClaim("aud", platformJwtOptions.Audience));
+
+    options.AddPolicy("TenantOnly", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireClaim("identity_type", TenantIdentityType)
+        .RequireClaim("aud", tenantJwtOptions.Audience));
+});
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -83,6 +118,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -61,6 +61,43 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task SaveFailedCredentialAttemptAsync(
+        PlatformLoginAudit audit,
+        DateTimeOffset failedAttemptWindowStart,
+        int maxFailedAttempts,
+        CancellationToken cancellationToken)
+    {
+        _dbContext.PlatformLoginAudits.Add(audit);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (audit.PlatformUserId is null)
+        {
+            return;
+        }
+
+        var failedAttempts = await _dbContext.PlatformLoginAudits
+            .AsNoTracking()
+            .CountAsync(
+                x => x.PlatformUserId == audit.PlatformUserId &&
+                     x.LoginResult == PlatformAuthConstants.FailedLoginResult &&
+                     x.CreatedAt >= failedAttemptWindowStart,
+                cancellationToken);
+
+        if (failedAttempts < maxFailedAttempts)
+        {
+            return;
+        }
+
+        // Lock only active users so inactive/deleted account states are not overwritten by login noise.
+        await _dbContext.PlatformUsers
+            .Where(x => x.Id == audit.PlatformUserId && x.Status == PlatformAuthConstants.ActiveStatus)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(x => x.Status, PlatformAuthConstants.LockedStatus)
+                    .SetProperty(x => x.UpdatedAt, audit.CreatedAt),
+                cancellationToken);
+    }
+
     public async Task SaveSuccessfulLoginAsync(
         PlatformAuthSession session,
         PlatformRefreshToken refreshToken,
@@ -73,4 +110,3 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
-

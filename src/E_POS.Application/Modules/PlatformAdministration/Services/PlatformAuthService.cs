@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Domain.Modules.PlatformAdministration.Constants;
@@ -9,6 +10,9 @@ namespace E_POS.Application.Modules.PlatformAdministration.Services;
 
 public sealed class PlatformAuthService : IPlatformAuthService
 {
+    private const int MaxFailedCredentialAttempts = 5;
+    private static readonly TimeSpan FailedCredentialWindow = TimeSpan.FromMinutes(15);
+
     // Coordinates platform admin credential validation, token creation, and login auditing.
     private static readonly ApplicationError InvalidCredentials = new(
         "platform_auth.invalid_credentials",
@@ -16,25 +20,28 @@ public sealed class PlatformAuthService : IPlatformAuthService
 
     private readonly IPlatformAuthRepository _repository;
     private readonly IPasswordHashService _passwordHashService;
-    private readonly IJwtTokenService _jwtTokenService;
-    private readonly IRefreshTokenService _refreshTokenService;
+    private readonly IJwtTokenFactory _jwtTokenFactory;
+    private readonly IRefreshTokenGenerator _refreshTokenGenerator;
     private readonly ITokenHashService _tokenHashService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly PlatformJwtSettings _jwtSettings;
 
     public PlatformAuthService(
         IPlatformAuthRepository repository,
         IPasswordHashService passwordHashService,
-        IJwtTokenService jwtTokenService,
-        IRefreshTokenService refreshTokenService,
+        IJwtTokenFactory jwtTokenFactory,
+        IRefreshTokenGenerator refreshTokenGenerator,
         ITokenHashService tokenHashService,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        PlatformJwtSettings jwtSettings)
     {
         _repository = repository;
         _passwordHashService = passwordHashService;
-        _jwtTokenService = jwtTokenService;
-        _refreshTokenService = refreshTokenService;
+        _jwtTokenFactory = jwtTokenFactory;
+        _refreshTokenGenerator = refreshTokenGenerator;
         _tokenHashService = tokenHashService;
         _dateTimeProvider = dateTimeProvider;
+        _jwtSettings = jwtSettings;
     }
 
     public async Task<ApplicationResult<PlatformAdminLoginResponse>> LoginAsync(
@@ -66,12 +73,16 @@ public sealed class PlatformAuthService : IPlatformAuthService
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
-        // Deny inactive users and bad passwords with the same safe credential failure.
-        if (user.Status != PlatformAuthConstants.ActiveStatus ||
-            string.IsNullOrWhiteSpace(user.PasswordHash) ||
-            !_passwordHashService.VerifyPassword(request.Password, user.PasswordHash))
+        if (user.Status != PlatformAuthConstants.ActiveStatus || string.IsNullOrWhiteSpace(user.PasswordHash))
         {
             await SaveFailedAuditAsync(user.Id, PlatformAuthConstants.FailedLoginResult, now, cancellationToken);
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
+        }
+
+        if (!_passwordHashService.VerifyPassword(request.Password, user.PasswordHash))
+        {
+            // Count only real bad-password attempts toward lockout, not inactive/access-denied states.
+            await SaveFailedAuditAsync(user.Id, PlatformAuthConstants.FailedLoginResult, now, cancellationToken, applyCredentialLockout: true);
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
@@ -87,20 +98,20 @@ public sealed class PlatformAuthService : IPlatformAuthService
 
         var sessionId = Guid.NewGuid();
         var jwtId = Guid.NewGuid().ToString("N");
-        var accessToken = _jwtTokenService.CreateAccessToken(user, sessionId, jwtId, permissions);
-        var refreshToken = _refreshTokenService.CreateRefreshToken();
+        var accessToken = _jwtTokenFactory.CreateAccessToken(CreateTokenDescriptor(user, sessionId, jwtId, permissions));
+        var refreshToken = _refreshTokenGenerator.CreateRefreshToken(_jwtSettings.RefreshTokenDays);
 
         // Persist only token identifiers and hashes, never raw access or refresh tokens.
         var session = PlatformAuthSession.Create(
             sessionId,
             user.Id,
-            _tokenHashService.HashToken(jwtId),
+            _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey),
             now);
 
         var refreshTokenEntity = PlatformRefreshToken.Create(
             Guid.NewGuid(),
             sessionId,
-            _tokenHashService.HashToken(refreshToken.Token),
+            _tokenHashService.HashToken(refreshToken.Token, _jwtSettings.SigningKey),
             now);
 
         var audit = PlatformLoginAudit.Create(
@@ -122,14 +133,47 @@ public sealed class PlatformAuthService : IPlatformAuthService
         return ApplicationResult<PlatformAdminLoginResponse>.Success(response);
     }
 
+    private JwtTokenDescriptor CreateTokenDescriptor(
+        PlatformUser user,
+        Guid sessionId,
+        string jwtId,
+        IReadOnlyList<string> permissions)
+    {
+        // Platform JWTs carry identity, session, token id, and permission claims.
+        return new JwtTokenDescriptor(
+            _jwtSettings.Issuer,
+            _jwtSettings.Audience,
+            _jwtSettings.SigningKey,
+            _jwtSettings.AccessTokenMinutes,
+            new Dictionary<string, object>
+            {
+                ["sub"] = user.Id.ToString(),
+                ["email"] = user.Email,
+                ["identity_type"] = PlatformAuthConstants.IdentityType,
+                ["session_id"] = sessionId.ToString(),
+                ["jti"] = jwtId,
+                ["permissions"] = permissions
+            });
+    }
+
     private Task SaveFailedAuditAsync(
         Guid? platformUserId,
         string loginResult,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool applyCredentialLockout = false)
     {
         var audit = PlatformLoginAudit.Create(Guid.NewGuid(), platformUserId, loginResult, now);
-        return _repository.SaveFailedLoginAuditAsync(audit, cancellationToken);
+
+        if (!applyCredentialLockout)
+        {
+            return _repository.SaveFailedLoginAuditAsync(audit, cancellationToken);
+        }
+
+        return _repository.SaveFailedCredentialAttemptAsync(
+            audit,
+            now.Subtract(FailedCredentialWindow),
+            MaxFailedCredentialAttempts,
+            cancellationToken);
     }
 }
-
