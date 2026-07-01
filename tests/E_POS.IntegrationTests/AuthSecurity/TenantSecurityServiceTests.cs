@@ -1,10 +1,15 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Claims;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.AuthSecurity.Contracts;
 using E_POS.Domain.Modules.AuthSecurity.Constants;
+using E_POS.Domain.Modules.AuthSecurity.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Infrastructure.Common.Security;
+using E_POS.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace E_POS.IntegrationTests.AuthSecurity;
@@ -60,6 +65,69 @@ public sealed class TenantSecurityServiceTests
         Assert.Equal("tenant.dashboard.view", root.GetProperty("permissions")[0].GetString());
     }
 
+    [Fact]
+    public void TenantAuthSession_Revoke_SetsRevokedStatusAndUpdatedAt()
+    {
+        var session = TenantAuthSession.Create(Guid.NewGuid(), Guid.NewGuid(), "session-hash", Now);
+        var revokedAt = Now.AddMinutes(5);
+
+        session.Revoke(revokedAt);
+
+        Assert.Equal(TenantAuthConstants.RevokedTokenStatus, session.Status);
+        Assert.Equal(revokedAt, session.UpdatedAt);
+    }
+
+    [Fact]
+    public void TenantRefreshToken_Revoke_SetsRevokedStatusAndUpdatedAt()
+    {
+        var refreshToken = TenantRefreshToken.Create(Guid.NewGuid(), Guid.NewGuid(), "refresh-hash", Now.AddDays(7), Now);
+        var revokedAt = Now.AddMinutes(5);
+
+        refreshToken.Revoke(revokedAt);
+
+        Assert.Equal(TenantAuthConstants.RevokedTokenStatus, refreshToken.Status);
+        Assert.Equal(revokedAt, refreshToken.UpdatedAt);
+        Assert.Equal(Now.AddDays(7), refreshToken.ExpiresAt);
+    }
+
+
+    [Fact]
+    public async Task AuthSessionValidator_WithActiveTenantUserAndSession_ReturnsTrue()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var tenantUserId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", null, "hash", TenantAuthConstants.ActiveUserStatus, Now));
+        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantUserId, "session-hash", Now));
+        await dbContext.SaveChangesAsync();
+
+        var validator = new AuthSessionValidator(dbContext);
+
+        var isActive = await validator.IsCurrentSessionActiveAsync(CreateTenantPrincipal(tenantUserId, tenantId, sessionId), CancellationToken.None);
+
+        Assert.True(isActive);
+    }
+
+    [Fact]
+    public async Task AuthSessionValidator_WithLockedTenantUser_ReturnsFalse()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var tenantUserId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "locked@tenant.test", null, "hash", TenantAuthConstants.LockedUserStatus, Now));
+        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantUserId, "session-hash", Now));
+        await dbContext.SaveChangesAsync();
+
+        var validator = new AuthSessionValidator(dbContext);
+
+        var isActive = await validator.IsCurrentSessionActiveAsync(CreateTenantPrincipal(tenantUserId, tenantId, sessionId), CancellationToken.None);
+
+        Assert.False(isActive);
+    }
     private static string DecodeBase64Url(string value)
     {
         var padded = value.Replace('-', '+').Replace('_', '/');
@@ -67,6 +135,26 @@ public sealed class TenantSecurityServiceTests
         return Encoding.UTF8.GetString(Convert.FromBase64String(padded));
     }
 
+
+    private static EPosDbContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<EPosDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        return new EPosDbContext(options);
+    }
+
+    private static ClaimsPrincipal CreateTenantPrincipal(Guid tenantUserId, Guid tenantId, Guid sessionId)
+    {
+        return new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim("sub", tenantUserId.ToString()),
+            new Claim("tenant_id", tenantId.ToString()),
+            new Claim("identity_type", TenantAuthConstants.IdentityType),
+            new Claim("session_id", sessionId.ToString())
+        }, "Test"));
+    }
     private sealed class FakeDateTimeProvider : IDateTimeProvider
     {
         public DateTimeOffset UtcNow => Now;

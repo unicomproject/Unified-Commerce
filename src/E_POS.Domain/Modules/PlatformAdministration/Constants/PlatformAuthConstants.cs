@@ -8,5 +8,7 @@ public static class PlatformAuthConstants
     public const string SuccessLoginResult = "SUCCESS";
     public const string FailedLoginResult = "FAILED";
     public const string LockedLoginResult = "LOCKED";
+    public const string ActiveTokenStatus = "ACTIVE";
+    public const string RevokedTokenStatus = "REVOKED";
     public const string IdentityType = "platform_user";
 }

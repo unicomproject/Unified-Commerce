@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.PlatformAdministration.Entities;
+using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -42,6 +42,9 @@ public sealed class PlatformLoginAuditConfiguration : IEntityTypeConfiguration<P
             .HasForeignKey(x => x.PlatformUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_platform_login_audits_platform_user_id_platform_users");
+
+        builder.HasIndex(x => new { x.PlatformUserId, x.LoginResult, x.CreatedAt })
+            .HasDatabaseName("ix_platform_login_audits_platform_user_id_login_result_created_at");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_platform_login_audits_login_result", "login_result IN ('SUCCESS', 'FAILED', 'LOCKED')")); 
     }

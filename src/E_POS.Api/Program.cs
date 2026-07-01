@@ -2,6 +2,7 @@ using System.Text;
 using E_POS.Api.Extensions;
 using E_POS.Api.Middleware;
 using E_POS.Application;
+using E_POS.Application.Common.Security;
 using E_POS.Infrastructure;
 using E_POS.Infrastructure.Modules.AuthSecurity.Options;
 using E_POS.Infrastructure.Modules.PlatformAdministration.Options;
@@ -55,6 +56,24 @@ builder.Services
             IssuerSigningKeys = signingKeys,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                if (context.Principal is null)
+                {
+                    context.Fail("Invalid authenticated principal.");
+                    return;
+                }
+
+                var validator = context.HttpContext.RequestServices.GetRequiredService<IAuthSessionValidator>();
+                if (!await validator.IsCurrentSessionActiveAsync(context.Principal, context.HttpContext.RequestAborted))
+                {
+                    context.Fail("Invalid or revoked auth session.");
+                }
+            }
         };
     });
 

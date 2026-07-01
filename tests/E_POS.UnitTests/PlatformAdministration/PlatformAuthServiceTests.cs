@@ -40,6 +40,7 @@ public sealed class PlatformAuthServiceTests
         Assert.Equal(PlatformAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginResult);
         Assert.Equal("hash:" + jwtFactory.JwtId, repository.SavedSession!.SessionTokenHash);
         Assert.Equal("hash:refresh-token", repository.SavedRefreshToken!.TokenHash);
+        Assert.Equal(Now.AddDays(7), repository.SavedRefreshToken.ExpiresAt);
     }
 
     [Fact]
@@ -74,6 +75,35 @@ public sealed class PlatformAuthServiceTests
         Assert.Equal(PlatformAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginResult);
     }
 
+    [Fact]
+    public async Task LogoutAsync_WithCurrentPlatformSession_RevokesResolvedSession()
+    {
+        var repository = new FakePlatformAuthRepository(null, []);
+        var service = CreateService(repository);
+        var platformUserId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        var result = await service.LogoutAsync(platformUserId, sessionId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(platformUserId, repository.RevokedPlatformUserId);
+        Assert.Equal(sessionId, repository.RevokedSessionId);
+        Assert.Equal(Now, repository.RevokedAt);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_WithMissingSessionContext_ReturnsInvalidSession()
+    {
+        var repository = new FakePlatformAuthRepository(null, []);
+        var service = CreateService(repository);
+
+        var result = await service.LogoutAsync(Guid.Empty, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_auth.invalid_session", result.Error.Code);
+        Assert.Null(repository.RevokedPlatformUserId);
+    }
+
     private static PlatformAuthService CreateService(
         FakePlatformAuthRepository repository,
         IJwtTokenFactory? jwtFactory = null)
@@ -104,6 +134,12 @@ public sealed class PlatformAuthServiceTests
         public PlatformRefreshToken? SavedRefreshToken { get; private set; }
 
         public PlatformLoginAudit? SavedAudit { get; private set; }
+
+        public Guid? RevokedPlatformUserId { get; private set; }
+
+        public Guid? RevokedSessionId { get; private set; }
+
+        public DateTimeOffset? RevokedAt { get; private set; }
 
         public Task<PlatformUser?> FindUserByNormalizedEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
         {
@@ -140,6 +176,18 @@ public sealed class PlatformAuthServiceTests
             SavedSession = session;
             SavedRefreshToken = refreshToken;
             SavedAudit = audit;
+            return Task.CompletedTask;
+        }
+
+        public Task RevokeCurrentSessionAsync(
+            Guid platformUserId,
+            Guid sessionId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            RevokedPlatformUserId = platformUserId;
+            RevokedSessionId = sessionId;
+            RevokedAt = now;
             return Task.CompletedTask;
         }
     }

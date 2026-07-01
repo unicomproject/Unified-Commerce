@@ -18,6 +18,10 @@ public sealed class PlatformAuthService : IPlatformAuthService
         "platform_auth.invalid_credentials",
         "Invalid email or password.");
 
+    private static readonly ApplicationError InvalidSession = new(
+        "platform_auth.invalid_session",
+        "Invalid platform session.");
+
     private readonly IPlatformAuthRepository _repository;
     private readonly IPasswordHashService _passwordHashService;
     private readonly IJwtTokenFactory _jwtTokenFactory;
@@ -112,6 +116,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
             Guid.NewGuid(),
             sessionId,
             _tokenHashService.HashToken(refreshToken.Token, _jwtSettings.SigningKey),
+            refreshToken.ExpiresAt,
             now);
 
         var audit = PlatformLoginAudit.Create(
@@ -131,6 +136,25 @@ public sealed class PlatformAuthService : IPlatformAuthService
             permissions);
 
         return ApplicationResult<PlatformAdminLoginResponse>.Success(response);
+    }
+
+    public async Task<ApplicationResult> LogoutAsync(
+        Guid platformUserId,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (platformUserId == Guid.Empty || sessionId == Guid.Empty)
+        {
+            return ApplicationResult.Failure(InvalidSession);
+        }
+
+        await _repository.RevokeCurrentSessionAsync(
+            platformUserId,
+            sessionId,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+
+        return ApplicationResult.Success();
     }
 
     private JwtTokenDescriptor CreateTokenDescriptor(

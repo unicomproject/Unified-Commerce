@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.PlatformAdministration.Entities;
+using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -42,6 +42,11 @@ public sealed class PlatformRefreshTokenConfiguration : IEntityTypeConfiguration
             .HasColumnType("varchar(255)")
             .HasMaxLength(255);
 
+        builder.Property(x => x.ExpiresAt)
+            .HasColumnName("expires_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
         builder.HasOne<PlatformAuthSession>()
             .WithMany()
             .HasForeignKey(x => x.PlatformAuthSessionId)
@@ -52,7 +57,13 @@ public sealed class PlatformRefreshTokenConfiguration : IEntityTypeConfiguration
             .IsUnique()
             .HasDatabaseName("uq_platform_refresh_tokens_token_hash");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_refresh_tokens_status", "status IN ('ACTIVE', 'USED', 'EXPIRED', 'REVOKED')")); 
+        builder.HasIndex(x => new { x.PlatformAuthSessionId, x.Status })
+            .HasDatabaseName("ix_platform_refresh_tokens_platform_auth_session_id_status");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_platform_refresh_tokens_status", "status IN ('ACTIVE', 'USED', 'EXPIRED', 'REVOKED')");
+            t.HasCheckConstraint("ck_platform_refresh_tokens_expires_at_created_at", "expires_at > created_at");
+        });
     }
 }
-
