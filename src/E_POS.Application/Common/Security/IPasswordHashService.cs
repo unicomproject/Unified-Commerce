@@ -1,4 +1,4 @@
-namespace E_POS.Application.Modules.PlatformAdministration.Contracts;
+namespace E_POS.Application.Common.Security;
 
 public interface IPasswordHashService
 {

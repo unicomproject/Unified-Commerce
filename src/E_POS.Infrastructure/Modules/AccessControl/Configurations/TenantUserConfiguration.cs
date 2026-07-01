@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.AccessControl.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -35,12 +35,19 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
 
         builder.Property(x => x.NormalizedEmail)
             .HasColumnName("normalized_email")
-            .HasColumnType("citext");
+            .HasColumnType("citext")
+            .IsRequired();
 
         builder.Property(x => x.NormalizedPhone)
             .HasColumnName("normalized_phone")
             .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
+            .HasMaxLength(40)
+            .IsRequired(false);
+
+        builder.Property(x => x.PasswordHash)
+            .HasColumnName("password_hash")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255);
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
@@ -53,16 +60,15 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_tenant_users_tenant_id_tenants");
 
-        builder.HasIndex(x => new { x.TenantId, x.NormalizedEmail })
+        builder.HasIndex(x => x.NormalizedEmail)
             .IsUnique()
-            .HasDatabaseName("uq_tenant_users_tenant_id_normalized_email");
+            .HasDatabaseName("uq_tenant_users_normalized_email");
 
         builder.HasIndex(x => new { x.TenantId, x.NormalizedPhone })
             .IsUnique()
             .HasDatabaseName("uq_tenant_users_tenant_id_normalized_phone")
             .HasFilter("normalized_phone IS NOT NULL");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_users_status", "status IN ('ACTIVE', 'INACTIVE', 'INVITED', 'LOCKED', 'DELETED')")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_users_status", "status IN ('ACTIVE', 'INACTIVE', 'INVITED', 'LOCKED', 'DELETED')"));
     }
 }
-

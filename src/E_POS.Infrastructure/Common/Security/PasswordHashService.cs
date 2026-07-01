@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
+using E_POS.Application.Common.Security;
 
-namespace E_POS.Infrastructure.Modules.PlatformAdministration.Services;
+namespace E_POS.Infrastructure.Common.Security;
 
 public sealed class PasswordHashService : IPasswordHashService
 {
@@ -59,4 +59,3 @@ public sealed class PasswordHashService : IPasswordHashService
         }
     }
 }
-

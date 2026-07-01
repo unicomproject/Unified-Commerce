@@ -1,4 +1,4 @@
-namespace E_POS.Infrastructure.Modules.PlatformAdministration.Services;
+namespace E_POS.Infrastructure.Common.Security;
 
 internal static class Base64Url
 {

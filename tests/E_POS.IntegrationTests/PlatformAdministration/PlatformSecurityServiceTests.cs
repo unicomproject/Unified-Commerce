@@ -1,11 +1,10 @@
 using System.Text;
 using System.Text.Json;
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Security;
 using E_POS.Domain.Modules.PlatformAdministration.Constants;
 using E_POS.Domain.Modules.PlatformAdministration.Entities;
-using E_POS.Infrastructure.Modules.PlatformAdministration.Options;
-using E_POS.Infrastructure.Modules.PlatformAdministration.Services;
-using Microsoft.Extensions.Options;
+using E_POS.Infrastructure.Common.Security;
 using Xunit;
 
 namespace E_POS.IntegrationTests.PlatformAdministration;
@@ -27,22 +26,27 @@ public sealed class PlatformSecurityServiceTests
     }
 
     [Fact]
-    public void JwtTokenService_CreatesJwtWithPlatformClaimsAndPermissions()
+    public void JwtTokenFactory_CreatesJwtWithPlatformClaimsAndPermissions()
     {
-        var options = Options.Create(new PlatformJwtOptions
-        {
-            Issuer = "TM-EPOS",
-            Audience = "TM-EPOS-Platform",
-            SigningKey = "TEST_PLATFORM_JWT_SIGNING_KEY_32_CHARS_MINIMUM",
-            AccessTokenMinutes = 15,
-            RefreshTokenDays = 7
-        });
-        var service = new JwtTokenService(options, new FakeDateTimeProvider());
+        var service = new JwtTokenFactory(new FakeDateTimeProvider());
         var user = PlatformUser.Create(Guid.NewGuid(), "admin@tmepos.test", "hash", PlatformAuthConstants.ActiveStatus, Now);
         var sessionId = Guid.NewGuid();
         const string jwtId = "jwt-id-123";
 
-        var token = service.CreateAccessToken(user, sessionId, jwtId, ["platform.users.manage"]);
+        var token = service.CreateAccessToken(new JwtTokenDescriptor(
+            "TM-EPOS",
+            "TM-EPOS-Platform",
+            "TEST_PLATFORM_JWT_SIGNING_KEY_32_CHARS_MINIMUM",
+            15,
+            new Dictionary<string, object>
+            {
+                ["sub"] = user.Id.ToString(),
+                ["email"] = user.Email,
+                ["identity_type"] = PlatformAuthConstants.IdentityType,
+                ["session_id"] = sessionId.ToString(),
+                ["jti"] = jwtId,
+                ["permissions"] = new[] { "platform.users.manage" }
+            }));
 
         var parts = token.AccessToken.Split('.');
         Assert.Equal(3, parts.Length);

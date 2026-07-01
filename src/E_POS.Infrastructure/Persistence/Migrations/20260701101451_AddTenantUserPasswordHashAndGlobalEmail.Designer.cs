@@ -3,6 +3,7 @@ using System;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260701101451_AddTenantUserPasswordHashAndGlobalEmail")]
+    partial class AddTenantUserPasswordHashAndGlobalEmail
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -406,6 +409,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("normalized_email");
 
                     b.Property<string>("NormalizedPhone")
+                        .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)")
                         .HasColumnName("normalized_phone");

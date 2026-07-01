@@ -1,4 +1,5 @@
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Application.Modules.PlatformAdministration.Services;
@@ -11,14 +12,20 @@ namespace E_POS.UnitTests.PlatformAdministration;
 public sealed class PlatformAuthServiceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 1, 4, 30, 0, TimeSpan.Zero);
+    private static readonly PlatformJwtSettings JwtSettings = new(
+        "TM-EPOS",
+        "TM-EPOS-Platform",
+        "TEST_PLATFORM_JWT_SIGNING_KEY_32_CHARS_MINIMUM",
+        15,
+        7);
 
     [Fact]
     public async Task LoginAsync_WithValidPlatformAdmin_CreatesSessionRefreshTokenAndSuccessAudit()
     {
         var user = PlatformUser.Create(Guid.NewGuid(), "admin@tmepos.test", "valid-hash", PlatformAuthConstants.ActiveStatus, Now);
         var repository = new FakePlatformAuthRepository(user, ["platform.users.manage"]);
-        var jwtService = new FakeJwtTokenService();
-        var service = CreateService(repository, jwtService: jwtService);
+        var jwtFactory = new FakeJwtTokenFactory();
+        var service = CreateService(repository, jwtFactory: jwtFactory);
 
         var result = await service.LoginAsync(new PlatformAdminLoginRequest(" admin@tmepos.test ", "correct-password"), CancellationToken.None);
 
@@ -31,7 +38,7 @@ public sealed class PlatformAuthServiceTests
         Assert.NotNull(repository.SavedRefreshToken);
         Assert.NotNull(repository.SavedAudit);
         Assert.Equal(PlatformAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginResult);
-        Assert.Equal("hash:" + jwtService.JwtId, repository.SavedSession!.SessionTokenHash);
+        Assert.Equal("hash:" + jwtFactory.JwtId, repository.SavedSession!.SessionTokenHash);
         Assert.Equal("hash:refresh-token", repository.SavedRefreshToken!.TokenHash);
     }
 
@@ -69,15 +76,16 @@ public sealed class PlatformAuthServiceTests
 
     private static PlatformAuthService CreateService(
         FakePlatformAuthRepository repository,
-        IJwtTokenService? jwtService = null)
+        IJwtTokenFactory? jwtFactory = null)
     {
         return new PlatformAuthService(
             repository,
             new FakePasswordHashService(),
-            jwtService ?? new FakeJwtTokenService(),
-            new FakeRefreshTokenService(),
+            jwtFactory ?? new FakeJwtTokenFactory(),
+            new FakeRefreshTokenGenerator(),
             new FakeTokenHashService(),
-            new FakeDateTimeProvider());
+            new FakeDateTimeProvider(),
+            JwtSettings);
     }
 
     private sealed class FakePlatformAuthRepository : IPlatformAuthRepository
@@ -113,6 +121,16 @@ public sealed class PlatformAuthServiceTests
             return Task.CompletedTask;
         }
 
+        public Task SaveFailedCredentialAttemptAsync(
+            PlatformLoginAudit audit,
+            DateTimeOffset failedAttemptWindowStart,
+            int maxFailedAttempts,
+            CancellationToken cancellationToken)
+        {
+            SavedAudit = audit;
+            return Task.CompletedTask;
+        }
+
         public Task SaveSuccessfulLoginAsync(
             PlatformAuthSession session,
             PlatformRefreshToken refreshToken,
@@ -136,32 +154,28 @@ public sealed class PlatformAuthServiceTests
         }
     }
 
-    private sealed class FakeJwtTokenService : IJwtTokenService
+    private sealed class FakeJwtTokenFactory : IJwtTokenFactory
     {
         public string? JwtId { get; private set; }
 
-        public JwtTokenResult CreateAccessToken(
-            PlatformUser user,
-            Guid sessionId,
-            string jwtId,
-            IReadOnlyList<string> permissions)
+        public JwtTokenResult CreateAccessToken(JwtTokenDescriptor descriptor)
         {
-            JwtId = jwtId;
+            JwtId = descriptor.Claims["jti"].ToString();
             return new JwtTokenResult("jwt-access-token", Now.AddMinutes(15));
         }
     }
 
-    private sealed class FakeRefreshTokenService : IRefreshTokenService
+    private sealed class FakeRefreshTokenGenerator : IRefreshTokenGenerator
     {
-        public RefreshTokenResult CreateRefreshToken()
+        public RefreshTokenResult CreateRefreshToken(int lifetimeDays)
         {
-            return new RefreshTokenResult("refresh-token", Now.AddDays(7));
+            return new RefreshTokenResult("refresh-token", Now.AddDays(lifetimeDays));
         }
     }
 
     private sealed class FakeTokenHashService : ITokenHashService
     {
-        public string HashToken(string token) => "hash:" + token;
+        public string HashToken(string token, string signingKey) => "hash:" + token;
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
