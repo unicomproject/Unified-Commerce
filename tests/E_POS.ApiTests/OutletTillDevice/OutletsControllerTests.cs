@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Security.Claims;
+using E_POS.Api.Common;
 using E_POS.Api.Controllers;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.OutletTillDevice.Contracts;
@@ -81,7 +82,7 @@ public sealed class OutletsControllerTests
 
     private static OutletsController CreateController(FakeOutletService service)
     {
-        var controller = new OutletsController(service);
+        var controller = new OutletsController(service, new TenantRequestContextFactory());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         return controller;
     }
@@ -101,7 +102,6 @@ public sealed class OutletsControllerTests
     {
         return new OutletCreateRequest(
             "Main Outlet",
-            "MAIN001",
             "ACTIVE",
             "STORE",
             true,

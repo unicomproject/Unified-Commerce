@@ -5,17 +5,20 @@ using E_POS.Domain.Modules.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.OutletTillDevice.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace E_POS.Infrastructure.Modules.OutletTillDevice.Repositories;
 
 public sealed class OutletRepository : IOutletRepository
 {
+    private const string UniqueViolationSqlState = "23505";
     private readonly EPosDbContext _dbContext;
 
     public OutletRepository(EPosDbContext dbContext)
     {
         _dbContext = dbContext;
     }
+
 
     public Task<bool> OutletCodeExistsAsync(
         Guid tenantId,
@@ -53,23 +56,70 @@ public sealed class OutletRepository : IOutletRepository
         string? search,
         CancellationToken cancellationToken)
     {
-        var query = _dbContext.Outlets
+        var outlets = _dbContext.Outlets
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId &&
                         x.Status != OutletConstants.DeletedStatus);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim().ToUpperInvariant();
-            query = query.Where(x => x.Name.ToUpper().Contains(term) ||
-                                     x.OutletCode.ToUpper().Contains(term));
+            var term = search.Trim();
+            if (_dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                var pattern = $"%{term}%";
+                outlets = outlets.Where(x => EF.Functions.ILike(x.Name, pattern) ||
+                                             EF.Functions.ILike(x.OutletCode, pattern));
+            }
+            else
+            {
+                var normalizedTerm = term.ToUpperInvariant();
+                outlets = outlets.Where(x => x.Name.ToUpper().Contains(normalizedTerm) ||
+                                             x.OutletCode.ToUpper().Contains(normalizedTerm));
+            }
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query
-            .OrderBy(x => x.OutletCode)
+        var activePickupOutletIds = (
+            from mapping in _dbContext.FulfillmentMethodOutlets.AsNoTracking()
+            join method in _dbContext.FulfillmentMethods.AsNoTracking()
+                on mapping.FulfillmentMethodId equals method.Id
+            where method.TenantId == tenantId &&
+                  method.MethodType == OutletConstants.PickupMethodType &&
+                  method.Status == OutletConstants.ActiveStatus &&
+                  mapping.Status == OutletConstants.ActiveStatus
+            select mapping.OutletId)
+            .Distinct();
+
+        var query =
+            from outlet in outlets
+            join activePickupOutletId in activePickupOutletIds
+                on outlet.Id equals activePickupOutletId into pickupJoin
+            select new
+            {
+                Outlet = outlet,
+                CollectionEnabled = pickupJoin.Any()
+            };
+
+        var rows = await query
+            .OrderBy(x => x.Outlet.OutletCode)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
+            .Select(x => new
+            {
+                x.Outlet.Id,
+                x.Outlet.OutletCode,
+                x.Outlet.Name,
+                x.Outlet.Status,
+                x.Outlet.OutletType,
+                x.Outlet.IsOnlineVisible,
+                x.Outlet.ContactPhone,
+                x.Outlet.ContactEmail,
+                x.CollectionEnabled,
+                TotalCount = query.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        var totalCount = rows.FirstOrDefault()?.TotalCount ?? (pageNumber == 1 ? 0 : await query.CountAsync(cancellationToken));
+        var items = rows
             .Select(x => new OutletSummaryResponse(
                 x.Id,
                 x.OutletCode,
@@ -79,15 +129,8 @@ public sealed class OutletRepository : IOutletRepository
                 x.IsOnlineVisible,
                 x.ContactPhone,
                 x.ContactEmail,
-                _dbContext.FulfillmentMethodOutlets.Any(mapping =>
-                    mapping.OutletId == x.Id &&
-                    mapping.Status == OutletConstants.ActiveStatus &&
-                    _dbContext.FulfillmentMethods.Any(method =>
-                        method.Id == mapping.FulfillmentMethodId &&
-                        method.TenantId == tenantId &&
-                        method.MethodType == OutletConstants.PickupMethodType &&
-                        method.Status == OutletConstants.ActiveStatus))))
-            .ToListAsync(cancellationToken);
+                x.CollectionEnabled))
+            .ToList();
 
         return new OutletListResponse(items, pageNumber, pageSize, totalCount);
     }
@@ -227,7 +270,7 @@ public sealed class OutletRepository : IOutletRepository
                 cancellationToken);
     }
 
-    public async Task AddAsync(
+    public async Task<bool> AddAsync(
         Outlet outlet,
         OutletAddress address,
         IReadOnlyCollection<OutletBusinessHour> businessHours,
@@ -243,10 +286,10 @@ public sealed class OutletRepository : IOutletRepository
             _dbContext.FulfillmentMethodOutlets.Add(pickupMapping);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        return await SaveChangesHandlingUniqueViolationAsync(cancellationToken);
     }
 
-    public async Task SaveUpdatedAsync(
+    public async Task<bool> SaveUpdatedAsync(
         OutletEditAggregate aggregate,
         OutletAddress address,
         IReadOnlyCollection<OutletBusinessHour> businessHours,
@@ -266,7 +309,7 @@ public sealed class OutletRepository : IOutletRepository
             _dbContext.FulfillmentMethodOutlets.Add(newPickupMapping);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        return await SaveChangesHandlingUniqueViolationAsync(cancellationToken);
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)
@@ -291,4 +334,27 @@ public sealed class OutletRepository : IOutletRepository
                                method.Status == OutletConstants.ActiveStatus),
                 cancellationToken);
     }
+
+    private async Task<bool> SaveChangesHandlingUniqueViolationAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: UniqueViolationSqlState })
+        {
+            DetachChangedEntries();
+            return false;
+        }
+    }
+
+    private void DetachChangedEntries()
+    {
+        foreach (var entry in _dbContext.ChangeTracker.Entries().Where(entry => entry.State is not EntityState.Unchanged and not EntityState.Detached))
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
 }

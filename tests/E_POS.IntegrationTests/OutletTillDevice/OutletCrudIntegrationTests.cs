@@ -27,7 +27,7 @@ public sealed class OutletCrudIntegrationTests
         var result = await service.CreateAsync(CreateContext(tenantId), CreateRequest(collectionEnabled: true), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("MAIN001", result.Value!.OutletCode);
+        Assert.Equal("OUT001", result.Value!.OutletCode);
         Assert.True(result.Value.CollectionEnabled);
         Assert.Equal(1, await dbContext.Outlets.CountAsync());
         Assert.Equal(1, await dbContext.OutletAddresses.CountAsync());
@@ -51,17 +51,18 @@ public sealed class OutletCrudIntegrationTests
     }
 
     [Fact]
-    public async Task CreateAsync_WithDuplicateOutletCode_ReturnsDuplicateCode()
+    public async Task CreateAsync_SecondOutletWithoutCode_GeneratesNextOutletCode()
     {
         await using var dbContext = CreateDbContext();
         var tenantId = Guid.NewGuid();
         var service = CreateService(dbContext, DateTimeOffset.UtcNow);
         await service.CreateAsync(CreateContext(tenantId), CreateRequest(collectionEnabled: false), CancellationToken.None);
 
-        var duplicate = await service.CreateAsync(CreateContext(tenantId), CreateRequest(collectionEnabled: false), CancellationToken.None);
+        var second = await service.CreateAsync(CreateContext(tenantId), CreateRequest(collectionEnabled: false), CancellationToken.None);
 
-        Assert.True(duplicate.IsFailure);
-        Assert.Equal("outlet.duplicate_code", duplicate.Error.Code);
+        Assert.True(second.IsSuccess);
+        Assert.Equal("OUT002", second.Value!.OutletCode);
+        Assert.Equal(2, await dbContext.Outlets.CountAsync());
     }
 
     private static EPosDbContext CreateDbContext()
@@ -74,7 +75,7 @@ public sealed class OutletCrudIntegrationTests
 
     private static OutletService CreateService(EPosDbContext dbContext, DateTimeOffset now)
     {
-        return new OutletService(new OutletRepository(dbContext), new OutletRequestValidator(), new FakeDateTimeProvider(now));
+        return new OutletService(new OutletRepository(dbContext), new CodeSequenceRepository(dbContext), new OutletRequestValidator(), new FakeDateTimeProvider(now));
     }
 
     private static TenantRequestContext CreateContext(Guid tenantId)
@@ -86,7 +87,6 @@ public sealed class OutletCrudIntegrationTests
     {
         return new OutletCreateRequest(
             "Main Outlet",
-            "main001",
             "ACTIVE",
             "STORE",
             true,
