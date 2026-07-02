@@ -2,12 +2,14 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.AuthSecurity.Contracts;
 using E_POS.Application.Modules.AuthSecurity.Dtos;
+using E_POS.Application.Modules.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Infrastructure.Common;
 using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Modules.AuthSecurity.Options;
 using E_POS.Infrastructure.Modules.AuthSecurity.Repositories;
+using E_POS.Infrastructure.Modules.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Modules.PlatformAdministration.Options;
 using E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
 using E_POS.Infrastructure.Persistence;
@@ -41,25 +43,17 @@ public static class DependencyInjection
         services.AddScoped<IAuthSessionValidator, AuthSessionValidator>();
         services.AddScoped<IPlatformAuthRepository, PlatformAuthRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();
+        services.AddScoped<IOutletRepository, OutletRepository>();
+        services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
-            return new PlatformJwtSettings(
-                options.Issuer,
-                options.Audience,
-                options.SigningKey,
-                options.AccessTokenMinutes,
-                options.RefreshTokenDays);
+            return new PlatformJwtSettings(options.Issuer, options.Audience, options.SigningKey, options.AccessTokenMinutes, options.RefreshTokenDays);
         });
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<TenantJwtOptions>>().Value;
-            return new TenantJwtSettings(
-                options.Issuer,
-                options.Audience,
-                options.SigningKey,
-                options.AccessTokenMinutes,
-                options.RefreshTokenDays);
+            return new TenantJwtSettings(options.Issuer, options.Audience, options.SigningKey, options.AccessTokenMinutes, options.RefreshTokenDays);
         });
 
         return services;
