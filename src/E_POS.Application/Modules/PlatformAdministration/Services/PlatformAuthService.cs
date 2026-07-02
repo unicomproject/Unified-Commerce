@@ -18,11 +18,8 @@ public sealed class PlatformAuthService : IPlatformAuthService
         "platform_auth.invalid_credentials",
         "Invalid email or password.");
 
-    private static readonly ApplicationError InvalidSession = new(
-        "platform_auth.invalid_session",
-        "Invalid platform session.");
-
     private readonly IPlatformAuthRepository _repository;
+    private readonly IPlatformAuthRequestValidator _requestValidator;
     private readonly IPasswordHashService _passwordHashService;
     private readonly IJwtTokenFactory _jwtTokenFactory;
     private readonly IRefreshTokenGenerator _refreshTokenGenerator;
@@ -32,6 +29,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
 
     public PlatformAuthService(
         IPlatformAuthRepository repository,
+        IPlatformAuthRequestValidator requestValidator,
         IPasswordHashService passwordHashService,
         IJwtTokenFactory jwtTokenFactory,
         IRefreshTokenGenerator refreshTokenGenerator,
@@ -40,6 +38,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
         PlatformJwtSettings jwtSettings)
     {
         _repository = repository;
+        _requestValidator = requestValidator;
         _passwordHashService = passwordHashService;
         _jwtTokenFactory = jwtTokenFactory;
         _refreshTokenGenerator = refreshTokenGenerator;
@@ -52,12 +51,8 @@ public sealed class PlatformAuthService : IPlatformAuthService
         PlatformAdminLoginRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
-        {
-            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
-                "platform_auth.validation_failed",
-                "Email and password are required."));
-        }
+        var validationError = _requestValidator.ValidateLogin(request);
+        if (validationError is not null) return ApplicationResult<PlatformAdminLoginResponse>.Failure(validationError);
 
         var normalizedEmail = PlatformUser.NormalizeEmail(request.Email);
         var now = _dateTimeProvider.UtcNow;
@@ -143,10 +138,8 @@ public sealed class PlatformAuthService : IPlatformAuthService
         Guid sessionId,
         CancellationToken cancellationToken)
     {
-        if (platformUserId == Guid.Empty || sessionId == Guid.Empty)
-        {
-            return ApplicationResult.Failure(InvalidSession);
-        }
+        var validationError = _requestValidator.ValidateLogout(platformUserId, sessionId);
+        if (validationError is not null) return ApplicationResult.Failure(validationError);
 
         await _repository.RevokeCurrentSessionAsync(
             platformUserId,

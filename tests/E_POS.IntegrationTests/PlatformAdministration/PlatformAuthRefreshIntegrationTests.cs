@@ -2,6 +2,7 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Application.Modules.PlatformAdministration.Services;
+using E_POS.Application.Modules.PlatformAdministration.Validators;
 using E_POS.Domain.Modules.PlatformAdministration.Constants;
 using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
@@ -166,6 +167,7 @@ public sealed class PlatformAuthRefreshIntegrationTests
     {
         return new PlatformAuthService(
             authRepository,
+            new PlatformAuthRequestValidator(),
             new PasswordHashService(),
             new JwtTokenFactory(new SystemDateTimeProvider()),
             new RefreshTokenGenerator(new SystemDateTimeProvider()),

@@ -235,16 +235,21 @@ public sealed class PlatformTenantRepositoryTests
         dbContext.Outlets.Add(Outlet.Create(
             Guid.Parse("33333333-3333-4333-8333-333333333301"),
             tenantOneId,
-            "OUT-001",
             "Main Outlet",
+            "OUT-001",
             "ACTIVE",
+            "STORE",
+            true,
+            null,
+            null,
             Now));
 
         dbContext.Tills.Add(Till.Create(
             Guid.Parse("44444444-4444-4444-8444-444444444401"),
             tenantOneId,
-            "TILL-001",
+            Guid.Parse("33333333-3333-4333-8333-333333333301"),
             "Front Till",
+            "TILL-001",
             "ACTIVE",
             Now));
 

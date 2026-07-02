@@ -1,4 +1,5 @@
-﻿using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.OutletTillDevice.Constants;
 
 namespace E_POS.Domain.Modules.OutletTillDevice.Entities;
 
@@ -13,22 +14,37 @@ public class Till : AuditableEntity
     public static Till Create(
         Guid id,
         Guid tenantId,
-        string tillCode,
+        Guid outletId,
         string name,
+        string tillCode,
         string status,
-        DateTimeOffset createdAt,
-        Guid? outletId = null)
+        DateTimeOffset now)
     {
         return new Till
         {
             Id = id,
             TenantId = tenantId,
             OutletId = outletId,
-            TillCode = tillCode,
-            Name = name,
-            Status = status,
-            CreatedAt = createdAt,
-            UpdatedAt = createdAt
+            Name = name.Trim(),
+            TillCode = TillConstants.NormalizeTillCode(tillCode),
+            Status = TillConstants.NormalizeStatus(status),
+            CreatedAt = now,
+            UpdatedAt = now
         };
+    }
+
+    public void UpdateProfile(Guid outletId, string name, string tillCode, string status, DateTimeOffset now)
+    {
+        OutletId = outletId;
+        Name = name.Trim();
+        TillCode = TillConstants.NormalizeTillCode(tillCode);
+        Status = TillConstants.NormalizeStatus(status);
+        UpdatedAt = now;
+    }
+
+    public void SoftDelete(DateTimeOffset now)
+    {
+        Status = TillConstants.DeletedStatus;
+        UpdatedAt = now;
     }
 }
