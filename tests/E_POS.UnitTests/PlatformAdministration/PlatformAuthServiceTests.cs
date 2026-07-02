@@ -3,6 +3,7 @@ using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Application.Modules.PlatformAdministration.Services;
+using E_POS.Application.Modules.PlatformAdministration.Validators;
 using E_POS.Domain.Modules.PlatformAdministration.Constants;
 using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using Xunit;
@@ -110,6 +111,7 @@ public sealed class PlatformAuthServiceTests
     {
         return new PlatformAuthService(
             repository,
+            new PlatformAuthRequestValidator(),
             new FakePasswordHashService(),
             jwtFactory ?? new FakeJwtTokenFactory(),
             new FakeRefreshTokenGenerator(),
