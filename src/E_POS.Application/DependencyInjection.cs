@@ -18,7 +18,9 @@ public static class DependencyInjection
         services.AddScoped<IPlatformAuthService, PlatformAuthService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
         services.AddScoped<IOutletRequestValidator, OutletRequestValidator>();
+        services.AddScoped<ITillRequestValidator, TillRequestValidator>();
         services.AddScoped<IOutletService, OutletService>();
+        services.AddScoped<ITillService, TillService>();
 
         return services;
     }
