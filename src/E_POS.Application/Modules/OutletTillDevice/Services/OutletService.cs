@@ -10,15 +10,21 @@ namespace E_POS.Application.Modules.OutletTillDevice.Services;
 
 public sealed class OutletService : IOutletService
 {
+    private const string OutletCodePrefix = "OUT";
+    private const string OutletCodeSequenceKey = "OUTLET_CODE";
+    private const int GeneratedCodePaddingLength = 3;
+    private const int MaxCodeGenerationAttempts = 5;
     private static readonly ApplicationError PermissionDenied = new("outlet.permission_denied", "Permission denied for outlet management.");
     private static readonly ApplicationError NotFound = new("outlet.not_found", "Outlet was not found.");
     private readonly IOutletRepository _repository;
+    private readonly ICodeSequenceRepository _codeSequenceRepository;
     private readonly IOutletRequestValidator _requestValidator;
     private readonly IDateTimeProvider _dateTimeProvider;
 
-    public OutletService(IOutletRepository repository, IOutletRequestValidator requestValidator, IDateTimeProvider dateTimeProvider)
+    public OutletService(IOutletRepository repository, ICodeSequenceRepository codeSequenceRepository, IOutletRequestValidator requestValidator, IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
+        _codeSequenceRepository = codeSequenceRepository;
         _requestValidator = requestValidator;
         _dateTimeProvider = dateTimeProvider;
     }
@@ -31,23 +37,32 @@ public sealed class OutletService : IOutletService
         var validationError = _requestValidator.ValidateCreate(request);
         if (validationError is not null) return ApplicationResult<OutletResponse>.Failure(validationError);
 
-        var normalizedOutletCode = OutletConstants.NormalizeOutletCode(request.OutletCode);
-        if (await _repository.OutletCodeExistsAsync(context.TenantId, normalizedOutletCode, null, cancellationToken))
+        for (var attempt = 0; attempt < MaxCodeGenerationAttempts; attempt++)
         {
-            return ApplicationResult<OutletResponse>.Failure(new ApplicationError("outlet.duplicate_code", "Outlet code already exists for this tenant."));
+            var now = _dateTimeProvider.UtcNow;
+            var outletCode = await GenerateOutletCodeAsync(context.TenantId, now, cancellationToken);
+            if (await _repository.OutletCodeExistsAsync(context.TenantId, outletCode, null, cancellationToken))
+            {
+                continue;
+            }
+
+            var outletId = Guid.NewGuid();
+            var outlet = Outlet.Create(outletId, context.TenantId, request.Name, outletCode, request.Status, request.OutletType, request.IsOnlineVisible, request.ContactPhone, request.ContactEmail, now);
+            var address = CreateAddress(outletId, request.Address, now);
+            var hours = CreateBusinessHours(outletId, request.BusinessHours, now);
+            var pickupMapping = await CreatePickupMappingAsync(context.TenantId, outletId, request.CollectionEnabled, now, cancellationToken);
+            if (pickupMapping.Error is not null) return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
+
+            if (!await _repository.AddAsync(outlet, address, hours, pickupMapping.Value, cancellationToken))
+            {
+                continue;
+            }
+
+            var response = await _repository.GetByIdAsync(context.TenantId, outletId, false, cancellationToken);
+            return ApplicationResult<OutletResponse>.Success(response!);
         }
 
-        var now = _dateTimeProvider.UtcNow;
-        var outletId = Guid.NewGuid();
-        var outlet = Outlet.Create(outletId, context.TenantId, request.Name, normalizedOutletCode, request.Status, request.OutletType, request.IsOnlineVisible, request.ContactPhone, request.ContactEmail, now);
-        var address = CreateAddress(outletId, request.Address, now);
-        var hours = CreateBusinessHours(outletId, request.BusinessHours, now);
-        var pickupMapping = await CreatePickupMappingAsync(context.TenantId, outletId, request.CollectionEnabled, now, cancellationToken);
-        if (pickupMapping.Error is not null) return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
-
-        await _repository.AddAsync(outlet, address, hours, pickupMapping.Value, cancellationToken);
-        var response = await _repository.GetByIdAsync(context.TenantId, outletId, false, cancellationToken);
-        return ApplicationResult<OutletResponse>.Success(response!);
+        return ApplicationResult<OutletResponse>.Failure(CreateDuplicateCodeError());
     }
 
     public async Task<ApplicationResult<OutletListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken)
@@ -81,10 +96,10 @@ public sealed class OutletService : IOutletService
         var aggregate = await _repository.GetEditAggregateAsync(context.TenantId, outletId, cancellationToken);
         if (aggregate is null) return ApplicationResult<OutletResponse>.Failure(NotFound);
 
-        var normalizedOutletCode = OutletConstants.NormalizeOutletCode(request.OutletCode);
+        var normalizedOutletCode = aggregate.Outlet.OutletCode;
         if (await _repository.OutletCodeExistsAsync(context.TenantId, normalizedOutletCode, outletId, cancellationToken))
         {
-            return ApplicationResult<OutletResponse>.Failure(new ApplicationError("outlet.duplicate_code", "Outlet code already exists for this tenant."));
+            return ApplicationResult<OutletResponse>.Failure(CreateDuplicateCodeError());
         }
 
         var status = OutletConstants.NormalizeStatus(request.Status);
@@ -101,7 +116,11 @@ public sealed class OutletService : IOutletService
         var pickupMapping = await UpdatePickupMappingAsync(context.TenantId, outletId, aggregate.PickupMapping, enableCollection, now, cancellationToken);
         if (pickupMapping.Error is not null) return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
 
-        await _repository.SaveUpdatedAsync(aggregate, address, hours, pickupMapping.Value, cancellationToken);
+        if (!await _repository.SaveUpdatedAsync(aggregate, address, hours, pickupMapping.Value, cancellationToken))
+        {
+            return ApplicationResult<OutletResponse>.Failure(CreateDuplicateCodeError());
+        }
+
         var includeDeleted = aggregate.Outlet.Status == OutletConstants.DeletedStatus;
         var response = await _repository.GetByIdAsync(context.TenantId, outletId, includeDeleted, cancellationToken);
         return response is null ? ApplicationResult<OutletResponse>.Failure(NotFound) : ApplicationResult<OutletResponse>.Success(response);
@@ -188,6 +207,12 @@ public sealed class OutletService : IOutletService
         return await CreatePickupMappingAsync(tenantId, outletId, collectionEnabled, now, cancellationToken);
     }
 
+    private Task<string> GenerateOutletCodeAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        return _codeSequenceRepository.GetNextCodeAsync(tenantId, OutletCodeSequenceKey, OutletCodePrefix, GeneratedCodePaddingLength, now, cancellationToken);
+    }
+
+
     private static OutletAddress CreateAddress(Guid outletId, OutletAddressRequest request, DateTimeOffset now) => OutletAddress.Create(Guid.NewGuid(), outletId, request.AddressLine1, request.AddressLine2, request.City, request.StateOrProvince, request.PostalCode, request.CountryCode, now);
 
     private static OutletAddress UpdateOrCreateAddress(OutletAddress? currentAddress, Guid outletId, OutletAddressRequest request, DateTimeOffset now)
@@ -202,6 +227,7 @@ public sealed class OutletService : IOutletService
         return (request ?? []).OrderBy(x => x.DayOfWeek).Select(x => OutletBusinessHour.Create(Guid.NewGuid(), outletId, x.DayOfWeek, x.OpenTime, x.CloseTime, now)).ToList();
     }
 
+    private static ApplicationError CreateDuplicateCodeError() => new("outlet.duplicate_code", "Outlet code already exists for this tenant.");
     private static ApplicationError CreateDeleteConflict() => new("outlet.delete_conflict", "Outlet cannot be deleted while active tills or POS devices are assigned.");
     private sealed record PickupMappingResult(FulfillmentMethodOutlet? Value, ApplicationError? Error);
 }

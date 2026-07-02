@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.PlatformAdministration.Entities;
+using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using E_POS.Domain.Modules.SubscriptionBilling.Entities;
 using E_POS.Domain.Modules.AccessControl.Entities;
@@ -101,6 +101,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<UserSetupToken> UserSetupTokens => Set<UserSetupToken>();
 
     // Outlet, Till and Device
+    public DbSet<CodeSequence> CodeSequences => Set<CodeSequence>();
     public DbSet<HardwareProfile> HardwareProfiles => Set<HardwareProfile>();
     public DbSet<Outlet> Outlets => Set<Outlet>();
     public DbSet<OutletAddress> OutletAddresses => Set<OutletAddress>();

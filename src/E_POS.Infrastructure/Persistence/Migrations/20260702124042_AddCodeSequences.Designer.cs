@@ -3,6 +3,7 @@ using System;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702124042_AddCodeSequences")]
+    partial class AddCodeSequences
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -10187,12 +10190,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("BaseCurrency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("char(3)")
-                        .HasColumnName("base_currency");
-
                     b.Property<string>("BillingInterval")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -10206,18 +10203,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
-
-                    b.Property<int?>("MaxOutlets")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_outlets");
-
-                    b.Property<int?>("MaxTills")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_tills");
-
-                    b.Property<int?>("MaxUsers")
-                        .HasColumnType("integer")
-                        .HasColumnName("max_users");
 
                     b.Property<string>("Name")
                         .IsRequired()

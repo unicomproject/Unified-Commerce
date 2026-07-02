@@ -1,12 +1,15 @@
+﻿using System.Reflection;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using System.Security.Claims;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.AuthSecurity.Contracts;
+using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Domain.Modules.AuthSecurity.Constants;
 using E_POS.Domain.Modules.AuthSecurity.Entities;
-using E_POS.Domain.Modules.AccessControl.Entities;
+using E_POS.Domain.Modules.TenantFoundation.Entities;
 using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -90,7 +93,6 @@ public sealed class TenantSecurityServiceTests
         Assert.Equal(Now.AddDays(7), refreshToken.ExpiresAt);
     }
 
-
     [Fact]
     public async Task AuthSessionValidator_WithActiveTenantUserAndSession_ReturnsTrue()
     {
@@ -99,6 +101,7 @@ public sealed class TenantSecurityServiceTests
         var tenantUserId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
 
+        dbContext.Tenants.Add(CreateTenant(tenantId, TenantAuthConstants.ActiveTenantStatus));
         dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", null, "hash", TenantAuthConstants.ActiveUserStatus, Now));
         dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantUserId, "session-hash", Now));
         await dbContext.SaveChangesAsync();
@@ -118,6 +121,7 @@ public sealed class TenantSecurityServiceTests
         var tenantUserId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
 
+        dbContext.Tenants.Add(CreateTenant(tenantId, TenantAuthConstants.ActiveTenantStatus));
         dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "locked@tenant.test", null, "hash", TenantAuthConstants.LockedUserStatus, Now));
         dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantUserId, "session-hash", Now));
         await dbContext.SaveChangesAsync();
@@ -128,13 +132,33 @@ public sealed class TenantSecurityServiceTests
 
         Assert.False(isActive);
     }
+
+    [Fact]
+    public async Task AuthSessionValidator_WithInactiveTenant_ReturnsFalse()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var tenantUserId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        dbContext.Tenants.Add(CreateTenant(tenantId, "suspended"));
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", null, "hash", TenantAuthConstants.ActiveUserStatus, Now));
+        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantUserId, "session-hash", Now));
+        await dbContext.SaveChangesAsync();
+
+        var validator = new AuthSessionValidator(dbContext);
+
+        var isActive = await validator.IsCurrentSessionActiveAsync(CreateTenantPrincipal(tenantUserId, tenantId, sessionId), CancellationToken.None);
+
+        Assert.False(isActive);
+    }
+
     private static string DecodeBase64Url(string value)
     {
         var padded = value.Replace('-', '+').Replace('_', '/');
         padded = padded.PadRight(padded.Length + ((4 - padded.Length % 4) % 4), '=');
         return Encoding.UTF8.GetString(Convert.FromBase64String(padded));
     }
-
 
     private static EPosDbContext CreateDbContext()
     {
@@ -147,14 +171,54 @@ public sealed class TenantSecurityServiceTests
 
     private static ClaimsPrincipal CreateTenantPrincipal(Guid tenantUserId, Guid tenantId, Guid sessionId)
     {
-        return new ClaimsPrincipal(new ClaimsIdentity(new[]
-        {
-            new Claim("sub", tenantUserId.ToString()),
-            new Claim("tenant_id", tenantId.ToString()),
-            new Claim("identity_type", TenantAuthConstants.IdentityType),
-            new Claim("session_id", sessionId.ToString())
-        }, "Test"));
+        return new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim("sub", tenantUserId.ToString()),
+                new Claim("tenant_id", tenantId.ToString()),
+                new Claim("identity_type", TenantAuthConstants.IdentityType),
+                new Claim("session_id", sessionId.ToString())
+            ],
+            "Test"));
     }
+
+    private static Tenant CreateTenant(Guid tenantId, string status)
+    {
+        var tenant = new Tenant();
+        SetProperty(tenant, nameof(BaseEntity.Id), tenantId);
+        SetProperty(tenant, nameof(Tenant.TenantCode), $"TENANT{tenantId:N}"[..20]);
+        SetProperty(tenant, nameof(Tenant.CurrencyCode), "LKR");
+        SetProperty(tenant, nameof(Tenant.Name), "Test Tenant");
+        SetProperty(tenant, nameof(Tenant.Status), status);
+        SetProperty(tenant, nameof(Tenant.BaseCurrency), "LKR");
+        SetProperty(tenant, nameof(Tenant.BillingStatus), "ACTIVE");
+        SetProperty(tenant, nameof(Tenant.BusinessTypeId), Guid.NewGuid());
+        SetProperty(tenant, nameof(Tenant.DefaultLocale), "en-LK");
+        SetProperty(tenant, nameof(Tenant.DefaultTimezone), "Asia/Colombo");
+        SetProperty(tenant, nameof(Tenant.OperatingMode), "POS");
+        SetProperty(tenant, nameof(Tenant.PrimaryDomain), "tenant.test");
+        SetProperty(tenant, nameof(AuditableEntity.CreatedAt), Now);
+        SetProperty(tenant, nameof(AuditableEntity.UpdatedAt), Now);
+        return tenant;
+    }
+
+    private static void SetProperty<T>(T target, string propertyName, object? value)
+    {
+        var type = target?.GetType() ?? throw new ArgumentNullException(nameof(target));
+        while (type is not null)
+        {
+            var property = type.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (property is not null)
+            {
+                property.SetValue(target, value);
+                return;
+            }
+
+            type = type.BaseType;
+        }
+
+        throw new InvalidOperationException($"Property '{propertyName}' was not found.");
+    }
+
     private sealed class FakeDateTimeProvider : IDateTimeProvider
     {
         public DateTimeOffset UtcNow => Now;
