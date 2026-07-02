@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Security.Claims;
-using E_POS.Api.Common;
 using E_POS.Api.Controllers;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.OutletTillDevice.Contracts;
@@ -50,7 +49,7 @@ public sealed class TillsControllerTests
     {
         var service = new FakeTillService(ApplicationResult<TillResponse>.Failure(new ApplicationError("till.permission_denied", "Permission denied for till management.")));
         var controller = CreateController(service);
-        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.tills.view");
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.outlets.manage");
 
         var result = await controller.Create(CreateRequest(), CancellationToken.None);
 
@@ -63,28 +62,12 @@ public sealed class TillsControllerTests
     {
         var service = new FakeTillService(ApplicationResult<TillResponse>.Failure(new ApplicationError("till.duplicate_code", "Till code already exists for this outlet.")));
         var controller = CreateController(service);
-        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.tills.create");
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.tills.manage");
 
         var result = await controller.Create(CreateRequest(), CancellationToken.None);
 
         var objectResult = Assert.IsType<ConflictObjectResult>(result);
         Assert.Equal(StatusCodes.Status409Conflict, objectResult.StatusCode);
-    }
-
-    [Fact]
-    public async Task List_WithViewPermission_PassesPermissionToService()
-    {
-        var tenantId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        var service = new FakeTillService(ApplicationResult<TillResponse>.Success(CreateResponse(Guid.NewGuid())));
-        var controller = CreateController(service);
-        SetTenantClaims(controller, tenantId, userId, "tenant.tills.view");
-
-        var result = await controller.List(cancellationToken: CancellationToken.None);
-
-        Assert.IsType<OkObjectResult>(result);
-        Assert.Equal(tenantId, service.ListContext?.TenantId);
-        Assert.Contains("tenant.tills.view", service.ListContext!.Permissions);
     }
 
     [Fact]
@@ -96,7 +79,7 @@ public sealed class TillsControllerTests
 
     private static TillsController CreateController(FakeTillService service)
     {
-        var controller = new TillsController(service, new TenantRequestContextFactory());
+        var controller = new TillsController(service);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         return controller;
     }
@@ -114,12 +97,12 @@ public sealed class TillsControllerTests
 
     private static TillCreateRequest CreateRequest()
     {
-        return new TillCreateRequest(Guid.NewGuid(), "Till 001", "ACTIVE");
+        return new TillCreateRequest(Guid.NewGuid(), "Main Till", "MAIN-01", "ACTIVE");
     }
 
     private static TillResponse CreateResponse(Guid id)
     {
-        return new TillResponse(id, Guid.NewGuid(), "MAIN", "Main Outlet", "TILL001", "Till 001", "ACTIVE", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        return new TillResponse(id, Guid.NewGuid(), "MAIN", "Main Outlet", "MAIN-01", "Main Till", "ACTIVE", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
     }
 
     private sealed class FakeTillService : ITillService
@@ -132,7 +115,6 @@ public sealed class TillsControllerTests
         }
 
         public TenantRequestContext? CreateContext { get; private set; }
-        public TenantRequestContext? ListContext { get; private set; }
 
         public Task<ApplicationResult<TillResponse>> CreateAsync(TenantRequestContext context, TillCreateRequest request, CancellationToken cancellationToken)
         {
@@ -142,7 +124,6 @@ public sealed class TillsControllerTests
 
         public Task<ApplicationResult<TillListResponse>> ListAsync(TenantRequestContext context, Guid? outletId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken)
         {
-            ListContext = context;
             return Task.FromResult(ApplicationResult<TillListResponse>.Success(new TillListResponse([], pageNumber, pageSize, 0)));
         }
 
@@ -162,4 +143,3 @@ public sealed class TillsControllerTests
         }
     }
 }
-

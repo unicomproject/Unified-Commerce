@@ -9,10 +9,14 @@ namespace E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
 public sealed class PlatformAuthRepository : IPlatformAuthRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly IPlatformPermissionRepository _permissionRepository;
 
-    public PlatformAuthRepository(EPosDbContext dbContext)
+    public PlatformAuthRepository(
+        EPosDbContext dbContext,
+        IPlatformPermissionRepository permissionRepository)
     {
         _dbContext = dbContext;
+        _permissionRepository = permissionRepository;
     }
 
     public Task<PlatformUser?> FindUserByNormalizedEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
@@ -26,33 +30,13 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         Guid platformUserId,
         CancellationToken cancellationToken)
     {
-        // Combine direct user permissions with active role-based permissions.
-        var directPermissions =
-            from userPermission in _dbContext.PlatformUserPermissions.AsNoTracking()
-            join permission in _dbContext.PlatformPermissions.AsNoTracking()
-                on userPermission.PlatformPermissionId equals permission.Id
-            where userPermission.PlatformUserId == platformUserId &&
-                  permission.Status == PlatformAuthConstants.ActiveStatus
-            select permission.PermissionCode;
+        var permissionCodes = await _permissionRepository.GetActivePermissionCodesAsync(
+            platformUserId,
+            cancellationToken);
 
-        var rolePermissions =
-            from userRole in _dbContext.PlatformUserRoles.AsNoTracking()
-            join role in _dbContext.PlatformRoles.AsNoTracking()
-                on userRole.PlatformRoleId equals role.Id
-            join rolePermission in _dbContext.PlatformRolePermissions.AsNoTracking()
-                on role.Id equals rolePermission.PlatformRoleId
-            join permission in _dbContext.PlatformPermissions.AsNoTracking()
-                on rolePermission.PlatformPermissionId equals permission.Id
-            where userRole.PlatformUserId == platformUserId &&
-                  role.Status == PlatformAuthConstants.ActiveStatus &&
-                  permission.Status == PlatformAuthConstants.ActiveStatus
-            select permission.PermissionCode;
-
-        return await directPermissions
-            .Union(rolePermissions)
-            .Where(x => x != string.Empty)
-            .OrderBy(x => x)
-            .ToListAsync(cancellationToken);
+        return permissionCodes
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToList();
     }
 
     public async Task SaveFailedLoginAuditAsync(PlatformLoginAudit audit, CancellationToken cancellationToken)
@@ -127,14 +111,65 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
 
         session.Revoke(now);
 
-        await _dbContext.PlatformRefreshTokens
+        var activeRefreshTokens = await _dbContext.PlatformRefreshTokens
             .Where(x => x.PlatformAuthSessionId == sessionId && x.Status == PlatformAuthConstants.ActiveTokenStatus)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(x => x.Status, PlatformAuthConstants.RevokedTokenStatus)
-                    .SetProperty(x => x.UpdatedAt, now),
-                cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        foreach (var refreshToken in activeRefreshTokens)
+        {
+            refreshToken.Revoke(now);
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<PlatformAuthRefreshContext?> FindRefreshContextByTokenHashAsync(
+        string refreshTokenHash,
+        CancellationToken cancellationToken)
+    {
+        return await (
+            from refreshToken in _dbContext.PlatformRefreshTokens.AsNoTracking()
+            join session in _dbContext.PlatformAuthSessions.AsNoTracking()
+                on refreshToken.PlatformAuthSessionId equals session.Id
+            join user in _dbContext.PlatformUsers.AsNoTracking()
+                on session.PlatformUserId equals user.Id
+            where refreshToken.TokenHash == refreshTokenHash
+            select new PlatformAuthRefreshContext
+            {
+                RefreshToken = refreshToken,
+                Session = session,
+                User = user
+            }).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<bool> TryRotateRefreshTokenAsync(
+        Guid refreshTokenId,
+        PlatformRefreshToken replacementRefreshToken,
+        string replacementSessionTokenHash,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var refreshToken = await _dbContext.PlatformRefreshTokens
+            .FirstOrDefaultAsync(x => x.Id == refreshTokenId, cancellationToken);
+
+        if (refreshToken is null || refreshToken.Status != PlatformAuthConstants.ActiveTokenStatus)
+        {
+            return false;
+        }
+
+        var session = await _dbContext.PlatformAuthSessions
+            .FirstOrDefaultAsync(x => x.Id == refreshToken.PlatformAuthSessionId, cancellationToken);
+
+        if (session is null || session.Status != PlatformAuthConstants.ActiveTokenStatus)
+        {
+            return false;
+        }
+
+        refreshToken.MarkUsed(now);
+        session.RotateSessionToken(replacementSessionTokenHash, now);
+        _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return true;
     }
 }

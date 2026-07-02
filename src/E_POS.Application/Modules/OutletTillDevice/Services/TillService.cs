@@ -9,22 +9,16 @@ namespace E_POS.Application.Modules.OutletTillDevice.Services;
 
 public sealed class TillService : ITillService
 {
-    private const string TillCodePrefix = "TILL";
-    private const string TillCodeSequenceKeyPrefix = "TILL_CODE";
-    private const int GeneratedCodePaddingLength = 3;
-    private const int MaxCodeGenerationAttempts = 5;
     private static readonly ApplicationError PermissionDenied = new("till.permission_denied", "Permission denied for till management.");
     private static readonly ApplicationError NotFound = new("till.not_found", "Till was not found.");
     private static readonly ApplicationError OutletNotFound = new("till.outlet_not_found", "Active outlet was not found for this tenant.");
     private readonly ITillRepository _repository;
-    private readonly ICodeSequenceRepository _codeSequenceRepository;
     private readonly ITillRequestValidator _requestValidator;
     private readonly IDateTimeProvider _dateTimeProvider;
 
-    public TillService(ITillRepository repository, ICodeSequenceRepository codeSequenceRepository, ITillRequestValidator requestValidator, IDateTimeProvider dateTimeProvider)
+    public TillService(ITillRepository repository, ITillRequestValidator requestValidator, IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
-        _codeSequenceRepository = codeSequenceRepository;
         _requestValidator = requestValidator;
         _dateTimeProvider = dateTimeProvider;
     }
@@ -42,27 +36,18 @@ public sealed class TillService : ITillService
             return ApplicationResult<TillResponse>.Failure(OutletNotFound);
         }
 
-        for (var attempt = 0; attempt < MaxCodeGenerationAttempts; attempt++)
+        var normalizedTillCode = TillConstants.NormalizeTillCode(request.TillCode);
+        if (await _repository.TillCodeExistsAsync(context.TenantId, request.OutletId, normalizedTillCode, null, cancellationToken))
         {
-            var now = _dateTimeProvider.UtcNow;
-            var tillCode = await GenerateTillCodeAsync(context.TenantId, request.OutletId, now, cancellationToken);
-            if (await _repository.TillCodeExistsAsync(context.TenantId, request.OutletId, tillCode, null, cancellationToken))
-            {
-                continue;
-            }
-
-            var tillId = Guid.NewGuid();
-            var till = Till.Create(tillId, context.TenantId, request.OutletId, request.Name, tillCode, request.Status, now);
-            if (!await _repository.AddAsync(till, cancellationToken))
-            {
-                continue;
-            }
-
-            var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
-            return ApplicationResult<TillResponse>.Success(response!);
+            return ApplicationResult<TillResponse>.Failure(new ApplicationError("till.duplicate_code", "Till code already exists for this outlet."));
         }
 
-        return ApplicationResult<TillResponse>.Failure(CreateDuplicateCodeError());
+        var now = _dateTimeProvider.UtcNow;
+        var tillId = Guid.NewGuid();
+        var till = Till.Create(tillId, context.TenantId, request.OutletId, request.Name, normalizedTillCode, request.Status, now);
+        await _repository.AddAsync(till, cancellationToken);
+        var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
+        return ApplicationResult<TillResponse>.Success(response!);
     }
 
     public async Task<ApplicationResult<TillListResponse>> ListAsync(TenantRequestContext context, Guid? outletId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken)
@@ -106,23 +91,14 @@ public sealed class TillService : ITillService
             return ApplicationResult<TillResponse>.Failure(OutletNotFound);
         }
 
-        if (till.OutletId != request.OutletId && await _repository.HasDeviceAssignmentAsync(context.TenantId, tillId, cancellationToken))
-        {
-            return ApplicationResult<TillResponse>.Failure(new ApplicationError("till.outlet_change_conflict", "Assigned till cannot be moved to another outlet."));
-        }
-
-        var normalizedTillCode = till.TillCode;
+        var normalizedTillCode = TillConstants.NormalizeTillCode(request.TillCode);
         if (await _repository.TillCodeExistsAsync(context.TenantId, request.OutletId, normalizedTillCode, tillId, cancellationToken))
         {
-            return ApplicationResult<TillResponse>.Failure(CreateDuplicateCodeError());
+            return ApplicationResult<TillResponse>.Failure(new ApplicationError("till.duplicate_code", "Till code already exists for this outlet."));
         }
 
         till.UpdateProfile(request.OutletId, request.Name, normalizedTillCode, request.Status, _dateTimeProvider.UtcNow);
-        if (!await _repository.SaveChangesAsync(cancellationToken))
-        {
-            return ApplicationResult<TillResponse>.Failure(CreateDuplicateCodeError());
-        }
-
+        await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
         return response is null ? ApplicationResult<TillResponse>.Failure(NotFound) : ApplicationResult<TillResponse>.Success(response);
     }
@@ -156,13 +132,4 @@ public sealed class TillService : ITillService
             ? null
             : PermissionDenied;
     }
-
-    private Task<string> GenerateTillCodeAsync(Guid tenantId, Guid outletId, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        var sequenceKey = $"{TillCodeSequenceKeyPrefix}:{outletId:N}";
-        return _codeSequenceRepository.GetNextCodeAsync(tenantId, sequenceKey, TillCodePrefix, GeneratedCodePaddingLength, now, cancellationToken);
-    }
-
-
-    private static ApplicationError CreateDuplicateCodeError() => new("till.duplicate_code", "Till code already exists for this outlet.");
 }

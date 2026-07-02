@@ -14,7 +14,17 @@ public class Outlet : AuditableEntity
     public string? ContactPhone { get; protected set; }
     public string? ContactEmail { get; protected set; }
 
-    public static Outlet Create(Guid id, Guid tenantId, string name, string outletCode, string status, string outletType, bool isOnlineVisible, string? contactPhone, string? contactEmail, DateTimeOffset now)
+    public static Outlet Create(
+        Guid id,
+        Guid tenantId,
+        string name,
+        string outletCode,
+        string status,
+        string outletType,
+        bool isOnlineVisible,
+        string? contactPhone,
+        string? contactEmail,
+        DateTimeOffset now)
     {
         return new Outlet
         {
@@ -32,7 +42,15 @@ public class Outlet : AuditableEntity
         };
     }
 
-    public void UpdateProfile(string name, string outletCode, string status, string outletType, bool isOnlineVisible, string? contactPhone, string? contactEmail, DateTimeOffset now)
+    public void UpdateProfile(
+        string name,
+        string outletCode,
+        string status,
+        string outletType,
+        bool isOnlineVisible,
+        string? contactPhone,
+        string? contactEmail,
+        DateTimeOffset now)
     {
         Name = name.Trim();
         OutletCode = OutletConstants.NormalizeOutletCode(outletCode);

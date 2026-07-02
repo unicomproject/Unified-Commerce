@@ -4,13 +4,11 @@ using E_POS.Domain.Modules.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.OutletTillDevice.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace E_POS.Infrastructure.Modules.OutletTillDevice.Repositories;
 
 public sealed class TillRepository : ITillRepository
 {
-    private const string UniqueViolationSqlState = "23505";
     private readonly EPosDbContext _dbContext;
 
     public TillRepository(EPosDbContext dbContext)
@@ -28,7 +26,6 @@ public sealed class TillRepository : ITillRepository
                      x.Status == OutletConstants.ActiveStatus,
                 cancellationToken);
     }
-
 
     public Task<bool> TillCodeExistsAsync(
         Guid tenantId,
@@ -55,23 +52,12 @@ public sealed class TillRepository : ITillRepository
         string? search,
         CancellationToken cancellationToken)
     {
-        var assignedTillIds = _dbContext.TillDeviceAssignments
-            .AsNoTracking()
-            .Select(x => x.TillId)
-            .Distinct();
-
         var query = from till in _dbContext.Tills.AsNoTracking()
                     join outlet in _dbContext.Outlets.AsNoTracking() on till.OutletId equals outlet.Id
-                    join assignedTillId in assignedTillIds on till.Id equals assignedTillId into assignmentJoin
                     where till.TenantId == tenantId &&
                           outlet.TenantId == tenantId &&
                           till.Status != TillConstants.DeletedStatus
-                    select new
-                    {
-                        till,
-                        outlet,
-                        IsDeviceAssigned = assignmentJoin.Any()
-                    };
+                    select new { till, outlet };
 
         if (outletId.HasValue)
         {
@@ -80,60 +66,31 @@ public sealed class TillRepository : ITillRepository
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim();
-            if (_dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
-            {
-                var pattern = $"%{term}%";
-                query = query.Where(x => EF.Functions.ILike(x.till.Name, pattern) ||
-                                         EF.Functions.ILike(x.till.TillCode, pattern) ||
-                                         EF.Functions.ILike(x.outlet.Name, pattern) ||
-                                         EF.Functions.ILike(x.outlet.OutletCode, pattern));
-            }
-            else
-            {
-                var normalizedTerm = term.ToUpperInvariant();
-                query = query.Where(x => x.till.Name.ToUpper().Contains(normalizedTerm) ||
-                                         x.till.TillCode.ToUpper().Contains(normalizedTerm) ||
-                                         x.outlet.Name.ToUpper().Contains(normalizedTerm) ||
-                                         x.outlet.OutletCode.ToUpper().Contains(normalizedTerm));
-            }
+            var term = search.Trim().ToUpperInvariant();
+            query = query.Where(x => x.till.Name.ToUpper().Contains(term) ||
+                                     x.till.TillCode.ToUpper().Contains(term) ||
+                                     x.outlet.Name.ToUpper().Contains(term) ||
+                                     x.outlet.OutletCode.ToUpper().Contains(term));
         }
 
-        var rows = await query
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
             .OrderBy(x => x.outlet.OutletCode)
             .ThenBy(x => x.till.TillCode)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new
-            {
+            .Select(x => new TillSummaryResponse(
                 x.till.Id,
-                OutletId = x.till.OutletId!.Value,
+                x.till.OutletId!.Value,
                 x.outlet.OutletCode,
-                OutletName = x.outlet.Name,
+                x.outlet.Name,
                 x.till.TillCode,
                 x.till.Name,
                 x.till.Status,
-                x.IsDeviceAssigned,
+                _dbContext.TillDeviceAssignments.Any(assignment => assignment.TillId == x.till.Id),
                 x.till.CreatedAt,
-                x.till.UpdatedAt,
-                TotalCount = query.Count()
-            })
+                x.till.UpdatedAt))
             .ToListAsync(cancellationToken);
-
-        var totalCount = rows.FirstOrDefault()?.TotalCount ?? (pageNumber == 1 ? 0 : await query.CountAsync(cancellationToken));
-        var items = rows
-            .Select(x => new TillSummaryResponse(
-                x.Id,
-                x.OutletId,
-                x.OutletCode,
-                x.OutletName,
-                x.TillCode,
-                x.Name,
-                x.Status,
-                x.IsDeviceAssigned,
-                x.CreatedAt,
-                x.UpdatedAt))
-            .ToList();
 
         return new TillListResponse(items, pageNumber, pageSize, totalCount);
     }
@@ -158,7 +115,9 @@ public sealed class TillRepository : ITillRepository
             return null;
         }
 
-        var isDeviceAssigned = await HasDeviceAssignmentAsync(tenantId, tillId, cancellationToken);
+        var isDeviceAssigned = await _dbContext.TillDeviceAssignments
+            .AsNoTracking()
+            .AnyAsync(x => x.TillId == tillId, cancellationToken);
 
         return new TillResponse(
             row.till.Id,
@@ -185,47 +144,22 @@ public sealed class TillRepository : ITillRepository
 
     public Task<bool> HasDeviceAssignmentAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken)
     {
-        return (
-            from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
-            join till in _dbContext.Tills.AsNoTracking()
-                on assignment.TillId equals till.Id
-            where assignment.TillId == tillId &&
-                  till.TenantId == tenantId
-            select assignment.Id)
-            .AnyAsync(cancellationToken);
+        return _dbContext.TillDeviceAssignments
+            .AsNoTracking()
+            .AnyAsync(
+                assignment => assignment.TillId == tillId &&
+                              _dbContext.Tills.Any(till => till.Id == assignment.TillId && till.TenantId == tenantId),
+                cancellationToken);
     }
 
-    public async Task<bool> AddAsync(Till till, CancellationToken cancellationToken)
+    public async Task AddAsync(Till till, CancellationToken cancellationToken)
     {
         _dbContext.Tills.Add(till);
-        return await SaveChangesHandlingUniqueViolationAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<bool> SaveChangesAsync(CancellationToken cancellationToken)
+    public Task SaveChangesAsync(CancellationToken cancellationToken)
     {
-        return SaveChangesHandlingUniqueViolationAsync(cancellationToken);
+        return _dbContext.SaveChangesAsync(cancellationToken);
     }
-
-    private async Task<bool> SaveChangesHandlingUniqueViolationAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return true;
-        }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: UniqueViolationSqlState })
-        {
-            DetachChangedEntries();
-            return false;
-        }
-    }
-
-    private void DetachChangedEntries()
-    {
-        foreach (var entry in _dbContext.ChangeTracker.Entries().Where(entry => entry.State is not EntityState.Unchanged and not EntityState.Detached))
-        {
-            entry.State = EntityState.Detached;
-        }
-    }
-
 }

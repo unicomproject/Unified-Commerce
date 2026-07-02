@@ -11,6 +11,6 @@ public interface ITillRepository
     Task<TillResponse?> GetByIdAsync(Guid tenantId, Guid tillId, bool includeDeleted, CancellationToken cancellationToken);
     Task<Till?> GetEditableAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken);
     Task<bool> HasDeviceAssignmentAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken);
-    Task<bool> AddAsync(Till till, CancellationToken cancellationToken);
-    Task<bool> SaveChangesAsync(CancellationToken cancellationToken);
+    Task AddAsync(Till till, CancellationToken cancellationToken);
+    Task SaveChangesAsync(CancellationToken cancellationToken);
 }

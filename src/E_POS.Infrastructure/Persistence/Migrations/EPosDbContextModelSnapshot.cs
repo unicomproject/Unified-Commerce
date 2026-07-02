@@ -10187,6 +10187,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("BaseCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("base_currency");
+
                     b.Property<string>("BillingInterval")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -10200,6 +10206,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<int?>("MaxOutlets")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_outlets");
+
+                    b.Property<int?>("MaxTills")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_tills");
+
+                    b.Property<int?>("MaxUsers")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_users");
 
                     b.Property<string>("Name")
                         .IsRequired()
