@@ -33,6 +33,16 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .HasColumnName("tenant_id")
             .IsRequired();
 
+        builder.Property(x => x.FirstName)
+            .HasColumnName("first_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
+        builder.Property(x => x.LastName)
+            .HasColumnName("last_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
         builder.Property(x => x.NormalizedEmail)
             .HasColumnName("normalized_email")
             .HasColumnType("citext")

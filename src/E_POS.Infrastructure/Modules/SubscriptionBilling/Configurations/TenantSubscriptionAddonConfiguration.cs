@@ -47,6 +47,10 @@ public sealed class TenantSubscriptionAddonConfiguration : IEntityTypeConfigurat
             .HasColumnName("tenant_subscription_id")
             .IsRequired();
 
+        builder.Property(x => x.Quantity)
+            .HasColumnName("quantity")
+            .HasDefaultValue(1);
+
         builder.HasOne<TenantSubscription>()
             .WithMany()
             .HasForeignKey(x => x.TenantSubscriptionId)

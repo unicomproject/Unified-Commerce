@@ -46,6 +46,21 @@ public sealed class SubscriptionInvoiceConfiguration : IEntityTypeConfiguration<
             .HasColumnName("total_amount")
             .HasPrecision(18, 2);
 
+        builder.Property(x => x.InvoiceStatus)
+            .HasColumnName("invoice_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .HasDefaultValue("DRAFT");
+
+        builder.Property(x => x.BillingCycle)
+            .HasColumnName("billing_cycle")
+            .HasColumnType("varchar(20)")
+            .HasMaxLength(20);
+
+        builder.Property(x => x.DueAt)
+            .HasColumnName("due_at")
+            .HasColumnType("timestamp with time zone");
+
         builder.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)

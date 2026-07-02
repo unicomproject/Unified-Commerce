@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Application.Modules.PlatformAdministration.Services;
@@ -156,7 +157,8 @@ public sealed class PlatformTenantServiceTests
                     ? new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsView }
                     : new HashSet<string>(StringComparer.Ordinal))),
             new FakePlatformPermissionRepository(permissions ?? new HashSet<string>(StringComparer.Ordinal)),
-            new FakeDateTimeProvider());
+            new FakeDateTimeProvider(),
+            new FakePasswordHashService());
     }
 
     private static PlatformTenantListResponse CreateListResponse()
@@ -302,6 +304,18 @@ public sealed class PlatformTenantServiceTests
             IReadOnlyList<string>? featureCodes,
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ResolvedTenantFeature>>([]);
+
+        public Task<PlatformTenantCreateOptionsResponse> GetCreateOptionsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new PlatformTenantCreateOptionsResponse([], [], [], [], [], [], [], [], [], [], []));
+
+        public Task<bool> TenantUserEmailExistsAsync(string email, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Guid>>([]);
     }
 
     private sealed class FakePlatformPermissionRepository : IPlatformPermissionRepository
@@ -340,6 +354,14 @@ public sealed class PlatformTenantServiceTests
     private sealed class FakeDateTimeProvider : IDateTimeProvider
     {
         public DateTimeOffset UtcNow => Now;
+    }
+
+    private sealed class FakePasswordHashService : IPasswordHashService
+    {
+        public string HashPassword(string password) => $"HASHED:{password}";
+
+        public bool VerifyPassword(string password, string passwordHash) =>
+            passwordHash == $"HASHED:{password}";
     }
 
     private sealed class FakePlatformSubscriptionPlanRepository : IPlatformSubscriptionPlanRepository

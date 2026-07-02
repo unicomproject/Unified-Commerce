@@ -54,6 +54,14 @@ public interface IPlatformTenantRepository
         IReadOnlyList<Guid>? featureIds,
         IReadOnlyList<string>? featureCodes,
         CancellationToken cancellationToken);
+
+    Task<PlatformTenantCreateOptionsResponse> GetCreateOptionsAsync(CancellationToken cancellationToken);
+
+    Task<bool> TenantUserEmailExistsAsync(string email, CancellationToken cancellationToken);
+
+    Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken);
 }
 
 public interface IPlatformTenantService
@@ -100,6 +108,10 @@ public interface IPlatformTenantService
     Task<ApplicationResult<PlatformTenantDetailResponse>> UpdateEntitlementsAsync(
         Guid tenantId,
         UpdatePlatformTenantEntitlementsRequest request,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformTenantCreateOptionsResponse>> GetCreateOptionsAsync(
         Guid platformUserId,
         CancellationToken cancellationToken);
 }

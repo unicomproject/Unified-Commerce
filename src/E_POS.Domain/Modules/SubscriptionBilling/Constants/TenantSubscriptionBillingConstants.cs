@@ -1,0 +1,20 @@
+namespace E_POS.Domain.Modules.SubscriptionBilling.Constants;
+
+public static class TenantSubscriptionBillingConstants
+{
+    public const string BillingCycleMonthly = "monthly";
+    public const string BillingCycleYearly = "yearly";
+
+    public const string DiscountTypeFixed = "fixed";
+    public const string DiscountTypePercent = "percent";
+
+    public const string InvoiceStatusDraft = "DRAFT";
+    public const string InvoiceStatusPending = "PENDING";
+    public const string InvoiceStatusPaid = "PAID";
+
+    public static readonly IReadOnlyList<string> BillingCycles =
+    [
+        BillingCycleMonthly,
+        BillingCycleYearly
+    ];
+}

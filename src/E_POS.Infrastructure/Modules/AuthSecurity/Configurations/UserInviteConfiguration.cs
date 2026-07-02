@@ -1,4 +1,5 @@
-﻿using E_POS.Domain.Modules.AuthSecurity.Entities;
+﻿using E_POS.Domain.Modules.AccessControl.Entities;
+using E_POS.Domain.Modules.AuthSecurity.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -33,6 +34,10 @@ public sealed class UserInviteConfiguration : IEntityTypeConfiguration<UserInvit
             .HasColumnName("tenant_id")
             .IsRequired();
 
+        builder.Property(x => x.TenantUserId)
+            .HasColumnName("tenant_user_id")
+            .IsRequired();
+
         builder.Property(x => x.InviteStatus)
             .HasColumnName("invite_status")
             .HasColumnType("varchar(30)")
@@ -48,6 +53,12 @@ public sealed class UserInviteConfiguration : IEntityTypeConfiguration<UserInvit
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_user_invites_tenant_id_tenants");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_user_invites_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.InviteTokenHash })
             .IsUnique()

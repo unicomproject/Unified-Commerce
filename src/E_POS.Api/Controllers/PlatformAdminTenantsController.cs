@@ -54,6 +54,23 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         return ToActionResult(result, "Platform tenant filter options loaded successfully.");
     }
 
+    [HttpGet("create-options")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantCreateOptionsResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetCreateOptions(CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(
+                "platform_auth.invalid_session",
+                "Invalid platform session."));
+        }
+
+        var result = await _tenantService.GetCreateOptionsAsync(platformUserId, cancellationToken);
+        return ToActionResult(result, "Platform tenant create options loaded successfully.");
+    }
+
     [HttpGet]
     [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantListResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

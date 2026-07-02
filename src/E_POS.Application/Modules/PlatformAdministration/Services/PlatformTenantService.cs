@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Application.Modules.PlatformAdministration.Mappers;
@@ -12,7 +13,7 @@ using E_POS.Domain.Modules.TenantFoundation.Entities;
 
 namespace E_POS.Application.Modules.PlatformAdministration.Services;
 
-public sealed class PlatformTenantService : IPlatformTenantService
+public sealed partial class PlatformTenantService : IPlatformTenantService
 {
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 100;
@@ -55,19 +56,22 @@ public sealed class PlatformTenantService : IPlatformTenantService
     private readonly IPlatformPermissionChecker _permissionChecker;
     private readonly IPlatformPermissionRepository _permissionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IPasswordHashService _passwordHashService;
 
     public PlatformTenantService(
         IPlatformTenantRepository repository,
         IPlatformSubscriptionPlanRepository subscriptionPlanRepository,
         IPlatformPermissionChecker permissionChecker,
         IPlatformPermissionRepository permissionRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IPasswordHashService passwordHashService)
     {
         _repository = repository;
         _subscriptionPlanRepository = subscriptionPlanRepository;
         _permissionChecker = permissionChecker;
         _permissionRepository = permissionRepository;
         _dateTimeProvider = dateTimeProvider;
+        _passwordHashService = passwordHashService;
     }
 
     public async Task<ApplicationResult<PlatformTenantListResponse>> GetTenantsAsync(
@@ -131,98 +135,7 @@ public sealed class PlatformTenantService : IPlatformTenantService
         Guid platformUserId,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
-        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantsCreate, cancellationToken))
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(AccessDenied);
-        }
-
-        var code = NormalizeRequiredText(request.Code);
-        var name = NormalizeRequiredText(request.Name);
-
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                ValidationFailed with { Message = "Tenant code is required." });
-        }
-
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                ValidationFailed with { Message = "Tenant name is required." });
-        }
-
-        if (request.SubscriptionPlanId is null || request.SubscriptionPlanId == Guid.Empty)
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                ValidationFailed with { Message = "Subscription plan is required." });
-        }
-
-        if (await _repository.TenantCodeExistsAsync(code, cancellationToken))
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                Conflict with { Message = "A tenant with this code already exists." });
-        }
-
-        var plan = await _subscriptionPlanRepository.GetPlanEntityByIdAsync(
-            request.SubscriptionPlanId.Value,
-            cancellationToken);
-
-        if (plan is null || !IsActivePlan(plan.Status))
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                ValidationFailed with { Message = "Subscription plan was not found or is not active." });
-        }
-
-        var featureResolution = await ResolveEnabledFeaturesForPlanAsync(
-            request.SubscriptionPlanId.Value,
-            request.EnabledFeatureIds,
-            request.EnabledFeatureCodes,
-            cancellationToken);
-
-        if (featureResolution.IsFailure)
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(featureResolution.Error);
-        }
-
-        var billingStatus = NormalizeBillingStatus(request.BillingStatus);
-        if (!AllowedBillingStatuses.Contains(billingStatus))
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                ValidationFailed with { Message = "Invalid tenant billing status." });
-        }
-
-        var now = _dateTimeProvider.UtcNow;
-        var tenantId = Guid.NewGuid();
-        var tenant = Tenant.CreateDraft(
-            tenantId,
-            code,
-            name,
-            billingStatus,
-            NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
-            NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
-            NormalizeOptionalText(request.DefaultLocale) ?? DefaultLocale,
-            NormalizeOptionalText(request.OperatingMode) ?? DefaultOperatingMode,
-            request.BusinessType,
-            businessTypeId: null,
-            now);
-
-        var subscription = TenantSubscription.Create(
-            Guid.NewGuid(),
-            tenantId,
-            request.SubscriptionPlanId.Value,
-            TenantSubscriptionStatusConstants.Trial,
-            now);
-
-        await _repository.AddTenantWithSubscriptionAndEntitlementsAsync(
-            tenant,
-            subscription,
-            featureResolution.Value!,
-            now,
-            cancellationToken);
-
-        return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+        return await CreateTenantInternalAsync(request, platformUserId, cancellationToken);
     }
 
     public async Task<ApplicationResult<PlatformTenantDetailResponse>> UpdateTenantAsync(

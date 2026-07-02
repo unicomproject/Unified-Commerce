@@ -421,5 +421,11 @@ public sealed class PlatformAdminTenantsControllerTests
             Guid platformUserId,
             CancellationToken cancellationToken) =>
             Task.FromResult(_detailResult);
+
+        public Task<ApplicationResult<PlatformTenantCreateOptionsResponse>> GetCreateOptionsAsync(
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PlatformTenantCreateOptionsResponse>.Success(
+                new PlatformTenantCreateOptionsResponse([], [], [], [], [], [], [], [], [], [], [])));
     }
 }
