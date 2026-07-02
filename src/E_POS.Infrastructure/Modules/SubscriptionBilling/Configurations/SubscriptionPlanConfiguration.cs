@@ -55,9 +55,27 @@ public sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<Sub
             .HasColumnType("varchar(255)")
             .HasMaxLength(255);
 
+        builder.Property(x => x.BaseCurrency)
+            .HasColumnName("base_currency")
+            .HasColumnType("char(3)")
+            .HasMaxLength(3)
+            .IsRequired();
+
         builder.Property(x => x.PriceAmount)
             .HasColumnName("price_amount")
             .HasPrecision(18, 2);
+
+        builder.Property(x => x.MaxOutlets)
+            .HasColumnName("max_outlets")
+            .IsRequired(false);
+
+        builder.Property(x => x.MaxUsers)
+            .HasColumnName("max_users")
+            .IsRequired(false);
+
+        builder.Property(x => x.MaxTills)
+            .HasColumnName("max_tills")
+            .IsRequired(false);
 
         builder.HasIndex(x => x.PlanCode)
             .IsUnique()

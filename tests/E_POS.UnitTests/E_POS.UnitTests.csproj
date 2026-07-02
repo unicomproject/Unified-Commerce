@@ -16,5 +16,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\E_POS.Application\E_POS.Application.csproj" />
     <ProjectReference Include="..\..\src\E_POS.Domain\E_POS.Domain.csproj" />
+    <ProjectReference Include="..\..\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

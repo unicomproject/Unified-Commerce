@@ -32,4 +32,10 @@ public class PlatformAuthSession : AuditableEntity
         Status = PlatformAuthConstants.RevokedTokenStatus;
         UpdatedAt = now;
     }
+
+    public void RotateSessionToken(string sessionTokenHash, DateTimeOffset now)
+    {
+        SessionTokenHash = sessionTokenHash;
+        UpdatedAt = now;
+    }
 }

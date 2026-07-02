@@ -13,4 +13,12 @@ public interface IPlatformAuthService
         Guid platformUserId,
         Guid sessionId,
         CancellationToken cancellationToken);
+
+    Task LogoutByRefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformAdminLoginResponse>> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken);
 }

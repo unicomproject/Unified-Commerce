@@ -27,4 +27,15 @@ public interface IPlatformAuthRepository
         Guid sessionId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+
+    Task<PlatformAuthRefreshContext?> FindRefreshContextByTokenHashAsync(
+        string refreshTokenHash,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryRotateRefreshTokenAsync(
+        Guid refreshTokenId,
+        PlatformRefreshToken replacementRefreshToken,
+        string replacementSessionTokenHash,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }

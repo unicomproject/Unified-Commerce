@@ -11,7 +11,14 @@ public class Till : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public string TillCode { get; protected set; } = string.Empty;
 
-    public static Till Create(Guid id, Guid tenantId, Guid outletId, string name, string tillCode, string status, DateTimeOffset now)
+    public static Till Create(
+        Guid id,
+        Guid tenantId,
+        Guid outletId,
+        string name,
+        string tillCode,
+        string status,
+        DateTimeOffset now)
     {
         return new Till
         {
