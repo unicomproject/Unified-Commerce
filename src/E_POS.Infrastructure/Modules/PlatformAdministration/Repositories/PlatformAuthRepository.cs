@@ -109,4 +109,32 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         _dbContext.PlatformLoginAudits.Add(audit);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+    public async Task RevokeCurrentSessionAsync(
+        Guid platformUserId,
+        Guid sessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var session = await _dbContext.PlatformAuthSessions
+            .FirstOrDefaultAsync(
+                x => x.Id == sessionId && x.PlatformUserId == platformUserId,
+                cancellationToken);
+
+        if (session is null)
+        {
+            return;
+        }
+
+        session.Revoke(now);
+
+        await _dbContext.PlatformRefreshTokens
+            .Where(x => x.PlatformAuthSessionId == sessionId && x.Status == PlatformAuthConstants.ActiveTokenStatus)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(x => x.Status, PlatformAuthConstants.RevokedTokenStatus)
+                    .SetProperty(x => x.UpdatedAt, now),
+                cancellationToken);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

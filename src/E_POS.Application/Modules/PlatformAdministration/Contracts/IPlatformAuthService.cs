@@ -8,4 +8,9 @@ public interface IPlatformAuthService
     Task<ApplicationResult<PlatformAdminLoginResponse>> LoginAsync(
         PlatformAdminLoginRequest request,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult> LogoutAsync(
+        Guid platformUserId,
+        Guid sessionId,
+        CancellationToken cancellationToken);
 }

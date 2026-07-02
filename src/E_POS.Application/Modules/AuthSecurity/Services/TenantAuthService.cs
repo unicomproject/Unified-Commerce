@@ -18,6 +18,10 @@ public sealed class TenantAuthService : ITenantAuthService
         "tenant_auth.invalid_credentials",
         "Invalid email or password.");
 
+    private static readonly ApplicationError InvalidSession = new(
+        "tenant_auth.invalid_session",
+        "Invalid tenant session.");
+
     private readonly ITenantAuthRepository _repository;
     private readonly IPasswordHashService _passwordHashService;
     private readonly IJwtTokenFactory _jwtTokenFactory;
@@ -116,6 +120,7 @@ public sealed class TenantAuthService : ITenantAuthService
             Guid.NewGuid(),
             sessionId,
             _tokenHashService.HashToken(refreshToken.Token, _jwtSettings.SigningKey),
+            refreshToken.ExpiresAt,
             now);
 
         var audit = TenantLoginAudit.Create(
@@ -142,6 +147,26 @@ public sealed class TenantAuthService : ITenantAuthService
         return ApplicationResult<TenantLoginResponse>.Success(response);
     }
 
+    public async Task<ApplicationResult> LogoutAsync(
+        Guid tenantUserId,
+        Guid tenantId,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (tenantUserId == Guid.Empty || tenantId == Guid.Empty || sessionId == Guid.Empty)
+        {
+            return ApplicationResult.Failure(InvalidSession);
+        }
+
+        await _repository.RevokeCurrentSessionAsync(
+            tenantUserId,
+            tenantId,
+            sessionId,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+
+        return ApplicationResult.Success();
+    }
     private JwtTokenDescriptor CreateTokenDescriptor(
         TenantLoginAccount account,
         Guid sessionId,

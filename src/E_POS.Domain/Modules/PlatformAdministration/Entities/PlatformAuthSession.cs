@@ -1,4 +1,5 @@
 using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.PlatformAdministration.Constants;
 
 namespace E_POS.Domain.Modules.PlatformAdministration.Entities;
 
@@ -14,10 +15,21 @@ public class PlatformAuthSession : AuditableEntity
         {
             Id = id,
             PlatformUserId = platformUserId,
-            Status = "ACTIVE",
+            Status = PlatformAuthConstants.ActiveTokenStatus,
             SessionTokenHash = sessionTokenHash,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public void Revoke(DateTimeOffset now)
+    {
+        if (Status == PlatformAuthConstants.RevokedTokenStatus)
+        {
+            return;
+        }
+
+        Status = PlatformAuthConstants.RevokedTokenStatus;
+        UpdatedAt = now;
     }
 }

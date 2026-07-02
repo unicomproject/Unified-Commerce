@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.AccessControl.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Domain.Modules.AuthSecurity.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -43,6 +43,9 @@ public sealed class TenantLoginAuditConfiguration : IEntityTypeConfiguration<Ten
             .HasForeignKey(x => x.TenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_tenant_login_audits_tenant_user_id_tenant_users");
+
+        builder.HasIndex(x => new { x.TenantUserId, x.LoginResult, x.CreatedAt })
+            .HasDatabaseName("ix_tenant_login_audits_tenant_user_id_login_result_created_at");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_tenant_login_audits_login_result", "login_result IN ('SUCCESS', 'FAILED', 'LOCKED')")); 
     }

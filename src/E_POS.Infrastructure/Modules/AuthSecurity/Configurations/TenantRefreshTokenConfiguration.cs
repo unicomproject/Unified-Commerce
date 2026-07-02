@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.AuthSecurity.Entities;
+using E_POS.Domain.Modules.AuthSecurity.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -42,6 +42,11 @@ public sealed class TenantRefreshTokenConfiguration : IEntityTypeConfiguration<T
             .HasColumnType("varchar(255)")
             .HasMaxLength(255);
 
+        builder.Property(x => x.ExpiresAt)
+            .HasColumnName("expires_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
         builder.HasOne<TenantAuthSession>()
             .WithMany()
             .HasForeignKey(x => x.TenantAuthSessionId)
@@ -52,7 +57,13 @@ public sealed class TenantRefreshTokenConfiguration : IEntityTypeConfiguration<T
             .IsUnique()
             .HasDatabaseName("uq_tenant_refresh_tokens_token_hash");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_refresh_tokens_status", "status IN ('ACTIVE', 'USED', 'EXPIRED', 'REVOKED')")); 
+        builder.HasIndex(x => new { x.TenantAuthSessionId, x.Status })
+            .HasDatabaseName("ix_tenant_refresh_tokens_tenant_auth_session_id_status");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_tenant_refresh_tokens_status", "status IN ('ACTIVE', 'USED', 'EXPIRED', 'REVOKED')");
+            t.HasCheckConstraint("ck_tenant_refresh_tokens_expires_at_created_at", "expires_at > created_at");
+        });
     }
 }
-

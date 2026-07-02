@@ -21,4 +21,10 @@ public interface IPlatformAuthRepository
         PlatformRefreshToken refreshToken,
         PlatformLoginAudit audit,
         CancellationToken cancellationToken);
+
+    Task RevokeCurrentSessionAsync(
+        Guid platformUserId,
+        Guid sessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }

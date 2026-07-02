@@ -41,6 +41,7 @@ public sealed class TenantAuthServiceTests
         Assert.Equal(TenantAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginResult);
         Assert.Equal("hash:" + jwtFactory.JwtId, repository.SavedSession!.SessionTokenHash);
         Assert.Equal("hash:tenant-refresh-token", repository.SavedRefreshToken!.TokenHash);
+        Assert.Equal(Now.AddDays(7), repository.SavedRefreshToken.ExpiresAt);
     }
 
     [Fact]
@@ -92,6 +93,37 @@ public sealed class TenantAuthServiceTests
         Assert.Equal(TenantAuthConstants.LockedLoginResult, repository.SavedAudit!.LoginResult);
     }
 
+    [Fact]
+    public async Task LogoutAsync_WithCurrentTenantSession_RevokesResolvedSession()
+    {
+        var repository = new FakeTenantAuthRepository(null, []);
+        var service = CreateService(repository);
+        var tenantUserId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        var result = await service.LogoutAsync(tenantUserId, tenantId, sessionId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(tenantUserId, repository.RevokedTenantUserId);
+        Assert.Equal(tenantId, repository.RevokedTenantId);
+        Assert.Equal(sessionId, repository.RevokedSessionId);
+        Assert.Equal(Now, repository.RevokedAt);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_WithMissingSessionContext_ReturnsInvalidSession()
+    {
+        var repository = new FakeTenantAuthRepository(null, []);
+        var service = CreateService(repository);
+
+        var result = await service.LogoutAsync(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_auth.invalid_session", result.Error.Code);
+        Assert.Null(repository.RevokedTenantUserId);
+    }
+
     private static TenantLoginAccount CreateAccount(
         string? passwordHash,
         string userStatus = TenantAuthConstants.ActiveUserStatus,
@@ -137,6 +169,14 @@ public sealed class TenantAuthServiceTests
 
         public TenantLoginAudit? SavedAudit { get; private set; }
 
+        public Guid? RevokedTenantUserId { get; private set; }
+
+        public Guid? RevokedTenantId { get; private set; }
+
+        public Guid? RevokedSessionId { get; private set; }
+
+        public DateTimeOffset? RevokedAt { get; private set; }
+
         public Task<TenantLoginAccount?> FindLoginAccountByNormalizedEmailAsync(
             string normalizedEmail,
             CancellationToken cancellationToken)
@@ -177,6 +217,20 @@ public sealed class TenantAuthServiceTests
             SavedSession = session;
             SavedRefreshToken = refreshToken;
             SavedAudit = audit;
+            return Task.CompletedTask;
+        }
+
+        public Task RevokeCurrentSessionAsync(
+            Guid tenantUserId,
+            Guid tenantId,
+            Guid sessionId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            RevokedTenantUserId = tenantUserId;
+            RevokedTenantId = tenantId;
+            RevokedSessionId = sessionId;
+            RevokedAt = now;
             return Task.CompletedTask;
         }
     }

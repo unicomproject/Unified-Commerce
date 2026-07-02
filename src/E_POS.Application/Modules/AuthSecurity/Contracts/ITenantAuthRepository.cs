@@ -26,4 +26,11 @@ public interface ITenantAuthRepository
         TenantRefreshToken refreshToken,
         TenantLoginAudit audit,
         CancellationToken cancellationToken);
+
+    Task RevokeCurrentSessionAsync(
+        Guid tenantUserId,
+        Guid tenantId,
+        Guid sessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }

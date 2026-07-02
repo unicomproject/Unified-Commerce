@@ -9,6 +9,8 @@ public static class TenantAuthConstants
     public const string SuccessLoginResult = "SUCCESS";
     public const string FailedLoginResult = "FAILED";
     public const string LockedLoginResult = "LOCKED";
+    public const string ActiveTokenStatus = "ACTIVE";
+    public const string RevokedTokenStatus = "REVOKED";
     public const string IdentityType = "tenant_user";
 
     public static bool IsTenantLoginStatusAllowed(string tenantStatus)

@@ -127,4 +127,38 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
         _dbContext.TenantLoginAudits.Add(audit);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+    public async Task RevokeCurrentSessionAsync(
+        Guid tenantUserId,
+        Guid tenantId,
+        Guid sessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var session = await (
+            from authSession in _dbContext.TenantAuthSessions
+            join user in _dbContext.TenantUsers
+                on authSession.TenantUserId equals user.Id
+            where authSession.Id == sessionId &&
+                  authSession.TenantUserId == tenantUserId &&
+                  user.TenantId == tenantId
+            select authSession)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (session is null)
+        {
+            return;
+        }
+
+        session.Revoke(now);
+
+        await _dbContext.TenantRefreshTokens
+            .Where(x => x.TenantAuthSessionId == sessionId && x.Status == TenantAuthConstants.ActiveTokenStatus)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(x => x.Status, TenantAuthConstants.RevokedTokenStatus)
+                    .SetProperty(x => x.UpdatedAt, now),
+                cancellationToken);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

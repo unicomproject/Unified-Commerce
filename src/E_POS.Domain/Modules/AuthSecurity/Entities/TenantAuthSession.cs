@@ -1,4 +1,5 @@
 using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.AuthSecurity.Constants;
 
 namespace E_POS.Domain.Modules.AuthSecurity.Entities;
 
@@ -14,10 +15,21 @@ public class TenantAuthSession : AuditableEntity
         {
             Id = id,
             TenantUserId = tenantUserId,
-            Status = "ACTIVE",
+            Status = TenantAuthConstants.ActiveTokenStatus,
             SessionTokenHash = sessionTokenHash,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public void Revoke(DateTimeOffset now)
+    {
+        if (Status == TenantAuthConstants.RevokedTokenStatus)
+        {
+            return;
+        }
+
+        Status = TenantAuthConstants.RevokedTokenStatus;
+        UpdatedAt = now;
     }
 }

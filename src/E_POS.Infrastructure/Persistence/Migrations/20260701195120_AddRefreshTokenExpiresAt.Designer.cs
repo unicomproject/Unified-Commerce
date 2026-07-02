@@ -3,6 +3,7 @@ using System;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260701195120_AddRefreshTokenExpiresAt")]
+    partial class AddRefreshTokenExpiresAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -691,8 +694,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_tenant_login_audits");
 
-                    b.HasIndex("TenantUserId", "LoginResult", "CreatedAt")
-                        .HasDatabaseName("ix_tenant_login_audits_tenant_user_id_login_result_created_at");
+                    b.HasIndex("TenantUserId");
 
                     b.ToTable("tenant_login_audits", null, t =>
                         {
@@ -738,12 +740,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_tenant_refresh_tokens");
 
+                    b.HasIndex("TenantAuthSessionId");
+
                     b.HasIndex("TokenHash")
                         .IsUnique()
                         .HasDatabaseName("uq_tenant_refresh_tokens_token_hash");
-
-                    b.HasIndex("TenantAuthSessionId", "Status")
-                        .HasDatabaseName("ix_tenant_refresh_tokens_tenant_auth_session_id_status");
 
                     b.ToTable("tenant_refresh_tokens", null, t =>
                         {
@@ -8100,8 +8101,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_platform_login_audits");
 
-                    b.HasIndex("PlatformUserId", "LoginResult", "CreatedAt")
-                        .HasDatabaseName("ix_platform_login_audits_platform_user_id_login_result_created_at");
+                    b.HasIndex("PlatformUserId");
 
                     b.ToTable("platform_login_audits", null, t =>
                         {
@@ -8243,12 +8243,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_platform_refresh_tokens");
 
+                    b.HasIndex("PlatformAuthSessionId");
+
                     b.HasIndex("TokenHash")
                         .IsUnique()
                         .HasDatabaseName("uq_platform_refresh_tokens_token_hash");
-
-                    b.HasIndex("PlatformAuthSessionId", "Status")
-                        .HasDatabaseName("ix_platform_refresh_tokens_platform_auth_session_id_status");
 
                     b.ToTable("platform_refresh_tokens", null, t =>
                         {

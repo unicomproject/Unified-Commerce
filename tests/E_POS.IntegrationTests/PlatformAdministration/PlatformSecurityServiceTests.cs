@@ -1,10 +1,13 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Claims;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
 using E_POS.Domain.Modules.PlatformAdministration.Constants;
 using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using E_POS.Infrastructure.Common.Security;
+using E_POS.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace E_POS.IntegrationTests.PlatformAdministration;
@@ -64,6 +67,67 @@ public sealed class PlatformSecurityServiceTests
         Assert.Equal("platform.users.manage", root.GetProperty("permissions")[0].GetString());
     }
 
+    [Fact]
+    public void PlatformAuthSession_Revoke_SetsRevokedStatusAndUpdatedAt()
+    {
+        var session = PlatformAuthSession.Create(Guid.NewGuid(), Guid.NewGuid(), "session-hash", Now);
+        var revokedAt = Now.AddMinutes(5);
+
+        session.Revoke(revokedAt);
+
+        Assert.Equal(PlatformAuthConstants.RevokedTokenStatus, session.Status);
+        Assert.Equal(revokedAt, session.UpdatedAt);
+    }
+
+    [Fact]
+    public void PlatformRefreshToken_Revoke_SetsRevokedStatusAndUpdatedAt()
+    {
+        var refreshToken = PlatformRefreshToken.Create(Guid.NewGuid(), Guid.NewGuid(), "refresh-hash", Now.AddDays(7), Now);
+        var revokedAt = Now.AddMinutes(5);
+
+        refreshToken.Revoke(revokedAt);
+
+        Assert.Equal(PlatformAuthConstants.RevokedTokenStatus, refreshToken.Status);
+        Assert.Equal(revokedAt, refreshToken.UpdatedAt);
+        Assert.Equal(Now.AddDays(7), refreshToken.ExpiresAt);
+    }
+
+
+    [Fact]
+    public async Task AuthSessionValidator_WithActivePlatformUserAndSession_ReturnsTrue()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        dbContext.PlatformUsers.Add(PlatformUser.Create(userId, "admin@tmepos.test", "hash", PlatformAuthConstants.ActiveStatus, Now));
+        dbContext.PlatformAuthSessions.Add(PlatformAuthSession.Create(sessionId, userId, "session-hash", Now));
+        await dbContext.SaveChangesAsync();
+
+        var validator = new AuthSessionValidator(dbContext);
+
+        var isActive = await validator.IsCurrentSessionActiveAsync(CreatePlatformPrincipal(userId, sessionId), CancellationToken.None);
+
+        Assert.True(isActive);
+    }
+
+    [Fact]
+    public async Task AuthSessionValidator_WithLockedPlatformUser_ReturnsFalse()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        dbContext.PlatformUsers.Add(PlatformUser.Create(userId, "locked@tmepos.test", "hash", PlatformAuthConstants.LockedStatus, Now));
+        dbContext.PlatformAuthSessions.Add(PlatformAuthSession.Create(sessionId, userId, "session-hash", Now));
+        await dbContext.SaveChangesAsync();
+
+        var validator = new AuthSessionValidator(dbContext);
+
+        var isActive = await validator.IsCurrentSessionActiveAsync(CreatePlatformPrincipal(userId, sessionId), CancellationToken.None);
+
+        Assert.False(isActive);
+    }
     private static string DecodeBase64Url(string value)
     {
         var padded = value.Replace('-', '+').Replace('_', '/');
@@ -71,6 +135,25 @@ public sealed class PlatformSecurityServiceTests
         return Encoding.UTF8.GetString(Convert.FromBase64String(padded));
     }
 
+
+    private static EPosDbContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<EPosDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        return new EPosDbContext(options);
+    }
+
+    private static ClaimsPrincipal CreatePlatformPrincipal(Guid userId, Guid sessionId)
+    {
+        return new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim("sub", userId.ToString()),
+            new Claim("identity_type", PlatformAuthConstants.IdentityType),
+            new Claim("session_id", sessionId.ToString())
+        }, "Test"));
+    }
     private sealed class FakeDateTimeProvider : IDateTimeProvider
     {
         public DateTimeOffset UtcNow => Now;
