@@ -13,7 +13,6 @@ namespace E_POS.Api.Controllers;
 [Route("api/v1/platform-auth")]
 public sealed class PlatformAuthController : ControllerBase
 {
-    private const string RefreshTokenCookieName = "platform_refresh_token";
     private readonly IPlatformAuthService _platformAuthService;
 
     public PlatformAuthController(IPlatformAuthService platformAuthService)
@@ -38,13 +37,45 @@ public sealed class PlatformAuthController : ControllerBase
 
         if (result.IsSuccess && result.Value is not null)
         {
-            AppendRefreshTokenCookie(result.Value);
+            PlatformAuthCookieHelper.AppendRefreshTokenCookie(
+                Response,
+                result.Value,
+                PlatformAuthCookieHelper.PlatformAuthCookiePath);
             return Ok(result.Value);
         }
 
         return result.Error.Code switch
         {
             "platform_auth.validation_failed" => BadRequest(CreateError(result.Error)),
+            "platform_auth.platform_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(result.Error)),
+            _ => Unauthorized(CreateError(result.Error))
+        };
+    }
+
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
+    [ProducesResponseType(typeof(PlatformAdminLoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    {
+        var result = await _platformAuthService.RefreshAsync(
+            Request.Cookies[PlatformAuthCookieHelper.RefreshTokenCookieName] ?? string.Empty,
+            cancellationToken);
+
+        if (result.IsSuccess && result.Value is not null)
+        {
+            PlatformAuthCookieHelper.AppendRefreshTokenCookie(
+                Response,
+                result.Value,
+                PlatformAuthCookieHelper.PlatformAuthCookiePath);
+            return Ok(result.Value);
+        }
+
+        return result.Error.Code switch
+        {
             "platform_auth.platform_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(result.Error)),
             _ => Unauthorized(CreateError(result.Error))
         };
@@ -70,33 +101,8 @@ public sealed class PlatformAuthController : ControllerBase
             return Unauthorized(CreateError(result.Error));
         }
 
-        ClearRefreshTokenCookie();
+        PlatformAuthCookieHelper.ClearRefreshTokenCookie(Response, PlatformAuthCookieHelper.PlatformAuthCookiePath);
         return NoContent();
-    }
-
-    private void AppendRefreshTokenCookie(PlatformAdminLoginResponse response)
-    {
-        // Keep the refresh token out of JavaScript-readable storage.
-        Response.Cookies.Append(RefreshTokenCookieName, response.RefreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Expires = response.RefreshTokenExpiresAt,
-            Path = "/api/v1/platform-auth"
-        });
-    }
-
-    private void ClearRefreshTokenCookie()
-    {
-        // Clearing the HttpOnly cookie removes the browser-held refresh token after server revoke.
-        Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/api/v1/platform-auth"
-        });
     }
 
     private bool TryGetPlatformSessionContext(out Guid platformUserId, out Guid sessionId)

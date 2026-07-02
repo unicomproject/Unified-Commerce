@@ -190,6 +190,19 @@ public sealed class PlatformAuthServiceTests
             RevokedAt = now;
             return Task.CompletedTask;
         }
+
+        public Task<PlatformAuthRefreshContext?> FindRefreshContextByTokenHashAsync(
+            string refreshTokenHash,
+            CancellationToken cancellationToken)
+            => Task.FromResult<PlatformAuthRefreshContext?>(null);
+
+        public Task<bool> TryRotateRefreshTokenAsync(
+            Guid refreshTokenId,
+            PlatformRefreshToken replacementRefreshToken,
+            string replacementSessionTokenHash,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+            => Task.FromResult(false);
     }
 
     private sealed class FakePasswordHashService : IPasswordHashService

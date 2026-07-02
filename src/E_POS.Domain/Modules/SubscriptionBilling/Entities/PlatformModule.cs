@@ -9,4 +9,26 @@ public class PlatformModule : AuditableEntity
     public string? Description { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public int SortOrder { get; protected set; }
+
+    public static PlatformModule Create(
+        Guid id,
+        string moduleCode,
+        string name,
+        string? description,
+        string status,
+        int sortOrder,
+        DateTimeOffset now)
+    {
+        return new PlatformModule
+        {
+            Id = id,
+            ModuleCode = moduleCode,
+            Name = name,
+            Description = description,
+            Status = status,
+            SortOrder = sortOrder,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }

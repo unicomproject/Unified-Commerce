@@ -39,4 +39,26 @@ public class PlatformRefreshToken : AuditableEntity
         Status = PlatformAuthConstants.RevokedTokenStatus;
         UpdatedAt = now;
     }
+
+    public void MarkUsed(DateTimeOffset now)
+    {
+        if (Status == PlatformAuthConstants.UsedTokenStatus)
+        {
+            return;
+        }
+
+        Status = PlatformAuthConstants.UsedTokenStatus;
+        UpdatedAt = now;
+    }
+
+    public void MarkExpired(DateTimeOffset now)
+    {
+        if (Status == PlatformAuthConstants.ExpiredTokenStatus)
+        {
+            return;
+        }
+
+        Status = PlatformAuthConstants.ExpiredTokenStatus;
+        UpdatedAt = now;
+    }
 }

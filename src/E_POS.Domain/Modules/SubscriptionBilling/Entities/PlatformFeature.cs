@@ -10,4 +10,26 @@ public class PlatformFeature : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public Guid PlatformModuleId { get; protected set; }
     public int SortOrder { get; protected set; }
+
+    public static PlatformFeature Create(
+        Guid id,
+        Guid platformModuleId,
+        string featureCode,
+        string name,
+        string status,
+        DateTimeOffset createdAt,
+        int sortOrder = 0)
+    {
+        return new PlatformFeature
+        {
+            Id = id,
+            PlatformModuleId = platformModuleId,
+            FeatureCode = featureCode,
+            Name = name,
+            Status = status,
+            SortOrder = sortOrder,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
+    }
 }

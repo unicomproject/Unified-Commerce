@@ -3,6 +3,7 @@ using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.AuthSecurity.Contracts;
 using E_POS.Application.Modules.AuthSecurity.Dtos;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
+using E_POS.Application.Modules.SubscriptionBilling.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Infrastructure.Common;
 using E_POS.Infrastructure.Common.Security;
@@ -10,6 +11,7 @@ using E_POS.Infrastructure.Modules.AuthSecurity.Options;
 using E_POS.Infrastructure.Modules.AuthSecurity.Repositories;
 using E_POS.Infrastructure.Modules.PlatformAdministration.Options;
 using E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
+using E_POS.Infrastructure.Modules.SubscriptionBilling.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -39,7 +41,14 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenGenerator, RefreshTokenGenerator>();
         services.AddScoped<ITokenHashService, TokenHashService>();
         services.AddScoped<IAuthSessionValidator, AuthSessionValidator>();
+        services.AddScoped<IPlatformPermissionRepository, PlatformPermissionRepository>();
         services.AddScoped<IPlatformAuthRepository, PlatformAuthRepository>();
+        services.AddScoped<IPlatformDashboardRepository, PlatformDashboardRepository>();
+        services.AddScoped<IPlatformTenantRepository, PlatformTenantRepository>();
+        services.AddScoped<IPlatformPermissionCatalogRepository, PlatformPermissionCatalogRepository>();
+        services.AddScoped<IPlatformRoleRepository, PlatformRoleRepository>();
+        services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
+        services.AddScoped<IPlatformSubscriptionPlanRepository, PlatformSubscriptionPlanRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();
         services.AddScoped(static provider =>
         {

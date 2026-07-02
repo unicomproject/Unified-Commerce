@@ -1,4 +1,5 @@
 using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.PlatformAdministration.Constants;
 
 namespace E_POS.Domain.Modules.PlatformAdministration.Entities;
 
@@ -14,13 +15,28 @@ public class PlatformUser : AuditableEntity
         return new PlatformUser
         {
             Id = id,
-            Email = email,
+            Email = email.Trim(),
             NormalizedEmail = NormalizeEmail(email),
             PasswordHash = passwordHash,
             Status = status,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public static PlatformUser CreatePendingInvite(Guid id, string email, DateTimeOffset now)
+    {
+        return Create(
+            id,
+            email,
+            PlatformUserConstants.PendingInvitePasswordHash,
+            PlatformAuthConstants.InactiveStatus,
+            now);
+    }
+
+    public void TouchUpdatedAt(DateTimeOffset now)
+    {
+        UpdatedAt = now;
     }
 
     public void SetPasswordHash(string passwordHash, DateTimeOffset now)

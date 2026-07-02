@@ -157,6 +157,165 @@ public sealed class PlatformAuthService : IPlatformAuthService
         return ApplicationResult.Success();
     }
 
+    public async Task LogoutByRefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return;
+        }
+
+        var refreshTokenHash = _tokenHashService.HashToken(refreshToken.Trim(), _jwtSettings.SigningKey);
+        var refreshContext = await _repository.FindRefreshContextByTokenHashAsync(refreshTokenHash, cancellationToken);
+
+        if (refreshContext is null)
+        {
+            return;
+        }
+
+        await _repository.RevokeCurrentSessionAsync(
+            refreshContext.User.Id,
+            refreshContext.Session.Id,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+    }
+
+    public async Task<ApplicationResult<PlatformAdminLoginResponse>> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.invalid_refresh_token",
+                "Invalid platform refresh token."));
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var refreshTokenHash = _tokenHashService.HashToken(refreshToken.Trim(), _jwtSettings.SigningKey);
+        var refreshContext = await _repository.FindRefreshContextByTokenHashAsync(refreshTokenHash, cancellationToken);
+
+        if (refreshContext is null)
+        {
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.invalid_refresh_token",
+                "Invalid platform refresh token."));
+        }
+
+        if (refreshContext.RefreshToken.Status == PlatformAuthConstants.UsedTokenStatus)
+        {
+            await _repository.RevokeCurrentSessionAsync(
+                refreshContext.User.Id,
+                refreshContext.Session.Id,
+                now,
+                cancellationToken);
+
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.refresh_token_reused",
+                "Platform refresh token has already been used."));
+        }
+
+        if (refreshContext.RefreshToken.Status != PlatformAuthConstants.ActiveTokenStatus)
+        {
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.invalid_refresh_token",
+                "Invalid platform refresh token."));
+        }
+
+        if (refreshContext.Session.Status != PlatformAuthConstants.ActiveTokenStatus)
+        {
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.invalid_session",
+                "Invalid platform session."));
+        }
+
+        if (refreshContext.RefreshToken.ExpiresAt <= now)
+        {
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.invalid_session",
+                "Invalid platform session."));
+        }
+
+        if (refreshContext.User.Status == PlatformAuthConstants.LockedStatus)
+        {
+            await _repository.RevokeCurrentSessionAsync(
+                refreshContext.User.Id,
+                refreshContext.Session.Id,
+                now,
+                cancellationToken);
+
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.invalid_refresh_token",
+                "Invalid platform refresh token."));
+        }
+
+        if (refreshContext.User.Status != PlatformAuthConstants.ActiveStatus)
+        {
+            await _repository.RevokeCurrentSessionAsync(
+                refreshContext.User.Id,
+                refreshContext.Session.Id,
+                now,
+                cancellationToken);
+
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.platform_access_denied",
+                "Platform access denied."));
+        }
+
+        var permissions = await _repository.GetActivePermissionCodesAsync(refreshContext.User.Id, cancellationToken);
+        if (permissions.Count == 0)
+        {
+            await _repository.RevokeCurrentSessionAsync(
+                refreshContext.User.Id,
+                refreshContext.Session.Id,
+                now,
+                cancellationToken);
+
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.platform_access_denied",
+                "Platform access denied."));
+        }
+
+        var jwtId = Guid.NewGuid().ToString("N");
+        var accessToken = _jwtTokenFactory.CreateAccessToken(CreateTokenDescriptor(
+            refreshContext.User,
+            refreshContext.Session.Id,
+            jwtId,
+            permissions));
+        var replacementRefreshToken = _refreshTokenGenerator.CreateRefreshToken(_jwtSettings.RefreshTokenDays);
+        var replacementRefreshTokenEntity = PlatformRefreshToken.Create(
+            Guid.NewGuid(),
+            refreshContext.Session.Id,
+            _tokenHashService.HashToken(replacementRefreshToken.Token, _jwtSettings.SigningKey),
+            replacementRefreshToken.ExpiresAt,
+            now);
+
+        var rotated = await _repository.TryRotateRefreshTokenAsync(
+            refreshContext.RefreshToken.Id,
+            replacementRefreshTokenEntity,
+            _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey),
+            now,
+            cancellationToken);
+
+        if (!rotated)
+        {
+            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
+                "platform_auth.invalid_refresh_token",
+                "Invalid platform refresh token."));
+        }
+
+        var response = new PlatformAdminLoginResponse(
+            accessToken.AccessToken,
+            accessToken.ExpiresAt,
+            replacementRefreshToken.Token,
+            replacementRefreshToken.ExpiresAt,
+            new PlatformAdminUserDto(refreshContext.User.Id, refreshContext.User.Email, refreshContext.User.Status),
+            permissions);
+
+        return ApplicationResult<PlatformAdminLoginResponse>.Success(response);
+    }
+
     private JwtTokenDescriptor CreateTokenDescriptor(
         PlatformUser user,
         Guid sessionId,
