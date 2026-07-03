@@ -6,10 +6,10 @@ namespace E_POS.UnitTests.PlatformAdministration;
 public sealed class PlatformPermissionCodesTests
 {
     [Fact]
-    public void All_ContainsExactlyThirtyOneTmEposPlatformPermissionCodes()
+    public void All_ContainsExactlyThirtySixTmEposPlatformPermissionCodes()
     {
-        Assert.Equal(31, PlatformPermissionCodes.All.Count);
-        Assert.Equal(31, PlatformPermissionCodes.All.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(36, PlatformPermissionCodes.All.Count);
+        Assert.Equal(36, PlatformPermissionCodes.All.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -51,7 +51,7 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
 
         builder.Property(x => x.ParentCategoryId)
             .HasColumnName("parent_category_id")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.SortOrder)
             .HasColumnName("sort_order")

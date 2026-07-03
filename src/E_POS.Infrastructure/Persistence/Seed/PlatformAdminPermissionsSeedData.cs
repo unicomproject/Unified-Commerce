@@ -50,7 +50,12 @@ public static class PlatformAdminPermissionsSeedData
         new(Guid.Parse("62000000-0000-0000-0000-000000000028"), PlatformPermissionCodes.RolesCreate, "Create Platform Roles", "Create platform roles."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000029"), PlatformPermissionCodes.RolesUpdate, "Update Platform Roles", "Update platform roles."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000030"), PlatformPermissionCodes.RolePermissionsView, "View Platform Role Permissions", "View platform role permissions."),
-        new(Guid.Parse("62000000-0000-0000-0000-000000000031"), PlatformPermissionCodes.RolePermissionsUpdate, "Update Platform Role Permissions", "Update platform role permissions.")
+        new(Guid.Parse("62000000-0000-0000-0000-000000000031"), PlatformPermissionCodes.RolePermissionsUpdate, "Update Platform Role Permissions", "Update platform role permissions."),
+        new(Guid.Parse("62000000-0000-0000-0000-000000000032"), PlatformPermissionCodes.ReturnPolicyTemplatesView, "View Return Policy Templates", "View platform return policy templates."),
+        new(Guid.Parse("62000000-0000-0000-0000-000000000033"), PlatformPermissionCodes.ReturnPolicyTemplatesCreate, "Create Return Policy Templates", "Create platform return policy templates."),
+        new(Guid.Parse("62000000-0000-0000-0000-000000000034"), PlatformPermissionCodes.ReturnPolicyTemplatesUpdate, "Update Return Policy Templates", "Update platform return policy templates."),
+        new(Guid.Parse("62000000-0000-0000-0000-000000000035"), PlatformPermissionCodes.ReturnPolicyTemplatesDelete, "Delete Return Policy Templates", "Delete platform return policy templates."),
+        new(Guid.Parse("62000000-0000-0000-0000-000000000036"), PlatformPermissionCodes.ReturnPolicyTemplatesManage, "Manage Return Policy Templates", "Manage platform return policy templates.")
     ];
 
     public static string UpSql => $"""
