@@ -20,6 +20,8 @@ public sealed record PlatformTenantDetailResponse(
     bool OnlineStoreEnabled,
     bool ClickCollectEnabled,
     bool OfflineEnabled,
+    IReadOnlyList<Guid> EnabledFeatureIds,
+    IReadOnlyList<string> EnabledFeatureCodes,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
     DateTimeOffset? LastActivityAt,

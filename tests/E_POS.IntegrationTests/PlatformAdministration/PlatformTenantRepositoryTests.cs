@@ -121,6 +121,7 @@ public sealed class PlatformTenantRepositoryTests
         await using var dbContext = CreateDbContext();
         var planId = Guid.Parse("77777777-7777-4777-8777-777777777711");
         var tenantId = Guid.Parse("11111111-1111-4111-8111-111111111111");
+        var onlineStoreFeatureId = Guid.Parse("88888888-8888-4888-8888-888888888801");
         await SeedAsync(dbContext, planId, tenantId, Guid.NewGuid(), Guid.NewGuid());
 
         IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
@@ -134,6 +135,8 @@ public sealed class PlatformTenantRepositoryTests
         Assert.Null(detail.Subscription.StartsAt);
         Assert.Equal(1, detail.UserCount);
         Assert.True(detail.OnlineStoreEnabled);
+        Assert.Equal([onlineStoreFeatureId], detail.EnabledFeatureIds);
+        Assert.Equal(["online_store"], detail.EnabledFeatureCodes);
         Assert.Null(detail.Profile);
         Assert.Null(detail.PrimaryAddress);
     }
@@ -174,6 +177,44 @@ public sealed class PlatformTenantRepositoryTests
         Assert.Null(detail);
     }
 
+    [Fact]
+    public async Task GetEntitlementOptionsAsync_WithSeededTenant_ReturnsPlansCatalogAndEnabledFeatures()
+    {
+        await using var dbContext = CreateDbContext();
+        var planId = Guid.Parse("77777777-7777-4777-8777-777777777711");
+        var tenantId = Guid.Parse("11111111-1111-4111-8111-111111111111");
+        var onlineStoreFeatureId = Guid.Parse("88888888-8888-4888-8888-888888888801");
+        await SeedAsync(dbContext, planId, tenantId, Guid.NewGuid(), Guid.NewGuid());
+
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+
+        var options = await repository.GetEntitlementOptionsAsync(tenantId, CancellationToken.None);
+
+        Assert.NotNull(options);
+        Assert.Equal(tenantId, options!.TenantId);
+        Assert.Equal(planId, options.CurrentSubscriptionPlanId);
+        Assert.Equal("STARTER", options.CurrentSubscriptionPlanCode);
+        Assert.Equal([onlineStoreFeatureId], options.EnabledFeatureIds);
+        Assert.Equal(["online_store"], options.EnabledFeatureCodes);
+        Assert.Single(options.Plans);
+        Assert.Equal([onlineStoreFeatureId], options.Plans[0].IncludedFeatureIds);
+        Assert.Equal(["online_store"], options.Plans[0].IncludedFeatureCodes);
+        Assert.Single(options.CatalogModules);
+        Assert.Single(options.CatalogModules[0].Features);
+        Assert.Equal("online_store", options.CatalogModules[0].Features[0].Code);
+    }
+
+    [Fact]
+    public async Task GetEntitlementOptionsAsync_WhenTenantMissing_ReturnsNull()
+    {
+        await using var dbContext = CreateDbContext();
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+
+        var options = await repository.GetEntitlementOptionsAsync(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Null(options);
+    }
+
     private static async Task SeedAsync(
         EPosDbContext dbContext,
         Guid planId,
@@ -182,22 +223,40 @@ public sealed class PlatformTenantRepositoryTests
         Guid tenantThreeId)
     {
         var onlineStoreFeatureId = Guid.Parse("88888888-8888-4888-8888-888888888801");
+        var moduleId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
 
         dbContext.SubscriptionPlans.Add(SubscriptionPlan.Create(
             planId,
             "STARTER",
             "Starter Plan",
-            "ACTIVE",
+            SubscriptionPlanConstants.Status.Active,
             "MONTHLY",
             49.99m,
             Now));
 
+        dbContext.PlatformModules.Add(PlatformModule.Create(
+            moduleId,
+            "commerce",
+            "Commerce",
+            "Commerce module",
+            "ACTIVE",
+            1,
+            Now));
+
         dbContext.PlatformFeatures.Add(PlatformFeature.Create(
             onlineStoreFeatureId,
-            Guid.NewGuid(),
+            moduleId,
             PlatformTenantFeatureCodes.OnlineStore,
             "Online Store",
             "ACTIVE",
+            Now,
+            1));
+
+        dbContext.SubscriptionPlanFeatures.Add(SubscriptionPlanFeature.CreateIncluded(
+            Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+            planId,
+            onlineStoreFeatureId,
+            1,
             Now));
 
         dbContext.Tenants.AddRange(

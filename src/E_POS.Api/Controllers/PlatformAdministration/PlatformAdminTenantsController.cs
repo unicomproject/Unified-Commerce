@@ -110,6 +110,27 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         return ToDetailActionResult(result, "Platform tenant loaded successfully.");
     }
 
+    [HttpGet("{tenantId:guid}/entitlement-options")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantEntitlementOptionsResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetEntitlementOptions(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError(
+                "platform_auth.invalid_session",
+                "Invalid platform session.")));
+        }
+
+        var result = await _tenantService.GetEntitlementOptionsAsync(tenantId, platformUserId, cancellationToken);
+        return ToEntitlementOptionsActionResult(result, "Platform tenant entitlement options loaded successfully.");
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantDetailResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -242,6 +263,18 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         if (result.IsSuccess && result.Value is not null)
         {
             return Ok(LegacyApiResponse<PlatformTenantDetailResponse>.Ok(successMessage, result.Value));
+        }
+
+        return MapError(result.Error);
+    }
+
+    private IActionResult ToEntitlementOptionsActionResult(
+        ApplicationResult<PlatformTenantEntitlementOptionsResponse> result,
+        string successMessage)
+    {
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Ok(LegacyApiResponse<PlatformTenantEntitlementOptionsResponse>.Ok(successMessage, result.Value));
         }
 
         return MapError(result.Error);

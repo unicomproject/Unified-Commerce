@@ -19,6 +19,10 @@ public interface IPlatformTenantRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
+    Task<PlatformTenantEntitlementOptionsResponse?> GetEntitlementOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
     Task<bool> TenantCodeExistsAsync(string tenantCode, CancellationToken cancellationToken);
 
     Task<Tenant?> GetTenantEntityByIdAsync(Guid tenantId, CancellationToken cancellationToken);
@@ -108,6 +112,11 @@ public interface IPlatformTenantService
     Task<ApplicationResult<PlatformTenantDetailResponse>> UpdateEntitlementsAsync(
         Guid tenantId,
         UpdatePlatformTenantEntitlementsRequest request,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformTenantEntitlementOptionsResponse>> GetEntitlementOptionsAsync(
+        Guid tenantId,
         Guid platformUserId,
         CancellationToken cancellationToken);
 
