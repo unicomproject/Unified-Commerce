@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
         services.AddScoped<IPlatformRoleService, PlatformRoleService>();
         services.AddScoped<IPlatformUserService, PlatformUserService>();
+        services.AddScoped<IPlatformAuditLogService, PlatformAuditLogService>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
         services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
