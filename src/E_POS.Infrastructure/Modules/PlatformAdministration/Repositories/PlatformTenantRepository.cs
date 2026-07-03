@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
 
-public sealed class PlatformTenantRepository : IPlatformTenantRepository
+public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
 {
     private static readonly string[] CurrentSubscriptionStatuses = ["TRIAL", "ACTIVE", "PAST_DUE"];
 
@@ -164,6 +164,33 @@ public sealed class PlatformTenantRepository : IPlatformTenantRepository
 
         var lastActivityAt = await GetLastActivityAtAsync(tenantId, tenant.UpdatedAt, cancellationToken);
 
+        var profile = await _dbContext.TenantProfiles
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .Select(x => new PlatformTenantProfileDetailDto(
+                x.LegalName,
+                x.PrimaryContactName,
+                x.PrimaryEmail,
+                x.PrimaryPhone,
+                x.WebsiteUrl))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var address = await _dbContext.TenantAddresses
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .OrderByDescending(x => x.AddressType == "REGISTERED")
+            .ThenByDescending(x => x.UpdatedAt)
+            .ThenByDescending(x => x.CreatedAt)
+            .Select(x => new PlatformTenantAddressDetailDto(
+                x.AddressType,
+                x.Line1,
+                x.Line2,
+                x.City,
+                x.State,
+                x.PostalCode,
+                x.CountryCode))
+            .FirstOrDefaultAsync(cancellationToken);
+
         PlatformTenantDetailSubscriptionDto? subscriptionDto = currentSubscription is null
             ? null
             : new PlatformTenantDetailSubscriptionDto(
@@ -185,8 +212,8 @@ public sealed class PlatformTenantRepository : IPlatformTenantRepository
             tenant.DefaultTimezone,
             tenant.DefaultLocale,
             tenant.BusinessType,
-            Profile: null,
-            PrimaryAddress: null,
+            Profile: profile,
+            PrimaryAddress: address,
             Subscription: subscriptionDto,
             userCount,
             outletCount,

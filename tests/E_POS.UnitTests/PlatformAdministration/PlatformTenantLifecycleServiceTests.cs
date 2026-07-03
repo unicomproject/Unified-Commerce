@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Application.Modules.PlatformAdministration.Services;
@@ -381,7 +382,8 @@ public sealed class PlatformTenantLifecycleServiceTests
             subscriptionPlanRepository,
             new FakeLifecyclePermissionChecker(permissions),
             new FakeLifecyclePermissionRepository(permissions),
-            new FakeLifecycleDateTimeProvider());
+            new FakeLifecycleDateTimeProvider(),
+            new FakeLifecyclePasswordHashService());
     }
 
     private static HashSet<string> AllTenantPermissions() =>
@@ -565,6 +567,26 @@ public sealed class PlatformTenantLifecycleServiceTests
 
             return Task.FromResult(ResolvedFeatures);
         }
+
+        public Task<PlatformTenantCreateOptionsResponse> GetCreateOptionsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new PlatformTenantCreateOptionsResponse([], [], [], [], [], [], [], [], [], [], [], [], []));
+
+        public Task<bool> TenantUserEmailExistsAsync(string email, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Guid>>([]);
+    }
+
+    private sealed class FakeLifecyclePasswordHashService : IPasswordHashService
+    {
+        public string HashPassword(string password) => $"HASHED:{password}";
+
+        public bool VerifyPassword(string password, string passwordHash) =>
+            passwordHash == $"HASHED:{password}";
     }
 
     private sealed class FakePlatformSubscriptionPlanRepository : IPlatformSubscriptionPlanRepository

@@ -28,9 +28,9 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.GetSummaryAsync(platformUserId, cancellationToken);
@@ -45,13 +45,30 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.GetFilterOptionsAsync(platformUserId, cancellationToken);
         return ToActionResult(result, "Platform tenant filter options loaded successfully.");
+    }
+
+    [HttpGet("create-options")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantCreateOptionsResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetCreateOptions(CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError(
+                "platform_auth.invalid_session",
+                "Invalid platform session.")));
+        }
+
+        var result = await _tenantService.GetCreateOptionsAsync(platformUserId, cancellationToken);
+        return ToActionResult(result, "Platform tenant create options loaded successfully.");
     }
 
     [HttpGet]
@@ -64,9 +81,9 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.GetTenantsAsync(query, platformUserId, cancellationToken);
@@ -84,9 +101,9 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.GetTenantDetailAsync(tenantId, platformUserId, cancellationToken);
@@ -105,9 +122,9 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.CreateTenantAsync(request, platformUserId, cancellationToken);
@@ -137,9 +154,9 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.UpdateTenantAsync(tenantId, request, platformUserId, cancellationToken);
@@ -157,9 +174,9 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.ActivateTenantAsync(tenantId, platformUserId, cancellationToken);
@@ -177,9 +194,9 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.SuspendTenantAsync(tenantId, platformUserId, cancellationToken);
@@ -199,9 +216,9 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
-            return Unauthorized(CreateLegacyError(
+            return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
-                "Invalid platform session."));
+                "Invalid platform session.")));
         }
 
         var result = await _tenantService.UpdateEntitlementsAsync(tenantId, request, platformUserId, cancellationToken);
@@ -234,11 +251,11 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     {
         return error.Code switch
         {
-            "platform_tenants.not_found" => NotFound(CreateLegacyError(error.Code, error.Message)),
-            "platform_tenants.validation_failed" => BadRequest(CreateLegacyError(error.Code, error.Message)),
+            "platform_tenants.not_found" => NotFound(CreateLegacyError(error)),
+            "platform_tenants.validation_failed" => BadRequest(CreateLegacyError(error)),
             "platform_tenants.conflict" or "platform_tenants.invalid_transition" =>
-                StatusCode(StatusCodes.Status409Conflict, CreateLegacyError(error.Code, error.Message)),
-            _ => StatusCode(StatusCodes.Status403Forbidden, CreateLegacyError(error.Code, error.Message))
+                StatusCode(StatusCodes.Status409Conflict, CreateLegacyError(error)),
+            _ => StatusCode(StatusCodes.Status403Forbidden, CreateLegacyError(error))
         };
     }
 
@@ -248,14 +265,18 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         return Guid.TryParse(platformUserIdValue, out platformUserId);
     }
 
-    private object CreateLegacyError(string errorCode, string message)
+    private object CreateLegacyError(ApplicationError error)
     {
+        var fieldErrors = error.FieldErrors?
+            .Select(item => new { field = item.Field, message = item.Message })
+            .ToArray<object>() ?? Array.Empty<object>();
+
         return new
         {
             success = false,
-            message,
-            errorCode,
-            errors = Array.Empty<object>(),
+            message = error.Message,
+            errorCode = error.Code,
+            errors = fieldErrors,
             traceId = HttpContext.TraceIdentifier
         };
     }

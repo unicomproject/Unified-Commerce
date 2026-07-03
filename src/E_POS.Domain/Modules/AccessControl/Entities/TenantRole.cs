@@ -10,4 +10,28 @@ public class TenantRole : AuditableEntity
     public string? Description { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid RoleTemplateVersionId { get; protected set; }
+
+    public static TenantRole Create(
+        Guid id,
+        Guid tenantId,
+        string roleCode,
+        string name,
+        string? description,
+        string status,
+        Guid roleTemplateVersionId,
+        DateTimeOffset now)
+    {
+        return new TenantRole
+        {
+            Id = id,
+            TenantId = tenantId,
+            RoleCode = roleCode.Trim(),
+            Name = name.Trim(),
+            Description = description?.Trim(),
+            Status = status,
+            RoleTemplateVersionId = roleTemplateVersionId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }

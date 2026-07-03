@@ -3,6 +3,7 @@ using System;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702182515_AddTenantCreateWizardSupport")]
+    partial class AddTenantCreateWizardSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -7072,60 +7075,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.CodeSequence", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("CurrentValue")
-                        .HasColumnType("integer")
-                        .HasColumnName("current_value");
-
-                    b.Property<int>("PaddingLength")
-                        .HasColumnType("integer")
-                        .HasColumnName("padding_length");
-
-                    b.Property<string>("Prefix")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("prefix");
-
-                    b.Property<string>("SequenceKey")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("varchar(160)")
-                        .HasColumnName("sequence_key");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_code_sequences");
-
-                    b.HasIndex("TenantId", "SequenceKey")
-                        .IsUnique()
-                        .HasDatabaseName("uq_code_sequences_tenant_id_sequence_key");
-
-                    b.ToTable("code_sequences", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_code_sequences_current_value", "current_value >= 0");
-
-                            t.HasCheckConstraint("ck_code_sequences_padding_length", "padding_length > 0");
-                        });
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.HardwareProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7501,21 +7450,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(255)")
                         .HasColumnName("effective_from");
 
-                    b.Property<DateTimeOffset?>("EffectiveTo")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("effective_to");
-
                     b.Property<Guid?>("PosDeviceId")
                         .HasColumnType("uuid")
                         .HasColumnName("pos_device_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasDefaultValue("ACTIVE")
-                        .HasColumnName("status");
 
                     b.Property<Guid?>("TillId")
                         .HasColumnType("uuid")
@@ -7528,24 +7465,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_till_device_assignments");
 
-                    b.HasIndex("PosDeviceId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_till_device_assignments_active_pos_device_id")
-                        .HasFilter("status = 'ACTIVE' AND pos_device_id IS NOT NULL");
-
-                    b.HasIndex("TillId", "PosDeviceId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_till_device_assignments_active_till_id_pos_device_id")
-                        .HasFilter("status = 'ACTIVE' AND till_id IS NOT NULL AND pos_device_id IS NOT NULL");
+                    b.HasIndex("PosDeviceId");
 
                     b.HasIndex("TillId", "PosDeviceId", "EffectiveFrom")
                         .IsUnique()
                         .HasDatabaseName("uq_till_device_assignments_till_id_pos_device_id_effective_from");
 
-                    b.ToTable("till_device_assignments", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_till_device_assignments_status", "status IN ('ACTIVE', 'REVOKED')");
-                        });
+                    b.ToTable("till_device_assignments", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.PosOrderHold", b =>
@@ -13114,16 +13040,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_taxes_sales_order_line_id_sales_order_lines");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.CodeSequence", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_code_sequences_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.HardwareProfile", b =>
