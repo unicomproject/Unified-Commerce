@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.OutletTillDevice.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -41,6 +41,17 @@ public sealed class TillDeviceAssignmentConfiguration : IEntityTypeConfiguration
             .HasColumnType("varchar(255)")
             .HasMaxLength(255);
 
+        builder.Property(x => x.EffectiveTo)
+            .HasColumnName("effective_to")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .HasDefaultValue("ACTIVE")
+            .IsRequired();
+
         builder.HasOne<Till>()
             .WithMany()
             .HasForeignKey(x => x.TillId)
@@ -56,6 +67,17 @@ public sealed class TillDeviceAssignmentConfiguration : IEntityTypeConfiguration
         builder.HasIndex(x => new { x.TillId, x.PosDeviceId, x.EffectiveFrom })
             .IsUnique()
             .HasDatabaseName("uq_till_device_assignments_till_id_pos_device_id_effective_from");
+
+        builder.HasIndex(x => new { x.TillId, x.PosDeviceId })
+            .IsUnique()
+            .HasDatabaseName("uq_till_device_assignments_active_till_id_pos_device_id")
+            .HasFilter("status = 'ACTIVE' AND till_id IS NOT NULL AND pos_device_id IS NOT NULL");
+
+        builder.HasIndex(x => x.PosDeviceId)
+            .IsUnique()
+            .HasDatabaseName("uq_till_device_assignments_active_pos_device_id")
+            .HasFilter("status = 'ACTIVE' AND pos_device_id IS NOT NULL");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_till_device_assignments_status", "status IN ('ACTIVE', 'REVOKED')"));
     }
 }
-

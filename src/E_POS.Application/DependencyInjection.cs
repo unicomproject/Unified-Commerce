@@ -28,8 +28,11 @@ public static class DependencyInjection
         services.AddScoped<ITenantAuthService, TenantAuthService>();
         services.AddScoped<IOutletRequestValidator, OutletRequestValidator>();
         services.AddScoped<ITillRequestValidator, TillRequestValidator>();
+        services.AddScoped<IPosDeviceRequestValidator, PosDeviceRequestValidator>();
         services.AddScoped<IOutletService, OutletService>();
         services.AddScoped<ITillService, TillService>();
+        services.AddScoped<IPosDeviceService, PosDeviceService>();
+        services.AddScoped<ITillDeviceAssignmentService, TillDeviceAssignmentService>();
 
         return services;
     }
