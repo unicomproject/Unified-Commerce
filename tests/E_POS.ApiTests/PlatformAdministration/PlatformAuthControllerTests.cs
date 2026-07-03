@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Security.Claims;
+using E_POS.Api.Common.Cookies;
 using E_POS.Api.Controllers;
 using E_POS.Api.Models;
 using E_POS.Application.Common.Models;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
+
 
 namespace E_POS.ApiTests.PlatformAdministration;
 

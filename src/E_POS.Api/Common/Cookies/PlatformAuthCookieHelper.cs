@@ -2,7 +2,7 @@ using E_POS.Api.Models;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
-namespace E_POS.Api.Controllers;
+namespace E_POS.Api.Common.Cookies;
 
 public static class PlatformAuthCookieHelper
 {
