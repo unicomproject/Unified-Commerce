@@ -178,6 +178,60 @@ public sealed class PlatformAdminTenantsControllerTests
     }
 
     [Fact]
+    public async Task GetEntitlementOptions_WithPermission_ReturnsLegacyApiResponse()
+    {
+        var tenantId = Guid.NewGuid();
+        var options = CreateEntitlementOptions(tenantId);
+        var controller = CreateController(
+            new FakePlatformTenantService(
+                entitlementOptionsResult: ApplicationResult<PlatformTenantEntitlementOptionsResponse>.Success(options)),
+            tenantId);
+
+        var result = await controller.GetEntitlementOptions(tenantId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var payload = Assert.IsType<LegacyApiResponse<PlatformTenantEntitlementOptionsResponse>>(ok.Value);
+        Assert.True(payload.Success);
+        Assert.Equal(tenantId, payload.Data.TenantId);
+        Assert.Single(payload.Data.EnabledFeatureIds);
+        Assert.Single(payload.Data.Plans);
+        Assert.NotEmpty(payload.Data.CatalogModules);
+    }
+
+    [Fact]
+    public async Task GetEntitlementOptions_WithoutPermission_ReturnsForbidden()
+    {
+        var tenantId = Guid.NewGuid();
+        var controller = CreateController(
+            new FakePlatformTenantService(
+                entitlementOptionsResult: ApplicationResult<PlatformTenantEntitlementOptionsResponse>.Failure(new ApplicationError(
+                    "platform_tenants.access_denied",
+                    "Platform tenant access denied."))),
+            tenantId);
+
+        var result = await controller.GetEntitlementOptions(tenantId, CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetEntitlementOptions_WhenTenantMissing_ReturnsNotFound()
+    {
+        var tenantId = Guid.NewGuid();
+        var controller = CreateController(
+            new FakePlatformTenantService(
+                entitlementOptionsResult: ApplicationResult<PlatformTenantEntitlementOptionsResponse>.Failure(new ApplicationError(
+                    "platform_tenants.not_found",
+                    "Platform tenant not found."))),
+            tenantId);
+
+        var result = await controller.GetEntitlementOptions(tenantId, CancellationToken.None);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
     public async Task CreateTenant_WithDuplicateCode_ReturnsConflict()
     {
         var controller = CreateController(
@@ -331,6 +385,8 @@ public sealed class PlatformAdminTenantsControllerTests
             false,
             false,
             false,
+            [],
+            [],
             Now,
             Now,
             Now,
@@ -340,15 +396,52 @@ public sealed class PlatformAdminTenantsControllerTests
             true);
     }
 
+    private static PlatformTenantEntitlementOptionsResponse CreateEntitlementOptions(Guid tenantId)
+    {
+        var featureId = Guid.Parse("88888888-8888-4888-8888-888888888801");
+        var planId = Guid.Parse("77777777-7777-4777-8777-777777777711");
+
+        return new PlatformTenantEntitlementOptionsResponse(
+            tenantId,
+            planId,
+            "STARTER",
+            "Starter Plan",
+            [featureId],
+            ["online_store"],
+            [
+                new PlatformTenantEntitlementPlanOptionDto(
+                    planId,
+                    "STARTER",
+                    "Starter Plan",
+                    "active",
+                    [featureId],
+                    ["online_store"])
+            ],
+            [
+                new PlatformTenantEntitlementCatalogModuleDto(
+                    Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+                    "commerce",
+                    "Commerce",
+                    [
+                        new PlatformTenantEntitlementCatalogFeatureDto(
+                            featureId,
+                            "online_store",
+                            "Online Store",
+                            "Online store entitlement")
+                    ])
+            ]);
+    }
+
     private sealed class FakePlatformTenantService : IPlatformTenantService
     {
         private readonly ApplicationResult<PlatformTenantListResponse> _listResult;
         private readonly ApplicationResult<PlatformTenantSummaryResponse> _summaryResult;
         private readonly ApplicationResult<PlatformTenantFilterOptionsResponse> _filterOptionsResult;
         private readonly ApplicationResult<PlatformTenantDetailResponse> _detailResult;
+        private readonly ApplicationResult<PlatformTenantEntitlementOptionsResponse> _entitlementOptionsResult;
 
         public FakePlatformTenantService(ApplicationResult<PlatformTenantListResponse> listResult)
-            : this(listResult, null, null, null)
+            : this(listResult, null, null, null, null)
         {
         }
 
@@ -356,7 +449,8 @@ public sealed class PlatformAdminTenantsControllerTests
             ApplicationResult<PlatformTenantListResponse>? listResult = null,
             ApplicationResult<PlatformTenantSummaryResponse>? summaryResult = null,
             ApplicationResult<PlatformTenantFilterOptionsResponse>? filterOptionsResult = null,
-            ApplicationResult<PlatformTenantDetailResponse>? detailResult = null)
+            ApplicationResult<PlatformTenantDetailResponse>? detailResult = null,
+            ApplicationResult<PlatformTenantEntitlementOptionsResponse>? entitlementOptionsResult = null)
         {
             _listResult = listResult ?? ApplicationResult<PlatformTenantListResponse>.Success(CreateListResponse());
             _summaryResult = summaryResult ?? ApplicationResult<PlatformTenantSummaryResponse>.Success(
@@ -364,6 +458,9 @@ public sealed class PlatformAdminTenantsControllerTests
             _filterOptionsResult = filterOptionsResult ?? ApplicationResult<PlatformTenantFilterOptionsResponse>.Success(
                 new PlatformTenantFilterOptionsResponse([], [], [], []));
             _detailResult = detailResult ?? ApplicationResult<PlatformTenantDetailResponse>.Failure(new ApplicationError(
+                "platform_tenants.not_found",
+                "Platform tenant not found."));
+            _entitlementOptionsResult = entitlementOptionsResult ?? ApplicationResult<PlatformTenantEntitlementOptionsResponse>.Failure(new ApplicationError(
                 "platform_tenants.not_found",
                 "Platform tenant not found."));
         }
@@ -421,6 +518,12 @@ public sealed class PlatformAdminTenantsControllerTests
             Guid platformUserId,
             CancellationToken cancellationToken) =>
             Task.FromResult(_detailResult);
+
+        public Task<ApplicationResult<PlatformTenantEntitlementOptionsResponse>> GetEntitlementOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(_entitlementOptionsResult);
 
         public Task<ApplicationResult<PlatformTenantCreateOptionsResponse>> GetCreateOptionsAsync(
             Guid platformUserId,

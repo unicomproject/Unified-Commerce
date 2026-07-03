@@ -149,18 +149,29 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .ToListAsync(cancellationToken);
         var tillCount = tillStatuses.Count(x => !IsStatus(x, "DELETED"));
 
-        var enabledFeatureCodes = await (
+        var enabledFeatures = await (
             from entitlement in _dbContext.TenantFeatureEntitlements.AsNoTracking()
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on entitlement.PlatformFeatureId equals feature.Id
             where entitlement.TenantId == tenantId
-            select new { entitlement.EntitlementStatus, feature.FeatureCode })
+            select new { entitlement.EntitlementStatus, feature.Id, feature.FeatureCode })
             .ToListAsync(cancellationToken);
 
-        var featureCodes = enabledFeatureCodes
+        var enabled = enabledFeatures
             .Where(x => IsStatus(x.EntitlementStatus, "ENABLED"))
+            .ToList();
+
+        var enabledFeatureIds = enabled
+            .Select(x => x.Id)
+            .Distinct()
+            .ToList();
+
+        var enabledFeatureCodes = enabled
             .Select(x => x.FeatureCode)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .Distinct()
+            .ToList();
+
+        var featureCodes = enabledFeatureCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var lastActivityAt = await GetLastActivityAtAsync(tenantId, tenant.UpdatedAt, cancellationToken);
 
@@ -221,6 +232,8 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             HasFeature(featureCodes, PlatformTenantFeatureCodes.OnlineStore),
             HasFeature(featureCodes, PlatformTenantFeatureCodes.ClickCollect),
             HasFeature(featureCodes, PlatformTenantFeatureCodes.OfflineOperationSync),
+            enabledFeatureIds,
+            enabledFeatureCodes,
             tenant.CreatedAt,
             tenant.UpdatedAt,
             lastActivityAt,

@@ -328,6 +328,8 @@ public sealed class PlatformTenantWizardServiceTests
             false,
             false,
             false,
+            [],
+            [],
             Now,
             Now,
             Now,
@@ -359,6 +361,11 @@ public sealed class PlatformTenantWizardServiceTests
             Guid tenantId,
             CancellationToken cancellationToken) =>
             Task.FromResult(DetailResponse);
+
+        public Task<PlatformTenantEntitlementOptionsResponse?> GetEntitlementOptionsAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<PlatformTenantEntitlementOptionsResponse?>(null);
 
         public Task<bool> TenantCodeExistsAsync(string tenantCode, CancellationToken cancellationToken) =>
             Task.FromResult(TenantCodeExists);

@@ -97,6 +97,8 @@ public sealed class PlatformTenantDetailMapperTests
             false,
             false,
             false,
+            [],
+            [],
             Now,
             Now,
             Now,
