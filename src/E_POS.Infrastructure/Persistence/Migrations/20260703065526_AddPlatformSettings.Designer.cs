@@ -3,6 +3,7 @@ using System;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260703065526_AddPlatformSettings")]
+    partial class AddPlatformSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1368,7 +1371,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(200)")
                         .HasColumnName("name");
 
-                    b.Property<Guid?>("ParentCategoryId")
+                    b.Property<Guid>("ParentCategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("parent_category_id");
 
@@ -2686,12 +2689,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("return_window_days");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasColumnName("status");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -2710,60 +2707,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("return_policies", null, t =>
                         {
                             t.HasCheckConstraint("ck_return_policies_return_window_days", "return_window_days IS NULL OR return_window_days >= 0");
-
-                            t.HasCheckConstraint("ck_return_policies_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ReturnPolicyTemplate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("name");
-
-                    b.Property<int?>("ReturnWindowDays")
-                        .HasColumnType("integer")
-                        .HasColumnName("return_window_days");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasColumnName("status");
-
-                    b.Property<string>("TemplateCode")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)")
-                        .HasColumnName("template_code");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_return_policy_templates");
-
-                    b.HasIndex("TemplateCode")
-                        .IsUnique()
-                        .HasDatabaseName("uq_return_policy_templates_template_code");
-
-                    b.ToTable("return_policy_templates", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_return_policy_templates_return_window_days", "return_window_days IS NULL OR return_window_days >= 0");
-
-                            t.HasCheckConstraint("ck_return_policy_templates_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
                         });
                 });
 
@@ -2789,7 +2732,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(200)")
                         .HasColumnName("name");
 
-                    b.Property<Guid?>("TenantId")
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
@@ -2806,15 +2749,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_unit_of_measures");
 
-                    b.HasIndex("UomCode")
-                        .IsUnique()
-                        .HasDatabaseName("uq_unit_of_measures_global_uom_code")
-                        .HasFilter("tenant_id IS NULL");
-
                     b.HasIndex("TenantId", "UomCode")
                         .IsUnique()
-                        .HasDatabaseName("uq_unit_of_measures_tenant_id_uom_code")
-                        .HasFilter("tenant_id IS NOT NULL");
+                        .HasDatabaseName("uq_unit_of_measures_tenant_id_uom_code");
 
                     b.ToTable("unit_of_measures", null, t =>
                         {
@@ -11731,6 +11668,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ParentCategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
                         .HasConstraintName("fk_categories_parent_category_id_categories");
 
                     b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
@@ -12116,6 +12054,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
                         .HasConstraintName("fk_unit_of_measures_tenant_id_tenants");
                 });
 
