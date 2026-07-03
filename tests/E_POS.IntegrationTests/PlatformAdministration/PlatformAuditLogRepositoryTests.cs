@@ -102,6 +102,73 @@ public sealed class PlatformAuditLogRepositoryTests
     }
 
     [Fact]
+    public async Task GetLoginSecurityAuditLogsAsync_SecondPage_ReturnsRemainingLatestFirstItem()
+    {
+        await using var dbContext = CreateDbContext();
+        SeedAuditLogs(dbContext);
+
+        IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
+
+        var response = await repository.GetLoginSecurityAuditLogsAsync(
+            new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+            {
+                PageNumber = 2,
+                PageSize = 2
+            },
+            CancellationToken.None);
+
+        Assert.Single(response.Items);
+        Assert.Equal(SuccessAuditId, response.Items[0].Id);
+        Assert.Equal("platform.login.success", response.Items[0].Action);
+    }
+
+    [Fact]
+    public void GetLoginSecurityAuditLogsAsync_QueryOrdersByEntityColumnsBeforeProjection()
+    {
+        using var dbContext = CreatePostgreSqlDbContext();
+        SeedAuditLogs(dbContext);
+
+        var query = BuildPaginatedAuditQuery(dbContext, new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+        {
+            PageNumber = 1,
+            PageSize = 10
+        });
+
+        var sql = query.ToQueryString();
+
+        Assert.Contains("ORDER BY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("created_at", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("LoginAuditRow", sql, StringComparison.Ordinal);
+    }
+
+    private static IQueryable<PlatformLoginAudit> BuildPaginatedAuditQuery(
+        EPosDbContext dbContext,
+        Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery listQuery)
+    {
+        var audits = dbContext.PlatformLoginAudits.AsNoTracking();
+        var users = dbContext.PlatformUsers.AsNoTracking();
+
+        return (
+            from audit in audits
+            join user in users on audit.PlatformUserId equals user.Id into matchedUsers
+            from user in matchedUsers.DefaultIfEmpty()
+            select audit)
+            .OrderByDescending(audit => audit.CreatedAt)
+            .ThenByDescending(audit => audit.Id)
+            .Skip((listQuery.PageNumber - 1) * listQuery.PageSize)
+            .Take(listQuery.PageSize);
+    }
+
+    private static EPosDbContext CreatePostgreSqlDbContext()
+    {
+        var options = new DbContextOptionsBuilder<EPosDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Database=e_pos_audit_query_test;Username=postgres;Password=postgres")
+            .Options;
+
+        return new EPosDbContext(options);
+    }
+
+    [Fact]
     public async Task GetLoginSecurityAuditLogsAsync_WithNoRows_ReturnsEmptyItems()
     {
         await using var dbContext = CreateDbContext();

@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.PlatformAdministration;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
+using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,24 +28,25 @@ public sealed class PlatformAuditLogRepository : IPlatformAuditLogRepository
         var audits = _dbContext.PlatformLoginAudits.AsNoTracking();
         var users = _dbContext.PlatformUsers.AsNoTracking();
 
-        var rows = from audit in audits
-                   join user in users on audit.PlatformUserId equals user.Id into matchedUsers
-                   from user in matchedUsers.DefaultIfEmpty()
-                   select new LoginAuditRow(
-                       audit.Id,
-                       audit.CreatedAt,
-                       audit.PlatformUserId,
-                       user != null ? user.Email : null,
-                       audit.LoginResult);
+        var filteredAudits = ApplyFilters(
+            from audit in audits
+            join user in users on audit.PlatformUserId equals user.Id into matchedUsers
+            from user in matchedUsers.DefaultIfEmpty()
+            select new AuditUserJoinRow(audit, user != null ? user.Email : null),
+            query);
 
-        rows = ApplyFilters(rows, query);
-
-        var totalCount = await rows.CountAsync(cancellationToken);
-        var pageRows = await rows
-            .OrderByDescending(x => x.OccurredAt)
-            .ThenByDescending(x => x.Id)
+        var totalCount = await filteredAudits.CountAsync(cancellationToken);
+        var pageRows = await filteredAudits
+            .OrderByDescending(x => x.Audit.CreatedAt)
+            .ThenByDescending(x => x.Audit.Id)
             .Skip((query.PageNumber - 1) * query.PageSize)
             .Take(query.PageSize)
+            .Select(x => new LoginAuditRow(
+                x.Audit.Id,
+                x.Audit.CreatedAt,
+                x.Audit.PlatformUserId,
+                x.Email,
+                x.Audit.LoginResult))
             .ToListAsync(cancellationToken);
 
         var items = pageRows
@@ -88,29 +90,29 @@ public sealed class PlatformAuditLogRepository : IPlatformAuditLogRepository
             0);
     }
 
-    private static IQueryable<LoginAuditRow> ApplyFilters(
-        IQueryable<LoginAuditRow> rows,
+    private static IQueryable<AuditUserJoinRow> ApplyFilters(
+        IQueryable<AuditUserJoinRow> rows,
         PlatformAuditLogListQuery query)
     {
         if (query.ActorPlatformUserId is not null)
         {
-            rows = rows.Where(x => x.PlatformUserId == query.ActorPlatformUserId);
+            rows = rows.Where(x => x.Audit.PlatformUserId == query.ActorPlatformUserId);
         }
 
         if (query.From is not null)
         {
-            rows = rows.Where(x => x.OccurredAt >= query.From);
+            rows = rows.Where(x => x.Audit.CreatedAt >= query.From);
         }
 
         if (query.To is not null)
         {
-            rows = rows.Where(x => x.OccurredAt <= query.To);
+            rows = rows.Where(x => x.Audit.CreatedAt <= query.To);
         }
 
         var loginResultFilter = PlatformAuditLogMapper.ResolveLoginResultFilter(query.Action);
         if (loginResultFilter is not null)
         {
-            rows = rows.Where(x => x.LoginResult == loginResultFilter);
+            rows = rows.Where(x => x.Audit.LoginResult == loginResultFilter);
         }
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -121,19 +123,21 @@ public sealed class PlatformAuditLogRepository : IPlatformAuditLogRepository
             if (mappedLoginResult is not null)
             {
                 rows = rows.Where(x =>
-                    x.LoginResult == mappedLoginResult ||
+                    x.Audit.LoginResult == mappedLoginResult ||
                     (x.Email != null && x.Email.Contains(term)));
             }
             else
             {
                 rows = rows.Where(x =>
                     (x.Email != null && x.Email.Contains(term)) ||
-                    x.LoginResult.Contains(term));
+                    x.Audit.LoginResult.Contains(term));
             }
         }
 
         return rows;
     }
+
+    private sealed record AuditUserJoinRow(PlatformLoginAudit Audit, string? Email);
 
     private sealed record LoginAuditRow(
         Guid Id,
