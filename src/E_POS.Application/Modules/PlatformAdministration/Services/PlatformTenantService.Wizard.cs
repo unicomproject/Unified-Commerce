@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
+using E_POS.Application.Modules.PlatformAdministration.Validators;
 using E_POS.Domain.Modules.AccessControl.Constants;
 using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Domain.Modules.AuthSecurity.Entities;
@@ -41,6 +42,12 @@ public sealed partial class PlatformTenantService
         if (!IsWizardRequest(request))
         {
             return await CreateLegacyTenantAsync(request, platformUserId, cancellationToken);
+        }
+
+        var wizardValidationError = PlatformTenantCreateRequestValidator.ValidateWizard(request);
+        if (wizardValidationError is not null)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(wizardValidationError);
         }
 
         var code = NormalizeRequiredText(request.Code);

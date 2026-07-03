@@ -17,4 +17,10 @@ public static class TenantSubscriptionBillingConstants
         BillingCycleMonthly,
         BillingCycleYearly
     ];
+
+    public static readonly IReadOnlyList<(string Value, string Label)> PaymentMethods =
+    [
+        ("manual", "Manual"),
+        ("bank_transfer", "Bank Transfer")
+    ];
 }

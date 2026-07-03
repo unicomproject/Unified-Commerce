@@ -50,6 +50,9 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value!.Plans);
         Assert.Single(result.Value.Addons);
+        Assert.Single(result.Value.CountryCodes);
+        Assert.Equal("LK", result.Value.CountryCodes[0].Code);
+        Assert.Equal("Sri Lanka", result.Value.CountryCodes[0].Name);
     }
 
     [Fact]
@@ -117,6 +120,38 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("platform_tenants.validation_failed", result.Error.Code);
         Assert.Contains("Temporary password provisioning is deferred", result.Error.Message, StringComparison.Ordinal);
+        Assert.False(repository.CreateWizardCalled);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardWithInvalidCountryCode_ReturnsValidationFailureBeforeSave()
+    {
+        var repository = new FakeWizardTenantRepository();
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-COUNTRY",
+                Name = "Wizard Tenant",
+                CountryCode = "Sri Lanka",
+                BaseCurrency = "LKR",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Nimal",
+                    Email = "nimal@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_tenants.validation_failed", result.Error.Code);
+        Assert.Contains(result.Error.FieldErrors!, item => item.Field == "countryCode");
         Assert.False(repository.CreateWizardCalled);
     }
 
@@ -411,7 +446,12 @@ public sealed class PlatformTenantWizardServiceTests
                         })
                 ],
                 CatalogModules: [],
-                BillingModes: [],
+                BillingStatuses: [],
+                PaymentMethods: [],
+                CountryCodes:
+                [
+                    new PlatformTenantCreateCountryOptionDto("LK", "Sri Lanka")
+                ],
                 Currencies: [],
                 Timezones: [],
                 Locales: [],

@@ -178,7 +178,7 @@ public sealed partial class PlatformTenantRepository
             .Select(type => new PlatformTenantCreateLookupOptionDto(type.BusinessTypeCode, type.Name))
             .ToListAsync(cancellationToken);
 
-        var billingModes = new[]
+        var billingStatuses = new[]
         {
             TenantBillingStatusConstants.Pending,
             TenantBillingStatusConstants.Paid,
@@ -187,6 +187,14 @@ public sealed partial class PlatformTenantRepository
             TenantBillingStatusConstants.Waived
         }
             .Select(value => new PlatformTenantCreateLookupOptionDto(value, ToLookupLabel(value)))
+            .ToList();
+
+        var paymentMethods = TenantSubscriptionBillingConstants.PaymentMethods
+            .Select(item => new PlatformTenantCreateLookupOptionDto(item.Value, item.Label))
+            .ToList();
+
+        var countryCodes = TenantCreateWizardReferenceData.CountryCodes
+            .Select(item => new PlatformTenantCreateCountryOptionDto(item.Code, item.Name))
             .ToList();
 
         var timezones = TenantCreateWizardReferenceData.Timezones
@@ -220,7 +228,9 @@ public sealed partial class PlatformTenantRepository
             plans,
             addons,
             catalogModules,
-            billingModes,
+            billingStatuses,
+            paymentMethods,
+            countryCodes,
             currencies,
             timezones,
             locales,

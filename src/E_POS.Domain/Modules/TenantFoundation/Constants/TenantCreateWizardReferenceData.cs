@@ -17,6 +17,14 @@ public static class TenantCreateWizardReferenceData
         ("en-US", "English (United States)")
     ];
 
+    public static readonly IReadOnlyList<(string Code, string Name)> CountryCodes =
+    [
+        ("LK", "Sri Lanka"),
+        ("IN", "India"),
+        ("GB", "United Kingdom"),
+        ("US", "United States")
+    ];
+
     public static readonly IReadOnlyList<string> TenantAdminBootstrapPermissionCodes =
     [
         "tenant.dashboard.view",

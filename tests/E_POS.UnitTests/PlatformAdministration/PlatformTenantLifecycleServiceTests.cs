@@ -569,7 +569,7 @@ public sealed class PlatformTenantLifecycleServiceTests
         }
 
         public Task<PlatformTenantCreateOptionsResponse> GetCreateOptionsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(new PlatformTenantCreateOptionsResponse([], [], [], [], [], [], [], [], [], [], []));
+            Task.FromResult(new PlatformTenantCreateOptionsResponse([], [], [], [], [], [], [], [], [], [], [], [], []));
 
         public Task<bool> TenantUserEmailExistsAsync(string email, CancellationToken cancellationToken) =>
             Task.FromResult(false);

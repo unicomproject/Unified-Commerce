@@ -4,7 +4,9 @@ public sealed record PlatformTenantCreateOptionsResponse(
     IReadOnlyList<PlatformTenantCreatePlanOptionDto> Plans,
     IReadOnlyList<PlatformTenantCreateAddonOptionDto> Addons,
     IReadOnlyList<PlatformTenantCreateCatalogModuleDto> CatalogModules,
-    IReadOnlyList<PlatformTenantCreateLookupOptionDto> BillingModes,
+    IReadOnlyList<PlatformTenantCreateLookupOptionDto> BillingStatuses,
+    IReadOnlyList<PlatformTenantCreateLookupOptionDto> PaymentMethods,
+    IReadOnlyList<PlatformTenantCreateCountryOptionDto> CountryCodes,
     IReadOnlyList<PlatformTenantCreateLookupOptionDto> Currencies,
     IReadOnlyList<PlatformTenantCreateLookupOptionDto> Timezones,
     IReadOnlyList<PlatformTenantCreateLookupOptionDto> Locales,
@@ -52,6 +54,10 @@ public sealed record PlatformTenantCreateCatalogFeatureDto(
     string Name,
     string? Description,
     int SortOrder);
+
+public sealed record PlatformTenantCreateCountryOptionDto(
+    string Code,
+    string Name);
 
 public sealed record PlatformTenantCreateLookupOptionDto(
     string Value,

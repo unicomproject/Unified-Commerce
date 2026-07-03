@@ -426,6 +426,6 @@ public sealed class PlatformAdminTenantsControllerTests
             Guid platformUserId,
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<PlatformTenantCreateOptionsResponse>.Success(
-                new PlatformTenantCreateOptionsResponse([], [], [], [], [], [], [], [], [], [], [])));
+                new PlatformTenantCreateOptionsResponse([], [], [], [], [], [], [], [], [], [], [], [], [])));
     }
 }
