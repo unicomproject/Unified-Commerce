@@ -152,6 +152,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<ProductVariantOptionValue> ProductVariantOptionValues => Set<ProductVariantOptionValue>();
     public DbSet<ReturnPolicy> ReturnPolicies => Set<ReturnPolicy>();
+    public DbSet<ReturnPolicyTemplate> ReturnPolicyTemplates => Set<ReturnPolicyTemplate>();
     public DbSet<UnitOfMeasure> UnitOfMeasures => Set<UnitOfMeasure>();
 
     // Pricing and Tax

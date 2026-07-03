@@ -29,7 +29,7 @@ public sealed class PlatformUserRepositoryTests
 
         Assert.Equal(DevelopmentPlatformAdminSeedData.Email, superAdmin.Email);
         Assert.Contains(PlatformRoleCodes.SuperAdministrator, superAdmin.RoleCodes);
-        Assert.Equal(31, superAdmin.PermissionCount);
+        Assert.Equal(36, superAdmin.PermissionCount);
     }
 
     [Fact]

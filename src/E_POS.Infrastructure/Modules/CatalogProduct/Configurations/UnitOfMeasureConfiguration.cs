@@ -31,7 +31,7 @@ public sealed class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOf
 
         builder.Property(x => x.TenantId)
             .HasColumnName("tenant_id")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.Name)
             .HasColumnName("name")
@@ -54,11 +54,16 @@ public sealed class UnitOfMeasureConfiguration : IEntityTypeConfiguration<UnitOf
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_unit_of_measures_tenant_id_tenants");
 
+        builder.HasIndex(x => x.UomCode)
+            .IsUnique()
+            .HasDatabaseName("uq_unit_of_measures_global_uom_code")
+            .HasFilter("tenant_id IS NULL");
+
         builder.HasIndex(x => new { x.TenantId, x.UomCode })
             .IsUnique()
-            .HasDatabaseName("uq_unit_of_measures_tenant_id_uom_code");
+            .HasDatabaseName("uq_unit_of_measures_tenant_id_uom_code")
+            .HasFilter("tenant_id IS NOT NULL");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_unit_of_measures_conversion_factor", "conversion_factor IS NULL OR conversion_factor > 0")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_unit_of_measures_conversion_factor", "conversion_factor IS NULL OR conversion_factor > 0"));
     }
 }
-

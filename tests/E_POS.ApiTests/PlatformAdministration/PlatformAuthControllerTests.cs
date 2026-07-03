@@ -174,7 +174,7 @@ public sealed class PlatformAuthControllerTests
         var payload = Assert.IsType<LegacyApiResponse<LegacyPlatformLoginResponse>>(ok.Value);
         Assert.True(payload.Success);
         Assert.Equal("jwt-token", payload.Data.AccessToken);
-        Assert.Equal(31, payload.Data.User.PlatformPermissions.Count);
+        Assert.Equal(36, payload.Data.User.PlatformPermissions.Count);
         Assert.Contains("platform_refresh_token=refresh-token", controller.Response.Headers.SetCookie.ToString());
         Assert.Contains("path=/api/v1/auth", controller.Response.Headers.SetCookie.ToString(), StringComparison.OrdinalIgnoreCase);
     }
