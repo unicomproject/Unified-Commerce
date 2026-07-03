@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using E_POS.Api.Common.Cookies;
 using E_POS.Api.Extensions;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;

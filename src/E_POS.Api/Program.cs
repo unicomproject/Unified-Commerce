@@ -1,4 +1,5 @@
 using System.Text;
+using E_POS.Api.Common;
 using E_POS.Api.Extensions;
 using E_POS.Api.Middleware;
 using E_POS.Application;
@@ -19,6 +20,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<ITenantRequestContextFactory, TenantRequestContextFactory>();
 
 var platformJwtOptions = builder.Configuration
     .GetSection(PlatformJwtOptions.SectionName)

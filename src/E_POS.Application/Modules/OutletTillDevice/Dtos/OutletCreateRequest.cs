@@ -1,8 +1,7 @@
-namespace E_POS.Application.Modules.OutletTillDevice.Dtos;
+﻿namespace E_POS.Application.Modules.OutletTillDevice.Dtos;
 
 public sealed record OutletCreateRequest(
     string Name,
-    string OutletCode,
     string Status,
     string OutletType,
     bool IsOnlineVisible,

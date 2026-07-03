@@ -108,7 +108,7 @@ public sealed class OutletServiceTests
 
     private static OutletService CreateService(FakeOutletRepository repository)
     {
-        return new OutletService(repository, new OutletRequestValidator(), new FakeDateTimeProvider());
+        return new OutletService(repository, new FakeCodeSequenceRepository(), new OutletRequestValidator(), new FakeDateTimeProvider());
     }
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string>? permissions = null)
@@ -120,7 +120,6 @@ public sealed class OutletServiceTests
     {
         return new OutletCreateRequest(
             "Main Outlet",
-            "main001",
             "ACTIVE",
             "STORE",
             true,
@@ -129,6 +128,17 @@ public sealed class OutletServiceTests
             new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "LK"),
             [new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0))],
             false);
+    }
+
+    private sealed class FakeCodeSequenceRepository : ICodeSequenceRepository
+    {
+        private int _nextValue;
+
+        public Task<string> GetNextCodeAsync(Guid tenantId, string sequenceKey, string prefix, int paddingLength, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            _nextValue++;
+            return Task.FromResult($"{prefix}{_nextValue.ToString().PadLeft(paddingLength, '0')}");
+        }
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
@@ -149,8 +159,13 @@ public sealed class OutletServiceTests
         public Task<OutletResponse?> GetByIdAsync(Guid tenantId, Guid outletId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<OutletResponse?>(CreateResponse(outletId));
         public Task<OutletEditAggregate?> GetEditAggregateAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(EditAggregate);
         public Task<bool> HasActiveTillOrDeviceAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(HasActiveTillOrDevice);
-        public Task AddAsync(Outlet outlet, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? pickupMapping, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task SaveUpdatedAsync(OutletEditAggregate aggregate, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? newPickupMapping, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Outlet? AddedOutlet { get; private set; }
+        public Task<bool> AddAsync(Outlet outlet, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? pickupMapping, CancellationToken cancellationToken)
+        {
+            AddedOutlet = outlet;
+            return Task.FromResult(true);
+        }
+        public Task<bool> SaveUpdatedAsync(OutletEditAggregate aggregate, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? newPickupMapping, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         private static OutletResponse CreateResponse(Guid outletId)
