@@ -9,13 +9,13 @@ namespace E_POS.UnitTests.PlatformAdministration;
 public sealed class PlatformPermissionCatalogMapperTests
 {
     [Fact]
-    public void BuildFlat_IncludesAllThirtyOneOptionAPermissions()
+    public void BuildFlat_IncludesAllThirtySixOptionAPermissions()
     {
         var permissions = CreateSeedPermissions();
 
         var flat = PlatformPermissionCatalogMapper.BuildFlat(permissions);
 
-        Assert.Equal(31, flat.TotalCount);
+        Assert.Equal(36, flat.TotalCount);
         Assert.Equal(
             PlatformPermissionCodes.All.OrderBy(x => x, StringComparer.Ordinal),
             flat.Permissions.Select(permission => permission.Code).OrderBy(x => x, StringComparer.Ordinal));
@@ -34,8 +34,8 @@ public sealed class PlatformPermissionCatalogMapperTests
 
         var flat = PlatformPermissionCatalogMapper.BuildFlat(permissions);
 
-        Assert.Equal(32, permissions.Count);
-        Assert.Equal(31, flat.TotalCount);
+        Assert.Equal(37, permissions.Count);
+        Assert.Equal(36, flat.TotalCount);
         Assert.DoesNotContain(
             flat.Permissions,
             permission => permission.Code == PlatformBootstrapPermissionCodes.AdminAccess);
@@ -51,7 +51,7 @@ public sealed class PlatformPermissionCatalogMapperTests
         var catalog = PlatformPermissionCatalogMapper.BuildCatalog(permissions);
 
         Assert.Equal(
-            ["dashboard", "tenants", "subscription_plans", "modules", "features", "users", "audit", "settings", "billing", "integrations", "permissions", "roles"],
+            ["dashboard", "tenants", "subscription_plans", "modules", "features", "users", "audit", "settings", "billing", "integrations", "permissions", "roles", "return_policy_templates"],
             catalog.Modules.Select(module => module.Key).ToList());
 
         var tenantModule = catalog.Modules.Single(module => module.Key == "tenants");

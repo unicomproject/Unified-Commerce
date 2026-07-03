@@ -1,5 +1,8 @@
 using E_POS.Application.Modules.AuthSecurity.Contracts;
 using E_POS.Application.Modules.AuthSecurity.Services;
+using E_POS.Application.Modules.CatalogProduct.Contracts;
+using E_POS.Application.Modules.CatalogProduct.Services;
+using E_POS.Application.Modules.CatalogProduct.Validators;
 using E_POS.Application.Modules.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.OutletTillDevice.Services;
 using E_POS.Application.Modules.OutletTillDevice.Validators;
@@ -26,6 +29,19 @@ public static class DependencyInjection
         services.AddScoped<IPlatformUserService, PlatformUserService>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
+        services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
+        services.AddScoped<IDepartmentRequestValidator, DepartmentRequestValidator>();
+        services.AddScoped<ICategoryRequestValidator, CategoryRequestValidator>();
+        services.AddScoped<IBrandRequestValidator, BrandRequestValidator>();
+        services.AddScoped<ICollectionRequestValidator, CollectionRequestValidator>();
+        services.AddScoped<IReturnPolicyTemplateRequestValidator, ReturnPolicyTemplateRequestValidator>();
+        services.AddScoped<IReturnPolicyRequestValidator, ReturnPolicyRequestValidator>();
+        services.AddScoped<IDepartmentService, DepartmentService>();
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IBrandService, BrandService>();
+        services.AddScoped<ICollectionService, CollectionService>();
+        services.AddScoped<IReturnPolicyTemplateService, ReturnPolicyTemplateService>();
+        services.AddScoped<IReturnPolicyService, ReturnPolicyService>();
         services.AddScoped<IOutletRequestValidator, OutletRequestValidator>();
         services.AddScoped<ITillRequestValidator, TillRequestValidator>();
         services.AddScoped<IPosDeviceRequestValidator, PosDeviceRequestValidator>();

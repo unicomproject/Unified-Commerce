@@ -155,7 +155,7 @@ public sealed class PlatformAdminRolesControllerTests
                 "Super Administrator",
                 "Protected role.",
                 PlatformAuthConstants.ActiveStatus,
-                31,
+                36,
                 1,
                 true,
                 true,

@@ -22,6 +22,12 @@ public static class PlatformPermissionCodes
     public const string SubscriptionPlansArchive = "platform.subscription_plans.archive";
     public const string SubscriptionPlansDelete = "platform.subscription_plans.delete";
 
+    public const string ReturnPolicyTemplatesView = "platform.return_policy_templates.view";
+    public const string ReturnPolicyTemplatesCreate = "platform.return_policy_templates.create";
+    public const string ReturnPolicyTemplatesUpdate = "platform.return_policy_templates.update";
+    public const string ReturnPolicyTemplatesDelete = "platform.return_policy_templates.delete";
+    public const string ReturnPolicyTemplatesManage = "platform.return_policy_templates.manage";
+
     public const string ModulesView = "platform.modules.view";
     public const string FeaturesView = "platform.features.view";
 
@@ -63,6 +69,11 @@ public static class PlatformPermissionCodes
         SubscriptionPlansDuplicate,
         SubscriptionPlansArchive,
         SubscriptionPlansDelete,
+        ReturnPolicyTemplatesView,
+        ReturnPolicyTemplatesCreate,
+        ReturnPolicyTemplatesUpdate,
+        ReturnPolicyTemplatesDelete,
+        ReturnPolicyTemplatesManage,
         ModulesView,
         FeaturesView,
         UsersView,

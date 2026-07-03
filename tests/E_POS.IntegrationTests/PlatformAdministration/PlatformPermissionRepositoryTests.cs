@@ -15,7 +15,7 @@ public sealed class PlatformPermissionRepositoryTests
     private static readonly DateTimeOffset Now = new(2026, 7, 2, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task GetActivePermissionCodesAsync_ForSuperAdministratorRole_ReturnsAllThirtyOneCodes()
+    public async Task GetActivePermissionCodesAsync_ForSuperAdministratorRole_ReturnsAllThirtySixCodes()
     {
         await using var dbContext = CreateDbContext();
         var platformUserId = Guid.NewGuid();
@@ -46,7 +46,7 @@ public sealed class PlatformPermissionRepositoryTests
 
         var permissionCodes = await repository.GetActivePermissionCodesAsync(platformUserId, CancellationToken.None);
 
-        Assert.Equal(31, permissionCodes.Count);
+        Assert.Equal(36, permissionCodes.Count);
         Assert.Equal(
             PlatformPermissionCodes.All.OrderBy(x => x, StringComparer.Ordinal),
             permissionCodes.OrderBy(x => x, StringComparer.Ordinal));

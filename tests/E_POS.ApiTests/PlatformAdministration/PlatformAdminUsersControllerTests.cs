@@ -201,7 +201,7 @@ public sealed class PlatformAdminUsersControllerTests
                 PlatformAuthConstants.ActiveStatus,
                 [PlatformRoleCodes.SuperAdministrator],
                 ["Super Administrator"],
-                31,
+                36,
                 Now,
                 Now,
                 Now)

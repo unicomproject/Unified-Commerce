@@ -341,7 +341,7 @@ public sealed class PlatformRoleServiceTests
                 "Super Administrator",
                 "Protected role.",
                 PlatformAuthConstants.ActiveStatus,
-                31,
+                36,
                 1,
                 Now,
                 Now)

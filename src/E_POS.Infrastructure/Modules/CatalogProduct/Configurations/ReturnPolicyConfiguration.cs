@@ -47,6 +47,12 @@ public sealed class ReturnPolicyConfiguration : IEntityTypeConfiguration<ReturnP
         builder.Property(x => x.ReturnWindowDays)
             .HasColumnName("return_window_days");
 
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired();
+
         builder.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -57,7 +63,10 @@ public sealed class ReturnPolicyConfiguration : IEntityTypeConfiguration<ReturnP
             .IsUnique()
             .HasDatabaseName("uq_return_policies_tenant_id_policy_code");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_return_policies_return_window_days", "return_window_days IS NULL OR return_window_days >= 0")); 
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_return_policies_return_window_days", "return_window_days IS NULL OR return_window_days >= 0");
+            t.HasCheckConstraint("ck_return_policies_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+        });
     }
 }
-
