@@ -126,7 +126,6 @@ public sealed class PlatformAuditLogRepositoryTests
     public void GetLoginSecurityAuditLogsAsync_QueryOrdersByEntityColumnsBeforeProjection()
     {
         using var dbContext = CreatePostgreSqlDbContext();
-        SeedAuditLogs(dbContext);
 
         var query = BuildPaginatedAuditQuery(dbContext, new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
         {
@@ -138,10 +137,10 @@ public sealed class PlatformAuditLogRepositoryTests
 
         Assert.Contains("ORDER BY", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("created_at", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("LoginAuditRow", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("OccurredAt", sql, StringComparison.Ordinal);
     }
 
-    private static IQueryable<PlatformLoginAudit> BuildPaginatedAuditQuery(
+    private static IQueryable<LoginAuditRow> BuildPaginatedAuditQuery(
         EPosDbContext dbContext,
         Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery listQuery)
     {
@@ -152,17 +151,30 @@ public sealed class PlatformAuditLogRepositoryTests
             from audit in audits
             join user in users on audit.PlatformUserId equals user.Id into matchedUsers
             from user in matchedUsers.DefaultIfEmpty()
-            select audit)
-            .OrderByDescending(audit => audit.CreatedAt)
-            .ThenByDescending(audit => audit.Id)
+            select new { audit, Email = user != null ? user.Email : null })
+            .OrderByDescending(x => x.audit.CreatedAt)
+            .ThenByDescending(x => x.audit.Id)
             .Skip((listQuery.PageNumber - 1) * listQuery.PageSize)
-            .Take(listQuery.PageSize);
+            .Take(listQuery.PageSize)
+            .Select(x => new LoginAuditRow(
+                x.audit.Id,
+                x.audit.CreatedAt,
+                x.audit.PlatformUserId,
+                x.Email,
+                x.audit.LoginResult));
     }
+
+    private sealed record LoginAuditRow(
+        Guid Id,
+        DateTimeOffset OccurredAt,
+        Guid? PlatformUserId,
+        string? Email,
+        string LoginResult);
 
     private static EPosDbContext CreatePostgreSqlDbContext()
     {
         var options = new DbContextOptionsBuilder<EPosDbContext>()
-            .UseNpgsql("Host=127.0.0.1;Database=e_pos_audit_query_test;Username=postgres;Password=postgres")
+            .UseNpgsql("Host=127.0.0.1;Database=e_pos_audit_query_test;Username=postgres;Password=admin")
             .Options;
 
         return new EPosDbContext(options);
