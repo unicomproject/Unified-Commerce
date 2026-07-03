@@ -42,6 +42,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<PlatformUser> PlatformUsers => Set<PlatformUser>();
     public DbSet<PlatformUserPermission> PlatformUserPermissions => Set<PlatformUserPermission>();
     public DbSet<PlatformUserRole> PlatformUserRoles => Set<PlatformUserRole>();
+    public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
 
     // Tenant Foundation
     public DbSet<BusinessType> BusinessTypes => Set<BusinessType>();
