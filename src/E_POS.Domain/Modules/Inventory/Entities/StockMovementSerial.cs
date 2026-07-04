@@ -4,6 +4,7 @@ namespace E_POS.Domain.Modules.Inventory.Entities;
 
 public class StockMovementSerial : AuditableEntity
 {
-    public Guid SerialNumberId { get; protected set; }
+    public Guid TenantId { get; protected set; }
     public Guid StockMovementId { get; protected set; }
+    public Guid SerialNumberId { get; protected set; }
 }

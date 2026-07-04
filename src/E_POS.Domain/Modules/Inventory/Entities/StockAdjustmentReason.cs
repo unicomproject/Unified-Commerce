@@ -6,6 +6,9 @@ public class StockAdjustmentReason : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
     public string ReasonCode { get; protected set; } = string.Empty;
-    public string Name { get; protected set; } = string.Empty;
-    public string? Description { get; protected set; }
+    public string ReasonName { get; protected set; } = string.Empty;
+    public string Direction { get; protected set; } = string.Empty;
+    public bool RequiresManagerApproval { get; protected set; }
+    public bool IsSystemReason { get; protected set; }
+    public string Status { get; protected set; } = string.Empty;
 }

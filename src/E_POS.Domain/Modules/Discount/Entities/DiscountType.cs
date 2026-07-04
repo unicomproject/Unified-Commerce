@@ -4,7 +4,9 @@ namespace E_POS.Domain.Modules.Discount.Entities;
 
 public class DiscountType : AuditableEntity
 {
-    public Guid TenantId { get; protected set; }
-    public string Name { get; protected set; } = string.Empty;
     public string DiscountTypeCode { get; protected set; } = string.Empty;
+    public string DiscountTypeName { get; protected set; } = string.Empty;
+    public string CalculationMethod { get; protected set; } = string.Empty;
+    public bool IsSystemType { get; protected set; }
+    public string Status { get; protected set; } = string.Empty;
 }

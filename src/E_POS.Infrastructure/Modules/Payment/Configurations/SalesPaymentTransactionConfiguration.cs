@@ -20,39 +20,110 @@ public sealed class SalesPaymentTransactionConfiguration : IEntityTypeConfigurat
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
+        builder.Ignore(x => x.UpdatedAt);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.Amount)
-            .HasColumnName("amount")
-            .HasPrecision(18, 2);
-
-        builder.Property(x => x.IdempotencyKey)
-            .HasColumnName("idempotency_key")
-            .HasColumnType("varchar(120)")
-            .HasMaxLength(120);
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.SalesPaymentId)
             .HasColumnName("sales_payment_id")
             .IsRequired();
 
-        builder.HasOne<SalesPayment>()
+        builder.Property(x => x.ParentTransactionId)
+            .HasColumnName("parent_transaction_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.TransactionType)
+            .HasColumnName("transaction_type")
+            .IsRequired();
+
+        builder.Property(x => x.TransactionStatus)
+            .HasColumnName("transaction_status")
+            .IsRequired();
+
+        builder.Property(x => x.Amount)
+            .HasColumnName("amount")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.CurrencyCode)
+            .HasColumnName("currency_code")
+            .HasColumnType("char(3)")
+            .HasMaxLength(3)
+            .IsRequired();
+
+        builder.Property(x => x.ExternalTransactionReference)
+            .HasColumnName("external_transaction_reference")
+            .HasColumnType("varchar(180)")
+            .HasMaxLength(180)
+            .IsRequired(false);
+
+        builder.Property(x => x.ProviderName)
+            .HasColumnName("provider_name")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(x => x.ProviderResponseJson)
+            .HasColumnName("provider_response_json")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
+        builder.Property(x => x.IdempotencyKey)
+            .HasColumnName("idempotency_key")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(x => x.ProcessedByTenantUserId)
+            .HasColumnName("processed_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ProcessedAt)
+            .HasColumnName("processed_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        // <second-brain-constraints>
+        builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("ux_sales_payment_transactions_e759526b");
+
+        builder.HasIndex(x => new { x.TenantId, x.ProviderName, x.ExternalTransactionReference })
+            .IsUnique()
+            .HasDatabaseName("ux_sales_payment_transactions_5562416e");
+
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_payment_transactions_d1461364");
+
+        builder.HasOne<E_POS.Domain.Modules.Payment.Entities.SalesPayment>()
             .WithMany()
             .HasForeignKey(x => x.SalesPaymentId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_payment_transactions_sales_payment_id_sales_payments");
+            .HasConstraintName("fk_sales_payment_transactions_b80a12d3");
 
-        builder.HasIndex(x => x.IdempotencyKey)
-            .IsUnique()
-            .HasDatabaseName("uq_sales_payment_transactions_idempotency_key")
-            .HasFilter("idempotency_key IS NOT NULL");
+        builder.HasOne<E_POS.Domain.Modules.Payment.Entities.SalesPaymentTransaction>()
+            .WithMany()
+            .HasForeignKey(x => x.ParentTransactionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_payment_transactions_d36a2128");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_sales_payment_transactions_amount", "amount >= 0")); 
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.ProcessedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_payment_transactions_31a79680");
+        // <second-brain-checks>
+        builder.ToTable(t => t.HasCheckConstraint("ck_sales_payment_transactions_d53c5618", "amount > 0"));
+        // </second-brain-checks>
+
+        // </second-brain-constraints>
     }
 }
-

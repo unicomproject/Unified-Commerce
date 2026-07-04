@@ -38,11 +38,6 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
             .HasColumnType("varchar(30)")
             .HasMaxLength(30)
             .IsRequired();
-
-        builder.Property(x => x.DocumentNumberSequenceId)
-            .HasColumnName("document_number_sequence_id")
-            .IsRequired();
-
         builder.Property(x => x.OrderNumber)
             .HasColumnName("order_number")
             .HasColumnType("varchar(80)")
@@ -61,13 +56,6 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_sales_orders_tenant_id_tenants");
-
-        builder.HasOne<DocumentNumberSequence>()
-            .WithMany()
-            .HasForeignKey(x => x.DocumentNumberSequenceId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_orders_document_number_sequence_id_document_number_sequences");
-
         builder.HasIndex(x => new { x.TenantId, x.OrderNumber })
             .IsUnique()
             .HasDatabaseName("uq_sales_orders_tenant_id_order_number");

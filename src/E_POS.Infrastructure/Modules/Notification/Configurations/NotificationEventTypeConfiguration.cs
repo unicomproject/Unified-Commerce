@@ -23,19 +23,32 @@ public sealed class NotificationEventTypeConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.UpdatedAt)
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId)
-            .HasColumnName("tenant_id");
+            .HasColumnName("tenant_id")
+            .IsRequired(false);
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+        builder.Property(x => x.EventCode)
+            .HasColumnName("event_code")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
             .IsRequired();
+
+        builder.Property(x => x.EventName)
+            .HasColumnName("event_name")
+            .HasColumnType("varchar(180)")
+            .HasMaxLength(180)
+            .IsRequired();
+
+        builder.Property(x => x.SourceModule)
+            .HasColumnName("source_module")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired(false);
 
         builder.Property(x => x.Description)
             .HasColumnName("description")
@@ -44,24 +57,70 @@ public sealed class NotificationEventTypeConfiguration : IEntityTypeConfiguratio
 
         builder.Property(x => x.DefaultPriority)
             .HasColumnName("default_priority")
-            .HasColumnType("varchar(255)")
-            .HasMaxLength(255);
+            .IsRequired();
 
-        builder.Property(x => x.EventCode)
-            .HasColumnName("event_code")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
+        builder.Property(x => x.IsSystemEvent)
+            .HasColumnName("is_system_event")
+            .IsRequired();
 
-        builder.Property(x => x.SortOrder)
-            .HasColumnName("sort_order")
-            .IsRequired()
-            .HasDefaultValue(0);
+        builder.Property(x => x.IsEnabled)
+            .HasColumnName("is_enabled")
+            .IsRequired();
 
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
         builder.HasIndex(x => new { x.TenantId, x.EventCode })
             .IsUnique()
-            .HasDatabaseName("uq_notification_event_types_tenant_id_event_code");
+            .HasDatabaseName("ux_notification_event_types_ff3ad4c7");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_notification_event_types_default_priority", "default_priority IN ('LOW', 'NORMAL', 'HIGH', 'URGENT')")); 
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_notification_event_types_fed61083");
+
+        builder.HasOne<E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_notification_event_types_54cfe12d");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_notification_event_types_f5c84fbd");
+
+        builder.HasOne<E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_notification_event_types_bf0de1fd");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_notification_event_types_7c7b15b0");
+        // </second-brain-constraints>
     }
 }
-

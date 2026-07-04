@@ -29,40 +29,91 @@ public sealed class PaymentMethodConfiguration : IEntityTypeConfiguration<Paymen
         builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId)
-            .HasColumnName("tenant_id");
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.MethodCode)
             .HasColumnName("method_code")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
-
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
             .IsRequired();
 
-        builder.Property(x => x.Description)
-            .HasColumnName("description")
-            .HasColumnType("text")
-            .IsRequired(false);
-
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
+        builder.Property(x => x.MethodName)
+            .HasColumnName("method_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
             .IsRequired();
 
         builder.Property(x => x.MethodType)
             .HasColumnName("method_type")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
+            .IsRequired();
 
+        builder.Property(x => x.IsActiveForPos)
+            .HasColumnName("is_active_for_pos")
+            .IsRequired();
+
+        builder.Property(x => x.IsActiveForOnline)
+            .HasColumnName("is_active_for_online")
+            .IsRequired();
+
+        builder.Property(x => x.RequiresManualConfirmation)
+            .HasColumnName("requires_manual_confirmation")
+            .IsRequired();
+
+        builder.Property(x => x.SupportsRefund)
+            .HasColumnName("supports_refund")
+            .IsRequired();
+
+        builder.Property(x => x.RequiresReference)
+            .HasColumnName("requires_reference")
+            .IsRequired();
+
+        builder.Property(x => x.AllowsChange)
+            .HasColumnName("allows_change")
+            .IsRequired();
+
+        builder.Property(x => x.SortOrder)
+            .HasColumnName("sort_order")
+            .IsRequired();
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
         builder.HasIndex(x => new { x.TenantId, x.MethodCode })
             .IsUnique()
-            .HasDatabaseName("uq_payment_methods_tenant_id_method_code");
+            .HasDatabaseName("ux_payment_methods_d1d0cc7d");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_payment_methods_method_type", "method_type IN ('CASH', 'CARD', 'QR', 'BANK_TRANSFER', 'MANUAL', 'OTHER')")); 
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_payment_methods_61d22a01");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_payment_methods_8c525868");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_payment_methods_b8bcb1a7");
+        // <second-brain-checks>
+        builder.ToTable(t => t.HasCheckConstraint("ck_payment_methods_222cc075", "sort_order >= 0"));
+        // </second-brain-checks>
+
+        // </second-brain-constraints>
     }
 }
-

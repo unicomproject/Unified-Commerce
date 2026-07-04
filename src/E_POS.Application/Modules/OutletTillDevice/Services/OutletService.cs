@@ -1,4 +1,4 @@
-using E_POS.Application.Common.Contracts;
+﻿using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.OutletTillDevice.Dtos;
@@ -187,7 +187,7 @@ public sealed class OutletService : IOutletService
             return new PickupMappingResult(null, new ApplicationError("outlet.pickup_method_missing", "Active pickup fulfillment method is required before enabling collection point."));
         }
 
-        return new PickupMappingResult(FulfillmentMethodOutlet.Create(Guid.NewGuid(), pickupMethodId.Value, outletId, OutletConstants.ActiveStatus, now), null);
+        return new PickupMappingResult(FulfillmentMethodOutlet.Create(Guid.NewGuid(), tenantId, pickupMethodId.Value, outletId, OutletConstants.ActiveStatus, now), null);
     }
 
     private async Task<PickupMappingResult> UpdatePickupMappingAsync(Guid tenantId, Guid outletId, FulfillmentMethodOutlet? existingMapping, bool collectionEnabled, DateTimeOffset now, CancellationToken cancellationToken)

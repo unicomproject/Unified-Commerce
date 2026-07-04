@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.ReturnExchange.Entities;
+﻿using E_POS.Domain.Modules.ReturnExchange.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,32 +20,64 @@ public sealed class SalesExchangeEventConfiguration : IEntityTypeConfiguration<S
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
+        builder.Ignore(x => x.UpdatedAt);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
+
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.SalesExchangeId)
             .HasColumnName("sales_exchange_id")
             .IsRequired();
 
-        builder.Property(x => x.SequenceNumber)
-            .HasColumnName("sequence_number");
+        builder.Property(x => x.EventType)
+            .HasColumnName("event_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
 
-        builder.HasOne<SalesExchange>()
+        builder.Property(x => x.OldStatus)
+            .HasColumnName("old_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired(false);
+
+        builder.Property(x => x.NewStatus)
+            .HasColumnName("new_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired(false);
+
+        builder.Property(x => x.EventNotes)
+            .HasColumnName("event_notes")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_exchange_events_f22e3e9c");
+
+        builder.HasOne<E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchange>()
             .WithMany()
             .HasForeignKey(x => x.SalesExchangeId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_exchange_events_sales_exchange_id_sales_exchanges");
+            .HasConstraintName("fk_sales_exchange_events_23d6ab17");
 
-        builder.HasIndex(x => new { x.SalesExchangeId, x.SequenceNumber })
-            .IsUnique()
-            .HasDatabaseName("uq_sales_exchange_events_sales_exchange_id_sequence_number");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_sales_exchange_events_sequence_number", "sequence_number > 0")); 
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_exchange_events_9a6cae34");
+        // </second-brain-constraints>
     }
 }
-

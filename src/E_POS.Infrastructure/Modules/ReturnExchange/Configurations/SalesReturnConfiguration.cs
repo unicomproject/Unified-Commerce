@@ -1,5 +1,4 @@
-﻿using E_POS.Domain.Modules.Orders.Entities;
-using E_POS.Domain.Modules.ReturnExchange.Entities;
+﻿using E_POS.Domain.Modules.ReturnExchange.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -24,50 +23,163 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
         builder.Property(x => x.UpdatedAt)
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId)
-            .HasColumnName("tenant_id");
-
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
+            .HasColumnName("tenant_id")
             .IsRequired();
+
+        builder.Property(x => x.DocumentNumberSequenceId)
+            .HasColumnName("document_number_sequence_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.SalesOrderId)
+            .HasColumnName("sales_order_id")
+            .IsRequired();
+
+        builder.Property(x => x.CustomerId)
+            .HasColumnName("customer_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.OutletId)
+            .HasColumnName("outlet_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ReturnReasonId)
+            .HasColumnName("return_reason_id")
+            .IsRequired(false);
 
         builder.Property(x => x.ReturnNumber)
             .HasColumnName("return_number")
             .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
+            .HasMaxLength(80)
+            .IsRequired();
 
-        builder.Property(x => x.SalesOrderId)
-            .HasColumnName("sales_order_id")
+        builder.Property(x => x.ReturnChannel)
+            .HasColumnName("return_channel")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.ReturnStatus)
+            .HasColumnName("return_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired();
+
+        builder.Property(x => x.RequestedAt)
+            .HasColumnName("requested_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.ApprovedAt)
+            .HasColumnName("approved_at")
+            .HasColumnType("timestamp with time zone")
             .IsRequired(false);
+
+        builder.Property(x => x.ReceivedAt)
+            .HasColumnName("received_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.CompletedAt)
+            .HasColumnName("completed_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.CancelledAt)
+            .HasColumnName("cancelled_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.TotalRequestedQty)
+            .HasColumnName("total_requested_qty")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.TotalReceivedQty)
+            .HasColumnName("total_received_qty")
+            .HasPrecision(18, 4)
+            .IsRequired();
 
         builder.Property(x => x.TotalRefundAmount)
             .HasColumnName("total_refund_amount")
-            .HasPrecision(18, 2);
+            .HasPrecision(18, 4)
+            .IsRequired();
 
-        builder.Property(x => x.TotalReturnAmount)
-            .HasColumnName("total_return_amount")
-            .HasPrecision(18, 2);
+        builder.Property(x => x.TotalExchangeAmount)
+            .HasColumnName("total_exchange_amount")
+            .HasPrecision(18, 4)
+            .IsRequired();
 
-        builder.HasOne<SalesOrder>()
+        builder.Property(x => x.Notes)
+            .HasColumnName("notes")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasIndex(x => new { x.TenantId, x.ReturnNumber })
+            .IsUnique()
+            .HasDatabaseName("ux_sales_returns_35ae5e87");
+
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_returns_06232f9d");
+
+        builder.HasOne<E_POS.Domain.Modules.Orders.Entities.DocumentNumberSequence>()
+            .WithMany()
+            .HasForeignKey(x => x.DocumentNumberSequenceId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_returns_1549e8c2");
+
+        builder.HasOne<E_POS.Domain.Modules.Orders.Entities.SalesOrder>()
             .WithMany()
             .HasForeignKey(x => x.SalesOrderId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_returns_sales_order_id_sales_orders");
+            .HasConstraintName("fk_sales_returns_8e3771a4");
 
-        builder.HasIndex(x => new { x.TenantId, x.ReturnNumber })
-            .IsUnique()
-            .HasDatabaseName("uq_sales_returns_tenant_id_return_number");
+        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>()
+            .WithMany()
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_returns_f8fcc58d");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_sales_returns_total_return_amount", "total_return_amount >= 0")); 
+        builder.HasOne<E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet>()
+            .WithMany()
+            .HasForeignKey(x => x.OutletId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_returns_8bbbda2e");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_sales_returns_total_refund_amount", "total_refund_amount >= 0")); 
+        builder.HasOne<E_POS.Domain.Modules.ReturnExchange.Entities.ReturnReason>()
+            .WithMany()
+            .HasForeignKey(x => x.ReturnReasonId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_returns_8308f645");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_returns_341b4dbd");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_returns_43c7eee4");
+        // </second-brain-constraints>
     }
 }
-

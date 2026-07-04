@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.PlatformAdministration.Entities;
+﻿using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using E_POS.Domain.Modules.SubscriptionBilling.Entities;
 using E_POS.Domain.Modules.AccessControl.Entities;
@@ -214,9 +214,9 @@ public sealed class EPosDbContext : DbContext
 
     // Orders and Sales
     public DbSet<DocumentNumberSequence> DocumentNumberSequences => Set<DocumentNumberSequence>();
+    public DbSet<SalesOrderNumberSequence> SalesOrderNumberSequences => Set<SalesOrderNumberSequence>();
     public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
-    public DbSet<SalesOrderCharge> SalesOrderCharges => Set<SalesOrderCharge>();
-    public DbSet<SalesOrderDiscount> SalesOrderDiscounts => Set<SalesOrderDiscount>();
+    public DbSet<SalesOrderAddress> SalesOrderAddresses => Set<SalesOrderAddress>();    public DbSet<SalesOrderDiscount> SalesOrderDiscounts => Set<SalesOrderDiscount>();
     public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
     public DbSet<SalesOrderLineComponent> SalesOrderLineComponents => Set<SalesOrderLineComponent>();
     public DbSet<SalesOrderLineOption> SalesOrderLineOptions => Set<SalesOrderLineOption>();
@@ -239,13 +239,10 @@ public sealed class EPosDbContext : DbContext
     // Cart and Checkout
     public DbSet<CheckoutEvent> CheckoutEvents => Set<CheckoutEvent>();
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
-    public DbSet<CheckoutSessionLine> CheckoutSessionLines => Set<CheckoutSessionLine>();
-    public DbSet<CheckoutSessionLineComponent> CheckoutSessionLineComponents => Set<CheckoutSessionLineComponent>();
-    public DbSet<CheckoutSessionLineOption> CheckoutSessionLineOptions => Set<CheckoutSessionLineOption>();
+    public DbSet<CheckoutSessionAddress> CheckoutSessionAddresses => Set<CheckoutSessionAddress>();
+    public DbSet<CheckoutSessionLine> CheckoutSessionLines => Set<CheckoutSessionLine>();    public DbSet<CheckoutSessionLineOption> CheckoutSessionLineOptions => Set<CheckoutSessionLineOption>();
     public DbSet<ShoppingCart> ShoppingCarts => Set<ShoppingCart>();
-    public DbSet<ShoppingCartItem> ShoppingCartItems => Set<ShoppingCartItem>();
-    public DbSet<ShoppingCartItemComponent> ShoppingCartItemComponents => Set<ShoppingCartItemComponent>();
-    public DbSet<ShoppingCartItemOption> ShoppingCartItemOptions => Set<ShoppingCartItemOption>();
+    public DbSet<ShoppingCartItem> ShoppingCartItems => Set<ShoppingCartItem>();    public DbSet<ShoppingCartItemOption> ShoppingCartItemOptions => Set<ShoppingCartItemOption>();
 
     // Fulfilment and Pickup
     public DbSet<FulfillmentMethod> FulfillmentMethods => Set<FulfillmentMethod>();

@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.Payment.Entities;
+﻿using E_POS.Domain.Modules.Payment.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,32 +20,80 @@ public sealed class SalesPaymentEventConfiguration : IEntityTypeConfiguration<Sa
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
+        builder.Ignore(x => x.UpdatedAt);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
+
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.SalesPaymentId)
             .HasColumnName("sales_payment_id")
             .IsRequired();
 
         builder.Property(x => x.SequenceNumber)
-            .HasColumnName("sequence_number");
+            .HasColumnName("sequence_number")
+            .IsRequired();
 
-        builder.HasOne<SalesPayment>()
+        builder.Property(x => x.EventType)
+            .HasColumnName("event_type")
+            .IsRequired();
+
+        builder.Property(x => x.OldStatus)
+            .HasColumnName("old_status")
+            .IsRequired(false);
+
+        builder.Property(x => x.NewStatus)
+            .HasColumnName("new_status")
+            .IsRequired(false);
+
+        builder.Property(x => x.EventNote)
+            .HasColumnName("event_note")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.Property(x => x.EventPayloadJson)
+            .HasColumnName("event_payload_json")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
+        builder.Property(x => x.EventAt)
+            .HasColumnName("event_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.EventByTenantUserId)
+            .HasColumnName("event_by_tenant_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasIndex(x => new { x.TenantId, x.SalesPaymentId, x.SequenceNumber })
+            .IsUnique()
+            .HasDatabaseName("ux_sales_payment_events_f38768c9");
+
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_payment_events_7033c252");
+
+        builder.HasOne<E_POS.Domain.Modules.Payment.Entities.SalesPayment>()
             .WithMany()
             .HasForeignKey(x => x.SalesPaymentId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_payment_events_sales_payment_id_sales_payments");
+            .HasConstraintName("fk_sales_payment_events_832fd9c0");
 
-        builder.HasIndex(x => new { x.SalesPaymentId, x.SequenceNumber })
-            .IsUnique()
-            .HasDatabaseName("uq_sales_payment_events_sales_payment_id_sequence_number");
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.EventByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_payment_events_ea76aac1");
+        // <second-brain-checks>
+        builder.ToTable(t => t.HasCheckConstraint("ck_sales_payment_events_a1a5b828", "sequence_number > 0"));
+        // </second-brain-checks>
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_sales_payment_events_sequence_number", "sequence_number > 0")); 
+        // </second-brain-constraints>
     }
 }
-

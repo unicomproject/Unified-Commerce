@@ -1,5 +1,4 @@
 ﻿using E_POS.Domain.Modules.FulfilmentPickup.Entities;
-using E_POS.Domain.Modules.OutletTillDevice.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -29,35 +28,77 @@ public sealed class FulfillmentMethodOutletConfiguration : IEntityTypeConfigurat
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.OutletId)
-            .HasColumnName("outlet_id")
-            .IsRequired(false);
-
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
             .IsRequired();
 
         builder.Property(x => x.FulfillmentMethodId)
             .HasColumnName("fulfillment_method_id")
             .IsRequired();
 
-        builder.HasOne<FulfillmentMethod>()
+        builder.Property(x => x.OutletId)
+            .HasColumnName("outlet_id")
+            .IsRequired();
+
+        builder.Property(x => x.PreparationLeadMinutes)
+            .HasColumnName("preparation_lead_minutes")
+            .IsRequired(false);
+
+        builder.Property(x => x.PickupWindowMinutes)
+            .HasColumnName("pickup_window_minutes")
+            .IsRequired(false);
+
+        builder.Property(x => x.CutoffTime)
+            .HasColumnName("cutoff_time")
+            .HasColumnType("time")
+            .IsRequired(false);
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasIndex(x => new { x.TenantId, x.FulfillmentMethodId, x.OutletId })
+            .IsUnique()
+            .HasDatabaseName("ux_fulfillment_method_outlets_cf79fc78");
+
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_fulfillment_method_outlets_f359be5f");
+
+        builder.HasOne<E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentMethod>()
             .WithMany()
             .HasForeignKey(x => x.FulfillmentMethodId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_fulfillment_method_outlets_fulfillment_method_id_fulfillment_methods");
+            .HasConstraintName("fk_fulfillment_method_outlets_e627f2fa");
 
-        builder.HasOne<Outlet>()
+        builder.HasOne<E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet>()
             .WithMany()
             .HasForeignKey(x => x.OutletId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_fulfillment_method_outlets_outlet_id_outlets");
+            .HasConstraintName("fk_fulfillment_method_outlets_821f4b29");
 
-        builder.HasIndex(x => new { x.FulfillmentMethodId, x.OutletId })
-            .IsUnique()
-            .HasDatabaseName("uq_fulfillment_method_outlets_fulfillment_method_id_outlet_id");
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_fulfillment_method_outlets_bd06d410");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_fulfillment_method_outlets_6480bfac");
+        // </second-brain-constraints>
     }
 }
-
