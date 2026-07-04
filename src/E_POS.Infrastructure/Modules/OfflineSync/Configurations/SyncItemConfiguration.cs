@@ -20,65 +20,105 @@ public sealed class SyncItemConfiguration : IEntityTypeConfiguration<SyncItem>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
+        builder.Ignore(x => x.UpdatedAt);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId)
-            .HasColumnName("tenant_id");
-
-        builder.Property(x => x.OfflineClientId)
-            .HasColumnName("offline_client_id")
+            .HasColumnName("tenant_id")
             .IsRequired();
-
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
-            .IsRequired();
-
-        builder.Property(x => x.OperationType)
-            .HasColumnName("operation_type")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
-
-        builder.Property(x => x.ClientRecordId)
-            .HasColumnName("client_record_id");
-
-        builder.Property(x => x.EntityName)
-            .HasColumnName("entity_name")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
-
-        builder.Property(x => x.PayloadHash)
-            .HasColumnName("payload_hash")
-            .HasColumnType("char(64)")
-            .HasMaxLength(64);
 
         builder.Property(x => x.SyncBatchId)
             .HasColumnName("sync_batch_id")
             .IsRequired();
 
-        builder.HasOne<SyncBatch>()
+        builder.Property(x => x.OfflineClientId)
+            .HasColumnName("offline_client_id")
+            .IsRequired();
+
+        builder.Property(x => x.Direction)
+            .HasColumnName("direction")
+            .IsRequired();
+
+        builder.Property(x => x.EntityName)
+            .HasColumnName("entity_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired();
+
+        builder.Property(x => x.ClientRecordId)
+            .HasColumnName("client_record_id")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired(false);
+
+        builder.Property(x => x.ServerRecordId)
+            .HasColumnName("server_record_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.OperationType)
+            .HasColumnName("operation_type")
+            .IsRequired();
+
+        builder.Property(x => x.PayloadJson)
+            .HasColumnName("payload_json")
+            .HasColumnType("jsonb")
+            .IsRequired();
+
+        builder.Property(x => x.PayloadHash)
+            .HasColumnName("payload_hash")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255)
+            .IsRequired(false);
+
+        builder.Property(x => x.ItemStatus)
+            .HasColumnName("item_status")
+            .IsRequired();
+
+        builder.Property(x => x.ErrorCode)
+            .HasColumnName("error_code")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired(false);
+
+        builder.Property(x => x.ErrorMessage)
+            .HasColumnName("error_message")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.Property(x => x.ReceivedAt)
+            .HasColumnName("received_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.ProcessedAt)
+            .HasColumnName("processed_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasIndex(x => new { x.TenantId, x.OfflineClientId, x.EntityName, x.ClientRecordId, x.OperationType, x.PayloadHash })
+            .IsUnique()
+            .HasDatabaseName("ux_sync_items_ae7f345a");
+
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sync_items_23643150");
+
+        builder.HasOne<E_POS.Domain.Modules.OfflineSync.Entities.SyncBatch>()
             .WithMany()
             .HasForeignKey(x => x.SyncBatchId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sync_items_sync_batch_id_sync_batches");
+            .HasConstraintName("fk_sync_items_e950bc88");
 
-        builder.HasOne<OfflineClient>()
+        builder.HasOne<E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient>()
             .WithMany()
             .HasForeignKey(x => x.OfflineClientId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sync_items_offline_client_id_offline_clients");
-
-        builder.HasIndex(x => new { x.TenantId, x.OfflineClientId, x.EntityName, x.ClientRecordId, x.OperationType, x.PayloadHash })
-            .IsUnique()
-            .HasDatabaseName("uq_sync_items_tenant_id_offline_client_id_entity_name_client_record_id_operation_type_payload_hash")
-            .HasFilter("payload_hash IS NOT NULL");
+            .HasConstraintName("fk_sync_items_c57862d6");
+        // </second-brain-constraints>
     }
 }
-

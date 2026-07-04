@@ -6,7 +6,9 @@ public class ReturnReason : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
     public string ReasonCode { get; protected set; } = string.Empty;
-    public string Name { get; protected set; } = string.Empty;
-    public string? Description { get; protected set; }
+    public string ReasonName { get; protected set; } = string.Empty;
     public string AppliesTo { get; protected set; } = string.Empty;
+    public bool RequiresInspection { get; protected set; }
+    public bool IsActive { get; protected set; }
+    public int SortOrder { get; protected set; }
 }

@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.FulfilmentPickup.Entities;
+﻿using E_POS.Domain.Modules.FulfilmentPickup.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,32 +20,72 @@ public sealed class PickupOrderEventConfiguration : IEntityTypeConfiguration<Pic
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
+        builder.Ignore(x => x.UpdatedAt);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
+
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.PickupOrderId)
             .HasColumnName("pickup_order_id")
             .IsRequired();
 
         builder.Property(x => x.SequenceNumber)
-            .HasColumnName("sequence_number");
+            .HasColumnName("sequence_number")
+            .IsRequired();
 
-        builder.HasOne<PickupOrder>()
+        builder.Property(x => x.EventType)
+            .HasColumnName("event_type")
+            .IsRequired();
+
+        builder.Property(x => x.OldStatus)
+            .HasColumnName("old_status")
+            .IsRequired(false);
+
+        builder.Property(x => x.NewStatus)
+            .HasColumnName("new_status")
+            .IsRequired(false);
+
+        builder.Property(x => x.EventNote)
+            .HasColumnName("event_note")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.Property(x => x.EventPayloadJson)
+            .HasColumnName("event_payload_json")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
+        builder.Property(x => x.EventAt)
+            .HasColumnName("event_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.EventByTenantUserId)
+            .HasColumnName("event_by_tenant_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pickup_order_events_7f9983ca");
+
+        builder.HasOne<E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupOrder>()
             .WithMany()
             .HasForeignKey(x => x.PickupOrderId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_pickup_order_events_pickup_order_id_pickup_orders");
+            .HasConstraintName("fk_pickup_order_events_d220b84e");
 
-        builder.HasIndex(x => new { x.PickupOrderId, x.SequenceNumber })
-            .IsUnique()
-            .HasDatabaseName("uq_pickup_order_events_pickup_order_id_sequence_number");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_pickup_order_events_sequence_number", "sequence_number > 0")); 
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.EventByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pickup_order_events_9194aa75");
+        // </second-brain-constraints>
     }
 }
-

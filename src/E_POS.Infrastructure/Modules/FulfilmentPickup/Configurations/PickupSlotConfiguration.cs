@@ -28,43 +28,67 @@ public sealed class PickupSlotConfiguration : IEntityTypeConfiguration<PickupSlo
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.Capacity)
-            .HasColumnName("capacity");
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.FulfillmentMethodOutletId)
             .HasColumnName("fulfillment_method_outlet_id")
             .IsRequired();
 
-        builder.Property(x => x.ReservedCount)
-            .HasColumnName("reserved_count");
+        builder.Property(x => x.SlotCode)
+            .HasColumnName("slot_code")
+            .HasColumnType("varchar(50)")
+            .HasMaxLength(50)
+            .IsRequired();
 
         builder.Property(x => x.SlotDate)
             .HasColumnName("slot_date")
-            .HasColumnType("date");
-
-        builder.Property(x => x.WindowEnd)
-            .HasColumnName("window_end")
-            .HasColumnType("time without time zone");
+            .HasColumnType("date")
+            .IsRequired();
 
         builder.Property(x => x.WindowStart)
             .HasColumnName("window_start")
-            .HasColumnType("time without time zone");
+            .HasColumnType("time")
+            .IsRequired();
 
-        builder.HasOne<FulfillmentMethodOutlet>()
+        builder.Property(x => x.WindowEnd)
+            .HasColumnName("window_end")
+            .HasColumnType("time")
+            .IsRequired();
+
+        builder.Property(x => x.Capacity)
+            .HasColumnName("capacity")
+            .IsRequired();
+
+        builder.Property(x => x.ReservedCount)
+            .HasColumnName("reserved_count")
+            .IsRequired();
+
+        builder.Property(x => x.SlotStatus)
+            .HasColumnName("slot_status")
+            .IsRequired();
+
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .IsRequired();
+
+        // <second-brain-constraints>
+        builder.HasIndex(x => new { x.TenantId, x.FulfillmentMethodOutletId, x.SlotCode })
+            .IsUnique()
+            .HasDatabaseName("ux_pickup_slots_d08294ab");
+
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pickup_slots_8275d8d5");
+
+        builder.HasOne<E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentMethodOutlet>()
             .WithMany()
             .HasForeignKey(x => x.FulfillmentMethodOutletId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_pickup_slots_fulfillment_method_outlet_id_fulfillment_method_outlets");
-
-        builder.HasIndex(x => new { x.FulfillmentMethodOutletId, x.SlotDate, x.WindowStart, x.WindowEnd })
-            .IsUnique()
-            .HasDatabaseName("uq_pickup_slots_fulfillment_method_outlet_id_slot_date_window_start_window_end");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_pickup_slots_capacity", "capacity >= 0")); 
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_pickup_slots_reserved_count", "reserved_count >= 0")); 
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_pickup_slots_reserved_count_capacity", "reserved_count <= capacity")); 
+            .HasConstraintName("fk_pickup_slots_5580f869");
+        // </second-brain-constraints>
     }
 }
-

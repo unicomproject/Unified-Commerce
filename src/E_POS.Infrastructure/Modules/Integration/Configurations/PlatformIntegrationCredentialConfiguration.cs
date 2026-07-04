@@ -28,30 +28,76 @@ public sealed class PlatformIntegrationCredentialConfiguration : IEntityTypeConf
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.CredentialName)
-            .HasColumnName("credential_name")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
-
         builder.Property(x => x.PlatformIntegrationId)
             .HasColumnName("platform_integration_id")
             .IsRequired();
 
+        builder.Property(x => x.CredentialName)
+            .HasColumnName("credential_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired();
+
+        builder.Property(x => x.CredentialType)
+            .HasColumnName("credential_type")
+            .IsRequired();
+
+        builder.Property(x => x.EncryptedValue)
+            .HasColumnName("encrypted_value")
+            .HasColumnType("text")
+            .IsRequired();
+
+        builder.Property(x => x.EncryptionKeyId)
+            .HasColumnName("encryption_key_id")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired();
+
+        builder.Property(x => x.CredentialKeyVersion)
+            .HasColumnName("credential_key_version")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
+            .IsRequired(false);
+
+        builder.Property(x => x.ExpiresAt)
+            .HasColumnName("expires_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.LastRotatedAt)
+            .HasColumnName("last_rotated_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
         builder.Property(x => x.RevokedAt)
             .HasColumnName("revoked_at")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
 
-        builder.HasOne<PlatformIntegration>()
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasIndex(x => new { x.PlatformIntegrationId, x.CredentialName })
+            .IsUnique()
+            .HasDatabaseName("ux_platform_integration_credentials_f64f2b19");
+
+        builder.HasOne<E_POS.Domain.Modules.Integration.Entities.PlatformIntegration>()
             .WithMany()
             .HasForeignKey(x => x.PlatformIntegrationId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_platform_integration_credentials_platform_integration_id_platform_integrations");
+            .HasConstraintName("fk_platform_integration_credentials_308650a2");
 
-        builder.HasIndex(x => new { x.PlatformIntegrationId, x.CredentialName })
-            .IsUnique()
-            .HasDatabaseName("uq_platform_integration_credentials_platform_integration_id_credential_name");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_integration_credentials_revoked_at_created_at", "revoked_at IS NULL OR revoked_at >= created_at")); 
+        builder.HasOne<E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_platform_integration_credentials_fd56824e");
+        // </second-brain-constraints>
     }
 }
-

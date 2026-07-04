@@ -1,5 +1,4 @@
 ﻿using E_POS.Domain.Modules.FulfilmentPickup.Entities;
-using E_POS.Domain.Modules.Orders.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -29,31 +28,95 @@ public sealed class FulfillmentOrderLineConfiguration : IEntityTypeConfiguration
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
+
         builder.Property(x => x.FulfillmentOrderId)
             .HasColumnName("fulfillment_order_id")
             .IsRequired();
 
-        builder.Property(x => x.RequestedQuantity)
-            .HasColumnName("requested_quantity")
-            .HasPrecision(18, 4);
-
         builder.Property(x => x.SalesOrderLineId)
             .HasColumnName("sales_order_line_id")
+            .IsRequired();
+
+        builder.Property(x => x.SalesOrderLineComponentId)
+            .HasColumnName("sales_order_line_component_id")
             .IsRequired(false);
 
-        builder.HasOne<FulfillmentOrder>()
+        builder.Property(x => x.RequestedQuantity)
+            .HasColumnName("requested_quantity")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.PickedQuantity)
+            .HasColumnName("picked_quantity")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.PackedQuantity)
+            .HasColumnName("packed_quantity")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.FulfilledQuantity)
+            .HasColumnName("fulfilled_quantity")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.CancelledQuantity)
+            .HasColumnName("cancelled_quantity")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.LineStatus)
+            .HasColumnName("line_status")
+            .IsRequired();
+
+        builder.Property(x => x.PickedByTenantUserId)
+            .HasColumnName("picked_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.PackedByTenantUserId)
+            .HasColumnName("packed_by_tenant_user_id")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_fulfillment_order_lines_aff467be");
+
+        builder.HasOne<E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrder>()
             .WithMany()
             .HasForeignKey(x => x.FulfillmentOrderId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_fulfillment_order_lines_fulfillment_order_id_fulfillment_orders");
+            .HasConstraintName("fk_fulfillment_order_lines_5ac519a0");
 
-        builder.HasOne<SalesOrderLine>()
+        builder.HasOne<E_POS.Domain.Modules.Orders.Entities.SalesOrderLine>()
             .WithMany()
             .HasForeignKey(x => x.SalesOrderLineId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_fulfillment_order_lines_sales_order_line_id_sales_order_lines");
+            .HasConstraintName("fk_fulfillment_order_lines_f29543cf");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_fulfillment_order_lines_requested_quantity", "requested_quantity > 0")); 
+        builder.HasOne<E_POS.Domain.Modules.Orders.Entities.SalesOrderLineComponent>()
+            .WithMany()
+            .HasForeignKey(x => x.SalesOrderLineComponentId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_fulfillment_order_lines_9a8cfc05");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.PickedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_fulfillment_order_lines_ec4817ec");
+
+        builder.HasOne<E_POS.Domain.Modules.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.PackedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_fulfillment_order_lines_bcaca9ef");
+        // </second-brain-constraints>
     }
 }
-

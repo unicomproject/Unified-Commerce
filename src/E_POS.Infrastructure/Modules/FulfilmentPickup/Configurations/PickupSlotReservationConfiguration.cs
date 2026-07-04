@@ -28,34 +28,75 @@ public sealed class PickupSlotReservationConfiguration : IEntityTypeConfiguratio
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
             .IsRequired();
-
-        builder.Property(x => x.CheckoutSessionId)
-            .HasColumnName("checkout_session_id");
 
         builder.Property(x => x.PickupSlotId)
             .HasColumnName("pickup_slot_id")
             .IsRequired();
 
-        builder.Property(x => x.ReservedCapacity)
-            .HasColumnName("reserved_capacity");
+        builder.Property(x => x.CheckoutSessionId)
+            .HasColumnName("checkout_session_id")
+            .IsRequired(false);
 
         builder.Property(x => x.SalesOrderId)
-            .HasColumnName("sales_order_id");
+            .HasColumnName("sales_order_id")
+            .IsRequired(false);
 
-        builder.HasOne<PickupSlot>()
+        builder.Property(x => x.ReservedCapacity)
+            .HasColumnName("reserved_capacity")
+            .IsRequired();
+
+        builder.Property(x => x.ReservationStatus)
+            .HasColumnName("reservation_status")
+            .IsRequired();
+
+        builder.Property(x => x.ExpiresAt)
+            .HasColumnName("expires_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.ConfirmedAt)
+            .HasColumnName("confirmed_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.ReleasedAt)
+            .HasColumnName("released_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.ReleaseReason)
+            .HasColumnName("release_reason")
+            .HasColumnType("varchar(250)")
+            .HasMaxLength(250)
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pickup_slot_reservations_2fb817a0");
+
+        builder.HasOne<E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupSlot>()
             .WithMany()
             .HasForeignKey(x => x.PickupSlotId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_pickup_slot_reservations_pickup_slot_id_pickup_slots");
+            .HasConstraintName("fk_pickup_slot_reservations_04fa082b");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_pickup_slot_reservations_reserved_capacity", "reserved_capacity > 0")); 
+        builder.HasOne<E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSession>()
+            .WithMany()
+            .HasForeignKey(x => x.CheckoutSessionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pickup_slot_reservations_0ceb7dfa");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_pickup_slot_reservations_checkout_session_id_sales_order_id", "checkout_session_id IS NOT NULL OR sales_order_id IS NOT NULL")); 
+        builder.HasOne<E_POS.Domain.Modules.Orders.Entities.SalesOrder>()
+            .WithMany()
+            .HasForeignKey(x => x.SalesOrderId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pickup_slot_reservations_7b279b41");
+        // </second-brain-constraints>
     }
 }
-

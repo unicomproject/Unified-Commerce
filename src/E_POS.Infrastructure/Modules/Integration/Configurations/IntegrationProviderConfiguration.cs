@@ -31,29 +31,55 @@ public sealed class IntegrationProviderConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.ProviderCode)
             .HasColumnName("provider_code")
             .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
-
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+            .HasMaxLength(80)
             .IsRequired();
 
-        builder.Property(x => x.Description)
-            .HasColumnName("description")
-            .HasColumnType("text")
-            .IsRequired(false);
+        builder.Property(x => x.ProviderName)
+            .HasColumnName("provider_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
 
         builder.Property(x => x.ProviderCategory)
             .HasColumnName("provider_category")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
+            .IsRequired();
 
+        builder.Property(x => x.ProviderType)
+            .HasColumnName("provider_type")
+            .IsRequired();
+
+        builder.Property(x => x.AuthType)
+            .HasColumnName("auth_type")
+            .IsRequired();
+
+        builder.Property(x => x.ApiBaseUrl)
+            .HasColumnName("api_base_url")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(x => x.DocumentationUrl)
+            .HasColumnName("documentation_url")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(x => x.SupportsWebhook)
+            .HasColumnName("supports_webhook")
+            .IsRequired();
+
+        builder.Property(x => x.SupportsTestMode)
+            .HasColumnName("supports_test_mode")
+            .IsRequired();
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .IsRequired();
+
+        // <second-brain-constraints>
         builder.HasIndex(x => x.ProviderCode)
             .IsUnique()
-            .HasDatabaseName("uq_integration_providers_provider_code");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_integration_providers_provider_category", "provider_category IN ('PAYMENT', 'SMS', 'EMAIL', 'WHATSAPP', 'ACCOUNTING', 'DELIVERY', 'ANALYTICS', 'OTHER')")); 
+            .HasDatabaseName("ux_integration_providers_b845f32a");
+        // </second-brain-constraints>
     }
 }
-

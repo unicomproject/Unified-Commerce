@@ -1,5 +1,4 @@
-﻿using E_POS.Domain.Modules.Orders.Entities;
-using E_POS.Domain.Modules.ReturnExchange.Entities;
+﻿using E_POS.Domain.Modules.ReturnExchange.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -24,36 +23,92 @@ public sealed class SalesReturnLineConfiguration : IEntityTypeConfiguration<Sale
         builder.Property(x => x.UpdatedAt)
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.RequestedQuantity)
-            .HasColumnName("requested_quantity")
-            .HasPrecision(18, 4);
-
-        builder.Property(x => x.SalesOrderLineId)
-            .HasColumnName("sales_order_line_id")
-            .IsRequired(false);
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.SalesReturnId)
             .HasColumnName("sales_return_id")
+            .IsRequired();
+
+        builder.Property(x => x.SalesOrderLineId)
+            .HasColumnName("sales_order_line_id")
+            .IsRequired();
+
+        builder.Property(x => x.ReturnReasonId)
+            .HasColumnName("return_reason_id")
             .IsRequired(false);
 
-        builder.HasOne<SalesReturn>()
+        builder.Property(x => x.QuantityRequested)
+            .HasColumnName("quantity_requested")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.QuantityReceived)
+            .HasColumnName("quantity_received")
+            .HasPrecision(18, 4)
+            .IsRequired(false);
+
+        builder.Property(x => x.UnitPriceSnapshot)
+            .HasColumnName("unit_price_snapshot")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.UnitTaxAmountSnapshot)
+            .HasColumnName("unit_tax_amount_snapshot")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.LineSubtotalAmount)
+            .HasColumnName("line_subtotal_amount")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.LineTaxAmount)
+            .HasColumnName("line_tax_amount")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.DispositionStatus)
+            .HasColumnName("disposition_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired(false);
+
+        builder.Property(x => x.Notes)
+            .HasColumnName("notes")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        // <second-brain-constraints>
+        builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_return_lines_5de350c6");
+
+        builder.HasOne<E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturn>()
             .WithMany()
             .HasForeignKey(x => x.SalesReturnId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_return_lines_sales_return_id_sales_returns");
+            .HasConstraintName("fk_sales_return_lines_6cf63e7f");
 
-        builder.HasOne<SalesOrderLine>()
+        builder.HasOne<E_POS.Domain.Modules.Orders.Entities.SalesOrderLine>()
             .WithMany()
             .HasForeignKey(x => x.SalesOrderLineId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_return_lines_sales_order_line_id_sales_order_lines");
+            .HasConstraintName("fk_sales_return_lines_1e6282f1");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_sales_return_lines_requested_quantity", "requested_quantity > 0")); 
+        builder.HasOne<E_POS.Domain.Modules.ReturnExchange.Entities.ReturnReason>()
+            .WithMany()
+            .HasForeignKey(x => x.ReturnReasonId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_return_lines_4427f485");
+        // </second-brain-constraints>
     }
 }
-
