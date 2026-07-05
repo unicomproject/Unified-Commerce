@@ -1,4 +1,5 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -28,10 +29,8 @@ public sealed class ProductAttributeOptionConfiguration : IEntityTypeConfigurati
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
             .IsRequired();
 
         builder.Property(x => x.AttributeDefinitionId)
@@ -41,22 +40,56 @@ public sealed class ProductAttributeOptionConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.OptionCode)
             .HasColumnName("option_code")
             .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(x => x.OptionLabel)
+            .HasColumnName("option_label")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
 
         builder.Property(x => x.SortOrder)
             .HasColumnName("sort_order")
-            .IsRequired()
-            .HasDefaultValue(0);
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_product_attribute_options_tenant_id_tenants");
 
         builder.HasOne<ProductAttributeDefinition>()
             .WithMany()
-            .HasForeignKey(x => x.AttributeDefinitionId)
+            .HasForeignKey(x => new { x.TenantId, x.AttributeDefinitionId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_product_attribute_options_attribute_definition_id_product_attribute_definitions");
 
-        builder.HasIndex(x => new { x.AttributeDefinitionId, x.OptionCode })
+        builder.HasIndex(x => new { x.TenantId, x.AttributeDefinitionId, x.OptionCode })
             .IsUnique()
-            .HasDatabaseName("uq_product_attribute_options_attribute_definition_id_option_code");
+            .HasDatabaseName("uq_product_attribute_options_tenant_id_attribute_def_id_opt_code");
+
+        builder.HasIndex(x => new { x.TenantId, x.AttributeDefinitionId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_product_attribute_options_tenant_id_attribute_def_id_id");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_product_attribute_options_sort_order", "sort_order >= 0"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_product_attribute_options_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-

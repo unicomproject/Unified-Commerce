@@ -27,7 +27,7 @@ public sealed class ReturnPolicyControllerTests
         var controller = CreateReturnPolicyController(service);
         SetTenantClaims(controller, tenantId, userId, ReturnPolicyConstants.CreatePermission);
 
-        var result = await controller.Create(new ReturnPolicyCreateRequest("7DAYS", "7 Days", 7, ReturnPolicyConstants.ActiveStatus), CancellationToken.None);
+        var result = await controller.Create(new ReturnPolicyCreateRequest("7DAYS", "7 Days", null, 7, 7, true, true, false, false, ReturnPolicyConstants.ActiveStatus), CancellationToken.None);
 
         var created = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Same(response, created.Value);

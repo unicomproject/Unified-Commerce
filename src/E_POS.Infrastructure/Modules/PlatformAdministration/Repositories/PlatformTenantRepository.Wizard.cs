@@ -174,8 +174,8 @@ public sealed partial class PlatformTenantRepository
         var businessTypes = await _dbContext.BusinessTypes
             .AsNoTracking()
             .Where(type => type.Status == "ACTIVE")
-            .OrderBy(type => type.Name)
-            .Select(type => new PlatformTenantCreateLookupOptionDto(type.BusinessTypeCode, type.Name))
+            .OrderBy(type => type.BusinessTypeName)
+            .Select(type => new PlatformTenantCreateLookupOptionDto(type.BusinessTypeKey, type.BusinessTypeName))
             .ToListAsync(cancellationToken);
 
         var billingStatuses = new[]

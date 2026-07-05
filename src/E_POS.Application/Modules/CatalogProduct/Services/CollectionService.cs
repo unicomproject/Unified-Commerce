@@ -37,7 +37,25 @@ public sealed class CollectionService : ICollectionService
         }
 
         var collectionId = Guid.NewGuid();
-        var collection = Collection.Create(collectionId, context.TenantId, normalizedCode, request.Name, request.Status, _dateTimeProvider.UtcNow);
+        var slug = string.IsNullOrWhiteSpace(request.CollectionSlug)
+            ? normalizedCode.ToLowerInvariant()
+            : request.CollectionSlug.Trim().ToLowerInvariant();
+
+        var collection = Collection.Create(
+            collectionId, 
+            context.TenantId, 
+            normalizedCode, 
+            request.Name, 
+            slug,
+            request.Description,
+            request.CollectionType,
+            request.StartsAt,
+            request.EndsAt,
+            request.SortOrder,
+            request.Status,
+            context.UserId,
+            _dateTimeProvider.UtcNow);
+
         await _repository.AddAsync(collection, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, collectionId, false, cancellationToken);
         return ApplicationResult<CollectionResponse>.Success(response!);
@@ -80,7 +98,23 @@ public sealed class CollectionService : ICollectionService
             return ApplicationResult<CollectionResponse>.Failure(new ApplicationError("collection.duplicate_code", "Collection code already exists."));
         }
 
-        collection.UpdateProfile(normalizedCode, request.Name, request.Status, _dateTimeProvider.UtcNow);
+        var slug = string.IsNullOrWhiteSpace(request.CollectionSlug)
+            ? normalizedCode.ToLowerInvariant()
+            : request.CollectionSlug.Trim().ToLowerInvariant();
+
+        collection.UpdateProfile(
+            normalizedCode, 
+            request.Name, 
+            slug,
+            request.Description,
+            request.CollectionType,
+            request.StartsAt,
+            request.EndsAt,
+            request.SortOrder,
+            request.Status,
+            context.UserId,
+            _dateTimeProvider.UtcNow);
+
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, collectionId, false, cancellationToken);
         return response is null ? ApplicationResult<CollectionResponse>.Failure(NotFound) : ApplicationResult<CollectionResponse>.Success(response);
@@ -99,7 +133,7 @@ public sealed class CollectionService : ICollectionService
             return ApplicationResult.Failure(new ApplicationError("collection.delete_conflict", "Collection cannot be deleted while products are linked."));
         }
 
-        collection.SoftDelete(_dateTimeProvider.UtcNow);
+        collection.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }

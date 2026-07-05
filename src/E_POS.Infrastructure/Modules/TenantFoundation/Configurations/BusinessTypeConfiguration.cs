@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -28,10 +28,16 @@ public sealed class BusinessTypeConfiguration : IEntityTypeConfiguration<Busines
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+        builder.Property(x => x.BusinessTypeKey)
+            .HasColumnName("business_type_key")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Property(x => x.BusinessTypeName)
+            .HasColumnName("business_type_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
             .IsRequired();
 
         builder.Property(x => x.Description)
@@ -39,21 +45,27 @@ public sealed class BusinessTypeConfiguration : IEntityTypeConfiguration<Busines
             .HasColumnType("text")
             .IsRequired(false);
 
+        builder.Property(x => x.IsSystemType)
+            .HasColumnName("is_system_type")
+            .HasDefaultValue(true)
+            .IsRequired();
+
+        builder.Property(x => x.SortOrder)
+            .HasColumnName("sort_order")
+            .HasDefaultValue(0)
+            .IsRequired();
+
         builder.Property(x => x.Status)
             .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30);
-
-        builder.Property(x => x.BusinessTypeCode)
-            .HasColumnName("business_type_code")
             .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
+            .HasMaxLength(40)
+            .IsRequired();
 
-        builder.HasIndex(x => x.BusinessTypeCode)
+        builder.HasIndex(x => x.BusinessTypeKey)
             .IsUnique()
-            .HasDatabaseName("uq_business_types_business_type_code");
+            .HasDatabaseName("uq_business_types_business_type_key");
 
+        builder.ToTable(t => t.HasCheckConstraint("ck_business_types_sort_order", "sort_order >= 0")); 
         builder.ToTable(t => t.HasCheckConstraint("ck_business_types_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
     }
 }
-

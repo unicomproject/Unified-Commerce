@@ -16,7 +16,7 @@ public sealed class ReturnPolicyRepository : IReturnPolicyRepository
     public Task<bool> PolicyCodeExistsAsync(Guid tenantId, string policyCode, Guid? excludePolicyId, CancellationToken cancellationToken)
     {
         return _dbContext.ReturnPolicies.AsNoTracking()
-            .AnyAsync(x => x.TenantId == tenantId && x.PolicyCode == policyCode && (!excludePolicyId.HasValue || x.Id != excludePolicyId.Value), cancellationToken);
+            .AnyAsync(x => x.TenantId == tenantId && x.ReturnPolicyCode == policyCode && (!excludePolicyId.HasValue || x.Id != excludePolicyId.Value), cancellationToken);
     }
 
     public async Task<ReturnPolicyListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken)
@@ -28,17 +28,17 @@ public sealed class ReturnPolicyRepository : IReturnPolicyRepository
             if (_dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
                 var pattern = $"%{term}%";
-                query = query.Where(x => EF.Functions.ILike(x.Name, pattern) || EF.Functions.ILike(x.PolicyCode, pattern));
+                query = query.Where(x => EF.Functions.ILike(x.ReturnPolicyName, pattern) || EF.Functions.ILike(x.ReturnPolicyCode, pattern));
             }
             else
             {
                 var normalizedTerm = term.ToUpperInvariant();
-                query = query.Where(x => x.Name.ToUpper().Contains(normalizedTerm) || x.PolicyCode.ToUpper().Contains(normalizedTerm));
+                query = query.Where(x => x.ReturnPolicyName.ToUpper().Contains(normalizedTerm) || x.ReturnPolicyCode.ToUpper().Contains(normalizedTerm));
             }
         }
         var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query.OrderBy(x => x.PolicyCode).Skip((pageNumber - 1) * pageSize).Take(pageSize)
-            .Select(x => new ReturnPolicySummaryResponse(x.Id, x.PolicyCode, x.Name, x.ReturnWindowDays, x.Status, x.CreatedAt, x.UpdatedAt))
+        var items = await query.OrderBy(x => x.ReturnPolicyCode).Skip((pageNumber - 1) * pageSize).Take(pageSize)
+            .Select(x => new ReturnPolicySummaryResponse(x.Id, x.ReturnPolicyCode, x.ReturnPolicyName, x.ReturnWindowDays, x.Status, x.CreatedAt, x.UpdatedAt))
             .ToListAsync(cancellationToken);
         return new ReturnPolicyListResponse(items, pageNumber, pageSize, totalCount);
     }
@@ -47,7 +47,7 @@ public sealed class ReturnPolicyRepository : IReturnPolicyRepository
     {
         return _dbContext.ReturnPolicies.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Id == policyId && (includeDeleted || x.Status != ReturnPolicyConstants.DeletedStatus))
-            .Select(x => new ReturnPolicyResponse(x.Id, x.PolicyCode, x.Name, x.ReturnWindowDays, x.Status, x.CreatedAt, x.UpdatedAt))
+            .Select(x => new ReturnPolicyResponse(x.Id, x.ReturnPolicyCode, x.ReturnPolicyName, x.ReturnWindowDays, x.Status, x.CreatedAt, x.UpdatedAt))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.OutletTillDevice.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -60,6 +60,10 @@ public sealed class TillConfiguration : IEntityTypeConfiguration<Till>
         builder.HasIndex(x => new { x.TenantId, x.OutletId, x.TillCode })
             .IsUnique()
             .HasDatabaseName("uq_tills_tenant_id_outlet_id_till_code");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_tills_tenant_id_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_tills_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
     }

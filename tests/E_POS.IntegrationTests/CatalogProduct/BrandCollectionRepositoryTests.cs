@@ -19,9 +19,9 @@ public sealed class BrandCollectionRepositoryTests
         var otherTenantId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         dbContext.Brands.AddRange(
-            Brand.Create(Guid.NewGuid(), tenantId, "ACME", "Acme", BrandConstants.ActiveStatus, Now),
-            Brand.Create(Guid.NewGuid(), tenantId, "OLD", "Old", BrandConstants.DeletedStatus, Now),
-            Brand.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", BrandConstants.ActiveStatus, Now));
+            Brand.Create(Guid.NewGuid(), tenantId, "ACME", "Acme", "acme", null, null, BrandConstants.ActiveStatus, null, Now),
+            Brand.Create(Guid.NewGuid(), tenantId, "OLD", "Old", "old", null, null, BrandConstants.DeletedStatus, null, Now),
+            Brand.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", "other", null, null, BrandConstants.ActiveStatus, null, Now));
         await dbContext.SaveChangesAsync();
         var repository = new BrandRepository(dbContext);
 
@@ -38,9 +38,9 @@ public sealed class BrandCollectionRepositoryTests
         var otherTenantId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         dbContext.Collections.AddRange(
-            Collection.Create(Guid.NewGuid(), tenantId, "SUMMER", "Summer", CollectionConstants.ActiveStatus, Now),
-            Collection.Create(Guid.NewGuid(), tenantId, "OLD", "Old", CollectionConstants.DeletedStatus, Now),
-            Collection.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", CollectionConstants.ActiveStatus, Now));
+            Collection.Create(Guid.NewGuid(), tenantId, "SUMMER", "Summer", "summer", null, "STANDARD", null, null, 0, CollectionConstants.ActiveStatus, null, Now),
+            Collection.Create(Guid.NewGuid(), tenantId, "OLD", "Old", "old", null, "STANDARD", null, null, 0, CollectionConstants.DeletedStatus, null, Now),
+            Collection.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", "other", null, "STANDARD", null, null, 0, CollectionConstants.ActiveStatus, null, Now));
         await dbContext.SaveChangesAsync();
         var repository = new CollectionRepository(dbContext);
 
@@ -57,7 +57,7 @@ public sealed class BrandCollectionRepositoryTests
         var collectionId = Guid.NewGuid();
         var productId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
-        dbContext.Collections.Add(Collection.Create(collectionId, tenantId, "SUMMER", "Summer", CollectionConstants.ActiveStatus, Now));
+        dbContext.Collections.Add(Collection.Create(collectionId, tenantId, "SUMMER", "Summer", "summer", null, "STANDARD", null, null, 0, CollectionConstants.ActiveStatus, null, Now));
         dbContext.Products.Add(CreateProduct(productId, tenantId, "PROD-1", "Product 1", "ACTIVE"));
         dbContext.ProductCollections.Add(CreateProductCollection(productId, collectionId));
         await dbContext.SaveChangesAsync();
@@ -70,27 +70,36 @@ public sealed class BrandCollectionRepositoryTests
 
     private static Product CreateProduct(Guid productId, Guid tenantId, string code, string name, string status)
     {
-        var product = (Product)Activator.CreateInstance(typeof(Product), nonPublic: true)!;
-        Set(product, "Id", productId);
-        Set(product, "TenantId", tenantId);
-        Set(product, "ProductCode", code);
-        Set(product, "Name", name);
-        Set<string?>(product, "Description", null);
-        Set(product, "Status", status);
-        Set(product, "CreatedAt", Now);
-        Set<DateTimeOffset?>(product, "UpdatedAt", Now);
-        return product;
+        return Product.Create(
+            id: productId,
+            tenantId: tenantId,
+            productCode: code,
+            productName: name,
+            productSlug: name.ToLowerInvariant(),
+            productType: "STANDARD",
+            productStructure: "SIMPLE",
+            businessTypeId: null,
+            brandId: null,
+            returnPolicyId: null,
+            shortDescription: null,
+            longDescription: null,
+            isSellable: true,
+            isTaxable: true,
+            status: status,
+            createdByTenantUserId: null,
+            now: Now);
     }
 
     private static ProductCollection CreateProductCollection(Guid productId, Guid collectionId)
     {
-        var productCollection = (ProductCollection)Activator.CreateInstance(typeof(ProductCollection), nonPublic: true)!;
-        Set(productCollection, "Id", Guid.NewGuid());
-        Set(productCollection, "ProductId", productId);
-        Set(productCollection, "CollectionId", collectionId);
-        Set(productCollection, "CreatedAt", Now);
-        Set<DateTimeOffset?>(productCollection, "UpdatedAt", Now);
-        return productCollection;
+        return ProductCollection.Create(
+            id: Guid.NewGuid(),
+            tenantId: Guid.Empty,
+            productId: productId,
+            collectionId: collectionId,
+            sortOrder: 0,
+            createdByTenantUserId: null,
+            now: Now);
     }
 
     private static void Set<T>(object entity, string propertyName, T value)

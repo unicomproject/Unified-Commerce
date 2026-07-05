@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Discount.Entities;
 
@@ -12,7 +12,7 @@ public class ExpiryDiscountApplication : AuditableEntity
     public decimal DiscountPercent { get; protected set; }
     public string ApplicationSource { get; protected set; } = string.Empty;
     public string ApplicationStatus { get; protected set; } = string.Empty;
-    public DateTimeOffset? AppliedFrom { get; protected set; }
+    public DateTimeOffset AppliedFrom { get; protected set; }
     public DateTimeOffset? AppliedUntil { get; protected set; }
     public Guid? ApprovedByTenantUserId { get; protected set; }
     public DateTimeOffset? ApprovedAt { get; protected set; }

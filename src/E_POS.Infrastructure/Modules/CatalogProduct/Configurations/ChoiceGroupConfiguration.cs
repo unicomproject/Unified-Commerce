@@ -33,22 +33,45 @@ public sealed class ChoiceGroupConfiguration : IEntityTypeConfiguration<ChoiceGr
             .HasColumnName("tenant_id")
             .IsRequired();
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+        builder.Property(x => x.GroupCode)
+            .HasColumnName("group_code")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
             .IsRequired();
 
-        builder.Property(x => x.ChoiceGroupCode)
-            .HasColumnName("choice_group_code")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
-
-        builder.Property(x => x.MaxSelect)
-            .HasColumnName("max_select");
+        builder.Property(x => x.GroupName)
+            .HasColumnName("group_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
 
         builder.Property(x => x.MinSelect)
-            .HasColumnName("min_select");
+            .HasColumnName("min_select")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(x => x.MaxSelect)
+            .HasColumnName("max_select")
+            .IsRequired();
+
+        builder.Property(x => x.SortOrder)
+            .HasColumnName("sort_order")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.HasOne<Tenant>()
             .WithMany()
@@ -56,13 +79,18 @@ public sealed class ChoiceGroupConfiguration : IEntityTypeConfiguration<ChoiceGr
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_choice_groups_tenant_id_tenants");
 
-        builder.HasIndex(x => new { x.TenantId, x.ChoiceGroupCode })
+        builder.HasIndex(x => new { x.TenantId, x.GroupCode })
             .IsUnique()
-            .HasDatabaseName("uq_choice_groups_tenant_id_choice_group_code");
+            .HasDatabaseName("uq_choice_groups_tenant_id_group_code");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_choice_groups_tenant_id_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_choice_groups_min_select", "min_select >= 0")); 
-
+        builder.ToTable(t => t.HasCheckConstraint("ck_choice_groups_max_select", "max_select > 0")); 
         builder.ToTable(t => t.HasCheckConstraint("ck_choice_groups_max_select_min_select", "max_select >= min_select")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_choice_groups_sort_order", "sort_order >= 0")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_choice_groups_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
     }
 }
-

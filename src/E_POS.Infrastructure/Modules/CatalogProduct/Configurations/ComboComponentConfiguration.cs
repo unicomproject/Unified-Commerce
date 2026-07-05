@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -28,6 +28,10 @@ public sealed class ComboComponentConfiguration : IEntityTypeConfiguration<Combo
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
+
         builder.Property(x => x.ComboDefinitionId)
             .HasColumnName("combo_definition_id")
             .IsRequired();
@@ -37,34 +41,82 @@ public sealed class ComboComponentConfiguration : IEntityTypeConfiguration<Combo
             .IsRequired();
 
         builder.Property(x => x.ComponentVariantId)
-            .HasColumnName("component_variant_id");
+            .HasColumnName("component_variant_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ComponentUomId)
+            .HasColumnName("component_uom_id")
+            .IsRequired();
 
         builder.Property(x => x.Quantity)
             .HasColumnName("quantity")
-            .HasPrecision(18, 4);
+            .HasColumnType("numeric(18,4)")
+            .IsRequired();
+
+        builder.Property(x => x.BasePriceAdjustment)
+            .HasColumnName("base_price_adjustment")
+            .HasColumnType("numeric(18,4)")
+            .HasDefaultValue(0m)
+            .IsRequired();
 
         builder.Property(x => x.SortOrder)
             .HasColumnName("sort_order")
-            .IsRequired()
-            .HasDefaultValue(0);
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.HasOne<ComboDefinition>()
             .WithMany()
-            .HasForeignKey(x => x.ComboDefinitionId)
+            .HasForeignKey(x => new { x.TenantId, x.ComboDefinitionId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_combo_components_combo_definition_id_combo_definitions");
 
         builder.HasOne<Product>()
             .WithMany()
-            .HasForeignKey(x => x.ComponentProductId)
+            .HasForeignKey(x => new { x.TenantId, x.ComponentProductId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_combo_components_component_product_id_products");
 
-        builder.HasIndex(x => new { x.ComboDefinitionId, x.ComponentProductId, x.ComponentVariantId })
-            .IsUnique()
-            .HasDatabaseName("uq_combo_components_combo_definition_id_component_product_id_component_variant_id");
+        builder.HasOne<ProductVariant>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.ComponentVariantId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_combo_components_component_variant_id_product_variants");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_combo_components_quantity", "quantity > 0")); 
+        builder.HasOne<UnitOfMeasure>()
+            .WithMany()
+            .HasForeignKey(x => x.ComponentUomId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_combo_components_component_uom_id_unit_of_measures");
+
+        builder.HasIndex(x => new { x.ComboDefinitionId, x.ComponentProductId, x.ComponentUomId })
+            .IsUnique()
+            .HasDatabaseName("uq_combo_components_combo_definition_id_comp_product_uom")
+            .HasFilter("component_variant_id IS NULL");
+
+        builder.HasIndex(x => new { x.ComboDefinitionId, x.ComponentVariantId, x.ComponentUomId })
+            .IsUnique()
+            .HasDatabaseName("uq_combo_components_combo_definition_id_comp_variant_uom")
+            .HasFilter("component_variant_id IS NOT NULL");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_combo_components_quantity", "quantity > 0"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_combo_components_sort_order", "sort_order >= 0"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_combo_components_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-

@@ -37,7 +37,22 @@ public sealed class BrandService : IBrandService
         }
 
         var brandId = Guid.NewGuid();
-        var brand = Brand.Create(brandId, context.TenantId, normalizedCode, request.Name, request.Status, _dateTimeProvider.UtcNow);
+        var slug = string.IsNullOrWhiteSpace(request.BrandSlug)
+            ? normalizedCode.ToLowerInvariant()
+            : request.BrandSlug.Trim().ToLowerInvariant();
+
+        var brand = Brand.Create(
+            brandId, 
+            context.TenantId, 
+            normalizedCode, 
+            request.Name, 
+            slug,
+            request.Description,
+            request.LogoUrl,
+            request.Status,
+            context.UserId,
+            _dateTimeProvider.UtcNow);
+
         await _repository.AddAsync(brand, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, brandId, false, cancellationToken);
         return ApplicationResult<BrandResponse>.Success(response!);
@@ -80,7 +95,20 @@ public sealed class BrandService : IBrandService
             return ApplicationResult<BrandResponse>.Failure(new ApplicationError("brand.duplicate_code", "Brand code already exists."));
         }
 
-        brand.UpdateProfile(normalizedCode, request.Name, request.Status, _dateTimeProvider.UtcNow);
+        var slug = string.IsNullOrWhiteSpace(request.BrandSlug)
+            ? normalizedCode.ToLowerInvariant()
+            : request.BrandSlug.Trim().ToLowerInvariant();
+
+        brand.UpdateProfile(
+            normalizedCode, 
+            request.Name, 
+            slug,
+            request.Description,
+            request.LogoUrl,
+            request.Status,
+            context.UserId,
+            _dateTimeProvider.UtcNow);
+
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, brandId, false, cancellationToken);
         return response is null ? ApplicationResult<BrandResponse>.Failure(NotFound) : ApplicationResult<BrandResponse>.Success(response);
@@ -94,7 +122,7 @@ public sealed class BrandService : IBrandService
         var brand = await _repository.GetEditableAsync(context.TenantId, brandId, cancellationToken);
         if (brand is null) return ApplicationResult.Failure(NotFound);
 
-        brand.SoftDelete(_dateTimeProvider.UtcNow);
+        brand.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }

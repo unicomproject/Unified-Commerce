@@ -1,5 +1,6 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -33,21 +34,41 @@ public sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departmen
             .HasColumnName("tenant_id")
             .IsRequired();
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+        builder.Property(x => x.DepartmentCode)
+            .HasColumnName("department_code")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(x => x.DepartmentName)
+            .HasColumnName("department_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
+
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.Property(x => x.SortOrder)
+            .HasColumnName("sort_order")
+            .HasDefaultValue(0)
             .IsRequired();
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30);
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
 
-        builder.Property(x => x.DepartmentCode)
-            .HasColumnName("department_code")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.HasOne<Tenant>()
             .WithMany()
@@ -55,11 +76,27 @@ public sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departmen
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_departments_tenant_id_tenants");
 
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_departments_created_by_tenant_user_id_tenant_users");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_departments_updated_by_tenant_user_id_tenant_users");
+
         builder.HasIndex(x => new { x.TenantId, x.DepartmentCode })
             .IsUnique()
             .HasDatabaseName("uq_departments_tenant_id_department_code");
 
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_departments_tenant_id_id");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_departments_sort_order", "sort_order >= 0")); 
         builder.ToTable(t => t.HasCheckConstraint("ck_departments_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
     }
 }
-

@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.Inventory.Entities;
+using E_POS.Domain.Modules.Inventory.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -52,6 +52,10 @@ public sealed class StockAdjustmentConfiguration : IEntityTypeConfiguration<Stoc
         builder.HasIndex(x => new { x.TenantId, x.AdjustmentNumber })
             .IsUnique()
             .HasDatabaseName("uq_stock_adjustments_tenant_id_adjustment_number");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_stock_adjustments_tenant_id_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_stock_adjustments_adjustment_status", "adjustment_status IN ('DRAFT', 'APPROVED', 'POSTED', 'CANCELLED')")); 
     }

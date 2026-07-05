@@ -23,7 +23,7 @@ public sealed class BrandCollectionServiceTests
 
         var result = await service.CreateAsync(
             CreateContext([]),
-            new BrandCreateRequest("ACME", "Acme", BrandConstants.ActiveStatus),
+            new BrandCreateRequest("ACME", "Acme", null, null, null, BrandConstants.ActiveStatus),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -38,7 +38,7 @@ public sealed class BrandCollectionServiceTests
 
         var result = await service.CreateAsync(
             CreateContext([BrandConstants.CreatePermission]),
-            new BrandCreateRequest(" acme ", "Acme", BrandConstants.ActiveStatus),
+            new BrandCreateRequest(" acme ", "Acme", null, null, null, BrandConstants.ActiveStatus),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -54,7 +54,7 @@ public sealed class BrandCollectionServiceTests
 
         var result = await service.CreateAsync(
             CreateContext([CollectionConstants.CreatePermission]),
-            new CollectionCreateRequest(" summer ", "Summer", CollectionConstants.ActiveStatus),
+            new CollectionCreateRequest(" summer ", "Summer", null, null, "STANDARD", null, null, 0, CollectionConstants.ActiveStatus),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -68,7 +68,7 @@ public sealed class BrandCollectionServiceTests
         var collectionId = Guid.NewGuid();
         var repository = new FakeCollectionRepository
         {
-            EditableCollection = Collection.Create(collectionId, TenantId, "SUMMER", "Summer", CollectionConstants.ActiveStatus, Now),
+            EditableCollection = Collection.Create(collectionId, TenantId, "SUMMER", "Summer", "summer", null, "STANDARD", null, null, 0, CollectionConstants.ActiveStatus, UserId, Now),
             HasProductLinks = true
         };
         var service = new CollectionService(repository, new CollectionRequestValidator(), new FakeDateTimeProvider());
@@ -105,7 +105,7 @@ public sealed class BrandCollectionServiceTests
 
         public Task<BrandResponse?> GetByIdAsync(Guid tenantId, Guid brandId, bool includeDeleted, CancellationToken cancellationToken)
         {
-            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, AddedBrand!.BrandCode, AddedBrand.Name, AddedBrand.Status, AddedBrand.CreatedAt, AddedBrand.UpdatedAt));
+            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, AddedBrand!.BrandCode, AddedBrand.BrandName, AddedBrand.Status, AddedBrand.CreatedAt, AddedBrand.UpdatedAt));
         }
 
         public Task<Brand?> GetEditableAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)
@@ -149,7 +149,7 @@ public sealed class BrandCollectionServiceTests
         public Task<CollectionResponse?> GetByIdAsync(Guid tenantId, Guid collectionId, bool includeDeleted, CancellationToken cancellationToken)
         {
             var collection = AddedCollection ?? EditableCollection;
-            return Task.FromResult<CollectionResponse?>(new CollectionResponse(collectionId, collection!.CollectionCode, collection.Name, collection.Status, collection.CreatedAt, collection.UpdatedAt));
+            return Task.FromResult<CollectionResponse?>(new CollectionResponse(collectionId, collection!.CollectionCode, collection.CollectionName, collection.Status, collection.CreatedAt, collection.UpdatedAt));
         }
 
         public Task<Collection?> GetEditableAsync(Guid tenantId, Guid collectionId, CancellationToken cancellationToken)

@@ -47,10 +47,13 @@ public sealed class ReturnPolicyServiceTests
         var repository = new FakePolicyRepository();
         var service = new ReturnPolicyService(repository, new ReturnPolicyRequestValidator(), new FakeDateTimeProvider());
 
-        var result = await service.CreateAsync(CreateContext([ReturnPolicyConstants.CreatePermission]), new ReturnPolicyCreateRequest(" no_return ", "No Return", 0, ReturnPolicyConstants.ActiveStatus), CancellationToken.None);
+        var result = await service.CreateAsync(
+            CreateContext([ReturnPolicyConstants.CreatePermission]), 
+            new ReturnPolicyCreateRequest(" no_return ", "No Return", null, 0, 0, true, true, false, false, ReturnPolicyConstants.ActiveStatus), 
+            CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("NO_RETURN", repository.AddedPolicy?.PolicyCode);
+        Assert.Equal("NO_RETURN", repository.AddedPolicy?.ReturnPolicyCode);
         Assert.Equal(TenantId, repository.AddedPolicy?.TenantId);
     }
 
@@ -81,7 +84,7 @@ public sealed class ReturnPolicyServiceTests
         public ReturnPolicy? AddedPolicy { get; private set; }
         public Task<bool> PolicyCodeExistsAsync(Guid tenantId, string policyCode, Guid? excludePolicyId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<ReturnPolicyListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => Task.FromResult(new ReturnPolicyListResponse([], pageNumber, pageSize, 0));
-        public Task<ReturnPolicyResponse?> GetByIdAsync(Guid tenantId, Guid policyId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<ReturnPolicyResponse?>(new ReturnPolicyResponse(policyId, AddedPolicy!.PolicyCode, AddedPolicy.Name, AddedPolicy.ReturnWindowDays, AddedPolicy.Status, AddedPolicy.CreatedAt, AddedPolicy.UpdatedAt));
+        public Task<ReturnPolicyResponse?> GetByIdAsync(Guid tenantId, Guid policyId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<ReturnPolicyResponse?>(new ReturnPolicyResponse(policyId, AddedPolicy!.ReturnPolicyCode, AddedPolicy.ReturnPolicyName, AddedPolicy.ReturnWindowDays, AddedPolicy.Status, AddedPolicy.CreatedAt, AddedPolicy.UpdatedAt));
         public Task<ReturnPolicy?> GetEditableAsync(Guid tenantId, Guid policyId, CancellationToken cancellationToken) => Task.FromResult<ReturnPolicy?>(AddedPolicy);
         public Task AddAsync(ReturnPolicy policy, CancellationToken cancellationToken) { AddedPolicy = policy; return Task.CompletedTask; }
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
