@@ -44,18 +44,34 @@ public sealed class CodeSequenceRepository : ICodeSequenceRepository
     {
         var sequenceId = Guid.NewGuid();
 
-        // PostgreSQL upsert keeps setup code generation atomic under concurrent creates.
-        return await _dbContext.Database.SqlQuery<int>($"""
+        // EF Core's SqlQuery with RETURNING is non-composable; use raw ADO.NET for atomic upsert.
+        var conn = (Npgsql.NpgsqlConnection)_dbContext.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+        {
+            await conn.OpenAsync(cancellationToken);
+        }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
             INSERT INTO code_sequences (id, tenant_id, sequence_key, prefix, current_value, padding_length, created_at, updated_at)
-            VALUES ({sequenceId}, {tenantId}, {sequenceKey}, {prefix}, 1, {paddingLength}, {now}, {now})
+            VALUES (@id, @tenantId, @sequenceKey, @prefix, 1, @paddingLength, @now, @now)
             ON CONFLICT (tenant_id, sequence_key)
             DO UPDATE SET current_value = code_sequences.current_value + 1,
                           prefix = EXCLUDED.prefix,
                           padding_length = EXCLUDED.padding_length,
                           updated_at = EXCLUDED.updated_at
-            RETURNING current_value AS "Value"
-            """)
-            .SingleAsync(cancellationToken);
+            RETURNING current_value
+            """;
+
+        cmd.Parameters.AddWithValue("id", sequenceId);
+        cmd.Parameters.AddWithValue("tenantId", tenantId);
+        cmd.Parameters.AddWithValue("sequenceKey", sequenceKey);
+        cmd.Parameters.AddWithValue("prefix", prefix);
+        cmd.Parameters.AddWithValue("paddingLength", paddingLength);
+        cmd.Parameters.AddWithValue("now", now.UtcDateTime);
+
+        var result = await cmd.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(result);
     }
 
     private async Task<int> GetNextTrackedValueAsync(

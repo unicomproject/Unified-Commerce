@@ -148,6 +148,7 @@ public sealed class PriceListServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
         Assert.Equal("PL-1", result.Value.PriceListCode);
     }
 

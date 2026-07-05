@@ -61,6 +61,10 @@ public static class DependencyInjection
         services.AddScoped<IPriceListService, PriceListService>();
         services.AddScoped<IPriceListItemsRequestValidator, PriceListItemsRequestValidator>();
         services.AddScoped<IPriceListItemsService, PriceListItemsService>();
+        services.AddScoped<ITaxSetupRequestValidator, TaxSetupRequestValidator>();
+        services.AddScoped<IProductTaxAssignmentRequestValidator, ProductTaxAssignmentRequestValidator>();
+        services.AddScoped<ITaxSetupService, TaxSetupService>();
+        services.AddScoped<IProductTaxAssignmentService, ProductTaxAssignmentService>();
 
         return services;
     }

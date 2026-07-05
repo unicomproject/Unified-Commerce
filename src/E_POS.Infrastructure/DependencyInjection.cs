@@ -76,6 +76,8 @@ public static class DependencyInjection
         services.AddScoped<ITillDeviceAssignmentRepository, TillDeviceAssignmentRepository>();
         services.AddScoped<IPriceListRepository, PriceListRepository>();
         services.AddScoped<IPriceListItemsRepository, PriceListItemsRepository>();
+        services.AddScoped<ITaxSetupRepository, TaxSetupRepository>();
+        services.AddScoped<IProductTaxAssignmentRepository, ProductTaxAssignmentRepository>();
         services.AddScoped<ITenantLookupRepository, TenantLookupRepository>();
         services.AddScoped(static provider =>
         {
