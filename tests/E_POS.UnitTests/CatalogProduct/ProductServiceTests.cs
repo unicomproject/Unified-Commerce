@@ -221,5 +221,8 @@ public sealed class ProductServiceTests
         {
             return Task.FromResult<ProductBarcode?>(null);
         }
+
+        public Task<bool> ProductExistsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }

@@ -32,4 +32,11 @@ public sealed class UnitOfMeasureRepository : IUnitOfMeasureRepository
                 x.UpdatedAt))
             .ToListAsync(cancellationToken);
     }
+
+    public Task<bool> UomExistsAsync(Guid? tenantId, Guid uomId, CancellationToken cancellationToken)
+    {
+        return _dbContext.UnitOfMeasures
+            .AsNoTracking()
+            .AnyAsync(x => (x.TenantId == null || x.TenantId == tenantId) && x.Id == uomId && x.Status != "DELETED", cancellationToken);
+    }
 }

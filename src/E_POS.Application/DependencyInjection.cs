@@ -59,6 +59,8 @@ public static class DependencyInjection
         services.AddScoped<ITillDeviceAssignmentService, TillDeviceAssignmentService>();
         services.AddScoped<IPriceListRequestValidator, PriceListRequestValidator>();
         services.AddScoped<IPriceListService, PriceListService>();
+        services.AddScoped<IPriceListItemsRequestValidator, PriceListItemsRequestValidator>();
+        services.AddScoped<IPriceListItemsService, PriceListItemsService>();
 
         return services;
     }

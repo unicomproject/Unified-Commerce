@@ -75,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();
         services.AddScoped<ITillDeviceAssignmentRepository, TillDeviceAssignmentRepository>();
         services.AddScoped<IPriceListRepository, PriceListRepository>();
+        services.AddScoped<IPriceListItemsRepository, PriceListItemsRepository>();
         services.AddScoped<ITenantLookupRepository, TenantLookupRepository>();
         services.AddScoped(static provider =>
         {
