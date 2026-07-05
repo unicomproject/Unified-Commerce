@@ -11,6 +11,9 @@ using E_POS.Application.Modules.PlatformAdministration.Services;
 using E_POS.Application.Modules.PlatformAdministration.Validators;
 using E_POS.Application.Modules.SubscriptionBilling.Contracts;
 using E_POS.Application.Modules.SubscriptionBilling.Services;
+using E_POS.Application.Modules.PricingTax.Contracts;
+using E_POS.Application.Modules.PricingTax.Services;
+using E_POS.Application.Modules.PricingTax.Validators;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -54,6 +57,14 @@ public static class DependencyInjection
         services.AddScoped<ITillService, TillService>();
         services.AddScoped<IPosDeviceService, PosDeviceService>();
         services.AddScoped<ITillDeviceAssignmentService, TillDeviceAssignmentService>();
+        services.AddScoped<IPriceListRequestValidator, PriceListRequestValidator>();
+        services.AddScoped<IPriceListService, PriceListService>();
+        services.AddScoped<IPriceListItemsRequestValidator, PriceListItemsRequestValidator>();
+        services.AddScoped<IPriceListItemsService, PriceListItemsService>();
+        services.AddScoped<ITaxSetupRequestValidator, TaxSetupRequestValidator>();
+        services.AddScoped<IProductTaxAssignmentRequestValidator, ProductTaxAssignmentRequestValidator>();
+        services.AddScoped<ITaxSetupService, TaxSetupService>();
+        services.AddScoped<IProductTaxAssignmentService, ProductTaxAssignmentService>();
 
         return services;
     }

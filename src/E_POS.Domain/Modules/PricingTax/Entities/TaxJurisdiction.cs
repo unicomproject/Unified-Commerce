@@ -4,6 +4,8 @@ namespace E_POS.Domain.Modules.PricingTax.Entities;
 
 public class TaxJurisdiction : AuditableEntity
 {
+    protected TaxJurisdiction() { }
+
     public Guid TenantId { get; protected set; }
     public Guid? ParentJurisdictionId { get; protected set; }
     public string JurisdictionCode { get; protected set; } = string.Empty;
@@ -16,4 +18,23 @@ public class TaxJurisdiction : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    public static TaxJurisdiction Create(Guid tenantId, string jurisdictionCode, string jurisdictionName, string jurisdictionType, string countryCode, string? regionCode, string? localityName, string? postalCodePattern, Guid? createdByTenantUserId, DateTimeOffset now)
+    {
+        return new TaxJurisdiction
+        {
+            TenantId = tenantId,
+            JurisdictionCode = jurisdictionCode.Trim().ToUpperInvariant(),
+            JurisdictionName = jurisdictionName.Trim(),
+            JurisdictionType = jurisdictionType.Trim().ToUpperInvariant(),
+            CountryCode = countryCode.Trim().ToUpperInvariant(),
+            RegionCode = regionCode?.Trim().ToUpperInvariant(),
+            LocalityName = localityName?.Trim(),
+            PostalCodePattern = postalCodePattern?.Trim(),
+            Status = "ACTIVE",
+            CreatedByTenantUserId = createdByTenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }

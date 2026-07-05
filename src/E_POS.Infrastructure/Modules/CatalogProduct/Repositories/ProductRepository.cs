@@ -280,4 +280,18 @@ public sealed class ProductRepository : IProductRepository
         return await _dbContext.ProductBarcodes
             .FirstOrDefaultAsync(x => x.ProductVariantId == variantId, cancellationToken);
     }
+
+    public Task<bool> ProductExistsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken)
+    {
+        return _dbContext.Products
+            .AsNoTracking()
+            .AnyAsync(x => x.TenantId == tenantId && x.Id == productId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
+    }
+
+    public Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.ProductVariants
+            .AsNoTracking()
+            .AnyAsync(x => x.TenantId == tenantId && x.ProductId == productId && x.Id == variantId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
+    }
 }

@@ -17,4 +17,80 @@ public class PriceList : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    public static PriceList Create(
+        Guid id,
+        Guid tenantId,
+        string priceListCode,
+        string priceListName,
+        string priceListType,
+        string currencyCode,
+        bool priceIncludesTax,
+        bool isDefaultPriceList,
+        int priority,
+        DateTimeOffset? validFrom,
+        DateTimeOffset? validUntil,
+        string status,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        return new PriceList
+        {
+            Id = id,
+            TenantId = tenantId,
+            PriceListCode = priceListCode.Trim().ToUpperInvariant(),
+            PriceListName = priceListName.Trim(),
+            PriceListType = priceListType.Trim().ToUpperInvariant(),
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            PriceIncludesTax = priceIncludesTax,
+            IsDefaultPriceList = isDefaultPriceList,
+            Priority = priority,
+            ValidFrom = validFrom,
+            ValidUntil = validUntil,
+            Status = status.Trim().ToUpperInvariant(),
+            CreatedByTenantUserId = createdByTenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    public void UpdateProfile(
+        string priceListCode,
+        string priceListName,
+        string priceListType,
+        string currencyCode,
+        bool priceIncludesTax,
+        bool isDefaultPriceList,
+        int priority,
+        DateTimeOffset? validFrom,
+        DateTimeOffset? validUntil,
+        string status,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        PriceListCode = priceListCode.Trim().ToUpperInvariant();
+        PriceListName = priceListName.Trim();
+        PriceListType = priceListType.Trim().ToUpperInvariant();
+        CurrencyCode = currencyCode.Trim().ToUpperInvariant();
+        PriceIncludesTax = priceIncludesTax;
+        IsDefaultPriceList = isDefaultPriceList;
+        Priority = priority;
+        ValidFrom = validFrom;
+        ValidUntil = validUntil;
+        Status = status.Trim().ToUpperInvariant();
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void SoftDelete(Guid? deletedByUserId, DateTimeOffset now)
+    {
+        Status = "DELETED";
+        UpdatedByTenantUserId = deletedByUserId;
+        UpdatedAt = now;
+    }
+
+    public void ClearDefaultFlag()
+    {
+        IsDefaultPriceList = false;
+    }
 }

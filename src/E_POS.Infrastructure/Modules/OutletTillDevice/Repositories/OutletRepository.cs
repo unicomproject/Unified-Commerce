@@ -35,6 +35,17 @@ public sealed class OutletRepository : IOutletRepository
                 cancellationToken);
     }
 
+    public async Task<bool> AllOutletsBelongToTenantAsync(
+        Guid tenantId,
+        Guid[] outletIds,
+        CancellationToken cancellationToken)
+    {
+        var count = await _dbContext.Outlets
+            .AsNoTracking()
+            .CountAsync(x => x.TenantId == tenantId && outletIds.Contains(x.Id), cancellationToken);
+        return count == outletIds.Length;
+    }
+
     public Task<Guid?> GetActivePickupFulfillmentMethodIdAsync(
         Guid tenantId,
         CancellationToken cancellationToken)

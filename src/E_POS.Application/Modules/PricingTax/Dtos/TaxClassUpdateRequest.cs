@@ -1,0 +1,9 @@
+namespace E_POS.Application.Modules.PricingTax.Dtos;
+
+public class TaxClassUpdateRequest
+{
+    public string TaxClassName { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsDefaultTaxClass { get; set; }
+    public List<Guid>? AssignedRateIds { get; set; }
+}

@@ -31,4 +31,7 @@ public interface IProductRepository
     Task<PriceListItem?> GetPriceListItemAsync(Guid priceListId, Guid variantId, CancellationToken cancellationToken);
     // Helper to get barcode for a variant
     Task<ProductBarcode?> GetBarcodeAsync(Guid variantId, CancellationToken cancellationToken);
+
+    Task<bool> ProductExistsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken);
+    Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken);
 }

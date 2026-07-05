@@ -60,5 +60,7 @@ public sealed class UnitOfMeasureServiceTests
 
             return Task.FromResult(response);
         }
+
+        public Task<bool> UomExistsAsync(Guid? tenantId, Guid uomId, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }
