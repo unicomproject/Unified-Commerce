@@ -21,6 +21,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using E_POS.Application.Modules.PricingTax.Contracts;
+using E_POS.Infrastructure.Modules.PricingTax.Repositories;
+using E_POS.Application.Modules.TenantFoundation.Contracts;
+using E_POS.Infrastructure.Modules.TenantFoundation.Repositories;
 
 namespace E_POS.Infrastructure;
 
@@ -70,6 +74,8 @@ public static class DependencyInjection
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();
         services.AddScoped<ITillDeviceAssignmentRepository, TillDeviceAssignmentRepository>();
+        services.AddScoped<IPriceListRepository, PriceListRepository>();
+        services.AddScoped<ITenantLookupRepository, TenantLookupRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
