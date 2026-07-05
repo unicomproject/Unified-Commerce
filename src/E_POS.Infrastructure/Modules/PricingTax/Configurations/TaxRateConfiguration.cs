@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.AccessControl.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Domain.Modules.PricingTax.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -16,9 +16,18 @@ public sealed class TaxRateConfiguration : IEntityTypeConfiguration<TaxRate>
 
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.CreatedBy).HasColumnName("created_by_tenant_user_id").IsRequired(false);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.UpdatedBy).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+
+        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedBy);
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.TaxJurisdictionId).HasColumnName("tax_jurisdiction_id").IsRequired();
@@ -31,9 +40,11 @@ public sealed class TaxRateConfiguration : IEntityTypeConfiguration<TaxRate>
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(30)").HasMaxLength(30).IsRequired();
 
         builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_rates_tenant_id_tenants");
-        builder.HasOne<TaxJurisdiction>().WithMany().HasForeignKey(x => x.TaxJurisdictionId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_rates_tax_jurisdiction_id_tax_jurisdictions");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_rates_created_by_tenant_user_id_tenant_users");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_rates_updated_by_tenant_user_id_tenant_users");
+        
+        builder.HasOne<TaxJurisdiction>().WithMany().HasForeignKey(x => new { x.TenantId, x.TaxJurisdictionId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_rates_tax_jurisdiction_id_tax_jurisdictions");
+        
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_rates_created_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_rates_updated_by_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.TaxRateCode }).IsUnique().HasDatabaseName("uq_tax_rates_tenant_id_tax_rate_code");
         builder.HasIndex(x => new { x.TenantId, x.Id }).IsUnique().HasDatabaseName("uq_tax_rates_tenant_id_id");
@@ -41,7 +52,7 @@ public sealed class TaxRateConfiguration : IEntityTypeConfiguration<TaxRate>
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_tax_rates_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
-            t.HasCheckConstraint("ck_tax_rates_rate_percent_min", "rate_percent > 0");
+            t.HasCheckConstraint("ck_tax_rates_rate_percent_min", "rate_percent >= 0");
             t.HasCheckConstraint("ck_tax_rates_rate_percent_max", "rate_percent <= 100");
             t.HasCheckConstraint("ck_tax_rates_valid_period", "valid_until IS NULL OR valid_from IS NULL OR valid_until >= valid_from");
         });

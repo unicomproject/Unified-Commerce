@@ -25,7 +25,7 @@ public sealed class UnitOfMeasureRepository : IUnitOfMeasureRepository
                 x.Id,
                 x.TenantId,
                 x.UomCode,
-                x.Name,
+                x.UomName,
                 x.ConversionFactor,
                 x.TenantId == null,
                 x.CreatedAt,

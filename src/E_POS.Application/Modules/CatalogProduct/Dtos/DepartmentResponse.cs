@@ -3,7 +3,7 @@ namespace E_POS.Application.Modules.CatalogProduct.Dtos;
 public sealed record DepartmentResponse(
     Guid Id,
     string DepartmentCode,
-    string Name,
+    string DepartmentName,
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt);

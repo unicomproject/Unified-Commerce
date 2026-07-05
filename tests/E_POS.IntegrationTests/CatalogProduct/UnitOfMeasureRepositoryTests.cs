@@ -1,4 +1,3 @@
-using System.Reflection;
 using E_POS.Domain.Modules.CatalogProduct.Entities;
 using E_POS.Infrastructure.Modules.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Persistence;
@@ -34,22 +33,17 @@ public sealed class UnitOfMeasureRepositoryTests
 
     private static UnitOfMeasure CreateUnit(Guid? tenantId, string code, string name)
     {
-        var unit = (UnitOfMeasure)Activator.CreateInstance(typeof(UnitOfMeasure), nonPublic: true)!;
-        Set(unit, "Id", Guid.NewGuid());
-        Set(unit, "TenantId", tenantId);
-        Set(unit, "UomCode", code);
-        Set(unit, "Name", name);
-        Set<decimal?>(unit, "ConversionFactor", null);
-        Set(unit, "CreatedAt", Now);
-        Set<DateTimeOffset?>(unit, "UpdatedAt", Now);
-        return unit;
-    }
-
-    private static void Set<T>(UnitOfMeasure unit, string propertyName, T value)
-    {
-        typeof(UnitOfMeasure)
-            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
-            .SetValue(unit, value);
+        return UnitOfMeasure.Create(
+            Guid.NewGuid(),
+            tenantId,
+            code,
+            name,
+            "UNIT",
+            null,
+            null,
+            1m,
+            "ACTIVE",
+            Now);
     }
 
     private static EPosDbContext CreateDbContext()

@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.AccessControl.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Domain.Modules.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Discount.Entities;
 using E_POS.Domain.Modules.Inventory.Entities;
@@ -27,7 +27,7 @@ public sealed class DiscountTypeConfiguration : IEntityTypeConfiguration<Discoun
         builder.HasIndex(x => x.DiscountTypeCode).IsUnique().HasDatabaseName("uq_discount_types_discount_type_code");
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_discount_types_calculation_method", "calculation_method IN ('PERCENTAGE', 'FIXED_AMOUNT', 'FIXED_PRICE', 'BUY_X_GET_Y')");
+            t.HasCheckConstraint("ck_discount_types_calculation_method", "calculation_method IN ('PERCENTAGE', 'FIXED_AMOUNT', 'BUY_X_GET_Y', 'FREE_ITEM', 'PRICE_OVERRIDE')");
             t.HasCheckConstraint("ck_discount_types_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
         });
     }

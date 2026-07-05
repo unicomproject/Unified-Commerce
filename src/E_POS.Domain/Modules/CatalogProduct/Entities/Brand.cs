@@ -1,40 +1,72 @@
 using E_POS.Domain.Common.Entities;
-using E_POS.Domain.Modules.CatalogProduct.Constants;
 
 namespace E_POS.Domain.Modules.CatalogProduct.Entities;
 
 public class Brand : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
-    public string Name { get; protected set; } = string.Empty;
-    public string Status { get; protected set; } = string.Empty;
     public string BrandCode { get; protected set; } = string.Empty;
+    public string BrandName { get; protected set; } = string.Empty;
+    public string BrandSlug { get; protected set; } = string.Empty;
+    public string? Description { get; protected set; }
+    public string? LogoUrl { get; protected set; }
+    public string Status { get; protected set; } = string.Empty;
+    public Guid? CreatedByTenantUserId { get; protected set; }
+    public Guid? UpdatedByTenantUserId { get; protected set; }
 
-    public static Brand Create(Guid id, Guid tenantId, string brandCode, string name, string status, DateTimeOffset now)
+    public static Brand Create(
+        Guid id, 
+        Guid tenantId, 
+        string brandCode, 
+        string brandName, 
+        string brandSlug,
+        string? description,
+        string? logoUrl,
+        string status, 
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
     {
         return new Brand
         {
             Id = id,
             TenantId = tenantId,
-            BrandCode = BrandConstants.NormalizeCode(brandCode),
-            Name = name.Trim(),
-            Status = BrandConstants.NormalizeStatus(status),
+            BrandCode = brandCode.Trim().ToUpperInvariant(),
+            BrandName = brandName.Trim(),
+            BrandSlug = brandSlug.Trim().ToLowerInvariant(),
+            Description = description?.Trim(),
+            LogoUrl = logoUrl?.Trim(),
+            Status = status.Trim().ToUpperInvariant(),
+            CreatedByTenantUserId = createdByTenantUserId,
+            UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
 
-    public void UpdateProfile(string brandCode, string name, string status, DateTimeOffset now)
+    public void UpdateProfile(
+        string brandCode, 
+        string brandName, 
+        string brandSlug,
+        string? description,
+        string? logoUrl,
+        string status, 
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now)
     {
-        BrandCode = BrandConstants.NormalizeCode(brandCode);
-        Name = name.Trim();
-        Status = BrandConstants.NormalizeStatus(status);
+        BrandCode = brandCode.Trim().ToUpperInvariant();
+        BrandName = brandName.Trim();
+        BrandSlug = brandSlug.Trim().ToLowerInvariant();
+        Description = description?.Trim();
+        LogoUrl = logoUrl?.Trim();
+        Status = status.Trim().ToUpperInvariant();
+        UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
 
-    public void SoftDelete(DateTimeOffset now)
+    public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
-        Status = BrandConstants.DeletedStatus;
+        Status = "DELETED";
+        UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
 }

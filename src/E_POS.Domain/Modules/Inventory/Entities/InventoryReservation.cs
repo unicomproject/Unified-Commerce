@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Inventory.Entities;
 
@@ -10,7 +10,7 @@ public class InventoryReservation : AuditableEntity
     public Guid? SourceReferenceId { get; protected set; }
     public string? SourceReferenceNumber { get; protected set; }
     public Guid? SalesChannelId { get; protected set; }
-    public Guid FulfillmentOutletId { get; protected set; }
+    public Guid? FulfillmentOutletId { get; protected set; }
     public Guid? CustomerId { get; protected set; }
     public string ReservationStatus { get; protected set; } = string.Empty;
     public DateTimeOffset ReservedAt { get; protected set; }

@@ -27,7 +27,7 @@ public sealed class BrandCollectionControllerTests
         var controller = CreateBrandController(service);
         SetTenantClaims(controller, tenantId, userId, BrandConstants.CreatePermission);
 
-        var result = await controller.Create(new BrandCreateRequest("ACME", "Acme", BrandConstants.ActiveStatus), CancellationToken.None);
+        var result = await controller.Create(new BrandCreateRequest("ACME", "Acme", null, null, null, BrandConstants.ActiveStatus), CancellationToken.None);
 
         var created = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Same(response, created.Value);
@@ -46,7 +46,7 @@ public sealed class BrandCollectionControllerTests
         var controller = CreateBrandController(service);
         SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), BrandConstants.CreatePermission);
 
-        var result = await controller.Create(new BrandCreateRequest("ACME", "Acme", BrandConstants.ActiveStatus), CancellationToken.None);
+        var result = await controller.Create(new BrandCreateRequest("ACME", "Acme", null, null, null, BrandConstants.ActiveStatus), CancellationToken.None);
 
         Assert.IsType<ConflictObjectResult>(result);
     }
@@ -73,7 +73,7 @@ public sealed class BrandCollectionControllerTests
         var controller = CreateCollectionController(service);
         SetTenantClaims(controller, tenantId, userId, CollectionConstants.CreatePermission);
 
-        var result = await controller.Create(new CollectionCreateRequest("SUMMER", "Summer", CollectionConstants.ActiveStatus), CancellationToken.None);
+        var result = await controller.Create(new CollectionCreateRequest("SUMMER", "Summer", null, null, "STANDARD", null, null, 0, CollectionConstants.ActiveStatus), CancellationToken.None);
 
         var created = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Same(response, created.Value);

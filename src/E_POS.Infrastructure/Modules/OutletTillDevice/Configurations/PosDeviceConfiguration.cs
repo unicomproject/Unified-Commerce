@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.OutletTillDevice.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -71,6 +71,10 @@ public sealed class PosDeviceConfiguration : IEntityTypeConfiguration<PosDevice>
             .IsUnique()
             .HasDatabaseName("uq_pos_devices_device_serial_number")
             .HasFilter("device_serial_number IS NOT NULL");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_pos_devices_tenant_id_id");
     }
 }
 

@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.Payment.Entities;
+using E_POS.Domain.Modules.Payment.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -92,6 +92,10 @@ public sealed class PaymentMethodConfiguration : IEntityTypeConfiguration<Paymen
         builder.HasIndex(x => new { x.TenantId, x.MethodCode })
             .IsUnique()
             .HasDatabaseName("ux_payment_methods_d1d0cc7d");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_payment_methods_tenant_id_id");
 
         builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
             .WithMany()

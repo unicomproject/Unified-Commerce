@@ -1,5 +1,4 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
-using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -29,25 +28,34 @@ public sealed class ProductOptionTemplateConfiguration : IEntityTypeConfiguratio
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.TenantId)
-            .HasColumnName("tenant_id")
-            .IsRequired();
-
         builder.Property(x => x.TemplateCode)
             .HasColumnName("template_code")
             .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
-
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+            .HasMaxLength(80)
             .IsRequired();
 
-        builder.Property(x => x.Description)
-            .HasColumnName("description")
-            .HasColumnType("text")
-            .IsRequired(false);
+        builder.Property(x => x.TemplateName)
+            .HasColumnName("template_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
+
+        builder.Property(x => x.OptionType)
+            .HasColumnName("option_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.InputType)
+            .HasColumnName("input_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.SortOrder)
+            .HasColumnName("sort_order")
+            .HasDefaultValue(0)
+            .IsRequired();
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
@@ -55,20 +63,19 @@ public sealed class ProductOptionTemplateConfiguration : IEntityTypeConfiguratio
             .HasMaxLength(30)
             .IsRequired();
 
-        builder.Property(x => x.SortOrder)
-            .HasColumnName("sort_order")
-            .IsRequired()
-            .HasDefaultValue(0);
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
 
-        builder.HasOne<Tenant>()
-            .WithMany()
-            .HasForeignKey(x => x.TenantId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_product_option_templates_tenant_id_tenants");
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id")
+            .IsRequired(false);
 
-        builder.HasIndex(x => new { x.TenantId, x.TemplateCode })
+        builder.HasIndex(x => x.TemplateCode)
             .IsUnique()
-            .HasDatabaseName("uq_product_option_templates_tenant_id_template_code");
+            .HasDatabaseName("uq_product_option_templates_template_code");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_product_option_templates_sort_order", "sort_order >= 0"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_product_option_templates_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-

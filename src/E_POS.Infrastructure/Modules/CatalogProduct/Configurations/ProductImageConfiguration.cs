@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -28,17 +28,93 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.ImageUrl)
-            .HasColumnName("image_url")
-            .HasColumnType("varchar(255)")
-            .HasMaxLength(255);
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.ProductId)
             .HasColumnName("product_id")
             .IsRequired();
 
+        builder.Property(x => x.ProductVariantId)
+            .HasColumnName("product_variant_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.SalesChannelId)
+            .HasColumnName("sales_channel_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ImageStorageKey)
+            .HasColumnName("image_storage_key")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500)
+            .IsRequired();
+
+        builder.Property(x => x.ImageUrl)
+            .HasColumnName("image_url")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(x => x.AltText)
+            .HasColumnName("alt_text")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255)
+            .IsRequired(false);
+
+        builder.Property(x => x.ImagePurpose)
+            .HasColumnName("image_purpose")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.MimeType)
+            .HasColumnName("mime_type")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(x => x.FileSizeBytes)
+            .HasColumnName("file_size_bytes")
+            .IsRequired(false);
+
+        builder.Property(x => x.WidthPx)
+            .HasColumnName("width_px")
+            .IsRequired(false);
+
+        builder.Property(x => x.HeightPx)
+            .HasColumnName("height_px")
+            .IsRequired(false);
+
+        builder.Property(x => x.ChecksumHash)
+            .HasColumnName("checksum_hash")
+            .HasColumnType("varchar(128)")
+            .HasMaxLength(128)
+            .IsRequired(false);
+
         builder.Property(x => x.SortOrder)
-            .HasColumnName("sort_order");
+            .HasColumnName("sort_order")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(x => x.IsPrimaryImage)
+            .HasColumnName("is_primary_image")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.HasOne<Product>()
             .WithMany()
@@ -46,11 +122,13 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_product_images_product_id_products");
 
-        builder.HasIndex(x => new { x.ProductId, x.ImageUrl })
-            .IsUnique()
-            .HasDatabaseName("uq_product_images_product_id_image_url");
+        builder.HasOne<ProductVariant>()
+            .WithMany()
+            .HasForeignKey(x => x.ProductVariantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_product_images_product_variant_id_product_variants");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_product_images_sort_order", "sort_order >= 0")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_product_images_sort_order", "sort_order >= 0"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_product_images_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-

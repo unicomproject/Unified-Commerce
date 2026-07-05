@@ -18,9 +18,9 @@ public sealed class DepartmentCategoryRepositoryTests
         var otherTenantId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         dbContext.Departments.AddRange(
-            Department.Create(Guid.NewGuid(), tenantId, "GROCERY", "Grocery", DepartmentConstants.ActiveStatus, Now),
-            Department.Create(Guid.NewGuid(), tenantId, "OLD", "Old", DepartmentConstants.DeletedStatus, Now),
-            Department.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", DepartmentConstants.ActiveStatus, Now));
+            Department.Create(Guid.NewGuid(), tenantId, "GROCERY", "Grocery", null, 0, DepartmentConstants.ActiveStatus, null, Now),
+            Department.Create(Guid.NewGuid(), tenantId, "OLD", "Old", null, 0, DepartmentConstants.DeletedStatus, null, Now),
+            Department.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", null, 0, DepartmentConstants.ActiveStatus, null, Now));
         await dbContext.SaveChangesAsync();
         var repository = new DepartmentRepository(dbContext);
 
@@ -39,9 +39,9 @@ public sealed class DepartmentCategoryRepositoryTests
         var childId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         dbContext.Categories.AddRange(
-            Category.Create(parentId, tenantId, "FOOD", "Food", CategoryConstants.ActiveStatus, null, 1, Now),
-            Category.Create(childId, tenantId, "MILK", "Milk", CategoryConstants.ActiveStatus, parentId, 2, Now),
-            Category.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", CategoryConstants.ActiveStatus, null, 1, Now));
+            Category.Create(parentId, tenantId, Guid.Empty, null, "FOOD", "Food", "food", null, 1, CategoryConstants.ActiveStatus, null, Now),
+            Category.Create(childId, tenantId, Guid.Empty, parentId, "MILK", "Milk", "milk", null, 2, CategoryConstants.ActiveStatus, null, Now),
+            Category.Create(Guid.NewGuid(), otherTenantId, Guid.Empty, null, "OTHER", "Other", "other", null, 1, CategoryConstants.ActiveStatus, null, Now));
         await dbContext.SaveChangesAsync();
         var repository = new CategoryRepository(dbContext);
 
@@ -63,8 +63,8 @@ public sealed class DepartmentCategoryRepositoryTests
         var childId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         dbContext.Categories.AddRange(
-            Category.Create(parentId, tenantId, "FOOD", "Food", CategoryConstants.ActiveStatus, null, 1, Now),
-            Category.Create(childId, tenantId, "MILK", "Milk", CategoryConstants.ActiveStatus, parentId, 2, Now));
+            Category.Create(parentId, tenantId, Guid.Empty, null, "FOOD", "Food", "food", null, 1, CategoryConstants.ActiveStatus, null, Now),
+            Category.Create(childId, tenantId, Guid.Empty, parentId, "MILK", "Milk", "milk", null, 2, CategoryConstants.ActiveStatus, null, Now));
         await dbContext.SaveChangesAsync();
         var repository = new CategoryRepository(dbContext);
 

@@ -39,12 +39,12 @@ public sealed class DepartmentRepository : IDepartmentRepository
             if (_dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
                 var pattern = $"%{term}%";
-                query = query.Where(x => EF.Functions.ILike(x.Name, pattern) || EF.Functions.ILike(x.DepartmentCode, pattern));
+                query = query.Where(x => EF.Functions.ILike(x.DepartmentName, pattern) || EF.Functions.ILike(x.DepartmentCode, pattern));
             }
             else
             {
                 var normalizedTerm = term.ToUpperInvariant();
-                query = query.Where(x => x.Name.ToUpper().Contains(normalizedTerm) || x.DepartmentCode.ToUpper().Contains(normalizedTerm));
+                query = query.Where(x => x.DepartmentName.ToUpper().Contains(normalizedTerm) || x.DepartmentCode.ToUpper().Contains(normalizedTerm));
             }
         }
 
@@ -53,7 +53,7 @@ public sealed class DepartmentRepository : IDepartmentRepository
             .OrderBy(x => x.DepartmentCode)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new DepartmentSummaryResponse(x.Id, x.DepartmentCode, x.Name, x.Status, x.CreatedAt, x.UpdatedAt))
+            .Select(x => new DepartmentSummaryResponse(x.Id, x.DepartmentCode, x.DepartmentName, x.Status, x.CreatedAt, x.UpdatedAt))
             .ToListAsync(cancellationToken);
 
         return new DepartmentListResponse(items, pageNumber, pageSize, totalCount);
@@ -64,7 +64,7 @@ public sealed class DepartmentRepository : IDepartmentRepository
         return _dbContext.Departments
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Id == departmentId && (includeDeleted || x.Status != DepartmentConstants.DeletedStatus))
-            .Select(x => new DepartmentResponse(x.Id, x.DepartmentCode, x.Name, x.Status, x.CreatedAt, x.UpdatedAt))
+            .Select(x => new DepartmentResponse(x.Id, x.DepartmentCode, x.DepartmentName, x.Status, x.CreatedAt, x.UpdatedAt))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

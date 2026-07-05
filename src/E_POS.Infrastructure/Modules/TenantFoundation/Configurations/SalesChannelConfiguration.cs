@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -70,6 +70,10 @@ public sealed class SalesChannelConfiguration : IEntityTypeConfiguration<SalesCh
         builder.HasIndex(x => new { x.TenantId, x.ChannelCode })
             .IsUnique()
             .HasDatabaseName("uq_sales_channels_tenant_id_channel_code");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_sales_channels_tenant_id_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_sales_channels_channel_type", "channel_type IN ('E_POS', 'E_COMMERCE')"));
 

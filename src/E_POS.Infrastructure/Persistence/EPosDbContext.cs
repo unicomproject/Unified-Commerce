@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.PlatformAdministration.Entities;
+using E_POS.Domain.Modules.PlatformAdministration.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using E_POS.Domain.Modules.SubscriptionBilling.Entities;
 using E_POS.Domain.Modules.AccessControl.Entities;
@@ -224,6 +224,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<SalesOrderLineStatusHistory> SalesOrderLineStatusHistory => Set<SalesOrderLineStatusHistory>();
     public DbSet<SalesOrderStatusHistory> SalesOrderStatusHistory => Set<SalesOrderStatusHistory>();
     public DbSet<SalesOrderTax> SalesOrderTaxes => Set<SalesOrderTax>();
+    public DbSet<SalesOrderCharge> SalesOrderCharges => Set<SalesOrderCharge>();
 
     // POS Operations
     public DbSet<PosOrderHold> PosOrderHolds => Set<PosOrderHold>();

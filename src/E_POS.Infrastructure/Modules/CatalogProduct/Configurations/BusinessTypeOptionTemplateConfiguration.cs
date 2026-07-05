@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -29,10 +29,23 @@ public sealed class BusinessTypeOptionTemplateConfiguration : IEntityTypeConfigu
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.Description)
-            .HasColumnName("description")
-            .HasColumnType("text")
-            .IsRequired(false);
+        builder.Property(x => x.BusinessTypeId)
+            .HasColumnName("business_type_id")
+            .IsRequired();
+
+        builder.Property(x => x.OptionTemplateId)
+            .HasColumnName("option_template_id")
+            .IsRequired();
+
+        builder.Property(x => x.IsDefaultTemplate)
+            .HasColumnName("is_default_template")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(x => x.SortOrder)
+            .HasColumnName("sort_order")
+            .HasDefaultValue(0)
+            .IsRequired();
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
@@ -40,18 +53,13 @@ public sealed class BusinessTypeOptionTemplateConfiguration : IEntityTypeConfigu
             .HasMaxLength(30)
             .IsRequired();
 
-        builder.Property(x => x.BusinessTypeId)
-            .HasColumnName("business_type_id")
-            .IsRequired();
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
 
-        builder.Property(x => x.ProductOptionTemplateId)
-            .HasColumnName("product_option_template_id")
-            .IsRequired();
-
-        builder.Property(x => x.SortOrder)
-            .HasColumnName("sort_order")
-            .IsRequired()
-            .HasDefaultValue(0);
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id")
+            .IsRequired(false);
 
         builder.HasOne<BusinessType>()
             .WithMany()
@@ -61,13 +69,15 @@ public sealed class BusinessTypeOptionTemplateConfiguration : IEntityTypeConfigu
 
         builder.HasOne<ProductOptionTemplate>()
             .WithMany()
-            .HasForeignKey(x => x.ProductOptionTemplateId)
+            .HasForeignKey(x => x.OptionTemplateId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_business_type_option_templates_product_option_template_id_product_option_templates");
+            .HasConstraintName("fk_business_type_option_templates_option_template_id_product_option_templates");
 
-        builder.HasIndex(x => new { x.BusinessTypeId, x.ProductOptionTemplateId })
+        builder.HasIndex(x => new { x.BusinessTypeId, x.OptionTemplateId })
             .IsUnique()
-            .HasDatabaseName("uq_business_type_option_templates_business_type_id_product_option_template_id");
+            .HasDatabaseName("uq_business_type_option_templates_business_type_id_option_template_id");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_business_type_option_templates_sort_order", "sort_order >= 0"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_business_type_option_templates_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-

@@ -3,7 +3,7 @@ namespace E_POS.Application.Modules.CatalogProduct.Dtos;
 public sealed record CategoryResponse(
     Guid Id,
     string CategoryCode,
-    string Name,
+    string CategoryName,
     string Status,
     Guid? ParentCategoryId,
     string? ParentCategoryCode,

@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.AccessControl.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Domain.Modules.HardwareCash.Entities;
 using E_POS.Domain.Modules.OutletTillDevice.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -58,7 +58,8 @@ public sealed class TillSessionConfiguration : IEntityTypeConfiguration<TillSess
 
         builder.HasOne<Till>()
             .WithMany()
-            .HasForeignKey(x => x.TillId)
+            .HasForeignKey(x => new { x.TenantId, x.TillId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_till_sessions_till_id_tills");
 
@@ -71,6 +72,10 @@ public sealed class TillSessionConfiguration : IEntityTypeConfiguration<TillSess
         builder.HasIndex(x => new { x.TenantId, x.TillId, x.SessionNumber })
             .IsUnique()
             .HasDatabaseName("uq_till_sessions_tenant_id_till_id_session_number");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_till_sessions_tenant_id_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_till_sessions_closing_cash_amount", "closing_cash_amount IS NULL OR closing_cash_amount >= 0")); 
     }

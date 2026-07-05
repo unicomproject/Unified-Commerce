@@ -36,12 +36,14 @@ public static class DependencyInjection
         services.AddScoped<IDepartmentRequestValidator, DepartmentRequestValidator>();
         services.AddScoped<ICategoryRequestValidator, CategoryRequestValidator>();
         services.AddScoped<IBrandRequestValidator, BrandRequestValidator>();
+        services.AddScoped<IProductRequestValidator, ProductRequestValidator>();
         services.AddScoped<ICollectionRequestValidator, CollectionRequestValidator>();
         services.AddScoped<IReturnPolicyTemplateRequestValidator, ReturnPolicyTemplateRequestValidator>();
         services.AddScoped<IReturnPolicyRequestValidator, ReturnPolicyRequestValidator>();
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();
+        services.AddScoped<IProductService, ProductService>();
         services.AddScoped<ICollectionService, CollectionService>();
         services.AddScoped<IReturnPolicyTemplateService, ReturnPolicyTemplateService>();
         services.AddScoped<IReturnPolicyService, ReturnPolicyService>();

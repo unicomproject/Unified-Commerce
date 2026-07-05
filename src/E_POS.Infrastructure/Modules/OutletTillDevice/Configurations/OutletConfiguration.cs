@@ -26,6 +26,7 @@ public sealed class OutletConfiguration : IEntityTypeConfiguration<Outlet>
         builder.Property(x => x.ContactEmail).HasColumnName("contact_email").HasColumnType("varchar(255)").HasMaxLength(255).IsRequired(false);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_outlets_tenant_id_tenants");
         builder.HasIndex(x => new { x.TenantId, x.OutletCode }).IsUnique().HasDatabaseName("uq_outlets_tenant_id_outlet_code");
+        builder.HasIndex(x => new { x.TenantId, x.Id }).IsUnique().HasDatabaseName("uq_outlets_tenant_id_id");
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_outlets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");

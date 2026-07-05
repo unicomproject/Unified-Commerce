@@ -39,12 +39,12 @@ public sealed class BrandRepository : IBrandRepository
             if (_dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
                 var pattern = $"%{term}%";
-                query = query.Where(x => EF.Functions.ILike(x.Name, pattern) || EF.Functions.ILike(x.BrandCode, pattern));
+                query = query.Where(x => EF.Functions.ILike(x.BrandName, pattern) || EF.Functions.ILike(x.BrandCode, pattern));
             }
             else
             {
                 var normalizedTerm = term.ToUpperInvariant();
-                query = query.Where(x => x.Name.ToUpper().Contains(normalizedTerm) || x.BrandCode.ToUpper().Contains(normalizedTerm));
+                query = query.Where(x => x.BrandName.ToUpper().Contains(normalizedTerm) || x.BrandCode.ToUpper().Contains(normalizedTerm));
             }
         }
 
@@ -53,7 +53,7 @@ public sealed class BrandRepository : IBrandRepository
             .OrderBy(x => x.BrandCode)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new BrandSummaryResponse(x.Id, x.BrandCode, x.Name, x.Status, x.CreatedAt, x.UpdatedAt))
+            .Select(x => new BrandSummaryResponse(x.Id, x.BrandCode, x.BrandName, x.Status, x.CreatedAt, x.UpdatedAt))
             .ToListAsync(cancellationToken);
 
         return new BrandListResponse(items, pageNumber, pageSize, totalCount);
@@ -64,7 +64,7 @@ public sealed class BrandRepository : IBrandRepository
         return _dbContext.Brands
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Id == brandId && (includeDeleted || x.Status != BrandConstants.DeletedStatus))
-            .Select(x => new BrandResponse(x.Id, x.BrandCode, x.Name, x.Status, x.CreatedAt, x.UpdatedAt))
+            .Select(x => new BrandResponse(x.Id, x.BrandCode, x.BrandName, x.Status, x.CreatedAt, x.UpdatedAt))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

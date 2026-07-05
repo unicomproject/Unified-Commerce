@@ -37,7 +37,17 @@ public sealed class DepartmentService : IDepartmentService
         }
 
         var departmentId = Guid.NewGuid();
-        var department = Department.Create(departmentId, context.TenantId, normalizedCode, request.Name, request.Status, _dateTimeProvider.UtcNow);
+        var department = Department.Create(
+            departmentId, 
+            context.TenantId, 
+            normalizedCode, 
+            request.Name, 
+            request.Description,
+            request.SortOrder,
+            request.Status, 
+            context.UserId,
+            _dateTimeProvider.UtcNow);
+
         await _repository.AddAsync(department, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, departmentId, false, cancellationToken);
         return ApplicationResult<DepartmentResponse>.Success(response!);
@@ -80,7 +90,15 @@ public sealed class DepartmentService : IDepartmentService
             return ApplicationResult<DepartmentResponse>.Failure(new ApplicationError("department.duplicate_code", "Department code already exists."));
         }
 
-        department.UpdateProfile(normalizedCode, request.Name, request.Status, _dateTimeProvider.UtcNow);
+        department.UpdateProfile(
+            normalizedCode, 
+            request.Name, 
+            request.Description,
+            request.SortOrder,
+            request.Status, 
+            context.UserId,
+            _dateTimeProvider.UtcNow);
+
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, departmentId, false, cancellationToken);
         return response is null ? ApplicationResult<DepartmentResponse>.Failure(NotFound) : ApplicationResult<DepartmentResponse>.Success(response);
@@ -94,7 +112,7 @@ public sealed class DepartmentService : IDepartmentService
         var department = await _repository.GetEditableAsync(context.TenantId, departmentId, cancellationToken);
         if (department is null) return ApplicationResult.Failure(NotFound);
 
-        department.SoftDelete(_dateTimeProvider.UtcNow);
+        department.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }

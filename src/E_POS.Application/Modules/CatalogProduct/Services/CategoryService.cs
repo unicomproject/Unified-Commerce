@@ -40,7 +40,24 @@ public sealed class CategoryService : ICategoryService
         }
 
         var categoryId = Guid.NewGuid();
-        var category = Category.Create(categoryId, context.TenantId, normalizedCode, request.Name, request.Status, request.ParentCategoryId, request.SortOrder, _dateTimeProvider.UtcNow);
+        var slug = string.IsNullOrWhiteSpace(request.CategorySlug)
+            ? normalizedCode.ToLowerInvariant()
+            : request.CategorySlug.Trim().ToLowerInvariant();
+
+        var category = Category.Create(
+            categoryId, 
+            context.TenantId, 
+            request.DepartmentId,
+            request.ParentCategoryId, 
+            normalizedCode, 
+            request.Name, 
+            slug,
+            request.Description,
+            request.SortOrder,
+            request.Status, 
+            context.UserId,
+            _dateTimeProvider.UtcNow);
+
         await _repository.AddAsync(category, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, categoryId, false, cancellationToken);
         return ApplicationResult<CategoryResponse>.Success(response!);
@@ -86,7 +103,22 @@ public sealed class CategoryService : ICategoryService
             return ApplicationResult<CategoryResponse>.Failure(new ApplicationError("category.duplicate_code", "Category code already exists."));
         }
 
-        category.UpdateProfile(normalizedCode, request.Name, request.Status, request.ParentCategoryId, request.SortOrder, _dateTimeProvider.UtcNow);
+        var slug = string.IsNullOrWhiteSpace(request.CategorySlug)
+            ? normalizedCode.ToLowerInvariant()
+            : request.CategorySlug.Trim().ToLowerInvariant();
+
+        category.UpdateProfile(
+            request.DepartmentId,
+            request.ParentCategoryId, 
+            normalizedCode, 
+            request.Name, 
+            slug,
+            request.Description,
+            request.SortOrder,
+            request.Status, 
+            context.UserId,
+            _dateTimeProvider.UtcNow);
+
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, categoryId, false, cancellationToken);
         return response is null ? ApplicationResult<CategoryResponse>.Failure(NotFound) : ApplicationResult<CategoryResponse>.Success(response);
@@ -110,7 +142,7 @@ public sealed class CategoryService : ICategoryService
             return ApplicationResult.Failure(new ApplicationError("category.delete_conflict", "Category cannot be deleted while products are linked."));
         }
 
-        category.SoftDelete(_dateTimeProvider.UtcNow);
+        category.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }

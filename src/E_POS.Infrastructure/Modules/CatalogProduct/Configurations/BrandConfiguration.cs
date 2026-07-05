@@ -1,5 +1,6 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -33,21 +34,48 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
             .HasColumnName("tenant_id")
             .IsRequired();
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
-            .IsRequired();
-
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30);
-
         builder.Property(x => x.BrandCode)
             .HasColumnName("brand_code")
             .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(x => x.BrandName)
+            .HasColumnName("brand_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
+
+        builder.Property(x => x.BrandSlug)
+            .HasColumnName("brand_slug")
+            .HasColumnType("varchar(180)")
+            .HasMaxLength(180)
+            .IsRequired();
+
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.Property(x => x.LogoUrl)
+            .HasColumnName("logo_url")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.HasOne<Tenant>()
             .WithMany()
@@ -55,11 +83,30 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_brands_tenant_id_tenants");
 
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_brands_created_by_tenant_user_id_tenant_users");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_brands_updated_by_tenant_user_id_tenant_users");
+
         builder.HasIndex(x => new { x.TenantId, x.BrandCode })
             .IsUnique()
             .HasDatabaseName("uq_brands_tenant_id_brand_code");
 
+        builder.HasIndex(x => new { x.TenantId, x.BrandSlug })
+            .IsUnique()
+            .HasDatabaseName("uq_brands_tenant_id_brand_slug");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_brands_tenant_id_id");
+
         builder.ToTable(t => t.HasCheckConstraint("ck_brands_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
     }
 }
-

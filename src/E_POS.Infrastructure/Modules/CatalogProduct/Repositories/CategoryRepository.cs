@@ -84,12 +84,12 @@ public sealed class CategoryRepository : ICategoryRepository
             if (_dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
                 var pattern = $"%{term}%";
-                categories = categories.Where(x => EF.Functions.ILike(x.Name, pattern) || EF.Functions.ILike(x.CategoryCode, pattern));
+                categories = categories.Where(x => EF.Functions.ILike(x.CategoryName, pattern) || EF.Functions.ILike(x.CategoryCode, pattern));
             }
             else
             {
                 var normalizedTerm = term.ToUpperInvariant();
-                categories = categories.Where(x => x.Name.ToUpper().Contains(normalizedTerm) || x.CategoryCode.ToUpper().Contains(normalizedTerm));
+                categories = categories.Where(x => x.CategoryName.ToUpper().Contains(normalizedTerm) || x.CategoryCode.ToUpper().Contains(normalizedTerm));
             }
         }
 
@@ -107,11 +107,11 @@ public sealed class CategoryRepository : ICategoryRepository
             .Select(x => new CategorySummaryResponse(
                 x.Category.Id,
                 x.Category.CategoryCode,
-                x.Category.Name,
+                x.Category.CategoryName,
                 x.Category.Status,
                 x.Category.ParentCategoryId,
                 x.Parent == null ? null : x.Parent.CategoryCode,
-                x.Parent == null ? null : x.Parent.Name,
+                x.Parent == null ? null : x.Parent.CategoryName,
                 x.Category.SortOrder,
                 x.Category.CreatedAt,
                 x.Category.UpdatedAt))
@@ -134,11 +134,11 @@ public sealed class CategoryRepository : ICategoryRepository
             .Select(x => new CategoryResponse(
                 x.Category.Id,
                 x.Category.CategoryCode,
-                x.Category.Name,
+                x.Category.CategoryName,
                 x.Category.Status,
                 x.Category.ParentCategoryId,
                 x.Parent == null ? null : x.Parent.CategoryCode,
-                x.Parent == null ? null : x.Parent.Name,
+                x.Parent == null ? null : x.Parent.CategoryName,
                 x.Category.SortOrder,
                 x.Category.CreatedAt,
                 x.Category.UpdatedAt))
@@ -161,6 +161,4 @@ public sealed class CategoryRepository : ICategoryRepository
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
-
-
 }

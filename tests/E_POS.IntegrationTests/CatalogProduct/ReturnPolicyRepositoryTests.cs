@@ -34,17 +34,17 @@ public sealed class ReturnPolicyRepositoryTests
         var otherTenantId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         dbContext.ReturnPolicies.AddRange(
-            ReturnPolicy.Create(Guid.NewGuid(), tenantId, "7DAYS", "7 Days", 7, ReturnPolicyConstants.ActiveStatus, Now),
-            ReturnPolicy.Create(Guid.NewGuid(), tenantId, "OLD", "Old", 30, ReturnPolicyConstants.DeletedStatus, Now),
-            ReturnPolicy.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", 14, ReturnPolicyConstants.ActiveStatus, Now));
+            ReturnPolicy.Create(Guid.NewGuid(), tenantId, "7DAYS", "7 Days", null, 7, 7, true, true, false, false, ReturnPolicyConstants.ActiveStatus, null, Now),
+            ReturnPolicy.Create(Guid.NewGuid(), tenantId, "OLD", "Old", null, 30, 30, true, true, false, false, ReturnPolicyConstants.DeletedStatus, null, Now),
+            ReturnPolicy.Create(Guid.NewGuid(), otherTenantId, "OTHER", "Other", null, 14, 14, true, true, false, false, ReturnPolicyConstants.ActiveStatus, null, Now));
         await dbContext.SaveChangesAsync();
         var repository = new ReturnPolicyRepository(dbContext);
 
         var result = await repository.ListAsync(tenantId, 1, 50, null, CancellationToken.None);
 
         Assert.Equal(1, result.TotalCount);
-        Assert.Equal("7DAYS", Assert.Single(result.Items).PolicyCode);
-        Assert.DoesNotContain(result.Items, x => x.PolicyCode == "OTHER");
+        Assert.Equal("7DAYS", Assert.Single(result.Items).ReturnPolicyCode);
+        Assert.DoesNotContain(result.Items, x => x.ReturnPolicyCode == "OTHER");
     }
 
     private static EPosDbContext CreateDbContext()

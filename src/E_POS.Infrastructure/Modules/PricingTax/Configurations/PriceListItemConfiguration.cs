@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.AccessControl.Entities;
+using E_POS.Domain.Modules.AccessControl.Entities;
 using E_POS.Domain.Modules.CatalogProduct.Entities;
 using E_POS.Domain.Modules.PricingTax.Entities;
 using E_POS.Domain.Modules.TenantFoundation.Entities;
@@ -17,9 +17,18 @@ public sealed class PriceListItemConfiguration : IEntityTypeConfiguration<PriceL
 
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.CreatedBy).HasColumnName("created_by_tenant_user_id").IsRequired(false);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.UpdatedBy).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+
+        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedBy);
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.PriceListId).HasColumnName("price_list_id").IsRequired();
@@ -34,12 +43,15 @@ public sealed class PriceListItemConfiguration : IEntityTypeConfiguration<PriceL
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(30)").HasMaxLength(30).IsRequired();
 
         builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_tenant_id_tenants");
-        builder.HasOne<PriceList>().WithMany().HasForeignKey(x => x.PriceListId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_price_list_id_price_lists");
-        builder.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_product_id_products");
-        builder.HasOne<ProductVariant>().WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_product_variant_id_product_variants");
+        
+        builder.HasOne<PriceList>().WithMany().HasForeignKey(x => new { x.TenantId, x.PriceListId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_price_list_id_price_lists");
+        builder.HasOne<Product>().WithMany().HasForeignKey(x => new { x.TenantId, x.ProductId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_product_id_products");
+        builder.HasOne<ProductVariant>().WithMany().HasForeignKey(x => new { x.TenantId, x.ProductVariantId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_product_variant_id_product_variants");
+        
         builder.HasOne<UnitOfMeasure>().WithMany().HasForeignKey(x => x.UomId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_uom_id_unit_of_measures");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_created_by_tenant_user_id_tenant_users");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_updated_by_tenant_user_id_tenant_users");
+        
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_created_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_price_list_items_updated_by_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.PriceListId, x.ProductId, x.MinQuantity })
             .IsUnique()
@@ -61,6 +73,8 @@ public sealed class PriceListItemConfiguration : IEntityTypeConfiguration<PriceL
             .HasDatabaseName("uq_price_list_items_variant_scope_with_uom")
             .HasFilter("product_variant_id IS NOT NULL AND uom_id IS NOT NULL");
 
+        builder.HasIndex(x => new { x.TenantId, x.Id }).IsUnique().HasDatabaseName("uq_price_list_items_tenant_id_id");
+
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_price_list_items_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
@@ -71,4 +85,3 @@ public sealed class PriceListItemConfiguration : IEntityTypeConfiguration<PriceL
         });
     }
 }
-

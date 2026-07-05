@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.FulfilmentPickup.Entities;
+using E_POS.Domain.Modules.FulfilmentPickup.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -69,6 +69,10 @@ public sealed class FulfillmentMethodOutletConfiguration : IEntityTypeConfigurat
         builder.HasIndex(x => new { x.TenantId, x.FulfillmentMethodId, x.OutletId })
             .IsUnique()
             .HasDatabaseName("ux_fulfillment_method_outlets_cf79fc78");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_fulfillment_method_outlets_tenant_id_id");
 
         builder.HasOne<E_POS.Domain.Modules.TenantFoundation.Entities.Tenant>()
             .WithMany()

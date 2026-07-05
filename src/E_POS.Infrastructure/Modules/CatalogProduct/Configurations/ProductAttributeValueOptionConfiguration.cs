@@ -1,4 +1,5 @@
-﻿using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.CatalogProduct.Entities;
+using E_POS.Domain.Modules.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -28,34 +29,48 @@ public sealed class ProductAttributeValueOptionConfiguration : IEntityTypeConfig
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.AttributeOptionId)
-            .HasColumnName("attribute_option_id")
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
             .IsRequired();
 
         builder.Property(x => x.ProductAttributeValueId)
             .HasColumnName("product_attribute_value_id")
             .IsRequired();
 
-        builder.Property(x => x.SortOrder)
-            .HasColumnName("sort_order")
-            .IsRequired()
-            .HasDefaultValue(0);
+        builder.Property(x => x.AttributeDefinitionId)
+            .HasColumnName("attribute_definition_id")
+            .IsRequired();
+
+        builder.Property(x => x.AttributeOptionId)
+            .HasColumnName("attribute_option_id")
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_product_attribute_value_options_tenant_id_tenants");
 
         builder.HasOne<ProductAttributeValue>()
             .WithMany()
-            .HasForeignKey(x => x.ProductAttributeValueId)
+            .HasForeignKey(x => new { x.TenantId, x.ProductAttributeValueId, x.AttributeDefinitionId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id, x.AttributeDefinitionId })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_product_attribute_value_options_product_attribute_value_id_product_attribute_values");
 
         builder.HasOne<ProductAttributeOption>()
             .WithMany()
-            .HasForeignKey(x => x.AttributeOptionId)
+            .HasForeignKey(x => new { x.TenantId, x.AttributeDefinitionId, x.AttributeOptionId })
+            .HasPrincipalKey(x => new { x.TenantId, x.AttributeDefinitionId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_product_attribute_value_options_attribute_option_id_product_attribute_options");
 
-        builder.HasIndex(x => new { x.ProductAttributeValueId, x.AttributeOptionId })
+        builder.HasIndex(x => new { x.TenantId, x.ProductAttributeValueId, x.AttributeOptionId })
             .IsUnique()
-            .HasDatabaseName("uq_product_attribute_value_options_product_attribute_value_id_attribute_option_id");
+            .HasDatabaseName("uq_product_attribute_val_opts_tenant_id_val_id_opt_id");
     }
 }
-

@@ -31,7 +31,21 @@ public sealed class ReturnPolicyService : IReturnPolicyService
         var normalizedCode = ReturnPolicyConstants.NormalizeCode(request.PolicyCode);
         if (await _repository.PolicyCodeExistsAsync(context.TenantId, normalizedCode, null, cancellationToken)) return ApplicationResult<ReturnPolicyResponse>.Failure(new ApplicationError("return_policies.duplicate_code", "Return policy code already exists."));
         var policyId = Guid.NewGuid();
-        var policy = ReturnPolicy.Create(policyId, context.TenantId, normalizedCode, request.Name, request.ReturnWindowDays, request.Status, _dateTimeProvider.UtcNow);
+        var policy = ReturnPolicy.Create(
+            policyId, 
+            context.TenantId, 
+            normalizedCode, 
+            request.Name, 
+            request.Description, 
+            request.ReturnWindowDays,
+            request.ExchangeWindowDays,
+            request.RequiresReceipt ?? true,
+            request.AllowDefectiveReturn ?? true,
+            request.RequiresManagerApproval ?? false,
+            request.IsDefaultPolicy ?? false,
+            request.Status, 
+            context.UserId,
+            _dateTimeProvider.UtcNow);
         await _repository.AddAsync(policy, cancellationToken);
         return ApplicationResult<ReturnPolicyResponse>.Success((await _repository.GetByIdAsync(context.TenantId, policyId, false, cancellationToken))!);
     }
@@ -62,7 +76,19 @@ public sealed class ReturnPolicyService : IReturnPolicyService
         if (policy is null) return ApplicationResult<ReturnPolicyResponse>.Failure(NotFound);
         var normalizedCode = ReturnPolicyConstants.NormalizeCode(request.PolicyCode);
         if (await _repository.PolicyCodeExistsAsync(context.TenantId, normalizedCode, policyId, cancellationToken)) return ApplicationResult<ReturnPolicyResponse>.Failure(new ApplicationError("return_policies.duplicate_code", "Return policy code already exists."));
-        policy.UpdateProfile(normalizedCode, request.Name, request.ReturnWindowDays, request.Status, _dateTimeProvider.UtcNow);
+        policy.UpdateProfile(
+            normalizedCode, 
+            request.Name, 
+            request.Description, 
+            request.ReturnWindowDays,
+            request.ExchangeWindowDays,
+            request.RequiresReceipt ?? true,
+            request.AllowDefectiveReturn ?? true,
+            request.RequiresManagerApproval ?? false,
+            request.IsDefaultPolicy ?? false,
+            request.Status, 
+            context.UserId,
+            _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult<ReturnPolicyResponse>.Success((await _repository.GetByIdAsync(context.TenantId, policyId, false, cancellationToken))!);
     }
@@ -73,7 +99,7 @@ public sealed class ReturnPolicyService : IReturnPolicyService
         if (accessError is not null) return ApplicationResult.Failure(accessError);
         var policy = await _repository.GetEditableAsync(context.TenantId, policyId, cancellationToken);
         if (policy is null) return ApplicationResult.Failure(NotFound);
-        policy.SoftDelete(_dateTimeProvider.UtcNow);
+        policy.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }
