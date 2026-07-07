@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 
 namespace E_POS.Infrastructure.Persistence.Seed;
 
@@ -145,3 +145,4 @@ public static class PlatformAdminPermissionsSeedData
         return string.Join(", ", Definitions.Select(definition => $"'{definition.PermissionCode}'"));
     }
 }
+

@@ -1,0 +1,12 @@
+using E_POS.Domain.Common.Entities;
+
+namespace E_POS.Domain.Modules.Tenant.Inventory.Entities;
+
+public class StockMovementReference : AuditableEntity
+{
+    public Guid TenantId { get; protected set; }
+    public Guid StockMovementId { get; protected set; }
+    public string ReferenceType { get; protected set; } = string.Empty;
+    public Guid ReferenceId { get; protected set; }
+    public Guid? ReferenceLineId { get; protected set; }
+}

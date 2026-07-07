@@ -1,10 +1,10 @@
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.PricingTax.Contracts;
-using E_POS.Application.Modules.PricingTax.Dtos;
-using E_POS.Application.Modules.PricingTax.Services;
-using E_POS.Application.Modules.PricingTax.Validators;
-using E_POS.Domain.Modules.PricingTax.Constants;
-using E_POS.Domain.Modules.PricingTax.Entities;
+using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
+using E_POS.Application.Modules.Tenant.PricingTax.Dtos;
+using E_POS.Application.Modules.Tenant.PricingTax.Services;
+using E_POS.Application.Modules.Tenant.PricingTax.Validators;
+using E_POS.Domain.Modules.Tenant.PricingTax.Constants;
+using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using Xunit;
 
 namespace E_POS.UnitTests.PricingTax;
@@ -192,3 +192,5 @@ public sealed class TaxSetupServiceTests
         public Task SaveChangesAsync() => Task.CompletedTask;
     }
 }
+
+

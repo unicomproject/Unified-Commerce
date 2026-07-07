@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using E_POS.Application.Common.Security;
-using E_POS.Domain.Modules.AuthSecurity.Constants;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -91,3 +91,4 @@ public sealed class AuthSessionValidator : IAuthSessionValidator
             .AnyAsync(cancellationToken);
     }
 }
+

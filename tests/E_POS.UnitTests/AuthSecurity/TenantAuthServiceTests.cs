@@ -1,10 +1,10 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
-using E_POS.Application.Modules.AuthSecurity.Contracts;
-using E_POS.Application.Modules.AuthSecurity.Dtos;
-using E_POS.Application.Modules.AuthSecurity.Services;
-using E_POS.Domain.Modules.AuthSecurity.Constants;
-using E_POS.Domain.Modules.AuthSecurity.Entities;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
+using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
+using E_POS.Application.Modules.Tenant.TenantAuth.Services;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 using Xunit;
 
 namespace E_POS.UnitTests.AuthSecurity;
@@ -274,3 +274,4 @@ public sealed class TenantAuthServiceTests
         public DateTimeOffset UtcNow => Now;
     }
 }
+

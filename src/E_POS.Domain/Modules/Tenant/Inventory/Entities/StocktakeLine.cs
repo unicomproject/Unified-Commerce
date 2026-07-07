@@ -1,0 +1,20 @@
+using E_POS.Domain.Common.Entities;
+
+namespace E_POS.Domain.Modules.Tenant.Inventory.Entities;
+
+public class StocktakeLine : AuditableEntity
+{
+    public Guid TenantId { get; protected set; }
+    public Guid StocktakeSessionId { get; protected set; }
+    public int LineNumber { get; protected set; }
+    public Guid ProductId { get; protected set; }
+    public Guid? ProductVariantId { get; protected set; }
+    public Guid? ProductBatchId { get; protected set; }
+    public decimal ExpectedQuantity { get; protected set; }
+    public decimal? CountedQuantity { get; protected set; }
+    public decimal? VarianceQuantity { get; protected set; }
+    public Guid? CountedByTenantUserId { get; protected set; }
+    public DateTimeOffset? CountedAt { get; protected set; }
+    public string LineStatus { get; protected set; } = string.Empty;
+    public string? LineNote { get; protected set; }
+}

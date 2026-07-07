@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.SubscriptionBilling.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -90,3 +90,4 @@ public static class SubscriptionBillingCatalogSeedApplicator
         }
     }
 }
+

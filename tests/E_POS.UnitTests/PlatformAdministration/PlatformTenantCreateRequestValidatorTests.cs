@@ -1,7 +1,7 @@
-using E_POS.Application.Modules.PlatformAdministration.Dtos;
-using E_POS.Application.Modules.PlatformAdministration.Validators;
-using E_POS.Domain.Modules.SubscriptionBilling.Constants;
-using E_POS.Domain.Modules.TenantFoundation.Constants;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using Xunit;
 
 namespace E_POS.UnitTests.PlatformAdministration;
@@ -122,3 +122,5 @@ public sealed class PlatformTenantCreateRequestValidatorTests
         };
     }
 }
+
+

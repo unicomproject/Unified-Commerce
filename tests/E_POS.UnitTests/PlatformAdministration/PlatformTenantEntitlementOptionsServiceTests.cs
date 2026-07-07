@@ -1,14 +1,14 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Application.Modules.PlatformAdministration.Dtos;
-using E_POS.Application.Modules.PlatformAdministration.Services;
-using E_POS.Application.Modules.SubscriptionBilling.Contracts;
-using E_POS.Application.Modules.SubscriptionBilling.Dtos;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
-using E_POS.Domain.Modules.SubscriptionBilling.Entities;
-using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Application.Modules.Platform.Subscription.Dtos;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Xunit;
 
 namespace E_POS.UnitTests.PlatformAdministration;
@@ -375,3 +375,5 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
         public bool VerifyPassword(string password, string passwordHash) => password == passwordHash;
     }
 }
+
+

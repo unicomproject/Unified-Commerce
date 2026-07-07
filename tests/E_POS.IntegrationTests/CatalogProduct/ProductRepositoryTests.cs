@@ -1,8 +1,8 @@
 using System.Reflection;
-using E_POS.Domain.Modules.CatalogProduct.Constants;
-using E_POS.Domain.Modules.CatalogProduct.Entities;
-using E_POS.Domain.Modules.PricingTax.Entities;
-using E_POS.Infrastructure.Modules.CatalogProduct.Repositories;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
+using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -159,3 +159,5 @@ public sealed class ProductRepositoryTests
         return new EPosDbContext(options);
     }
 }
+
+

@@ -3,9 +3,9 @@ using System.Security.Claims;
 using E_POS.Api.Common;
 using E_POS.Api.Controllers;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.CatalogProduct.Contracts;
-using E_POS.Application.Modules.CatalogProduct.Dtos;
-using E_POS.Domain.Modules.CatalogProduct.Constants;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -93,3 +93,4 @@ public sealed class ReturnPolicyControllerTests
         public Task<ApplicationResult> DeleteAsync(Guid platformUserId, Guid templateId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
     }
 }
+

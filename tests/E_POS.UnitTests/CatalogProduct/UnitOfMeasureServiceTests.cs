@@ -1,8 +1,8 @@
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.CatalogProduct.Contracts;
-using E_POS.Application.Modules.CatalogProduct.Dtos;
-using E_POS.Application.Modules.CatalogProduct.Services;
-using E_POS.Domain.Modules.CatalogProduct.Constants;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using Xunit;
 
 namespace E_POS.UnitTests.CatalogProduct;
@@ -64,3 +64,4 @@ public sealed class UnitOfMeasureServiceTests
         public Task<bool> UomExistsAsync(Guid? tenantId, Guid uomId, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }
+

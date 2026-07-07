@@ -1,5 +1,5 @@
 using E_POS.Domain.Modules.Customer.Entities;
-using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -74,7 +74,7 @@ public sealed class CustomerRefreshTokenConfiguration : IEntityTypeConfiguration
             .HasColumnType("varchar(250)")
             .HasMaxLength(250);
 
-        builder.HasOne<Tenant>()
+        builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
@@ -108,3 +108,5 @@ public sealed class CustomerRefreshTokenConfiguration : IEntityTypeConfiguration
         });
     }
 }
+
+

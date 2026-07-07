@@ -1,12 +1,12 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.CatalogProduct.Contracts;
-using E_POS.Application.Modules.CatalogProduct.Dtos;
-using E_POS.Application.Modules.CatalogProduct.Services;
-using E_POS.Application.Modules.CatalogProduct.Validators;
-using E_POS.Domain.Modules.CatalogProduct.Constants;
-using E_POS.Domain.Modules.CatalogProduct.Entities;
-using E_POS.Domain.Modules.PricingTax.Entities;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using Xunit;
 
 namespace E_POS.UnitTests.CatalogProduct;
@@ -226,3 +226,5 @@ public sealed class ProductServiceTests
         public Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }
+
+

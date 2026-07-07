@@ -1,9 +1,9 @@
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Domain.Modules.SubscriptionBilling.Constants;
-using E_POS.Domain.Modules.SubscriptionBilling.Entities;
-using E_POS.Domain.Modules.TenantFoundation.Constants;
-using E_POS.Domain.Modules.TenantFoundation.Entities;
-using E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -185,3 +185,6 @@ public sealed class PlatformTenantLifecycleRepositoryTests
         return new EPosDbContext(options);
     }
 }
+
+
+

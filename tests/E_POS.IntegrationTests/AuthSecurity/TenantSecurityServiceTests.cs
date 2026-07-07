@@ -1,15 +1,15 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
-using E_POS.Application.Modules.AuthSecurity.Contracts;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Domain.Common.Entities;
-using E_POS.Domain.Modules.AccessControl.Entities;
-using E_POS.Domain.Modules.AuthSecurity.Constants;
-using E_POS.Domain.Modules.AuthSecurity.Entities;
-using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -224,3 +224,5 @@ public sealed class TenantSecurityServiceTests
         public DateTimeOffset UtcNow => Now;
     }
 }
+
+

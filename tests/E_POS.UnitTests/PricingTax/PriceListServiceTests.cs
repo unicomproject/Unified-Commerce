@@ -1,16 +1,16 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.OutletTillDevice.Contracts;
-using E_POS.Application.Modules.TenantFoundation.Contracts;
-using E_POS.Application.Modules.PricingTax.Contracts;
-using E_POS.Application.Modules.PricingTax.Dtos;
-using E_POS.Application.Modules.PricingTax.Services;
-using E_POS.Application.Modules.PricingTax.Validators;
-using E_POS.Domain.Modules.PricingTax.Constants;
-using E_POS.Domain.Modules.PricingTax.Entities;
-using E_POS.Domain.Modules.OutletTillDevice.Entities;
-using E_POS.Domain.Modules.FulfilmentPickup.Entities;
-using E_POS.Application.Modules.OutletTillDevice.Dtos;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
+using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
+using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
+using E_POS.Application.Modules.Tenant.PricingTax.Dtos;
+using E_POS.Application.Modules.Tenant.PricingTax.Services;
+using E_POS.Application.Modules.Tenant.PricingTax.Validators;
+using E_POS.Domain.Modules.Tenant.PricingTax.Constants;
+using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 using Xunit;
 
 namespace E_POS.UnitTests.PricingTax;
@@ -328,3 +328,5 @@ public sealed class PriceListServiceTests
         }
     }
 }
+
+
