@@ -15,4 +15,39 @@ public class StockAdjustmentLine : AuditableEntity
     public decimal QuantityAfter { get; protected set; }
     public decimal? UnitCost { get; protected set; }
     public string? LineNote { get; protected set; }
+
+    protected StockAdjustmentLine() { }
+
+    public static StockAdjustmentLine Create(
+        Guid id,
+        Guid tenantId,
+        Guid stockAdjustmentId,
+        int lineNumber,
+        Guid productId,
+        Guid? productVariantId,
+        Guid? productBatchId,
+        decimal quantityBefore,
+        decimal quantityChange,
+        decimal? unitCost,
+        string? lineNote,
+        DateTimeOffset now)
+    {
+        return new StockAdjustmentLine
+        {
+            Id = id,
+            TenantId = tenantId,
+            StockAdjustmentId = stockAdjustmentId,
+            LineNumber = lineNumber,
+            ProductId = productId,
+            ProductVariantId = productVariantId,
+            ProductBatchId = productBatchId,
+            QuantityBefore = quantityBefore,
+            QuantityChange = quantityChange,
+            QuantityAfter = quantityBefore + quantityChange,
+            UnitCost = unitCost,
+            LineNote = lineNote?.Trim(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }

@@ -17,9 +17,11 @@ public sealed class ProductInventorySettingConfiguration : IEntityTypeConfigurat
 
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.CreatedBy).HasColumnName("created_by_tenant_user_id").IsRequired(false);
+        builder.Property(x => x.CreatedByTenantUserId).HasColumnName("created_by_tenant_user_id").IsRequired(false);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.UpdatedBy).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+        builder.Property(x => x.UpdatedByTenantUserId).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.ProductId).HasColumnName("product_id").IsRequired();
@@ -40,8 +42,8 @@ public sealed class ProductInventorySettingConfiguration : IEntityTypeConfigurat
         
         builder.HasOne<UnitOfMeasure>().WithMany().HasForeignKey(x => x.InventoryUomId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_product_inventory_settings_inventory_uom_id_unit_of_measures");
         
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_product_inventory_settings_created_by_tenant_user_id_tenant_users");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_product_inventory_settings_updated_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_product_inventory_settings_created_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_product_inventory_settings_updated_by_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.ProductId }).IsUnique().HasDatabaseName("uq_product_inventory_settings_tenant_id_product_id").HasFilter("product_variant_id IS NULL");
         builder.HasIndex(x => new { x.TenantId, x.ProductVariantId }).IsUnique().HasDatabaseName("uq_product_inventory_settings_tenant_id_product_variant_id").HasFilter("product_variant_id IS NOT NULL");

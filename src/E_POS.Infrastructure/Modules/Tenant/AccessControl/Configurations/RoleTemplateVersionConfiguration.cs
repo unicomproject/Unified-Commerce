@@ -33,7 +33,32 @@ public sealed class RoleTemplateVersionConfiguration : IEntityTypeConfiguration<
             .IsRequired();
 
         builder.Property(x => x.VersionNumber)
-            .HasColumnName("version_number");
+            .HasColumnName("version_number")
+            .IsRequired();
+
+        builder.Property(x => x.VersionLabel)
+            .HasColumnName("version_label")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(x => x.IsActive)
+            .HasColumnName("is_active")
+            .IsRequired();
+
+        builder.Property(x => x.EffectiveFrom)
+            .HasColumnName("effective_from")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.EffectiveUntil)
+            .HasColumnName("effective_until")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.HasOne<RoleTemplate>()
             .WithMany()
@@ -41,13 +66,20 @@ public sealed class RoleTemplateVersionConfiguration : IEntityTypeConfiguration<
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_role_template_versions_role_template_id_role_templates");
 
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_role_template_versions_created_by");
+
         builder.HasIndex(x => new { x.RoleTemplateId, x.VersionNumber })
             .IsUnique()
             .HasDatabaseName("uq_role_template_versions_role_template_id_version_number");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_role_template_versions_version_number", "version_number > 0")); 
+        builder.ToTable(t => 
+        {
+            t.HasCheckConstraint("ck_role_template_versions_version_number", "version_number > 0");
+            t.HasCheckConstraint("ck_role_template_versions_effective_dates", "effective_until IS NULL OR effective_until > effective_from");
+        });
     }
 }
-
-
-

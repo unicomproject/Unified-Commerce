@@ -34,84 +34,78 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<E_POS.Domain.
             .HasMaxLength(60)
             .IsRequired();
 
-        builder.Property(x => x.CurrencyCode)
-            .HasColumnName("currency_code")
-            .HasColumnType("char(3)")
-            .HasMaxLength(3)
+        builder.Property(x => x.TenantSlug)
+            .HasColumnName("tenant_slug")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
             .IsRequired();
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
+        builder.Property(x => x.DisplayName)
+            .HasColumnName("display_name")
             .HasColumnType("varchar(200)")
             .HasMaxLength(200)
             .IsRequired();
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
-        builder.Property(x => x.BaseCurrency)
-            .HasColumnName("base_currency")
+        builder.Property(x => x.BaseCurrencyCode)
+            .HasColumnName("base_currency_code")
             .HasColumnType("char(3)")
             .HasMaxLength(3)
             .IsRequired();
 
-        builder.Property(x => x.BillingStatus)
-            .HasColumnName("billing_status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
-            .IsRequired();
-
-        builder.Property(x => x.BusinessType)
-            .HasColumnName("business_type")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80)
-            .IsRequired(false);
-
-        builder.Property(x => x.BusinessTypeId)
-            .HasColumnName("business_type_id")
-            .IsRequired();
-
-        builder.Property(x => x.DefaultLocale)
-            .HasColumnName("default_locale")
-            .HasColumnType("varchar(20)")
-            .HasMaxLength(20)
-            .IsRequired();
-
         builder.Property(x => x.DefaultTimezone)
             .HasColumnName("default_timezone")
-            .HasColumnType("varchar(100)")
-            .HasMaxLength(100)
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
             .IsRequired();
 
-        builder.Property(x => x.OperatingMode)
-            .HasColumnName("operating_mode")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
-            .IsRequired();
+        builder.Property(x => x.DataRegion)
+            .HasColumnName("data_region")
+            .HasColumnType("varchar(50)")
+            .HasMaxLength(50)
+            .IsRequired(false);
 
-        builder.Property(x => x.PrimaryDomain)
-            .HasColumnName("primary_domain")
-            .HasColumnType("varchar(255)")
-            .HasMaxLength(255);
+        builder.Property(x => x.ActivatedAt)
+            .HasColumnName("activated_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
 
-        builder.HasOne<BusinessType>()
+        builder.Property(x => x.SuspendedAt)
+            .HasColumnName("suspended_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.ArchivedAt)
+            .HasColumnName("archived_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.HasOne<Currency>()
             .WithMany()
-            .HasForeignKey(x => x.BusinessTypeId)
+            .HasForeignKey(x => x.BaseCurrencyCode)
+            .HasPrincipalKey(x => x.CurrencyCode)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_tenants_business_type_id_business_types");
+            .HasConstraintName("fk_tenants_base_currency_code_currencies");
 
         builder.HasIndex(x => x.TenantCode)
             .IsUnique()
             .HasDatabaseName("uq_tenants_tenant_code");
 
-        builder.HasIndex(x => x.PrimaryDomain)
+        builder.HasIndex(x => x.TenantSlug)
             .IsUnique()
-            .HasDatabaseName("uq_tenants_primary_domain");
+            .HasDatabaseName("uq_tenants_tenant_slug");
     }
 }
-
-
-

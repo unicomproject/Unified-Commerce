@@ -16,9 +16,12 @@ public sealed class StockTransferConfiguration : IEntityTypeConfiguration<StockT
 
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.CreatedBy).HasColumnName("created_by_tenant_user_id").IsRequired(false);
+        builder.Property(x => x.CreatedByTenantUserId).HasColumnName("created_by_tenant_user_id").IsRequired(false);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.UpdatedBy).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+        builder.Property(x => x.UpdatedByTenantUserId).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+        
+        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.TransferNumber).HasColumnName("transfer_number").HasColumnType("varchar(80)").HasMaxLength(80).IsRequired();
@@ -42,8 +45,8 @@ public sealed class StockTransferConfiguration : IEntityTypeConfiguration<StockT
         builder.HasOne<InventoryLocation>().WithMany().HasForeignKey(x => new { x.TenantId, x.SourceLocationId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_transfers_source_location_id_inventory_locations");
         builder.HasOne<InventoryLocation>().WithMany().HasForeignKey(x => new { x.TenantId, x.DestinationLocationId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_transfers_destination_location_id_inventory_locations");
 
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_transfers_created_by_tenant_user_id_tenant_users");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_transfers_updated_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_transfers_created_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_transfers_updated_by_tenant_user_id_tenant_users");
 
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.ApprovedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_transfers_approved_by_tenant_user_id_tenant_users");
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.ShippedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_transfers_shipped_by_tenant_user_id_tenant_users");

@@ -6,22 +6,29 @@ public class TenantAddress : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
     public string AddressType { get; protected set; } = string.Empty;
-    public string? Line1 { get; protected set; }
-    public string? Line2 { get; protected set; }
+    public string AddressLine1 { get; protected set; } = string.Empty;
+    public string? AddressLine2 { get; protected set; }
     public string? City { get; protected set; }
-    public string? State { get; protected set; }
+    public string? StateOrProvince { get; protected set; }
     public string? PostalCode { get; protected set; }
-    public string? CountryCode { get; protected set; }
+    public string CountryCode { get; protected set; } = string.Empty;
+    public bool IsPrimary { get; protected set; }
+    public string Status { get; protected set; } = string.Empty;
+    public Guid? CreatedByPlatformUserId { get; protected set; }
+    public Guid? UpdatedByPlatformUserId { get; protected set; }
 
     public static TenantAddress CreateRegistered(
         Guid id,
         Guid tenantId,
-        string? line1,
-        string? line2,
+        string addressLine1,
+        string? addressLine2,
         string? city,
-        string? state,
+        string? stateOrProvince,
         string? postalCode,
-        string? countryCode,
+        string countryCode,
+        bool isPrimary,
+        string status,
+        Guid? createdByPlatformUserId,
         DateTimeOffset now)
     {
         return new TenantAddress
@@ -29,12 +36,16 @@ public class TenantAddress : AuditableEntity
             Id = id,
             TenantId = tenantId,
             AddressType = "REGISTERED",
-            Line1 = NormalizeOptionalText(line1),
-            Line2 = NormalizeOptionalText(line2),
+            AddressLine1 = addressLine1.Trim(),
+            AddressLine2 = NormalizeOptionalText(addressLine2),
             City = NormalizeOptionalText(city),
-            State = NormalizeOptionalText(state),
+            StateOrProvince = NormalizeOptionalText(stateOrProvince),
             PostalCode = NormalizeOptionalText(postalCode),
-            CountryCode = NormalizeOptionalText(countryCode),
+            CountryCode = countryCode.Trim(),
+            IsPrimary = isPrimary,
+            Status = status.Trim(),
+            CreatedByPlatformUserId = createdByPlatformUserId,
+            UpdatedByPlatformUserId = createdByPlatformUserId,
             CreatedAt = now,
             UpdatedAt = now
         };

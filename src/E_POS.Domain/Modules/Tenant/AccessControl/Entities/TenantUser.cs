@@ -6,55 +6,60 @@ namespace E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 public class TenantUser : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
-    public string? FirstName { get; protected set; }
-    public string? LastName { get; protected set; }
-    public string NormalizedEmail { get; protected set; } = string.Empty;
-    public string? NormalizedPhone { get; protected set; }
-    public string? PasswordHash { get; protected set; }
-    public string Status { get; protected set; } = string.Empty;
+    public string Email { get; protected set; } = string.Empty;
+    public string EncryptedPassword { get; protected set; } = string.Empty;
+    public string? Phone { get; protected set; }
+    public string? UnmaskedPhone { get; protected set; }
+    public string PasswordSalt { get; protected set; } = string.Empty;
+    public string FullName { get; protected set; } = string.Empty;
+    public string? DisplayName { get; protected set; }
+    public Guid? ProfileImageUrl { get; protected set; }
+    public Guid? OutletId { get; protected set; }
+    public string DefaultOutletId { get; protected set; } = string.Empty;
+    public string UserType { get; protected set; } = string.Empty;
+    public string AccountStatus { get; protected set; } = string.Empty;
+    public DateTimeOffset? LockedUntil { get; protected set; }
+    public int FailedLoginAttempts { get; protected set; }
+    public DateTimeOffset? PasswordChangeRequiredAt { get; protected set; }
+    public bool AcceptedPrivacyTerms { get; protected set; }
+    public string AcceptedTermsVersion { get; protected set; } = string.Empty;
+    public Guid? CreatedByTenantUserId { get; protected set; }
+    public Guid? UpdatedByTenantUserId { get; protected set; }
+    public string SourceUserType { get; protected set; } = string.Empty;
+    public string? Notes { get; protected set; }
 
     public static TenantUser Create(
         Guid id,
         Guid tenantId,
         string email,
-        string? normalizedPhone,
-        string? passwordHash,
-        string status,
-        DateTimeOffset now)
-    {
-        return Create(
-            id,
-            tenantId,
-            email,
-            firstName: null,
-            lastName: null,
-            normalizedPhone,
-            passwordHash,
-            status,
-            now);
-    }
-
-    public static TenantUser Create(
-        Guid id,
-        Guid tenantId,
-        string email,
-        string? firstName,
-        string? lastName,
-        string? normalizedPhone,
-        string? passwordHash,
-        string status,
+        string fullName,
+        string? phone,
+        string? unmaskedPhone,
+        string encryptedPassword,
+        string passwordSalt,
+        string accountStatus,
+        string userType,
+        string sourceUserType,
+        string defaultOutletId,
         DateTimeOffset now)
     {
         return new TenantUser
         {
             Id = id,
             TenantId = tenantId,
-            FirstName = NormalizeOptionalText(firstName),
-            LastName = NormalizeOptionalText(lastName),
-            NormalizedEmail = NormalizeEmail(email),
-            NormalizedPhone = normalizedPhone ?? string.Empty,
-            PasswordHash = passwordHash,
-            Status = status,
+            Email = NormalizeEmail(email),
+            FullName = fullName.Trim(),
+            Phone = phone,
+            UnmaskedPhone = unmaskedPhone,
+            EncryptedPassword = encryptedPassword,
+            PasswordSalt = passwordSalt,
+            AccountStatus = accountStatus,
+            UserType = userType,
+            SourceUserType = sourceUserType,
+            DefaultOutletId = defaultOutletId,
+            FailedLoginAttempts = 0,
+            AcceptedPrivacyTerms = false,
+            AcceptedTermsVersion = "1.0",
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -64,26 +69,37 @@ public class TenantUser : AuditableEntity
         Guid id,
         Guid tenantId,
         string email,
-        string? firstName,
-        string? lastName,
-        string? normalizedPhone,
+        string fullName,
+        string? phone,
+        string? unmaskedPhone,
         DateTimeOffset now)
     {
         return Create(
             id,
             tenantId,
             email,
-            firstName,
-            lastName,
-            normalizedPhone,
-            TenantUserConstants.PendingInvitePasswordHash,
+            fullName,
+            phone,
+            unmaskedPhone,
+            TenantUserConstants.PendingInvitePasswordHash, // using constant as placeholder
+            "empty_salt",
             TenantUserConstants.StatusInvited,
+            "admin", // default
+            "admin", // default
+            "HQ",
             now);
     }
 
-    public void SetPasswordHash(string passwordHash, DateTimeOffset now)
+    public void SetPasswordHash(string encryptedPassword, string passwordSalt, DateTimeOffset now)
     {
-        PasswordHash = passwordHash;
+        EncryptedPassword = encryptedPassword;
+        PasswordSalt = passwordSalt;
+        UpdatedAt = now;
+    }
+
+    public void UpdateAudit(Guid? updatedBy, DateTimeOffset now)
+    {
+        UpdatedByTenantUserId = updatedBy;
         UpdatedAt = now;
     }
 
@@ -91,11 +107,4 @@ public class TenantUser : AuditableEntity
     {
         return email.Trim().ToUpperInvariant();
     }
-
-    private static string? NormalizeOptionalText(string? value)
-    {
-        var normalized = value?.Trim();
-        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
-    }
 }
-

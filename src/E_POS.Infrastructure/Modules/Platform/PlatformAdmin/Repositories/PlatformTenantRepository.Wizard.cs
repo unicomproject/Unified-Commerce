@@ -168,14 +168,14 @@ public sealed partial class PlatformTenantRepository
             .OrderBy(currency => currency.CurrencyCode)
             .Select(currency => new PlatformTenantCreateLookupOptionDto(
                 currency.CurrencyCode,
-                $"{currency.CurrencyCode} - {currency.Name}"))
+                $"{currency.CurrencyCode} - {currency.CurrencyName}"))
             .ToListAsync(cancellationToken);
 
         var businessTypes = await _dbContext.BusinessTypes
             .AsNoTracking()
             .Where(type => type.Status == "ACTIVE")
-            .OrderBy(type => type.BusinessTypeName)
-            .Select(type => new PlatformTenantCreateLookupOptionDto(type.BusinessTypeKey, type.BusinessTypeName))
+            .OrderBy(type => type.BusinessName)
+            .Select(type => new PlatformTenantCreateLookupOptionDto(type.BusinessCode, type.BusinessName))
             .ToListAsync(cancellationToken);
 
         var billingStatuses = new[]
@@ -245,7 +245,7 @@ public sealed partial class PlatformTenantRepository
         var normalizedEmail = TenantUser.NormalizeEmail(email);
         return _dbContext.TenantUsers
             .AsNoTracking()
-            .AnyAsync(user => user.NormalizedEmail == normalizedEmail, cancellationToken);
+            .AnyAsync(user => user.Email == email, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken)
@@ -256,7 +256,7 @@ public sealed partial class PlatformTenantRepository
         return await _dbContext.PermissionDefinitions
             .AsNoTracking()
             .Where(permission =>
-                permission.Status == "ACTIVE" &&
+                permission.IsActive &&
                 bootstrapCodes.Contains(permission.PermissionCode))
             .Select(permission => permission.Id)
             .ToListAsync(cancellationToken);

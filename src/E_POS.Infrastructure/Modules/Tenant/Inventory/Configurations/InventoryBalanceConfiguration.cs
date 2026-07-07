@@ -33,7 +33,7 @@ public sealed class InventoryBalanceConfiguration : IEntityTypeConfiguration<Inv
         builder.Property(x => x.DamagedQuantity).HasColumnName("damaged_quantity").HasPrecision(18, 4).HasDefaultValue(0m).IsRequired();
         builder.Property(x => x.QuarantineQuantity).HasColumnName("quarantine_quantity").HasPrecision(18, 4).HasDefaultValue(0m).IsRequired();
         builder.Property(x => x.AvailableQuantity).HasColumnName("available_quantity").HasPrecision(18, 4).HasComputedColumnSql("on_hand_quantity - reserved_quantity - damaged_quantity - quarantine_quantity", stored: true);
-        builder.Property(x => x.RowVersion).HasColumnName("row_version").HasDefaultValue(1L).IsRequired();
+        builder.Property(x => x.RowVersion).HasColumnName("row_version").HasDefaultValue(0L).IsRequired();
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_balances_tenant_id_tenants");
         

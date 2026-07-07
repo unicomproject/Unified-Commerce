@@ -16,8 +16,9 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
 
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.CreatedBy).HasColumnName("created_by_tenant_user_id").IsRequired(false);
+        builder.Property(x => x.CreatedByTenantUserId).HasColumnName("created_by_tenant_user_id").IsRequired(false);
         
+        builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedAt);
         builder.Ignore(x => x.UpdatedBy);
 
@@ -37,7 +38,7 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_movements_tenant_id_tenants");
         
         builder.HasOne<InventoryBalance>().WithMany().HasForeignKey(x => new { x.TenantId, x.InventoryBalanceId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_movements_inventory_balance_id_inventory_balances");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_movements_created_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_stock_movements_created_by_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.MovementNumber }).IsUnique().HasDatabaseName("uq_stock_movements_tenant_id_movement_number");
         builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique().HasDatabaseName("uq_stock_movements_tenant_id_idempotency_key").HasFilter("idempotency_key IS NOT NULL");
@@ -47,7 +48,8 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
         {
             t.HasCheckConstraint("ck_stock_movements_quantity_change", "quantity_change <> 0");
             t.HasCheckConstraint("ck_stock_movements_quantity_after", "quantity_after = quantity_before + quantity_change");
-            t.HasCheckConstraint("ck_stock_movements_costs", "(unit_cost IS NULL OR unit_cost >= 0) AND (total_cost IS NULL OR total_cost >= 0)");
+            t.HasCheckConstraint("ck_stock_movements_unit_cost", "unit_cost IS NULL OR unit_cost >= 0");
+            t.HasCheckConstraint("ck_stock_movements_total_cost", "total_cost IS NULL OR total_cost >= 0");
         });
     }
 }

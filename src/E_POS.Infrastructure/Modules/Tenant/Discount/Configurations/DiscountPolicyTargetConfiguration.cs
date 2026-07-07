@@ -17,9 +17,11 @@ public sealed class DiscountPolicyTargetConfiguration : IEntityTypeConfiguration
 
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.CreatedBy).HasColumnName("created_by_tenant_user_id").IsRequired(false);
+        builder.Ignore(x => x.CreatedBy);
+        builder.Property(x => x.CreatedByTenantUserId).HasColumnName("created_by_tenant_user_id").IsRequired(false);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.UpdatedBy).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+        builder.Ignore(x => x.UpdatedBy);
+        builder.Property(x => x.UpdatedByTenantUserId).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.DiscountPolicyId).HasColumnName("discount_policy_id").IsRequired();
@@ -41,8 +43,8 @@ public sealed class DiscountPolicyTargetConfiguration : IEntityTypeConfiguration
         builder.HasOne<Brand>().WithMany().HasForeignKey(x => new { x.TenantId, x.BrandId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_discount_policy_targets_brand_id_brands");
         builder.HasOne<Collection>().WithMany().HasForeignKey(x => new { x.TenantId, x.CollectionId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_discount_policy_targets_collection_id_collections");
         
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_discount_policy_targets_created_by_tenant_user_id_tenant_users");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_discount_policy_targets_updated_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_discount_policy_targets_created_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_discount_policy_targets_updated_by_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.Id }).IsUnique().HasDatabaseName("uq_discount_policy_targets_tenant_id_id");
 

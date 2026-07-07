@@ -30,27 +30,39 @@ public sealed class PermissionDefinitionConfiguration : IEntityTypeConfiguration
 
         builder.Property(x => x.PermissionCode)
             .HasColumnName("permission_code")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
-
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
             .IsRequired();
 
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30);
+        builder.Property(x => x.ModuleId)
+            .HasColumnName("module_id")
+            .IsRequired();
+
+        builder.Property(x => x.FeatureId)
+            .HasColumnName("feature_id")
+            .IsRequired();
+
+        builder.Property(x => x.ActionType)
+            .HasColumnName("action_type")
+            .HasColumnType("varchar(50)")
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.Property(x => x.IsSystem)
+            .HasColumnName("is_system")
+            .IsRequired();
+
+        builder.Property(x => x.IsActive)
+            .HasColumnName("is_active")
+            .IsRequired();
 
         builder.HasIndex(x => x.PermissionCode)
             .IsUnique()
             .HasDatabaseName("uq_permission_definitions_permission_code");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_permission_definitions_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
     }
 }
-
-
-

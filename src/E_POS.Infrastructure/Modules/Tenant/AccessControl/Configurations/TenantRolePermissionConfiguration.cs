@@ -20,44 +20,77 @@ public sealed class TenantRolePermissionConfiguration : IEntityTypeConfiguration
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
-
+        builder.Ignore(x => x.UpdatedAt);
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.Description)
-            .HasColumnName("description")
-            .HasColumnType("text")
-            .IsRequired(false);
-
-        builder.Property(x => x.PermissionDefinitionId)
-            .HasColumnName("permission_definition_id")
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
             .IsRequired();
 
         builder.Property(x => x.TenantRoleId)
-            .HasColumnName("tenant_role_id")
+            .HasColumnName("role_id")
             .IsRequired();
+
+        builder.Property(x => x.PermissionDefinitionId)
+            .HasColumnName("permission_id")
+            .IsRequired();
+
+        builder.Property(x => x.GrantedByTenantUserId)
+            .HasColumnName("granted_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.RevokedByTenantUserId)
+            .HasColumnName("revoked_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.GrantedAt)
+            .HasColumnName("granted_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.RevokedAt)
+            .HasColumnName("revoked_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.Notes)
+            .HasColumnName("notes")
+            .HasColumnType("text")
+            .IsRequired(false);
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_tenant_role_permissions_tenant_id_tenants");
 
         builder.HasOne<TenantRole>()
             .WithMany()
             .HasForeignKey(x => x.TenantRoleId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_tenant_role_permissions_tenant_role_id_tenant_roles");
+            .HasConstraintName("fk_tenant_role_permissions_role_id_tenant_roles");
 
         builder.HasOne<PermissionDefinition>()
             .WithMany()
             .HasForeignKey(x => x.PermissionDefinitionId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_tenant_role_permissions_permission_definition_id_permission_definitions");
+            .HasConstraintName("fk_tenant_role_permissions_permission_id_permission_definitions");
 
-        builder.HasIndex(x => new { x.TenantRoleId, x.PermissionDefinitionId })
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.GrantedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_tenant_role_permissions_granted_by");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.RevokedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_tenant_role_permissions_revoked_by");
+
+        builder.HasIndex(x => new { x.TenantId, x.TenantRoleId, x.PermissionDefinitionId })
             .IsUnique()
-            .HasDatabaseName("uq_tenant_role_permissions_tenant_role_id_permission_definition_id");
+            .HasDatabaseName("uq_tenant_role_permissions_tenant_id_role_id_permission_id");
     }
 }
-
-
-

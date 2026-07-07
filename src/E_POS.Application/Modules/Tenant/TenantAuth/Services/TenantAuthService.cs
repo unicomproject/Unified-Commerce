@@ -66,34 +66,35 @@ public sealed class TenantAuthService : ITenantAuthService
         if (account is null)
         {
             // Return the same failure for missing users to avoid account enumeration.
-            await SaveFailedAuditAsync(null, TenantAuthConstants.FailedLoginResult, now, cancellationToken);
+            await SaveFailedAuditAsync(null, null, TenantAuthConstants.FailedLoginResult, now, cancellationToken);
             return ApplicationResult<TenantLoginResponse>.Failure(InvalidCredentials);
         }
 
         if (string.Equals(account.UserStatus, TenantAuthConstants.LockedUserStatus, StringComparison.OrdinalIgnoreCase))
         {
             // Locked tenant users still receive a generic login failure.
-            await SaveFailedAuditAsync(account.TenantUserId, TenantAuthConstants.LockedLoginResult, now, cancellationToken);
+            await SaveFailedAuditAsync(account.TenantId, account.TenantUserId, TenantAuthConstants.LockedLoginResult, now, cancellationToken);
             return ApplicationResult<TenantLoginResponse>.Failure(InvalidCredentials);
         }
 
         if (!string.Equals(account.UserStatus, TenantAuthConstants.ActiveUserStatus, StringComparison.OrdinalIgnoreCase) ||
             string.IsNullOrWhiteSpace(account.PasswordHash))
         {
-            await SaveFailedAuditAsync(account.TenantUserId, TenantAuthConstants.FailedLoginResult, now, cancellationToken);
+            await SaveFailedAuditAsync(account.TenantId, account.TenantUserId, TenantAuthConstants.FailedLoginResult, now, cancellationToken);
             return ApplicationResult<TenantLoginResponse>.Failure(InvalidCredentials);
         }
 
         if (!_passwordHashService.VerifyPassword(request.Password, account.PasswordHash))
         {
             // Count only real bad-password attempts toward lockout, not inactive/tenant-denied states.
-            await SaveFailedAuditAsync(account.TenantUserId, TenantAuthConstants.FailedLoginResult, now, cancellationToken, applyCredentialLockout: true);
+            await SaveFailedAuditAsync(account.TenantId, account.TenantUserId, TenantAuthConstants.FailedLoginResult, now, cancellationToken, applyCredentialLockout: true);
             return ApplicationResult<TenantLoginResponse>.Failure(InvalidCredentials);
         }
 
         if (!TenantAuthConstants.IsTenantLoginStatusAllowed(account.TenantStatus))
         {
-            await SaveFailedAuditAsync(account.TenantUserId, TenantAuthConstants.FailedLoginResult, now, cancellationToken);
+            // E.g., suspended or archived tenants
+            await SaveFailedAuditAsync(account.TenantId, account.TenantUserId, TenantAuthConstants.FailedLoginResult, now, cancellationToken);
             return ApplicationResult<TenantLoginResponse>.Failure(new ApplicationError(
                 "tenant_auth.tenant_access_denied",
                 "Tenant access denied."));
@@ -112,21 +113,36 @@ public sealed class TenantAuthService : ITenantAuthService
         // Persist only token identifiers and hashes, never raw access or refresh tokens.
         var session = TenantAuthSession.Create(
             sessionId,
+            account.TenantId,
             account.TenantUserId,
-            _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey),
+            null, // ipAddress
+            null, // userAgent
+            now.AddMinutes(_jwtSettings.AccessTokenMinutes),
             now);
 
         var refreshTokenEntity = TenantRefreshToken.Create(
             Guid.NewGuid(),
+            account.TenantId,
             sessionId,
+            account.TenantUserId,
             _tokenHashService.HashToken(refreshToken.Token, _jwtSettings.SigningKey),
+            Guid.NewGuid(), // tokenFamilyId
             refreshToken.ExpiresAt,
             now);
 
         var audit = TenantLoginAudit.Create(
             Guid.NewGuid(),
+            account.TenantId,
             account.TenantUserId,
-            TenantAuthConstants.SuccessLoginResult,
+            sessionId,
+            null, // posDeviceId
+            account.Email, // attemptedIdentifier
+            "PASSWORD", // authenticationMethod
+            "SUCCESS", // loginStatus
+            null,
+            null,
+            null,
+            null,
             now);
 
         await _repository.SaveSuccessfulLoginAsync(session, refreshTokenEntity, audit, cancellationToken);
@@ -192,13 +208,27 @@ public sealed class TenantAuthService : ITenantAuthService
     }
 
     private Task SaveFailedAuditAsync(
+        Guid? tenantId,
         Guid? tenantUserId,
         string loginResult,
         DateTimeOffset now,
         CancellationToken cancellationToken,
         bool applyCredentialLockout = false)
     {
-        var audit = TenantLoginAudit.Create(Guid.NewGuid(), tenantUserId, loginResult, now);
+        var audit = TenantLoginAudit.Create(
+            Guid.NewGuid(),
+            tenantId,
+            tenantUserId,
+            null,
+            null,
+            "UNKNOWN",
+            "PASSWORD",
+            loginResult,
+            null,
+            null,
+            null,
+            null,
+            now);
 
         if (!applyCredentialLockout)
         {

@@ -33,7 +33,7 @@ public sealed class PlatformTenantRepositoryTests
         {
             Search = "Active",
             Status = "active",
-            BillingStatus = "paid",
+            BillingStatus = "ACTIVE",
             PlanId = planId,
             PageNumber = 1,
             PageSize = 10,
@@ -71,7 +71,7 @@ public sealed class PlatformTenantRepositoryTests
         Assert.Equal(2, summary.ActiveTenants);
         Assert.Equal(1, summary.SuspendedTenants);
         Assert.Equal(1, summary.TrialTenants);
-        Assert.Equal(2, summary.PendingBillingCount);
+        Assert.Equal(1, summary.PendingBillingCount);
         Assert.Equal(1, summary.TotalOutlets);
         Assert.Equal(1, summary.TotalTills);
     }
@@ -93,8 +93,8 @@ public sealed class PlatformTenantRepositoryTests
         var options = await repository.GetFilterOptionsAsync(CancellationToken.None);
 
         Assert.Contains("active", options.Statuses);
-        Assert.Contains("paid", options.BillingStatuses);
-        Assert.Contains("unified_epos", options.OperatingModes);
+        Assert.Contains("ACTIVE", options.BillingStatuses);
+        Assert.Contains("STANDARD", options.OperatingModes);
         Assert.Contains(options.Plans, plan => plan.Id == planId);
     }
 
@@ -149,9 +149,13 @@ public sealed class PlatformTenantRepositoryTests
         dbContext.Tenants.Add(Tenant.Create(
             tenantId,
             "TEN-999",
+            "ten-999",
             "Minimal Tenant",
             "active",
-            "paid",
+            "LKR",
+            "Asia/Colombo",
+            null,
+            null,
             Now));
         await dbContext.SaveChangesAsync();
 
@@ -260,9 +264,9 @@ public sealed class PlatformTenantRepositoryTests
             Now));
 
         dbContext.Tenants.AddRange(
-            Tenant.Create(tenantOneId, "TEN-001", "Active Tenant", "active", "paid", Now.AddDays(-3)),
-            Tenant.Create(tenantTwoId, "TEN-002", "Suspended Tenant", "suspended", "overdue", Now.AddDays(-2)),
-            Tenant.Create(tenantThreeId, "TEN-003", "Trial Tenant", "active", "pending", Now.AddDays(-1)));
+            Tenant.Create(tenantOneId, "TEN-001", "ten-001", "Active Tenant", "active", "LKR", "Asia/Colombo", null, null, Now.AddDays(-3)),
+            Tenant.Create(tenantTwoId, "TEN-002", "ten-002", "Suspended Tenant", "suspended", "LKR", "Asia/Colombo", null, null, Now.AddDays(-2)),
+            Tenant.Create(tenantThreeId, "TEN-003", "ten-003", "Trial Tenant", "active", "LKR", "Asia/Colombo", null, null, Now.AddDays(-1)));
 
         dbContext.TenantSubscriptions.AddRange(
             TenantSubscription.Create(
@@ -316,9 +320,15 @@ public sealed class PlatformTenantRepositoryTests
             Guid.Parse("55555555-5555-4555-8555-555555555501"),
             tenantOneId,
             "user@tenant.test",
+            "User Test",
+            null,
             null,
             "hash",
+            "salt",
             "ACTIVE",
+            "standard",
+            "system",
+            "default",
             Now));
 
         await dbContext.SaveChangesAsync();

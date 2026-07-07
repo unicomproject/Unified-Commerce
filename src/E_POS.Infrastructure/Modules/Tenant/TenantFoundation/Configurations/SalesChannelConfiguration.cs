@@ -38,10 +38,10 @@ public sealed class SalesChannelConfiguration : IEntityTypeConfiguration<SalesCh
             .HasMaxLength(80)
             .IsRequired();
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+        builder.Property(x => x.ChannelName)
+            .HasColumnName("channel_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
             .IsRequired();
 
         builder.Property(x => x.ChannelType)
@@ -50,10 +50,16 @@ public sealed class SalesChannelConfiguration : IEntityTypeConfiguration<SalesCh
             .HasMaxLength(40)
             .IsRequired();
 
+        builder.Property(x => x.ChannelMode)
+            .HasColumnName("channel_mode")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired(false);
+
         builder.Property(x => x.Status)
             .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30)
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.SortOrder)
@@ -69,18 +75,22 @@ public sealed class SalesChannelConfiguration : IEntityTypeConfiguration<SalesCh
 
         builder.HasIndex(x => new { x.TenantId, x.ChannelCode })
             .IsUnique()
-            .HasDatabaseName("uq_sales_channels_tenant_id_channel_code");
+            .HasDatabaseName("ix_sales_channels_tenant_id_channel_code");
 
-        builder.HasIndex(x => new { x.TenantId, x.Id })
-            .IsUnique()
-            .HasDatabaseName("uq_sales_channels_tenant_id_id");
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_sales_channels_channel_type",
+            "channel_type IN ('POS', 'E_COMMERCE')"));
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_sales_channels_channel_type", "channel_type IN ('E_POS', 'E_COMMERCE')"));
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_sales_channels_channel_mode",
+            "channel_mode IS NULL OR channel_mode IN ('ONLINE', 'OFFLINE', 'HYBRID')"));
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_sales_channels_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_sales_channels_status",
+            "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_sales_channels_sort_order",
+            "sort_order >= 0"));
     }
 }
-
-
-
-

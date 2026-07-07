@@ -21,10 +21,18 @@ public sealed class StockAdjustmentConfiguration : IEntityTypeConfiguration<Stoc
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
         builder.Property(x => x.UpdatedAt)
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
@@ -36,18 +44,32 @@ public sealed class StockAdjustmentConfiguration : IEntityTypeConfiguration<Stoc
         builder.Property(x => x.AdjustmentNumber)
             .HasColumnName("adjustment_number")
             .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
+            .HasMaxLength(80)
+            .IsRequired();
 
         builder.Property(x => x.AdjustmentStatus)
             .HasColumnName("adjustment_status")
             .HasColumnType("varchar(30)")
-            .HasMaxLength(30);
+            .HasMaxLength(30)
+            .IsRequired();
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_stock_adjustments_tenant_id_tenants");
+            
+        builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_stock_adjustments_created_by_tenant_user_id_tenant_users");
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_stock_adjustments_updated_by_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.AdjustmentNumber })
             .IsUnique()

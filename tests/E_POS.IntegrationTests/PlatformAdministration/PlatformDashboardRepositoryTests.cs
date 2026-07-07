@@ -23,9 +23,9 @@ public sealed class PlatformDashboardRepositoryTests
         var tenantThreeId = Guid.Parse("11111111-1111-4111-8111-111111111103");
 
         dbContext.Tenants.AddRange(
-            Tenant.Create(tenantOneId, "TEN-001", "Active Tenant", "active", "paid", Now.AddDays(-3)),
-            Tenant.Create(tenantTwoId, "TEN-002", "Suspended Tenant", "suspended", "overdue", Now.AddDays(-2)),
-            Tenant.Create(tenantThreeId, "TEN-003", "Trial Tenant", "active", "pending", Now.AddDays(-1)));
+            Tenant.Create(tenantOneId, "TEN-001", "ten-001", "Active Tenant", "active", "LKR", "Asia/Colombo", null, null, Now.AddDays(-3)),
+            Tenant.Create(tenantTwoId, "TEN-002", "ten-002", "Suspended Tenant", "suspended", "LKR", "Asia/Colombo", null, null, Now.AddDays(-2)),
+            Tenant.Create(tenantThreeId, "TEN-003", "ten-003", "Trial Tenant", "active", "LKR", "Asia/Colombo", null, null, Now.AddDays(-1)));
 
         dbContext.TenantSubscriptions.AddRange(
             TenantSubscription.Create(
@@ -83,17 +83,29 @@ public sealed class PlatformDashboardRepositoryTests
             Guid.Parse("55555555-5555-4555-8555-555555555501"),
             tenantOneId,
             "user@tenant.test",
+            "User Test",
+            null,
             null,
             "hash",
+            "salt",
             "ACTIVE",
+            "standard",
+            "system",
+            "default",
             Now));
         dbContext.TenantUsers.Add(TenantUser.Create(
             Guid.Parse("55555555-5555-4555-8555-555555555502"),
             tenantOneId,
             "deleted@tenant.test",
+            "Deleted Test",
+            null,
             null,
             "hash",
+            "salt",
             "DELETED",
+            "standard",
+            "system",
+            "default",
             Now));
 
         await dbContext.SaveChangesAsync();
@@ -108,7 +120,7 @@ public sealed class PlatformDashboardRepositoryTests
         Assert.Equal(1, dashboard.TrialTenants);
         Assert.Equal(3, dashboard.TotalSubscriptions);
         Assert.Equal(1, dashboard.ActiveSubscriptions);
-        Assert.Equal(2, dashboard.PendingBillingCount);
+        Assert.Equal(1, dashboard.PendingBillingCount);
         Assert.Equal(1, dashboard.TotalOutlets);
         Assert.Equal(1, dashboard.TotalTills);
         Assert.Equal(1, dashboard.TotalUsers);

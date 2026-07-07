@@ -23,9 +23,9 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
             .Select(x => new TenantSnapshot(
                 x.Id,
                 x.TenantCode,
-                x.Name,
+                x.DisplayName,
                 x.Status,
-                x.BillingStatus,
+                "UNKNOWN",
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
 
@@ -68,10 +68,7 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
                 "pending_billing",
                 "Pending Billing",
                 "Tenants with pending, failed, or overdue billing status.",
-                tenants.Count(x =>
-                    IsStatus(x.BillingStatus, "pending") ||
-                    IsStatus(x.BillingStatus, "failed") ||
-                    IsStatus(x.BillingStatus, "overdue")),
+                pastDueSubscriptions,
                 "warning")
         };
 
@@ -93,13 +90,10 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
             TrialTenants: tenants.Count(x => trialTenantIds.Contains(x.Id)),
             TotalSubscriptions: subscriptions.Count,
             ActiveSubscriptions: subscriptions.Count(x => IsStatus(x.SubscriptionStatus, "ACTIVE")),
-            PendingBillingCount: tenants.Count(x =>
-                IsStatus(x.BillingStatus, "pending") ||
-                IsStatus(x.BillingStatus, "failed") ||
-                IsStatus(x.BillingStatus, "overdue")),
+            PendingBillingCount: pastDueSubscriptions,
             TotalOutlets: await CountNonDeletedAsync(_dbContext.Outlets.Select(x => x.Status), cancellationToken),
             TotalTills: await CountNonDeletedAsync(_dbContext.Tills.Select(x => x.Status), cancellationToken),
-            TotalUsers: await CountNonDeletedAsync(_dbContext.TenantUsers.Select(x => x.Status), cancellationToken),
+            TotalUsers: await CountNonDeletedAsync(_dbContext.TenantUsers.Select(x => x.AccountStatus), cancellationToken),
             RecentTenants: recentTenants,
             AttentionItems: attentionItems,
             GeneratedAt: generatedAt);

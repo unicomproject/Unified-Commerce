@@ -17,9 +17,11 @@ public sealed class InventoryReorderRuleConfiguration : IEntityTypeConfiguration
 
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.CreatedBy).HasColumnName("created_by_tenant_user_id").IsRequired(false);
+        builder.Property(x => x.CreatedByTenantUserId).HasColumnName("created_by_tenant_user_id").IsRequired(false);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
-        builder.Property(x => x.UpdatedBy).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+        builder.Property(x => x.UpdatedByTenantUserId).HasColumnName("updated_by_tenant_user_id").IsRequired(false);
+        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.InventoryLocationId).HasColumnName("inventory_location_id").IsRequired();
@@ -42,8 +44,8 @@ public sealed class InventoryReorderRuleConfiguration : IEntityTypeConfiguration
         builder.HasOne<Product>().WithMany().HasForeignKey(x => new { x.TenantId, x.ProductId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reorder_rules_product_id_products");
         builder.HasOne<ProductVariant>().WithMany().HasForeignKey(x => new { x.TenantId, x.ProductVariantId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reorder_rules_product_variant_id_product_variants");
 
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reorder_rules_created_by_tenant_user_id_tenant_users");
-        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedBy).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reorder_rules_updated_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reorder_rules_created_by_tenant_user_id_tenant_users");
+        builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reorder_rules_updated_by_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.InventoryLocationId, x.ProductId }).IsUnique().HasDatabaseName("uq_inventory_reorder_rules_product").HasFilter("product_variant_id IS NULL");
         builder.HasIndex(x => new { x.TenantId, x.InventoryLocationId, x.ProductVariantId }).IsUnique().HasDatabaseName("uq_inventory_reorder_rules_variant").HasFilter("product_variant_id IS NOT NULL");
@@ -51,7 +53,9 @@ public sealed class InventoryReorderRuleConfiguration : IEntityTypeConfiguration
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_inventory_reorder_rules_quantities", "(reorder_quantity IS NULL OR reorder_quantity > 0) AND reorder_point_quantity >= 0 AND safety_stock_quantity >= 0");
+            t.HasCheckConstraint("ck_inventory_reorder_rules_reorder_point_quantity", "reorder_point_quantity >= 0");
+            t.HasCheckConstraint("ck_inventory_reorder_rules_reorder_quantity", "reorder_quantity IS NULL OR reorder_quantity > 0");
+            t.HasCheckConstraint("ck_inventory_reorder_rules_safety_stock_quantity", "safety_stock_quantity >= 0");
             t.HasCheckConstraint("ck_inventory_reorder_rules_min_max", "max_stock_quantity IS NULL OR min_stock_quantity IS NULL OR max_stock_quantity >= min_stock_quantity");
             t.HasCheckConstraint("ck_inventory_reorder_rules_lead_time_days", "lead_time_days IS NULL OR lead_time_days >= 0");
             t.HasCheckConstraint("ck_inventory_reorder_rules_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");

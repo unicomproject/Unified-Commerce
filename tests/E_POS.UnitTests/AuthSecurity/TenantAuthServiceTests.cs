@@ -38,8 +38,8 @@ public sealed class TenantAuthServiceTests
         Assert.NotNull(repository.SavedSession);
         Assert.NotNull(repository.SavedRefreshToken);
         Assert.NotNull(repository.SavedAudit);
-        Assert.Equal(TenantAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginResult);
-        Assert.Equal("hash:" + jwtFactory.JwtId, repository.SavedSession!.SessionTokenHash);
+        Assert.Equal(TenantAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginStatus);
+        Assert.Equal(account.TenantId, repository.SavedSession!.TenantId);
         Assert.Equal("hash:tenant-refresh-token", repository.SavedRefreshToken!.TokenHash);
         Assert.Equal(Now.AddDays(7), repository.SavedRefreshToken.ExpiresAt);
     }
@@ -56,7 +56,7 @@ public sealed class TenantAuthServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("tenant_auth.invalid_credentials", result.Error.Code);
         Assert.NotNull(repository.SavedAudit);
-        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginResult);
+        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginStatus);
         Assert.Null(repository.SavedSession);
         Assert.Null(repository.SavedRefreshToken);
     }
@@ -73,7 +73,7 @@ public sealed class TenantAuthServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("tenant_auth.tenant_access_denied", result.Error.Code);
         Assert.NotNull(repository.SavedAudit);
-        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginResult);
+        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginStatus);
         Assert.Null(repository.SavedSession);
         Assert.Null(repository.SavedRefreshToken);
     }
@@ -90,7 +90,7 @@ public sealed class TenantAuthServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("tenant_auth.invalid_credentials", result.Error.Code);
         Assert.NotNull(repository.SavedAudit);
-        Assert.Equal(TenantAuthConstants.LockedLoginResult, repository.SavedAudit!.LoginResult);
+        Assert.Equal(TenantAuthConstants.LockedLoginResult, repository.SavedAudit!.LoginStatus);
     }
 
     [Fact]

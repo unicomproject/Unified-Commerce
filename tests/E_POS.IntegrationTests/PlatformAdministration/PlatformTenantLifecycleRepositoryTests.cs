@@ -24,18 +24,7 @@ public sealed class PlatformTenantLifecycleRepositoryTests
 
         IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
         var tenantId = Guid.NewGuid();
-        var tenant = Tenant.CreateDraft(
-            tenantId,
-            "TEN-LIFECYCLE",
-            "Lifecycle Tenant",
-            TenantBillingStatusConstants.Pending,
-            "LKR",
-            "Asia/Colombo",
-            "en-LK",
-            "unified_epos",
-            "Retail",
-            null,
-            Now);
+        var tenant = Tenant.Create(tenantId, "TEN-LIFECYCLE", "ten-lifecycle", "Lifecycle Tenant", TenantStatusConstants.Draft, "LKR", "Asia/Colombo", null, null, Now);
 
         var subscription = TenantSubscription.Create(
             Guid.NewGuid(),
@@ -58,7 +47,7 @@ public sealed class PlatformTenantLifecycleRepositoryTests
 
         var loadedTenant = await repository.GetTenantEntityByIdAsync(tenantId, CancellationToken.None);
         Assert.NotNull(loadedTenant);
-        loadedTenant!.Activate(Now);
+        loadedTenant!.Activate(null, Now);
         await repository.UpdateTenantAsync(loadedTenant, CancellationToken.None);
 
         var loadedSubscription = await repository.GetCurrentTenantSubscriptionEntityAsync(
@@ -72,7 +61,7 @@ public sealed class PlatformTenantLifecycleRepositoryTests
         Assert.Equal(TenantStatusConstants.Active, activeDetail!.Status);
         Assert.Equal(TenantSubscriptionStatusConstants.Active, activeDetail.Subscription!.SubscriptionStatus);
 
-        loadedTenant.Suspend(Now);
+        loadedTenant.Suspend(null, Now);
         await repository.UpdateTenantAsync(loadedTenant, CancellationToken.None);
 
         var suspendedDetail = await repository.GetTenantDetailAsync(tenantId, CancellationToken.None);
@@ -92,13 +81,7 @@ public sealed class PlatformTenantLifecycleRepositoryTests
             [onlineStoreFeatureId, clickCollectFeatureId]);
 
         var tenantId = Guid.NewGuid();
-        dbContext.Tenants.Add(Tenant.Create(
-            tenantId,
-            "TEN-ENT",
-            "Entitlement Tenant",
-            TenantStatusConstants.Active,
-            TenantBillingStatusConstants.Paid,
-            Now));
+        dbContext.Tenants.Add(Tenant.Create(tenantId, "TEN-ENT", "ten-ent", "Entitlement Tenant", TenantStatusConstants.Active, "LKR", "Asia/Colombo", null, null, Now));
         dbContext.TenantSubscriptions.Add(TenantSubscription.Create(
             Guid.NewGuid(),
             tenantId,

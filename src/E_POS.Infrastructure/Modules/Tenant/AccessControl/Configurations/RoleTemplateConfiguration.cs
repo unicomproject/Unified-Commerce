@@ -30,13 +30,14 @@ public sealed class RoleTemplateConfiguration : IEntityTypeConfiguration<RoleTem
 
         builder.Property(x => x.TemplateCode)
             .HasColumnName("template_code")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired();
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+        builder.Property(x => x.TemplateName)
+            .HasColumnName("template_name")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255)
             .IsRequired();
 
         builder.Property(x => x.Description)
@@ -44,23 +45,36 @@ public sealed class RoleTemplateConfiguration : IEntityTypeConfiguration<RoleTem
             .HasColumnType("text")
             .IsRequired(false);
 
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30);
+        builder.Property(x => x.IsDefault)
+            .HasColumnName("is_default")
+            .IsRequired();
 
-        builder.Property(x => x.SortOrder)
-            .HasColumnName("sort_order")
-            .IsRequired()
-            .HasDefaultValue(0);
+        builder.Property(x => x.IsActive)
+            .HasColumnName("is_active")
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
 
         builder.HasIndex(x => x.TemplateCode)
             .IsUnique()
             .HasDatabaseName("uq_role_templates_template_code");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_role_templates_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_role_templates_created_by");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_role_templates_updated_by");
     }
 }
-
-
-

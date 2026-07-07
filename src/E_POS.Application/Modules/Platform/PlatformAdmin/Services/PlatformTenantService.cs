@@ -164,21 +164,11 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                 ValidationFailed with { Message = "Tenant name is required." });
         }
 
-        var billingStatus = NormalizeBillingStatus(request.BillingStatus ?? tenant.BillingStatus);
-        if (!AllowedBillingStatuses.Contains(billingStatus))
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                ValidationFailed with { Message = "Invalid tenant billing status." });
-        }
-
         tenant.UpdateDetails(
             name,
-            NormalizeOptionalText(request.BaseCurrency) ?? tenant.BaseCurrency,
             NormalizeOptionalText(request.DefaultTimezone) ?? tenant.DefaultTimezone,
-            NormalizeOptionalText(request.DefaultLocale) ?? tenant.DefaultLocale,
-            NormalizeOptionalText(request.OperatingMode) ?? tenant.OperatingMode,
-            request.BusinessType ?? tenant.BusinessType,
-            billingStatus,
+            null, // dataRegion
+            platformUserId,
             _dateTimeProvider.UtcNow);
 
         await _repository.UpdateTenantAsync(tenant, cancellationToken);
@@ -207,7 +197,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                 InvalidTransition with { Message = "Tenant cannot be activated from its current status." });
         }
 
-        if (string.IsNullOrWhiteSpace(tenant.Name) || string.IsNullOrWhiteSpace(tenant.TenantCode))
+        if (string.IsNullOrWhiteSpace(tenant.DisplayName) || string.IsNullOrWhiteSpace(tenant.TenantCode))
         {
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(
                 ValidationFailed with { Message = "Tenant is missing required activation fields." });
@@ -221,7 +211,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         }
 
         var now = _dateTimeProvider.UtcNow;
-        tenant.Activate(now);
+        tenant.Activate(platformUserId, now);
         subscription.Activate(now);
 
         await _repository.UpdateTenantAsync(tenant, cancellationToken);
@@ -253,7 +243,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                 InvalidTransition with { Message = "Tenant cannot be suspended from its current status." });
         }
 
-        tenant.Suspend(_dateTimeProvider.UtcNow);
+        tenant.Suspend(platformUserId, _dateTimeProvider.UtcNow);
         await _repository.UpdateTenantAsync(tenant, cancellationToken);
 
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);

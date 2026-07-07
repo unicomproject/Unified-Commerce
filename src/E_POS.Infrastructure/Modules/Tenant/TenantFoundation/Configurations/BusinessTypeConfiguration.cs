@@ -28,14 +28,14 @@ public sealed class BusinessTypeConfiguration : IEntityTypeConfiguration<Busines
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
-        builder.Property(x => x.BusinessTypeKey)
-            .HasColumnName("business_type_key")
-            .HasColumnType("varchar(100)")
-            .HasMaxLength(100)
+        builder.Property(x => x.BusinessCode)
+            .HasColumnName("business_code")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
             .IsRequired();
 
-        builder.Property(x => x.BusinessTypeName)
-            .HasColumnName("business_type_name")
+        builder.Property(x => x.BusinessName)
+            .HasColumnName("business_name")
             .HasColumnType("varchar(150)")
             .HasMaxLength(150)
             .IsRequired();
@@ -45,29 +45,16 @@ public sealed class BusinessTypeConfiguration : IEntityTypeConfiguration<Busines
             .HasColumnType("text")
             .IsRequired(false);
 
-        builder.Property(x => x.IsSystemType)
-            .HasColumnName("is_system_type")
-            .HasDefaultValue(true)
-            .IsRequired();
-
-        builder.Property(x => x.SortOrder)
-            .HasColumnName("sort_order")
-            .HasDefaultValue(0)
-            .IsRequired();
-
         builder.Property(x => x.Status)
             .HasColumnName("status")
             .HasColumnType("varchar(40)")
             .HasMaxLength(40)
             .IsRequired();
 
-        builder.HasIndex(x => x.BusinessTypeKey)
+        builder.HasIndex(x => x.BusinessCode)
             .IsUnique()
-            .HasDatabaseName("uq_business_types_business_type_key");
+            .HasDatabaseName("ix_business_types_business_code");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_business_types_sort_order", "sort_order >= 0")); 
         builder.ToTable(t => t.HasCheckConstraint("ck_business_types_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
     }
 }
-
-

@@ -29,10 +29,10 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             select new
             {
                 UserId = user.Id,
-                user.FirstName,
-                user.LastName,
+                FirstName = user.FullName,
+                LastName = string.Empty,
                 TenantId = tenant.Id,
-                TenantName = tenant.Name
+                TenantName = tenant.DisplayName
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -48,8 +48,8 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                 on userRole.TenantRoleId equals role.Id
             where userRole.TenantUserId == tenantUserId
                   && role.TenantId == tenantId
-                  && role.Status == TenantAuthConstants.ActiveUserStatus
-            select new TenantAdminContextRoleDto(role.Id, role.Name))
+                  && role.IsActive
+            select new TenantAdminContextRoleDto(role.Id, role.RoleName))
             .ToListAsync(cancellationToken);
 
         // Outlets accessible to this tenant
@@ -65,7 +65,7 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             join pd in _dbContext.PermissionDefinitions.AsNoTracking()
                 on up.PermissionDefinitionId equals pd.Id
             where up.TenantUserId == tenantUserId
-                  && pd.Status.ToUpper() == "ACTIVE"
+                  && pd.IsActive
             select pd.PermissionCode;
 
         var rolePermissions =
@@ -78,8 +78,8 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                 on rp.PermissionDefinitionId equals pd.Id
             where ur.TenantUserId == tenantUserId
                   && role.TenantId == tenantId
-                  && role.Status.ToUpper() == "ACTIVE"
-                  && pd.Status.ToUpper() == "ACTIVE"
+                  && role.IsActive
+                  && pd.IsActive
             select pd.PermissionCode;
 
         var permissions = await directPermissions

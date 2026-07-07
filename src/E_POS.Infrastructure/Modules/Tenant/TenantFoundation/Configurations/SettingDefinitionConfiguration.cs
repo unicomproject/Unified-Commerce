@@ -30,19 +30,45 @@ public sealed class SettingDefinitionConfiguration : IEntityTypeConfiguration<Se
 
         builder.Property(x => x.SettingKey)
             .HasColumnName("setting_key")
-            .HasColumnType("varchar(255)")
-            .HasMaxLength(255);
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired();
+            
+        builder.Property(x => x.DisplayName)
+            .HasColumnName("display_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
 
         builder.Property(x => x.ValueType)
             .HasColumnName("value_type")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired();
+            
+        builder.Property(x => x.DefaultValue)
+            .HasColumnName("default_value")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+            
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasColumnType("text")
+            .IsRequired(false);
+            
+        builder.Property(x => x.IsTenantEditable)
+            .HasColumnName("is_tenant_editable")
+            .IsRequired();
+            
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
             .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
+            .HasMaxLength(40)
+            .IsRequired();
 
         builder.HasIndex(x => x.SettingKey)
             .IsUnique()
             .HasDatabaseName("uq_setting_definitions_setting_key");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_setting_definitions_value_type", "value_type IN ('STRING', 'NUMBER', 'BOOLEAN', 'JSON', 'DATE')")); 
     }
 }
 

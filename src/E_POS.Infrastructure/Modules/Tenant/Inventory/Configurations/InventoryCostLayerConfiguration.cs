@@ -41,8 +41,10 @@ public sealed class InventoryCostLayerConfiguration : IEntityTypeConfiguration<I
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_inventory_cost_layers_received_quantity", "received_quantity > 0");
-            t.HasCheckConstraint("ck_inventory_cost_layers_remaining_quantity", "remaining_quantity >= 0 AND remaining_quantity <= received_quantity");
-            t.HasCheckConstraint("ck_inventory_cost_layers_costs", "unit_cost >= 0 AND total_cost >= 0");
+            t.HasCheckConstraint("ck_inventory_cost_layers_remaining_quantity_min", "remaining_quantity >= 0");
+            t.HasCheckConstraint("ck_inventory_cost_layers_remaining_quantity_max", "remaining_quantity <= received_quantity");
+            t.HasCheckConstraint("ck_inventory_cost_layers_unit_cost", "unit_cost >= 0");
+            t.HasCheckConstraint("ck_inventory_cost_layers_total_cost", "total_cost >= 0");
         });
     }
 }

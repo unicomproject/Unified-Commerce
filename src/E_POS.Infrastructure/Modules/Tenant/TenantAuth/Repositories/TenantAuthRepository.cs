@@ -24,13 +24,13 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
             from user in _dbContext.TenantUsers.AsNoTracking()
             join tenant in _dbContext.Tenants.AsNoTracking()
                 on user.TenantId equals tenant.Id
-            where user.NormalizedEmail == normalizedEmail
+            where user.Email == normalizedEmail
             select new TenantLoginAccount(
                 user.Id,
                 user.TenantId,
-                user.NormalizedEmail,
-                user.PasswordHash,
-                user.Status,
+                user.Email,
+                user.EncryptedPassword, // it was PasswordHash, assuming it's EncryptedPassword in new ERD
+                user.AccountStatus,
                 tenant.Status))
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -49,7 +49,7 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
                 on userPermission.PermissionDefinitionId equals permission.Id
             where user.Id == tenantUserId &&
                   user.TenantId == tenantId &&
-                  permission.Status == TenantAuthConstants.ActiveUserStatus
+                  permission.IsActive
             select permission.PermissionCode;
 
         var rolePermissions =
@@ -62,8 +62,8 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
                 on rolePermission.PermissionDefinitionId equals permission.Id
             where userRole.TenantUserId == tenantUserId &&
                   role.TenantId == tenantId &&
-                  role.Status == TenantAuthConstants.ActiveUserStatus &&
-                  permission.Status == TenantAuthConstants.ActiveUserStatus
+                  role.IsActive &&
+                  permission.IsActive
             select permission.PermissionCode;
 
         return await directPermissions
@@ -88,7 +88,7 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
         _dbContext.TenantLoginAudits.Add(audit);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        if (audit.TenantUserId is null)
+        if (audit.UserId is null)
         {
             return;
         }
@@ -96,8 +96,8 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
         var failedAttempts = await _dbContext.TenantLoginAudits
             .AsNoTracking()
             .CountAsync(
-                x => x.TenantUserId == audit.TenantUserId &&
-                     x.LoginResult == TenantAuthConstants.FailedLoginResult &&
+                x => x.UserId == audit.UserId &&
+                     x.LoginStatus == TenantAuthConstants.FailedLoginResult &&
                      x.CreatedAt >= failedAttemptWindowStart,
                 cancellationToken);
 
@@ -108,10 +108,10 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
 
         // Lock only active users so inactive/deleted account states are not overwritten by login noise.
         await _dbContext.TenantUsers
-            .Where(x => x.Id == audit.TenantUserId && x.Status == TenantAuthConstants.ActiveUserStatus)
+            .Where(x => x.Id == audit.UserId && x.AccountStatus == TenantAuthConstants.ActiveUserStatus)
             .ExecuteUpdateAsync(
                 setters => setters
-                    .SetProperty(x => x.Status, TenantAuthConstants.LockedUserStatus)
+                    .SetProperty(x => x.AccountStatus, TenantAuthConstants.LockedUserStatus)
                     .SetProperty(x => x.UpdatedAt, audit.CreatedAt),
                 cancellationToken);
     }
@@ -137,9 +137,9 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
         var session = await (
             from authSession in _dbContext.TenantAuthSessions
             join user in _dbContext.TenantUsers
-                on authSession.TenantUserId equals user.Id
+                on authSession.UserId equals user.Id
             where authSession.Id == sessionId &&
-                  authSession.TenantUserId == tenantUserId &&
+                  authSession.UserId == tenantUserId &&
                   user.TenantId == tenantId
             select authSession)
             .FirstOrDefaultAsync(cancellationToken);
@@ -152,10 +152,10 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
         session.Revoke(now);
 
         await _dbContext.TenantRefreshTokens
-            .Where(x => x.TenantAuthSessionId == sessionId && x.Status == TenantAuthConstants.ActiveTokenStatus)
+            .Where(x => x.TenantAuthSessionId == sessionId && x.RevokedAt == null)
             .ExecuteUpdateAsync(
                 setters => setters
-                    .SetProperty(x => x.Status, TenantAuthConstants.RevokedTokenStatus)
+                    .SetProperty(x => x.RevokedAt, now)
                     .SetProperty(x => x.UpdatedAt, now),
                 cancellationToken);
 

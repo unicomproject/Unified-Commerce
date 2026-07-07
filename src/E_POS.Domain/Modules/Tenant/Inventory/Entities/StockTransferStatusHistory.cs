@@ -12,4 +12,33 @@ public class StockTransferStatusHistory : AuditableEntity
     public Guid? ChangedByTenantUserId { get; protected set; }
     public DateTimeOffset ChangedAt { get; protected set; }
     public string? ChangeReason { get; protected set; }
+
+    protected StockTransferStatusHistory() { }
+
+    public static StockTransferStatusHistory Create(
+        Guid id,
+        Guid tenantId,
+        Guid stockTransferId,
+        int sequenceNumber,
+        string? oldStatus,
+        string newStatus,
+        Guid? changedByTenantUserId,
+        string? changeReason,
+        DateTimeOffset now)
+    {
+        return new StockTransferStatusHistory
+        {
+            Id = id,
+            TenantId = tenantId,
+            StockTransferId = stockTransferId,
+            SequenceNumber = sequenceNumber,
+            OldStatus = oldStatus?.Trim(),
+            NewStatus = newStatus.Trim(),
+            ChangedByTenantUserId = changedByTenantUserId,
+            ChangedAt = now,
+            ChangeReason = changeReason?.Trim(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }

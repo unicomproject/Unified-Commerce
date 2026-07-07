@@ -122,9 +122,13 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
         Tenant.Create(
             TenantId,
             "TEN-001",
+            "ten-001",
             "Tenant One",
             "active",
-            "paid",
+            "LKR",
+            "Asia/Colombo",
+            null,
+            null,
             Now);
 
     private static TenantSubscription CreateSubscription() =>

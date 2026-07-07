@@ -44,7 +44,13 @@ public sealed class InventoryReservationLineConfiguration : IEntityTypeConfigura
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_inventory_reservation_lines_quantities", "line_number > 0 AND requested_quantity > 0 AND reserved_quantity >= 0 AND released_quantity >= 0 AND fulfilled_quantity >= 0 AND reserved_quantity <= requested_quantity AND released_quantity + fulfilled_quantity <= reserved_quantity");
+            t.HasCheckConstraint("ck_inventory_reservation_lines_line_number", "line_number > 0");
+            t.HasCheckConstraint("ck_inventory_reservation_lines_requested_quantity", "requested_quantity > 0");
+            t.HasCheckConstraint("ck_inventory_reservation_lines_reserved_quantity", "reserved_quantity >= 0");
+            t.HasCheckConstraint("ck_inventory_reservation_lines_released_quantity", "released_quantity >= 0");
+            t.HasCheckConstraint("ck_inventory_reservation_lines_fulfilled_quantity", "fulfilled_quantity >= 0");
+            t.HasCheckConstraint("ck_inventory_reservation_lines_reserved_requested_rule", "reserved_quantity <= requested_quantity");
+            t.HasCheckConstraint("ck_inventory_reservation_lines_release_fulfilled_rule", "released_quantity + fulfilled_quantity <= reserved_quantity");
         });
     }
 }

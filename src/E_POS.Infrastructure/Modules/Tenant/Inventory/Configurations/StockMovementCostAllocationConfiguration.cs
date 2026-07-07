@@ -38,7 +38,8 @@ public sealed class StockMovementCostAllocationConfiguration : IEntityTypeConfig
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_stock_movement_cost_allocations_allocated_quantity", "allocated_quantity > 0");
-            t.HasCheckConstraint("ck_stock_movement_cost_allocations_costs", "unit_cost >= 0 AND total_cost >= 0");
+            t.HasCheckConstraint("ck_stock_movement_cost_allocations_unit_cost", "unit_cost >= 0");
+            t.HasCheckConstraint("ck_stock_movement_cost_allocations_total_cost", "total_cost >= 0");
         });
     }
 }

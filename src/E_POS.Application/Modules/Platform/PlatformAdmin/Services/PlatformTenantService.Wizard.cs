@@ -190,20 +190,19 @@ public sealed partial class PlatformTenantService
 
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
-        var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.CreateDraft(
+        var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
             tenantId,
             code,
+            code.ToLowerInvariant(),
             name,
             billingStatus,
             NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
             NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
-            NormalizeOptionalText(request.DefaultLocale) ?? DefaultLocale,
-            NormalizeOptionalText(request.OperatingMode) ?? DefaultOperatingMode,
-            request.BusinessType,
-            businessTypeId: null,
+            null, // dataRegion
+            platformUserId,
             now);
 
-        var profile = CreateTenantProfileOrNull(tenantId, request, now);
+        var profile = CreateTenantProfileOrNull(tenantId, request, platformUserId, now);
         var address = CreateTenantAddressOrNull(tenantId, request, now);
 
         var subscriptionRequest = request.Subscription;
@@ -257,11 +256,14 @@ public sealed partial class PlatformTenantService
         var tenantAdminRole = TenantRole.Create(
             roleId,
             tenantId,
+            null, // sourceRoleTemplateId
+            TenantBootstrapConstants.DefaultRoleTemplateVersionId, // sourceRoleTemplateVersionId
             TenantUserConstants.DefaultTenantAdminRoleCode,
             "Tenant Administrator",
             "Bootstrap tenant admin role",
-            status: "ACTIVE",
-            TenantBootstrapConstants.DefaultRoleTemplateVersionId,
+            false, // isCustom
+            true, // isActive
+            platformUserId,
             now);
 
         var bootstrapPermissionIds = await _repository.GetTenantAdminBootstrapPermissionIdsAsync(cancellationToken);
@@ -269,9 +271,10 @@ public sealed partial class PlatformTenantService
             .Distinct()
             .Select(permissionId => TenantRolePermission.Create(
                 Guid.NewGuid(),
+                tenantId,
                 roleId,
                 permissionId,
-                description: "Wizard bootstrap permission",
+                platformUserId,
                 now))
             .ToList();
 
@@ -296,15 +299,21 @@ public sealed partial class PlatformTenantService
 
         var tenantAdminUserRole = TenantUserRole.Create(
             Guid.NewGuid(),
+            tenantId,
             tenantAdminUser.Id,
             roleId,
-            "Bootstrap tenant admin role assignment",
+            null,
             now);
 
         var invite = UserInvite.CreatePending(
             Guid.NewGuid(),
             tenantId,
-            tenantAdminUser.Id,
+            adminEmail,
+            adminEmail.ToUpperInvariant(),
+            roleId,
+            null, // platform user id
+            Guid.NewGuid().ToString("N"), // token hash mock, real hash is done by auth service usually but this is wizard
+            now.AddDays(7), // expires
             now);
 
         var shouldCreateDraftInvoice = subscriptionRequest?.CreateDraftInvoice == true ||
@@ -408,17 +417,16 @@ public sealed partial class PlatformTenantService
 
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
-        var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.CreateDraft(
+        var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
             tenantId,
             code,
+            code.ToLowerInvariant(),
             name,
             billingStatus,
             NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
             NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
-            NormalizeOptionalText(request.DefaultLocale) ?? DefaultLocale,
-            NormalizeOptionalText(request.OperatingMode) ?? DefaultOperatingMode,
-            request.BusinessType,
-            businessTypeId: null,
+            null, // dataRegion
+            platformUserId,
             now);
 
         var subscription = TenantSubscription.Create(
@@ -497,6 +505,7 @@ public sealed partial class PlatformTenantService
     private static TenantProfile? CreateTenantProfileOrNull(
         Guid tenantId,
         CreatePlatformTenantRequest request,
+        Guid platformUserId,
         DateTimeOffset now)
     {
         var legalName = NormalizeOptionalText(request.LegalName);
@@ -523,14 +532,16 @@ public sealed partial class PlatformTenantService
         return TenantProfile.Create(
             Guid.NewGuid(),
             tenantId,
-            legalName,
-            registrationNumber,
-            taxNumber,
+            null, // businessTypeId
+            string.IsNullOrWhiteSpace(legalName) ? (request.Name ?? "Unknown") : legalName,
+            null, // tradingName
             contactName,
             contactEmail,
             contactPhone,
-            websiteUrl: null,
-            countryCode,
+            null, // websiteUrl
+            null, // logoUrl
+            null, // description
+            platformUserId,
             now);
     }
 
@@ -561,12 +572,15 @@ public sealed partial class PlatformTenantService
         return TenantAddress.CreateRegistered(
             Guid.NewGuid(),
             tenantId,
-            address.Line1,
+            address.Line1 ?? string.Empty,
             address.Line2,
             address.City,
             address.State,
             address.PostalCode,
-            address.CountryCode,
+            address.CountryCode ?? "US",
+            true, // isPrimary
+            "ACTIVE", // status
+            null, // createdByPlatformUserId
             now);
     }
 

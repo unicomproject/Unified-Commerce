@@ -15,4 +15,51 @@ public class InventoryBalance : AuditableEntity
     public decimal QuarantineQuantity { get; protected set; }
     public decimal AvailableQuantity { get; protected set; }
     public long RowVersion { get; protected set; }
+
+    protected InventoryBalance() { }
+
+    public static InventoryBalance Create(
+        Guid id,
+        Guid tenantId,
+        Guid inventoryLocationId,
+        Guid productId,
+        Guid? productVariantId,
+        Guid? productBatchId,
+        DateTimeOffset now)
+    {
+        return new InventoryBalance
+        {
+            Id = id,
+            TenantId = tenantId,
+            InventoryLocationId = inventoryLocationId,
+            ProductId = productId,
+            ProductVariantId = productVariantId,
+            ProductBatchId = productBatchId,
+            OnHandQuantity = 0,
+            ReservedQuantity = 0,
+            DamagedQuantity = 0,
+            QuarantineQuantity = 0,
+            AvailableQuantity = 0,
+            RowVersion = 0,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    public void AdjustQuantities(
+        decimal onHandDelta,
+        decimal reservedDelta,
+        decimal damagedDelta,
+        decimal quarantineDelta,
+        DateTimeOffset now)
+    {
+        OnHandQuantity += onHandDelta;
+        ReservedQuantity += reservedDelta;
+        DamagedQuantity += damagedDelta;
+        QuarantineQuantity += quarantineDelta;
+        
+        AvailableQuantity = OnHandQuantity - ReservedQuantity - DamagedQuantity - QuarantineQuantity;
+        RowVersion++;
+        UpdatedAt = now;
+    }
 }

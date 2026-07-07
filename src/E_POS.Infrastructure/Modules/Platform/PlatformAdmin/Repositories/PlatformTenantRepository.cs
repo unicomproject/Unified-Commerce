@@ -53,9 +53,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             PendingActivationTenants: rows.Count(x =>
                 IsStatus(x.Status, "setup_pending") || IsStatus(x.Status, "pending_payment")),
             PendingBillingCount: rows.Count(x =>
-                IsStatus(x.BillingStatus, "pending") ||
-                IsStatus(x.BillingStatus, "failed") ||
-                IsStatus(x.BillingStatus, "overdue")),
+                IsStatus(x.BillingStatus, "PAST_DUE")),
             TotalOutlets: rows.Sum(x => x.OutletCount),
             TotalTills: rows.Sum(x => x.TillCount));
     }
@@ -69,19 +67,14 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .OrderBy(x => x)
             .ToListAsync(cancellationToken);
 
-        var billingStatuses = await _dbContext.Tenants
+        var billingStatuses = await _dbContext.TenantSubscriptions
             .AsNoTracking()
-            .Select(x => x.BillingStatus)
+            .Select(x => x.SubscriptionStatus)
             .Distinct()
             .OrderBy(x => x)
             .ToListAsync(cancellationToken);
 
-        var operatingModes = await _dbContext.Tenants
-            .AsNoTracking()
-            .Select(x => x.OperatingMode)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToListAsync(cancellationToken);
+        var operatingModes = new List<string> { "STANDARD" };
 
         var plans = await _dbContext.SubscriptionPlans
             .AsNoTracking()
@@ -131,7 +124,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         var userStatuses = await _dbContext.TenantUsers
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId)
-            .Select(x => x.Status)
+            .Select(x => x.AccountStatus)
             .ToListAsync(cancellationToken);
         var userCount = userStatuses.Count(x => !IsStatus(x, "DELETED"));
 
@@ -194,10 +187,10 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .ThenByDescending(x => x.CreatedAt)
             .Select(x => new PlatformTenantAddressDetailDto(
                 x.AddressType,
-                x.Line1,
-                x.Line2,
+                x.AddressLine1,
+                x.AddressLine2,
                 x.City,
-                x.State,
+                x.StateOrProvince,
                 x.PostalCode,
                 x.CountryCode))
             .FirstOrDefaultAsync(cancellationToken);
@@ -215,14 +208,14 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         return new PlatformTenantDetailResponse(
             tenant.Id,
             tenant.TenantCode,
-            tenant.Name,
+            tenant.DisplayName,
             tenant.Status,
-            tenant.BillingStatus,
-            tenant.OperatingMode,
-            tenant.BaseCurrency,
+            currentSubscription?.SubscriptionStatus ?? "UNKNOWN",
+            "STANDARD",
+            tenant.BaseCurrencyCode,
             tenant.DefaultTimezone,
-            tenant.DefaultLocale,
-            tenant.BusinessType,
+            "en-US",
+            null,
             Profile: profile,
             PrimaryAddress: address,
             Subscription: subscriptionDto,
@@ -331,7 +324,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         var tenant = await _dbContext.Tenants
             .FirstAsync(item => item.Id == tenantId, cancellationToken);
 
-        tenant.TouchUpdatedAt(now);
+        tenant.UpdateAudit(null, now);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -399,7 +392,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         var loginAudits = await (
             from audit in _dbContext.TenantLoginAudits.AsNoTracking()
             join user in _dbContext.TenantUsers.AsNoTracking()
-                on audit.TenantUserId equals user.Id
+                on audit.UserId equals user.Id
             where user.TenantId == tenantId
             select audit.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -448,7 +441,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .ToHashSet();
 
         var userCounts = await CountNonDeletedByTenantAsync(
-            _dbContext.TenantUsers.AsNoTracking().Select(x => new TenantCountRow(x.TenantId, x.Status)),
+            _dbContext.TenantUsers.AsNoTracking().Select(x => new TenantCountRow(x.TenantId, x.AccountStatus)),
             cancellationToken);
 
         var outletCounts = await CountNonDeletedByTenantAsync(
@@ -488,14 +481,14 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 {
                     Id = tenant.Id,
                     Code = tenant.TenantCode,
-                    Name = tenant.Name,
+                    Name = tenant.DisplayName,
                     Status = tenant.Status,
-                    BillingStatus = tenant.BillingStatus,
-                    OperatingMode = tenant.OperatingMode,
-                    BaseCurrency = tenant.BaseCurrency,
+                    BillingStatus = subscription?.SubscriptionStatus ?? "UNKNOWN",
+                    OperatingMode = "STANDARD",
+                    BaseCurrency = tenant.BaseCurrencyCode,
                     DefaultTimezone = tenant.DefaultTimezone,
-                    DefaultLocale = tenant.DefaultLocale,
-                    BusinessType = tenant.BusinessType,
+                    DefaultLocale = "en-US",
+                    BusinessType = null,
                     CreatedAt = tenant.CreatedAt,
                     UpdatedAt = tenant.UpdatedAt,
                     OutletCount = outletCounts.GetValueOrDefault(tenant.Id),

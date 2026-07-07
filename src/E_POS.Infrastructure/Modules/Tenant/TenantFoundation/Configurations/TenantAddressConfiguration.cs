@@ -19,13 +19,20 @@ public sealed class TenantAddressConfiguration : IEntityTypeConfiguration<Tenant
         builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
-        builder.Property(x => x.AddressType).HasColumnName("address_type").HasColumnType("varchar(40)").HasMaxLength(40);
-        builder.Property(x => x.Line1).HasColumnName("line1").HasColumnType("varchar(255)").HasMaxLength(255);
-        builder.Property(x => x.Line2).HasColumnName("line2").HasColumnType("varchar(255)").HasMaxLength(255);
+        builder.Property(x => x.AddressType).HasColumnName("address_type").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
+        
+        builder.Property(x => x.AddressLine1).HasColumnName("address_line1").HasColumnType("varchar(250)").HasMaxLength(250).IsRequired();
+        builder.Property(x => x.AddressLine2).HasColumnName("address_line2").HasColumnType("varchar(250)").HasMaxLength(250);
         builder.Property(x => x.City).HasColumnName("city").HasColumnType("varchar(120)").HasMaxLength(120);
-        builder.Property(x => x.State).HasColumnName("state").HasColumnType("varchar(120)").HasMaxLength(120);
+        builder.Property(x => x.StateOrProvince).HasColumnName("state_or_province").HasColumnType("varchar(120)").HasMaxLength(120);
         builder.Property(x => x.PostalCode).HasColumnName("postal_code").HasColumnType("varchar(30)").HasMaxLength(30);
-        builder.Property(x => x.CountryCode).HasColumnName("country_code").HasColumnType("char(2)").HasMaxLength(2);
+        builder.Property(x => x.CountryCode).HasColumnName("country_code").HasColumnType("char(2)").HasMaxLength(2).IsRequired();
+        
+        builder.Property(x => x.IsPrimary).HasColumnName("is_primary").IsRequired();
+        builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
+        
+        builder.Property(x => x.CreatedByPlatformUserId).HasColumnName("created_by_platform_user_id");
+        builder.Property(x => x.UpdatedByPlatformUserId).HasColumnName("updated_by_platform_user_id");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
@@ -38,6 +45,3 @@ public sealed class TenantAddressConfiguration : IEntityTypeConfiguration<Tenant
             "address_type IN ('BILLING', 'REGISTERED', 'CONTACT')"));
     }
 }
-
-
-

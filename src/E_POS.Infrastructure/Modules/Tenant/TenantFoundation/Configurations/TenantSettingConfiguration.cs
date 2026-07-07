@@ -35,6 +35,14 @@ public sealed class TenantSettingConfiguration : IEntityTypeConfiguration<Tenant
         builder.Property(x => x.SettingDefinitionId)
             .HasColumnName("setting_definition_id")
             .IsRequired();
+            
+        builder.Property(x => x.SettingValue)
+            .HasColumnName("setting_value")
+            .HasColumnType("jsonb")
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByPlatformUserId).HasColumnName("created_by_platform_user_id");
+        builder.Property(x => x.UpdatedByPlatformUserId).HasColumnName("updated_by_platform_user_id");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()

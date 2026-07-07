@@ -44,7 +44,10 @@ public sealed class InventoryReservationAllocationConfiguration : IEntityTypeCon
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_inventory_reservation_allocations_quantities", "allocated_quantity > 0 AND released_quantity >= 0 AND fulfilled_quantity >= 0 AND released_quantity + fulfilled_quantity <= allocated_quantity");
+            t.HasCheckConstraint("ck_inventory_reservation_allocations_allocated_quantity", "allocated_quantity > 0");
+            t.HasCheckConstraint("ck_inventory_reservation_allocations_released_quantity", "released_quantity >= 0");
+            t.HasCheckConstraint("ck_inventory_reservation_allocations_fulfilled_quantity", "fulfilled_quantity >= 0");
+            t.HasCheckConstraint("ck_inventory_reservation_allocations_release_fulfilled_rule", "released_quantity + fulfilled_quantity <= allocated_quantity");
             t.HasCheckConstraint("ck_inventory_reservation_allocations_released_at", "released_at IS NULL OR released_at >= allocated_at");
             t.HasCheckConstraint("ck_inventory_reservation_allocations_serial_quantity", "serial_number_id IS NULL OR allocated_quantity = 1");
         });

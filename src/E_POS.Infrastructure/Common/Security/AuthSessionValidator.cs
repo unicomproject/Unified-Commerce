@@ -77,16 +77,16 @@ public sealed class AuthSessionValidator : IAuthSessionValidator
         return (
             from session in _dbContext.TenantAuthSessions.AsNoTracking()
             join user in _dbContext.TenantUsers.AsNoTracking()
-                on session.TenantUserId equals user.Id
+                on session.UserId equals user.Id
             join tenant in _dbContext.Tenants.AsNoTracking()
                 on user.TenantId equals tenant.Id
             where session.Id == sessionId &&
-                  session.TenantUserId == tenantUserId &&
+                  session.UserId == tenantUserId &&
                   user.TenantId == tenantId &&
-                  user.Status == TenantAuthConstants.ActiveUserStatus &&
+                  user.AccountStatus == TenantAuthConstants.ActiveUserStatus &&
                   (tenant.Status == TenantAuthConstants.ActiveTenantStatus ||
                    tenant.Status == TenantAuthConstants.SetupPendingTenantStatus) &&
-                  session.Status == TenantAuthConstants.ActiveTokenStatus
+                  session.RevokedAt == null
             select session.Id)
             .AnyAsync(cancellationToken);
     }

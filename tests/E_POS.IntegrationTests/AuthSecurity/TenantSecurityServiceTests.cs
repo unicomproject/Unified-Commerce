@@ -71,24 +71,24 @@ public sealed class TenantSecurityServiceTests
     [Fact]
     public void TenantAuthSession_Revoke_SetsRevokedStatusAndUpdatedAt()
     {
-        var session = TenantAuthSession.Create(Guid.NewGuid(), Guid.NewGuid(), "session-hash", Now);
+        var session = TenantAuthSession.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, Now.AddHours(1), Now);
         var revokedAt = Now.AddMinutes(5);
 
         session.Revoke(revokedAt);
 
-        Assert.Equal(TenantAuthConstants.RevokedTokenStatus, session.Status);
+        Assert.NotNull(session.RevokedAt);
         Assert.Equal(revokedAt, session.UpdatedAt);
     }
 
     [Fact]
     public void TenantRefreshToken_Revoke_SetsRevokedStatusAndUpdatedAt()
     {
-        var refreshToken = TenantRefreshToken.Create(Guid.NewGuid(), Guid.NewGuid(), "refresh-hash", Now.AddDays(7), Now);
+        var refreshToken = TenantRefreshToken.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "refresh-hash", Guid.NewGuid(), Now.AddDays(7), Now);
         var revokedAt = Now.AddMinutes(5);
 
         refreshToken.Revoke(revokedAt);
 
-        Assert.Equal(TenantAuthConstants.RevokedTokenStatus, refreshToken.Status);
+        Assert.NotNull(refreshToken.RevokedAt);
         Assert.Equal(revokedAt, refreshToken.UpdatedAt);
         Assert.Equal(Now.AddDays(7), refreshToken.ExpiresAt);
     }
@@ -102,8 +102,8 @@ public sealed class TenantSecurityServiceTests
         var sessionId = Guid.NewGuid();
 
         dbContext.Tenants.Add(CreateTenant(tenantId, TenantAuthConstants.ActiveTenantStatus));
-        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", null, "hash", TenantAuthConstants.ActiveUserStatus, Now));
-        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantUserId, "session-hash", Now));
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.ActiveUserStatus, "standard", "system", "default", Now));
+        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantId, tenantUserId, null, null, Now.AddDays(1), Now));
         await dbContext.SaveChangesAsync();
 
         var validator = new AuthSessionValidator(dbContext);
@@ -122,8 +122,8 @@ public sealed class TenantSecurityServiceTests
         var sessionId = Guid.NewGuid();
 
         dbContext.Tenants.Add(CreateTenant(tenantId, TenantAuthConstants.ActiveTenantStatus));
-        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "locked@tenant.test", null, "hash", TenantAuthConstants.LockedUserStatus, Now));
-        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantUserId, "session-hash", Now));
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "locked@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.LockedUserStatus, "standard", "system", "default", Now));
+        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantId, tenantUserId, null, null, Now.AddDays(1), Now));
         await dbContext.SaveChangesAsync();
 
         var validator = new AuthSessionValidator(dbContext);
@@ -142,8 +142,8 @@ public sealed class TenantSecurityServiceTests
         var sessionId = Guid.NewGuid();
 
         dbContext.Tenants.Add(CreateTenant(tenantId, "suspended"));
-        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", null, "hash", TenantAuthConstants.ActiveUserStatus, Now));
-        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantUserId, "session-hash", Now));
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.ActiveUserStatus, "standard", "system", "default", Now));
+        dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantId, tenantUserId, null, null, Now.AddDays(1), Now));
         await dbContext.SaveChangesAsync();
 
         var validator = new AuthSessionValidator(dbContext);
@@ -183,22 +183,17 @@ public sealed class TenantSecurityServiceTests
 
     private static Tenant CreateTenant(Guid tenantId, string status)
     {
-        var tenant = new Tenant();
-        SetProperty(tenant, nameof(BaseEntity.Id), tenantId);
-        SetProperty(tenant, nameof(Tenant.TenantCode), $"TENANT{tenantId:N}"[..20]);
-        SetProperty(tenant, nameof(Tenant.CurrencyCode), "LKR");
-        SetProperty(tenant, nameof(Tenant.Name), "Test Tenant");
-        SetProperty(tenant, nameof(Tenant.Status), status);
-        SetProperty(tenant, nameof(Tenant.BaseCurrency), "LKR");
-        SetProperty(tenant, nameof(Tenant.BillingStatus), "ACTIVE");
-        SetProperty(tenant, nameof(Tenant.BusinessTypeId), Guid.NewGuid());
-        SetProperty(tenant, nameof(Tenant.DefaultLocale), "en-LK");
-        SetProperty(tenant, nameof(Tenant.DefaultTimezone), "Asia/Colombo");
-        SetProperty(tenant, nameof(Tenant.OperatingMode), "POS");
-        SetProperty(tenant, nameof(Tenant.PrimaryDomain), "tenant.test");
-        SetProperty(tenant, nameof(AuditableEntity.CreatedAt), Now);
-        SetProperty(tenant, nameof(AuditableEntity.UpdatedAt), Now);
-        return tenant;
+        return Tenant.Create(
+            tenantId,
+            $"TENANT{tenantId:N}"[..20],
+            $"tenant-{tenantId:N}"[..30],
+            "Test Tenant",
+            status,
+            "LKR",
+            "Asia/Colombo",
+            null,
+            null,
+            Now);
     }
 
     private static void SetProperty<T>(T target, string propertyName, object? value)

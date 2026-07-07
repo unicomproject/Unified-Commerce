@@ -1,5 +1,4 @@
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
-using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -33,36 +32,106 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .HasColumnName("tenant_id")
             .IsRequired();
 
-        builder.Property(x => x.FirstName)
-            .HasColumnName("first_name")
-            .HasColumnType("varchar(120)")
-            .HasMaxLength(120);
-
-        builder.Property(x => x.LastName)
-            .HasColumnName("last_name")
-            .HasColumnType("varchar(120)")
-            .HasMaxLength(120);
-
-        builder.Property(x => x.NormalizedEmail)
-            .HasColumnName("normalized_email")
-            .HasColumnType("citext")
+        builder.Property(x => x.Email)
+            .HasColumnName("email")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255)
             .IsRequired();
 
-        builder.Property(x => x.NormalizedPhone)
-            .HasColumnName("normalized_phone")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40)
-            .IsRequired(false);
-
-        builder.Property(x => x.PasswordHash)
-            .HasColumnName("password_hash")
+        builder.Property(x => x.EncryptedPassword)
+            .HasColumnName("encrypted_password")
             .HasColumnType("varchar(255)")
-            .HasMaxLength(255);
+            .HasMaxLength(255)
+            .IsRequired();
 
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasColumnType("varchar(30)")
-            .HasMaxLength(30);
+        builder.Property(x => x.Phone)
+            .HasColumnName("phone")
+            .HasColumnType("varchar(20)")
+            .HasMaxLength(20);
+
+        builder.Property(x => x.UnmaskedPhone)
+            .HasColumnName("unmasked_phone")
+            .HasColumnType("varchar(25)")
+            .HasMaxLength(25);
+
+        builder.Property(x => x.PasswordSalt)
+            .HasColumnName("password_salt")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255)
+            .IsRequired();
+
+        builder.Property(x => x.FullName)
+            .HasColumnName("full_name")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255)
+            .IsRequired();
+
+        builder.Property(x => x.DisplayName)
+            .HasColumnName("display_name")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500);
+
+        builder.Property(x => x.ProfileImageUrl)
+            .HasColumnName("profile_image_url");
+
+        builder.Property(x => x.OutletId)
+            .HasColumnName("outlet_id");
+
+        builder.Property(x => x.DefaultOutletId)
+            .HasColumnName("default_outlet_id")
+            .HasColumnType("varchar(50)")
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(x => x.UserType)
+            .HasColumnName("user_type")
+            .HasColumnType("varchar(20)")
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(x => x.AccountStatus)
+            .HasColumnName("account_status")
+            .HasColumnType("varchar(20)")
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(x => x.LockedUntil)
+            .HasColumnName("locked_until")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.FailedLoginAttempts)
+            .HasColumnName("failed_login_attempts")
+            .IsRequired();
+
+        builder.Property(x => x.PasswordChangeRequiredAt)
+            .HasColumnName("password_change_required_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.AcceptedPrivacyTerms)
+            .HasColumnName("accepted_privacy_terms")
+            .IsRequired();
+
+        builder.Property(x => x.AcceptedTermsVersion)
+            .HasColumnName("accepted_terms_version")
+            .HasColumnType("varchar(10)")
+            .HasMaxLength(10)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id");
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id");
+
+        builder.Property(x => x.SourceUserType)
+            .HasColumnName("source_user_type")
+            .HasColumnType("varchar(50)")
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(x => x.Notes)
+            .HasColumnName("notes")
+            .HasColumnType("text");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
@@ -70,17 +139,31 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_tenant_users_tenant_id_tenants");
 
-        builder.HasIndex(x => x.NormalizedEmail)
-            .IsUnique()
-            .HasDatabaseName("uq_tenant_users_normalized_email");
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_tenant_users_created_by");
 
-        builder.HasIndex(x => new { x.TenantId, x.NormalizedPhone })
-            .IsUnique()
-            .HasDatabaseName("uq_tenant_users_tenant_id_normalized_phone")
-            .HasFilter("normalized_phone IS NOT NULL");
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_tenant_users_updated_by");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_users_status", "status IN ('ACTIVE', 'INACTIVE', 'INVITED', 'LOCKED', 'DELETED')"));
+        builder.HasIndex(x => new { x.TenantId, x.Email })
+            .IsUnique()
+            .HasDatabaseName("uq_tenant_users_tenant_id_email");
+
+        builder.HasIndex(x => new { x.TenantId, x.UnmaskedPhone })
+            .IsUnique()
+            .HasDatabaseName("uq_tenant_users_tenant_id_unmasked_phone")
+            .HasFilter("unmasked_phone IS NOT NULL");
+
+        builder.ToTable(t => 
+        {
+            t.HasCheckConstraint("ck_tenant_users_locked_until", "locked_until IS NULL OR locked_until > now()");
+            t.HasCheckConstraint("ck_tenant_users_source_user_type", "source_user_type IN ('admin', 'outlet', 'platform')");
+        });
     }
 }
-
-
