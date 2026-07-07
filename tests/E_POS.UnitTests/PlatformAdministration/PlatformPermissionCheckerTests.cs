@@ -1,6 +1,6 @@
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Application.Modules.PlatformAdministration.Services;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using Xunit;
 
 namespace E_POS.UnitTests.PlatformAdministration;
@@ -76,3 +76,5 @@ public sealed class PlatformPermissionCheckerTests
         }
     }
 }
+
+

@@ -1,0 +1,88 @@
+using E_POS.Domain.Modules.Tenant.Inventory.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace E_POS.Infrastructure.Modules.Tenant.Inventory.Configurations;
+
+public sealed class StockAdjustmentConfiguration : IEntityTypeConfiguration<StockAdjustment>
+{
+    public void Configure(EntityTypeBuilder<StockAdjustment> builder)
+    {
+        builder.ToTable("stock_adjustments");
+
+        builder.HasKey(x => x.Id).HasName("pk_stock_adjustments");
+
+        builder.Property(x => x.Id)
+            .HasColumnName("id");
+
+        builder.Property(x => x.CreatedAt)
+            .HasColumnName("created_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByTenantUserId)
+            .HasColumnName("created_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedAt)
+            .HasColumnName("updated_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.UpdatedByTenantUserId)
+            .HasColumnName("updated_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedBy);
+
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
+
+        builder.Property(x => x.AdjustmentNumber)
+            .HasColumnName("adjustment_number")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(x => x.AdjustmentStatus)
+            .HasColumnName("adjustment_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired();
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_stock_adjustments_tenant_id_tenants");
+            
+        builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_stock_adjustments_created_by_tenant_user_id_tenant_users");
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_stock_adjustments_updated_by_tenant_user_id_tenant_users");
+
+        builder.HasIndex(x => new { x.TenantId, x.AdjustmentNumber })
+            .IsUnique()
+            .HasDatabaseName("uq_stock_adjustments_tenant_id_adjustment_number");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_stock_adjustments_tenant_id_id");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_stock_adjustments_adjustment_status", "adjustment_status IN ('DRAFT', 'APPROVED', 'POSTED', 'CANCELLED')")); 
+    }
+}
+
+
+
+

@@ -3,9 +3,9 @@ using System.Security.Claims;
 using E_POS.Api.Controllers;
 using E_POS.Api.Models;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.SubscriptionBilling.Contracts;
-using E_POS.Application.Modules.SubscriptionBilling.Dtos;
-using E_POS.Domain.Modules.SubscriptionBilling.Constants;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Application.Modules.Platform.Subscription.Dtos;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -226,3 +226,5 @@ public sealed class PlatformSubscriptionPlansControllerTests
         }
     }
 }
+
+

@@ -1,9 +1,9 @@
 using System.Security.Claims;
 using E_POS.Api.Common;
-using E_POS.Api.Controllers.PricingTax;
+using E_POS.Api.Controllers.V1.Tenant.PricingTax;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.PricingTax.Contracts;
-using E_POS.Application.Modules.PricingTax.Dtos;
+using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
+using E_POS.Application.Modules.Tenant.PricingTax.Dtos;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
@@ -76,3 +76,5 @@ public sealed class ProductTaxAssignmentsControllerTests
         }
     }
 }
+
+

@@ -1,10 +1,10 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
-using E_POS.Application.Modules.AuthSecurity.Contracts;
-using E_POS.Application.Modules.AuthSecurity.Dtos;
-using E_POS.Application.Modules.AuthSecurity.Services;
-using E_POS.Domain.Modules.AuthSecurity.Constants;
-using E_POS.Domain.Modules.AuthSecurity.Entities;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
+using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
+using E_POS.Application.Modules.Tenant.TenantAuth.Services;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 using Xunit;
 
 namespace E_POS.UnitTests.AuthSecurity;
@@ -38,8 +38,8 @@ public sealed class TenantAuthServiceTests
         Assert.NotNull(repository.SavedSession);
         Assert.NotNull(repository.SavedRefreshToken);
         Assert.NotNull(repository.SavedAudit);
-        Assert.Equal(TenantAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginResult);
-        Assert.Equal("hash:" + jwtFactory.JwtId, repository.SavedSession!.SessionTokenHash);
+        Assert.Equal(TenantAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginStatus);
+        Assert.Equal(account.TenantId, repository.SavedSession!.TenantId);
         Assert.Equal("hash:tenant-refresh-token", repository.SavedRefreshToken!.TokenHash);
         Assert.Equal(Now.AddDays(7), repository.SavedRefreshToken.ExpiresAt);
     }
@@ -56,7 +56,7 @@ public sealed class TenantAuthServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("tenant_auth.invalid_credentials", result.Error.Code);
         Assert.NotNull(repository.SavedAudit);
-        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginResult);
+        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginStatus);
         Assert.Null(repository.SavedSession);
         Assert.Null(repository.SavedRefreshToken);
     }
@@ -73,7 +73,7 @@ public sealed class TenantAuthServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("tenant_auth.tenant_access_denied", result.Error.Code);
         Assert.NotNull(repository.SavedAudit);
-        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginResult);
+        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginStatus);
         Assert.Null(repository.SavedSession);
         Assert.Null(repository.SavedRefreshToken);
     }
@@ -90,7 +90,7 @@ public sealed class TenantAuthServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("tenant_auth.invalid_credentials", result.Error.Code);
         Assert.NotNull(repository.SavedAudit);
-        Assert.Equal(TenantAuthConstants.LockedLoginResult, repository.SavedAudit!.LoginResult);
+        Assert.Equal(TenantAuthConstants.LockedLoginResult, repository.SavedAudit!.LoginStatus);
     }
 
     [Fact]
@@ -274,3 +274,4 @@ public sealed class TenantAuthServiceTests
         public DateTimeOffset UtcNow => Now;
     }
 }
+

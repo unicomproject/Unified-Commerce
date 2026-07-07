@@ -1,11 +1,11 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.OutletTillDevice.Dtos;
-using E_POS.Application.Modules.OutletTillDevice.Services;
-using E_POS.Application.Modules.OutletTillDevice.Validators;
-using E_POS.Domain.Modules.FulfilmentPickup.Entities;
-using E_POS.Domain.Modules.OutletTillDevice.Constants;
-using E_POS.Infrastructure.Modules.OutletTillDevice.Repositories;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
+using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -110,3 +110,6 @@ public sealed class OutletCrudIntegrationTests
         public DateTimeOffset UtcNow { get; }
     }
 }
+
+
+

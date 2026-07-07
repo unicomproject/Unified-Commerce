@@ -1,7 +1,7 @@
-using E_POS.Application.Modules.SubscriptionBilling.Contracts;
-using E_POS.Domain.Modules.SubscriptionBilling.Constants;
-using E_POS.Domain.Modules.SubscriptionBilling.Entities;
-using E_POS.Infrastructure.Modules.SubscriptionBilling.Repositories;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -110,7 +110,7 @@ public sealed class PlatformSubscriptionPlanRepositoryTests
         IPlatformSubscriptionPlanRepository repository = new PlatformSubscriptionPlanRepository(dbContext);
 
         var response = await repository.GetPlansAsync(
-            new Application.Modules.SubscriptionBilling.Dtos.SubscriptionPlanListQuery
+            new Application.Modules.Platform.Subscription.Dtos.SubscriptionPlanListQuery
             {
                 Status = SubscriptionPlanConstants.Status.Draft
             },
@@ -130,3 +130,7 @@ public sealed class PlatformSubscriptionPlanRepositoryTests
         return new EPosDbContext(options);
     }
 }
+
+
+
+

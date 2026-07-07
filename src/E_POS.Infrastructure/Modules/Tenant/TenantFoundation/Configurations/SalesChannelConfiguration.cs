@@ -1,0 +1,96 @@
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Configurations;
+
+public sealed class SalesChannelConfiguration : IEntityTypeConfiguration<SalesChannel>
+{
+    public void Configure(EntityTypeBuilder<SalesChannel> builder)
+    {
+        builder.ToTable("sales_channels");
+
+        builder.HasKey(x => x.Id).HasName("pk_sales_channels");
+
+        builder.Property(x => x.Id)
+            .HasColumnName("id");
+
+        builder.Property(x => x.CreatedAt)
+            .HasColumnName("created_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.UpdatedAt)
+            .HasColumnName("updated_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedBy);
+
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
+
+        builder.Property(x => x.ChannelCode)
+            .HasColumnName("channel_code")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(x => x.ChannelName)
+            .HasColumnName("channel_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
+
+        builder.Property(x => x.ChannelType)
+            .HasColumnName("channel_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.ChannelMode)
+            .HasColumnName("channel_mode")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired(false);
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.SortOrder)
+            .HasColumnName("sort_order")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_channels_tenant_id_tenants");
+
+        builder.HasIndex(x => new { x.TenantId, x.ChannelCode })
+            .IsUnique()
+            .HasDatabaseName("ix_sales_channels_tenant_id_channel_code");
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_sales_channels_channel_type",
+            "channel_type IN ('POS', 'E_COMMERCE')"));
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_sales_channels_channel_mode",
+            "channel_mode IS NULL OR channel_mode IN ('ONLINE', 'OFFLINE', 'HYBRID')"));
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_sales_channels_status",
+            "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_sales_channels_sort_order",
+            "sort_order >= 0"));
+    }
+}

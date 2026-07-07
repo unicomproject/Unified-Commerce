@@ -1,6 +1,6 @@
-using E_POS.Domain.Modules.CatalogProduct.Constants;
-using E_POS.Domain.Modules.CatalogProduct.Entities;
-using E_POS.Infrastructure.Modules.CatalogProduct.Repositories;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -56,3 +56,4 @@ public sealed class ReturnPolicyRepositoryTests
         return new EPosDbContext(options);
     }
 }
+

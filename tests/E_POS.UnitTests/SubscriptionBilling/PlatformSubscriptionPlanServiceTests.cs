@@ -1,12 +1,12 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Application.Modules.SubscriptionBilling.Contracts;
-using E_POS.Application.Modules.SubscriptionBilling.Dtos;
-using E_POS.Application.Modules.SubscriptionBilling.Services;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
-using E_POS.Domain.Modules.SubscriptionBilling.Constants;
-using E_POS.Domain.Modules.SubscriptionBilling.Entities;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Application.Modules.Platform.Subscription.Dtos;
+using E_POS.Application.Modules.Platform.Subscription.Services;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Infrastructure.Persistence.Seed;
 using Xunit;
 
@@ -425,3 +425,5 @@ public sealed class PlatformSubscriptionPlanServiceTests
         }
     }
 }
+
+
