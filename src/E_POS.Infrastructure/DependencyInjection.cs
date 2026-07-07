@@ -6,6 +6,8 @@ using E_POS.Application.Modules.CatalogProduct.Contracts;
 using E_POS.Application.Modules.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.PlatformAdministration.Contracts;
 using E_POS.Application.Modules.SubscriptionBilling.Contracts;
+using E_POS.Application.Modules.TenantAdministration.Contracts;
+using E_POS.Infrastructure.Modules.TenantAdministration.Repositories;
 using E_POS.Application.Modules.PlatformAdministration.Dtos;
 using E_POS.Infrastructure.Common;
 using E_POS.Infrastructure.Common.Security;
@@ -38,9 +40,13 @@ public static class DependencyInjection
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.Configure<TenantJwtOptions>(configuration.GetSection(TenantJwtOptions.SectionName));
 
+        var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
+        dataSourceBuilder.EnableDynamicJson();
+        var dataSource = dataSourceBuilder.Build();
+
         services.AddDbContext<EPosDbContext>(options =>
         {
-            options.UseNpgsql(connectionString);
+            options.UseNpgsql(dataSource);
         });
 
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
@@ -61,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();
         services.AddScoped<IPlatformSubscriptionPlanRepository, PlatformSubscriptionPlanRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();
+        services.AddScoped<ITenantAdminContextRepository, TenantAdminContextRepository>();
         services.AddScoped<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();

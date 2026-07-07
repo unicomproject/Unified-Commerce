@@ -1,5 +1,7 @@
 using E_POS.Application.Modules.AuthSecurity.Contracts;
 using E_POS.Application.Modules.AuthSecurity.Services;
+using E_POS.Application.Modules.TenantAdministration.Contracts;
+using E_POS.Application.Modules.TenantAdministration.Services;
 using E_POS.Application.Modules.CatalogProduct.Contracts;
 using E_POS.Application.Modules.CatalogProduct.Services;
 using E_POS.Application.Modules.CatalogProduct.Validators;
@@ -35,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformAuditLogService, PlatformAuditLogService>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
+        services.AddScoped<ITenantAdminContextService, TenantAdminContextService>();
         services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
         services.AddScoped<IDepartmentRequestValidator, DepartmentRequestValidator>();
         services.AddScoped<ICategoryRequestValidator, CategoryRequestValidator>();
