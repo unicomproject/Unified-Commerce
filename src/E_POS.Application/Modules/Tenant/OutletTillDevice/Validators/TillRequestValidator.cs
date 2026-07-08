@@ -54,7 +54,7 @@ public sealed class TillRequestValidator : ITillRequestValidator
         if (string.IsNullOrWhiteSpace(tillType) || tillType.Trim().Length > 40) return ValidationFailed("Till type is required and must be 40 characters or less.");
         if (defaultOpeningFloatAmount < 0) return ValidationFailed("Default opening float amount cannot be negative.");
         if (string.IsNullOrWhiteSpace(currencyCode) || currencyCode.Trim().Length != 3) return ValidationFailed("Currency code is required and must be 3 characters.");
-        if (string.IsNullOrWhiteSpace(status) || !TillConstants.IsValidWriteStatus(status)) return ValidationFailed("Till status must be ACTIVE or INACTIVE.");
+        if (string.IsNullOrWhiteSpace(status) || !TillConstants.IsValidWriteStatus(status)) return ValidationFailed("Till status must be ACTIVE, INACTIVE, or MAINTENANCE.");
         return null;
     }
 

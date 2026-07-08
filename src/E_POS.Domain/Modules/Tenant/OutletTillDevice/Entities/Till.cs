@@ -16,6 +16,12 @@ public class Till : AuditableEntity
     public string CurrencyCode { get; protected set; } = string.Empty;
     public bool IsCashManaged { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
+    public string? DeviceName { get; protected set; }
+    public string? PrinterName { get; protected set; }
+    public string? ScannerName { get; protected set; }
+    public string? CashDrawerName { get; protected set; }
+    public string? CardReaderName { get; protected set; }
+    public string? InternalNote { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
@@ -33,7 +39,13 @@ public class Till : AuditableEntity
         bool isCashManaged,
         string status,
         Guid? createdByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? deviceName = null,
+        string? printerName = null,
+        string? scannerName = null,
+        string? cashDrawerName = null,
+        string? cardReaderName = null,
+        string? internalNote = null)
     {
         return new Till
         {
@@ -49,6 +61,12 @@ public class Till : AuditableEntity
             CurrencyCode = TillConstants.NormalizeCurrencyCode(currencyCode),
             IsCashManaged = isCashManaged,
             Status = TillConstants.NormalizeStatus(status),
+            DeviceName = NormalizeOptional(deviceName),
+            PrinterName = NormalizeOptional(printerName),
+            ScannerName = NormalizeOptional(scannerName),
+            CashDrawerName = NormalizeOptional(cashDrawerName),
+            CardReaderName = NormalizeOptional(cardReaderName),
+            InternalNote = NormalizeOptional(internalNote),
             CreatedByTenantUserId = createdByTenantUserId,
             UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
@@ -68,7 +86,13 @@ public class Till : AuditableEntity
         bool isCashManaged,
         string status,
         Guid? updatedByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? deviceName = null,
+        string? printerName = null,
+        string? scannerName = null,
+        string? cashDrawerName = null,
+        string? cardReaderName = null,
+        string? internalNote = null)
     {
         OutletId = outletId;
         TillName = tillName.Trim();
@@ -80,6 +104,12 @@ public class Till : AuditableEntity
         CurrencyCode = TillConstants.NormalizeCurrencyCode(currencyCode);
         IsCashManaged = isCashManaged;
         Status = TillConstants.NormalizeStatus(status);
+        DeviceName = NormalizeOptional(deviceName);
+        PrinterName = NormalizeOptional(printerName);
+        ScannerName = NormalizeOptional(scannerName);
+        CashDrawerName = NormalizeOptional(cashDrawerName);
+        CardReaderName = NormalizeOptional(cardReaderName);
+        InternalNote = NormalizeOptional(internalNote);
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
@@ -89,5 +119,15 @@ public class Till : AuditableEntity
         Status = TillConstants.DeletedStatus;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim();
     }
 }
