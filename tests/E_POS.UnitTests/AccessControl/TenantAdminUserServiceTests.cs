@@ -331,7 +331,7 @@ public sealed class TenantAdminUserServiceTests
                 [], "Active", false, [], null, Now, null));
 
         public Task<TenantUser?> GetEditableAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken) =>
-            Task.FromResult(EditableUser ?? TenantUser.Create(
+            Task.FromResult<TenantUser?>(EditableUser ?? TenantUser.Create(
                 userId, tenantId, "user@example.com", "User", null, null, "hash", "salt",
                 TenantUserConstants.StatusActive, "admin", "admin", "HQ", Now));
 
