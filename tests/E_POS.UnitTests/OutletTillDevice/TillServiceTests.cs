@@ -91,10 +91,10 @@ public sealed class TillServiceTests
     [Fact]
     public async Task UpdateAsync_WithUpdatePermission_ReturnsSuccess()
     {
-        var till = Till.Create(Guid.NewGuid(), TenantId, OutletId, "Main Till", "MAIN-01", "ACTIVE", Now);
+        var till = Till.Create(Guid.NewGuid(), TenantId, OutletId, "Main", 1, "Main Till 01", "MAIN-01", "ACTIVE", Now);
         var service = CreateService(new FakeTillRepository { EditableTill = till });
 
-        var result = await service.UpdateAsync(CreateContext([TillConstants.UpdatePermission]), till.Id, new TillUpdateRequest(OutletId, "Updated Till", "main-02", "INACTIVE"), CancellationToken.None);
+        var result = await service.UpdateAsync(CreateContext([TillConstants.UpdatePermission]), till.Id, new TillUpdateRequest(OutletId, "Main", 1, "Updated Till 01", "main-02", "INACTIVE"), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
     }
@@ -102,7 +102,7 @@ public sealed class TillServiceTests
     [Fact]
     public async Task DeleteAsync_WithDeviceAssignment_ReturnsDeleteConflict()
     {
-        var till = Till.Create(Guid.NewGuid(), TenantId, OutletId, "Main Till", "MAIN-01", "ACTIVE", Now);
+        var till = Till.Create(Guid.NewGuid(), TenantId, OutletId, "Main", 1, "Main Till 01", "MAIN-01", "ACTIVE", Now);
         var service = CreateService(new FakeTillRepository
         {
             EditableTill = till,
@@ -132,7 +132,7 @@ public sealed class TillServiceTests
 
     private static TillCreateRequest CreateValidRequest()
     {
-        return new TillCreateRequest(OutletId, "Main Till", "main-01", "ACTIVE");
+        return new TillCreateRequest(OutletId, "Main", 1, "Main Till 01", "main-01", "ACTIVE");
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
@@ -150,6 +150,7 @@ public sealed class TillServiceTests
 
         public Task<bool> ActiveOutletExistsAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(ActiveOutletExists);
         public Task<bool> TillCodeExistsAsync(Guid tenantId, Guid outletId, string tillCode, Guid? excludeTillId, CancellationToken cancellationToken) => Task.FromResult(DuplicateCode);
+        public Task<bool> TillAreaNumberExistsAsync(Guid tenantId, Guid outletId, string tillAreaName, int tillNumber, Guid? excludeTillId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<TillListResponse> ListAsync(Guid tenantId, Guid? outletId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => Task.FromResult(new TillListResponse([], pageNumber, pageSize, 0));
         public Task<TillResponse?> GetByIdAsync(Guid tenantId, Guid tillId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<TillResponse?>(CreateResponse(tillId));
         public Task<Till?> GetEditableAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken) => Task.FromResult(EditableTill);
@@ -165,7 +166,7 @@ public sealed class TillServiceTests
 
         private static TillResponse CreateResponse(Guid tillId)
         {
-            return new TillResponse(tillId, OutletId, "MAIN", "Main Outlet", "MAIN-01", "Main Till", "ACTIVE", false, Now, Now);
+            return new TillResponse(tillId, OutletId, "MAIN", "Main Outlet", "Main", 1, "MAIN-01", "Main Till 01", "ACTIVE", false, Now, Now);
         }
     }
 }

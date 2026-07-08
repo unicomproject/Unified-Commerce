@@ -41,6 +41,16 @@ public sealed class TillConfiguration : IEntityTypeConfiguration<Till>
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(x => x.TillAreaName)
+            .HasColumnName("till_area_name")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(x => x.TillNumber)
+            .HasColumnName("till_number")
+            .IsRequired();
+
         builder.Property(x => x.Status)
             .HasColumnName("status")
             .HasColumnType("varchar(30)")
@@ -61,11 +71,19 @@ public sealed class TillConfiguration : IEntityTypeConfiguration<Till>
             .IsUnique()
             .HasDatabaseName("uq_tills_tenant_id_outlet_id_till_code");
 
+        builder.HasIndex(x => new { x.TenantId, x.OutletId, x.TillAreaName, x.TillNumber })
+            .IsUnique()
+            .HasDatabaseName("uq_tills_tenant_id_outlet_id_till_area_name_till_number");
+
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_tills_tenant_id_id");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_tills_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_tills_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+            t.HasCheckConstraint("ck_tills_till_number_positive", "till_number > 0");
+        });
     }
 }
 

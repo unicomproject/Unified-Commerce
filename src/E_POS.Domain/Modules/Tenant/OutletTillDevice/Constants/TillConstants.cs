@@ -12,7 +12,35 @@ public static class TillConstants
     public const string ManagePermission = "tenant.tills.manage";
 
     public static string NormalizeTillCode(string tillCode) => tillCode.Trim().ToUpperInvariant();
+    public static string NormalizeAreaName(string areaName) => areaName.Trim();
     public static string NormalizeStatus(string status) => status.Trim().ToUpperInvariant();
+
+    public static string BuildTillName(string areaName, int tillNumber) =>
+        $"{NormalizeAreaName(areaName)} Till {tillNumber:D2}";
+
+    public static string BuildDisplayLabel(string areaName, int tillNumber, string sessionStatus) =>
+        $"{BuildTillName(areaName, tillNumber)} / {sessionStatus}";
+
+    public static string FormatSessionStatusLabel(string? sessionStatus, bool isOpen)
+    {
+        if (!isOpen)
+        {
+            return "Closed";
+        }
+
+        if (string.IsNullOrWhiteSpace(sessionStatus))
+        {
+            return "Open";
+        }
+
+        var normalized = sessionStatus.Trim().ToUpperInvariant();
+        return normalized switch
+        {
+            "OPEN" => "Open",
+            "CLOSED" => "Closed",
+            _ => char.ToUpperInvariant(normalized[0]) + normalized[1..].ToLowerInvariant()
+        };
+    }
 
     public static bool IsValidStatus(string status)
     {

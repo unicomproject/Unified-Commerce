@@ -42,9 +42,31 @@ public sealed class TillService : ITillService
             return ApplicationResult<TillResponse>.Failure(new ApplicationError("till.duplicate_code", "Till code already exists for this outlet."));
         }
 
+        var normalizedAreaName = TillConstants.NormalizeAreaName(request.TillAreaName);
+        if (await _repository.TillAreaNumberExistsAsync(
+                context.TenantId,
+                request.OutletId,
+                normalizedAreaName,
+                request.TillNumber,
+                null,
+                cancellationToken))
+        {
+            return ApplicationResult<TillResponse>.Failure(
+                new ApplicationError("till.duplicate_area_number", "Till number already exists for this area in the outlet."));
+        }
+
         var now = _dateTimeProvider.UtcNow;
         var tillId = Guid.NewGuid();
-        var till = Till.Create(tillId, context.TenantId, request.OutletId, request.Name, normalizedTillCode, request.Status, now);
+        var till = Till.Create(
+            tillId,
+            context.TenantId,
+            request.OutletId,
+            normalizedAreaName,
+            request.TillNumber,
+            request.Name,
+            normalizedTillCode,
+            request.Status,
+            now);
         await _repository.AddAsync(till, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
         return ApplicationResult<TillResponse>.Success(response!);
@@ -97,7 +119,27 @@ public sealed class TillService : ITillService
             return ApplicationResult<TillResponse>.Failure(new ApplicationError("till.duplicate_code", "Till code already exists for this outlet."));
         }
 
-        till.UpdateProfile(request.OutletId, request.Name, normalizedTillCode, request.Status, _dateTimeProvider.UtcNow);
+        var normalizedAreaName = TillConstants.NormalizeAreaName(request.TillAreaName);
+        if (await _repository.TillAreaNumberExistsAsync(
+                context.TenantId,
+                request.OutletId,
+                normalizedAreaName,
+                request.TillNumber,
+                tillId,
+                cancellationToken))
+        {
+            return ApplicationResult<TillResponse>.Failure(
+                new ApplicationError("till.duplicate_area_number", "Till number already exists for this area in the outlet."));
+        }
+
+        till.UpdateProfile(
+            request.OutletId,
+            normalizedAreaName,
+            request.TillNumber,
+            request.Name,
+            normalizedTillCode,
+            request.Status,
+            _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
         return response is null ? ApplicationResult<TillResponse>.Failure(NotFound) : ApplicationResult<TillResponse>.Success(response);

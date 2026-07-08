@@ -44,6 +44,25 @@ public sealed class TillRepository : ITillRepository
                 cancellationToken);
     }
 
+    public Task<bool> TillAreaNumberExistsAsync(
+        Guid tenantId,
+        Guid outletId,
+        string tillAreaName,
+        int tillNumber,
+        Guid? excludeTillId,
+        CancellationToken cancellationToken)
+    {
+        return _dbContext.Tills
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.OutletId == outletId &&
+                     x.TillAreaName == tillAreaName &&
+                     x.TillNumber == tillNumber &&
+                     (!excludeTillId.HasValue || x.Id != excludeTillId.Value),
+                cancellationToken);
+    }
+
     public async Task<TillListResponse> ListAsync(
         Guid tenantId,
         Guid? outletId,
@@ -69,6 +88,7 @@ public sealed class TillRepository : ITillRepository
             var term = search.Trim().ToUpperInvariant();
             query = query.Where(x => x.till.Name.ToUpper().Contains(term) ||
                                      x.till.TillCode.ToUpper().Contains(term) ||
+                                     x.till.TillAreaName.ToUpper().Contains(term) ||
                                      x.outlet.Name.ToUpper().Contains(term) ||
                                      x.outlet.OutletCode.ToUpper().Contains(term));
         }
@@ -76,7 +96,8 @@ public sealed class TillRepository : ITillRepository
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query
             .OrderBy(x => x.outlet.OutletCode)
-            .ThenBy(x => x.till.TillCode)
+            .ThenBy(x => x.till.TillAreaName)
+            .ThenBy(x => x.till.TillNumber)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new TillSummaryResponse(
@@ -84,6 +105,8 @@ public sealed class TillRepository : ITillRepository
                 x.till.OutletId!.Value,
                 x.outlet.OutletCode,
                 x.outlet.Name,
+                x.till.TillAreaName,
+                x.till.TillNumber,
                 x.till.TillCode,
                 x.till.Name,
                 x.till.Status,
@@ -124,6 +147,8 @@ public sealed class TillRepository : ITillRepository
             row.till.OutletId!.Value,
             row.outlet.OutletCode,
             row.outlet.Name,
+            row.till.TillAreaName,
+            row.till.TillNumber,
             row.till.TillCode,
             row.till.Name,
             row.till.Status,

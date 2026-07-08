@@ -8,6 +8,8 @@ public class Till : AuditableEntity
     public Guid TenantId { get; protected set; }
     public Guid? OutletId { get; protected set; }
     public string Name { get; protected set; } = string.Empty;
+    public string TillAreaName { get; protected set; } = string.Empty;
+    public int TillNumber { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public string TillCode { get; protected set; } = string.Empty;
 
@@ -15,6 +17,8 @@ public class Till : AuditableEntity
         Guid id,
         Guid tenantId,
         Guid outletId,
+        string tillAreaName,
+        int tillNumber,
         string name,
         string tillCode,
         string status,
@@ -25,6 +29,8 @@ public class Till : AuditableEntity
             Id = id,
             TenantId = tenantId,
             OutletId = outletId,
+            TillAreaName = TillConstants.NormalizeAreaName(tillAreaName),
+            TillNumber = tillNumber,
             Name = name.Trim(),
             TillCode = TillConstants.NormalizeTillCode(tillCode),
             Status = TillConstants.NormalizeStatus(status),
@@ -33,9 +39,18 @@ public class Till : AuditableEntity
         };
     }
 
-    public void UpdateProfile(Guid outletId, string name, string tillCode, string status, DateTimeOffset now)
+    public void UpdateProfile(
+        Guid outletId,
+        string tillAreaName,
+        int tillNumber,
+        string name,
+        string tillCode,
+        string status,
+        DateTimeOffset now)
     {
         OutletId = outletId;
+        TillAreaName = TillConstants.NormalizeAreaName(tillAreaName);
+        TillNumber = tillNumber;
         Name = name.Trim();
         TillCode = TillConstants.NormalizeTillCode(tillCode);
         Status = TillConstants.NormalizeStatus(status);

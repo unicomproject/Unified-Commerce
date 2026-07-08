@@ -74,8 +74,10 @@ public sealed class PlatformDashboardRepositoryTests
             Guid.Parse("44444444-4444-4444-8444-444444444401"),
             tenantOneId,
             Guid.Parse("33333333-3333-4333-8333-333333333301"),
-            "Front Till",
-            "TILL-001",
+            "Front",
+            1,
+            "Front Till 01",
+            "FRONT-01",
             "ACTIVE",
             Now));
 

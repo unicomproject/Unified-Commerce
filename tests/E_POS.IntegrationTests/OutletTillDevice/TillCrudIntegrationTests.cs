@@ -110,7 +110,7 @@ public sealed class TillCrudIntegrationTests
 
     private static TillCreateRequest CreateRequest(Guid outletId)
     {
-        return new TillCreateRequest(outletId, "Main Till", "main-01", "ACTIVE");
+        return new TillCreateRequest(outletId, "Main", 1, "Main Till 01", "main-01", "ACTIVE");
     }
 
     private static Outlet CreateOutlet(Guid tenantId, string outletCode, string status)
