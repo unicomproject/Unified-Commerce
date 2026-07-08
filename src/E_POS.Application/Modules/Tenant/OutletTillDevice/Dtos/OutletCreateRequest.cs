@@ -1,13 +1,13 @@
 namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 
 public sealed record OutletCreateRequest(
-    string Name,
+    string OutletName,
     string Status,
     string OutletType,
-    bool IsOnlineVisible,
-    string? ContactPhone,
-    string? ContactEmail,
+    string Timezone,
+    bool IsDefaultOutlet,
+    string? Phone,
+    string? Email,
     OutletAddressRequest Address,
     IReadOnlyList<OutletBusinessHourRequest>? BusinessHours,
     bool CollectionEnabled);
-

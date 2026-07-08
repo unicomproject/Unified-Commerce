@@ -42,12 +42,6 @@ public sealed class PosDeviceService : IPosDeviceService
             return ApplicationResult<PosDeviceResponse>.Failure(OutletNotFound);
         }
 
-        var normalizedSerialNumber = PosDeviceConstants.NormalizeDeviceSerialNumber(request.DeviceSerialNumber);
-        if (await _repository.DeviceSerialNumberExistsAsync(normalizedSerialNumber, null, cancellationToken))
-        {
-            return ApplicationResult<PosDeviceResponse>.Failure(new ApplicationError("pos_device.duplicate_serial_number", "POS device serial number already exists."));
-        }
-
         var now = _dateTimeProvider.UtcNow;
         var deviceCode = await _codeSequenceRepository.GetNextCodeAsync(
             context.TenantId,
@@ -58,7 +52,16 @@ public sealed class PosDeviceService : IPosDeviceService
             cancellationToken);
 
         var posDeviceId = Guid.NewGuid();
-        var posDevice = PosDevice.Create(posDeviceId, context.TenantId, request.OutletId, request.Name, deviceCode, normalizedSerialNumber, request.Status, now);
+        var posDevice = PosDevice.Create(
+            posDeviceId,
+            context.TenantId,
+            request.OutletId,
+            deviceCode,
+            request.DeviceName,
+            request.DeviceType,
+            request.Status,
+            context.UserId,
+            now);
         await _repository.AddAsync(posDevice, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, posDeviceId, false, cancellationToken);
         return ApplicationResult<PosDeviceResponse>.Success(response!);
@@ -105,13 +108,7 @@ public sealed class PosDeviceService : IPosDeviceService
             return ApplicationResult<PosDeviceResponse>.Failure(OutletNotFound);
         }
 
-        var normalizedSerialNumber = PosDeviceConstants.NormalizeDeviceSerialNumber(request.DeviceSerialNumber);
-        if (await _repository.DeviceSerialNumberExistsAsync(normalizedSerialNumber, posDeviceId, cancellationToken))
-        {
-            return ApplicationResult<PosDeviceResponse>.Failure(new ApplicationError("pos_device.duplicate_serial_number", "POS device serial number already exists."));
-        }
-
-        posDevice.UpdateProfile(request.OutletId, request.Name, normalizedSerialNumber, request.Status, _dateTimeProvider.UtcNow);
+        posDevice.UpdateProfile(request.OutletId, request.DeviceName, request.DeviceType, request.Status, context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, posDeviceId, false, cancellationToken);
         return response is null ? ApplicationResult<PosDeviceResponse>.Failure(NotFound) : ApplicationResult<PosDeviceResponse>.Success(response);
@@ -130,7 +127,7 @@ public sealed class PosDeviceService : IPosDeviceService
             return ApplicationResult.Failure(new ApplicationError("pos_device.delete_conflict", "POS device cannot be deleted while assigned to a till."));
         }
 
-        posDevice.SoftDelete(_dateTimeProvider.UtcNow);
+        posDevice.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }
@@ -147,4 +144,3 @@ public sealed class PosDeviceService : IPosDeviceService
             : PermissionDenied;
     }
 }
-

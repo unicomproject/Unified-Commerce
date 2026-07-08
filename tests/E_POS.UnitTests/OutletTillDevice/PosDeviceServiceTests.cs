@@ -34,24 +34,13 @@ public sealed class PosDeviceServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(repository.SavedDevice);
         Assert.Equal("DEV001", repository.SavedDevice!.DeviceCode);
-        Assert.Equal("SN-001", repository.SavedDevice.DeviceSerialNumber);
-    }
-
-    [Fact]
-    public async Task CreateAsync_WithDuplicateSerialNumber_ReturnsDuplicateSerialNumber()
-    {
-        var service = CreateDeviceService(new FakePosDeviceRepository { DuplicateSerialNumber = true });
-
-        var result = await service.CreateAsync(CreateContext(), CreateValidRequest(), CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("pos_device.duplicate_serial_number", result.Error.Code);
+        Assert.Equal("TABLET", repository.SavedDevice.DeviceType);
     }
 
     [Fact]
     public async Task DeleteAsync_WithTillAssignment_ReturnsDeleteConflict()
     {
-        var device = PosDevice.Create(Guid.NewGuid(), TenantId, OutletId, "Front Tablet", "DEV001", "SN-001", "ACTIVE", Now);
+        var device = PosDevice.Create(Guid.NewGuid(), TenantId, OutletId, "DEV001", "Front Tablet", "TABLET", "ACTIVE", UserId, Now);
         var service = CreateDeviceService(new FakePosDeviceRepository
         {
             EditableDevice = device,
@@ -135,7 +124,7 @@ public sealed class PosDeviceServiceTests
 
     private static PosDeviceCreateRequest CreateValidRequest()
     {
-        return new PosDeviceCreateRequest(OutletId, "Front Tablet", "sn-001", "ACTIVE");
+        return new PosDeviceCreateRequest(OutletId, "Front Tablet", "TABLET", "ACTIVE");
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
@@ -154,13 +143,11 @@ public sealed class PosDeviceServiceTests
     private sealed class FakePosDeviceRepository : IPosDeviceRepository
     {
         public bool ActiveOutletExists { get; init; } = true;
-        public bool DuplicateSerialNumber { get; init; }
         public bool HasTillAssignment { get; init; }
         public PosDevice? EditableDevice { get; init; }
         public PosDevice? SavedDevice { get; private set; }
 
         public Task<bool> ActiveOutletExistsAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(ActiveOutletExists);
-        public Task<bool> DeviceSerialNumberExistsAsync(string deviceSerialNumber, Guid? excludePosDeviceId, CancellationToken cancellationToken) => Task.FromResult(DuplicateSerialNumber);
         public Task<PosDeviceListResponse> ListAsync(Guid tenantId, Guid? outletId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => Task.FromResult(new PosDeviceListResponse([], pageNumber, pageSize, 0));
         public Task<PosDeviceResponse?> GetByIdAsync(Guid tenantId, Guid posDeviceId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<PosDeviceResponse?>(CreateDeviceResponse(posDeviceId));
         public Task<PosDevice?> GetEditableAsync(Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken) => Task.FromResult(EditableDevice);
@@ -177,23 +164,21 @@ public sealed class PosDeviceServiceTests
 
     private sealed class FakeTillDeviceAssignmentRepository : ITillDeviceAssignmentRepository
     {
-        public bool ActiveTillExists { get; init; } = true;
-        public bool ActiveDeviceExists { get; init; } = true;
         public bool SameOutlet { get; init; } = true;
         public bool DeviceAssignedToAnotherTill { get; init; }
         public TillDeviceAssignment? ExistingAssignment { get; init; }
         public TillDeviceAssignment? SavedAssignment { get; private set; }
 
-        public Task<TillDeviceAssignmentResponse?> GetByTillAndDeviceAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken)
+        public Task<TillDeviceAssignmentResponse?> GetActiveByTillAndDeviceAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken)
         {
             return Task.FromResult(ExistingAssignment is null && SavedAssignment is null ? null : CreateAssignmentResponse(tillId, posDeviceId));
         }
 
         public Task<TillDeviceAssignmentListResponse?> ListByTillAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken) => Task.FromResult<TillDeviceAssignmentListResponse?>(new TillDeviceAssignmentListResponse(tillId, []));
-        public Task<bool> ActiveTillExistsAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken) => Task.FromResult(ActiveTillExists);
-        public Task<bool> ActiveDeviceExistsAsync(Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken) => Task.FromResult(ActiveDeviceExists);
-        public Task<bool> TillAndDeviceShareOutletAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken) => Task.FromResult(SameOutlet);
+        public Task<TillOutletContext?> GetTillContextAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken) => Task.FromResult<TillOutletContext?>(new TillOutletContext(OutletId));
+        public Task<DeviceOutletContext?> GetDeviceContextAsync(Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken) => Task.FromResult<DeviceOutletContext?>(new DeviceOutletContext(SameOutlet ? OutletId : Guid.NewGuid()));
         public Task<bool> DeviceAssignedToAnyTillAsync(Guid tenantId, Guid posDeviceId, Guid? excludeTillId, CancellationToken cancellationToken) => Task.FromResult(DeviceAssignedToAnotherTill);
+        public Task<bool> TillAssignedToAnyDeviceAsync(Guid tenantId, Guid tillId, Guid? excludePosDeviceId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<TillDeviceAssignment?> GetEditableAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken) => Task.FromResult(ExistingAssignment);
 
         public Task AddAsync(TillDeviceAssignment assignment, CancellationToken cancellationToken)
@@ -202,21 +187,20 @@ public sealed class PosDeviceServiceTests
             return Task.CompletedTask;
         }
 
-        public Task RevokeAsync(TillDeviceAssignment assignment, DateTimeOffset now, CancellationToken cancellationToken)
+        public Task ReleaseAsync(TillDeviceAssignment assignment, Guid? releasedByTenantUserId, string? releaseReason, DateTimeOffset now, CancellationToken cancellationToken)
         {
-            assignment.Revoke(now);
+            assignment.Release(releasedByTenantUserId, releaseReason, now);
             return Task.CompletedTask;
         }
     }
 
     private static PosDeviceResponse CreateDeviceResponse(Guid posDeviceId)
     {
-        return new PosDeviceResponse(posDeviceId, OutletId, "OUT001", "Main Outlet", "DEV001", "Front Tablet", "SN-001", "ACTIVE", null, null, null, Now, Now);
+        return new PosDeviceResponse(posDeviceId, OutletId, "OUT001", "Main Outlet", "DEV001", "Front Tablet", "TABLET", "ACTIVE", false, null, null, null, Now, Now);
     }
 
     private static TillDeviceAssignmentResponse CreateAssignmentResponse(Guid tillId, Guid posDeviceId)
     {
-        return new TillDeviceAssignmentResponse(Guid.NewGuid(), tillId, "TILL001", "Main Till", posDeviceId, "DEV001", "Front Tablet", OutletId, "OUT001", "Main Outlet", Now.UtcDateTime.ToString("O"), Now, Now);
+        return new TillDeviceAssignmentResponse(Guid.NewGuid(), tillId, "TILL001", "Main Till", posDeviceId, "DEV001", "Front Tablet", OutletId, "OUT001", "Main Outlet", Now, null);
     }
 }
-

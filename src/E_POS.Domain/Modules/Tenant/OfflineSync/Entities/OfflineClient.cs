@@ -18,5 +18,39 @@ public class OfflineClient : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    protected OfflineClient() { }
+
+    public static OfflineClient Create(
+        Guid id,
+        Guid tenantId,
+        Guid outletId,
+        Guid posDeviceId,
+        string clientCode,
+        string clientName,
+        string offlineType,
+        bool offlineEnabled,
+        int? maxOfflineDurationMinutes,
+        string status,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        return new OfflineClient
+        {
+            Id = id,
+            TenantId = tenantId,
+            OutletId = outletId,
+            PosDeviceId = posDeviceId,
+            ClientCode = clientCode.Trim(),
+            ClientName = clientName.Trim(),
+            OfflineType = offlineType.Trim(),
+            OfflineEnabled = offlineEnabled,
+            MaxOfflineDurationMinutes = maxOfflineDurationMinutes,
+            Status = status.Trim(),
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedByTenantUserId = createdByTenantUserId
+        };
+    }
 }
 

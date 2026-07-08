@@ -17,16 +17,8 @@ public sealed class SalesOrderStatusHistoryConfiguration : IEntityTypeConfigurat
         builder.Property(x => x.Id)
             .HasColumnName("id");
 
-        builder.Property(x => x.CreatedAt)
-            .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
-
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
-
+        builder.Ignore(x => x.CreatedAt);
+        builder.Ignore(x => x.UpdatedAt);
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 

@@ -89,13 +89,14 @@ public sealed class OutletCrudIntegrationTests
             "Main Outlet",
             "ACTIVE",
             "STORE",
-            true,
+            "UTC",
+            false,
             "+94770000000",
             "main@example.com",
-            new OutletAddressRequest("1 Main Street", "Level 1", "Colombo", "Western", "00100", "LK"),
+            new OutletAddressRequest("1 Main Street", "Level 1", "Colombo", "Western", "00100", "LK", null, null),
             [
-                new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0)),
-                new OutletBusinessHourRequest(2, new TimeOnly(9, 0), new TimeOnly(17, 0))
+                new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null),
+                new OutletBusinessHourRequest(2, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null)
             ],
             collectionEnabled);
     }
@@ -110,6 +111,3 @@ public sealed class OutletCrudIntegrationTests
         public DateTimeOffset UtcNow { get; }
     }
 }
-
-
-

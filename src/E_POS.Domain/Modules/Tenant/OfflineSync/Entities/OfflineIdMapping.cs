@@ -10,5 +10,30 @@ public class OfflineIdMapping : AuditableEntity
     public string ClientRecordId { get; protected set; } = string.Empty;
     public Guid ServerRecordId { get; protected set; }
     public Guid? CreatedFromSyncItemId { get; protected set; }
+
+    protected OfflineIdMapping() { }
+
+    public static OfflineIdMapping Create(
+        Guid id,
+        Guid tenantId,
+        Guid offlineClientId,
+        string entityName,
+        string clientRecordId,
+        Guid serverRecordId,
+        Guid? createdFromSyncItemId,
+        DateTimeOffset now)
+    {
+        return new OfflineIdMapping
+        {
+            Id = id,
+            TenantId = tenantId,
+            OfflineClientId = offlineClientId,
+            EntityName = entityName.Trim(),
+            ClientRecordId = clientRecordId.Trim(),
+            ServerRecordId = serverRecordId,
+            CreatedFromSyncItemId = createdFromSyncItemId,
+            CreatedAt = now
+        };
+    }
 }
 

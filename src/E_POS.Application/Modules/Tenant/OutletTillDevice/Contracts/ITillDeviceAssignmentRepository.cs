@@ -5,14 +5,16 @@ namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 
 public interface ITillDeviceAssignmentRepository
 {
-    Task<TillDeviceAssignmentResponse?> GetByTillAndDeviceAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken);
+    Task<TillDeviceAssignmentResponse?> GetActiveByTillAndDeviceAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken);
     Task<TillDeviceAssignmentListResponse?> ListByTillAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken);
-    Task<bool> ActiveTillExistsAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken);
-    Task<bool> ActiveDeviceExistsAsync(Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken);
-    Task<bool> TillAndDeviceShareOutletAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken);
+    Task<TillOutletContext?> GetTillContextAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken);
+    Task<DeviceOutletContext?> GetDeviceContextAsync(Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken);
     Task<bool> DeviceAssignedToAnyTillAsync(Guid tenantId, Guid posDeviceId, Guid? excludeTillId, CancellationToken cancellationToken);
+    Task<bool> TillAssignedToAnyDeviceAsync(Guid tenantId, Guid tillId, Guid? excludePosDeviceId, CancellationToken cancellationToken);
     Task<TillDeviceAssignment?> GetEditableAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken);
     Task AddAsync(TillDeviceAssignment assignment, CancellationToken cancellationToken);
-    Task RevokeAsync(TillDeviceAssignment assignment, DateTimeOffset now, CancellationToken cancellationToken);
+    Task ReleaseAsync(TillDeviceAssignment assignment, Guid? releasedByTenantUserId, string? releaseReason, DateTimeOffset now, CancellationToken cancellationToken);
 }
 
+public sealed record TillOutletContext(Guid OutletId);
+public sealed record DeviceOutletContext(Guid OutletId);
