@@ -1,11 +1,11 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
-using E_POS.Application.Modules.PlatformAdministration.Dtos;
-using E_POS.Application.Modules.PlatformAdministration.Services;
-using E_POS.Application.Modules.PlatformAdministration.Validators;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
-using E_POS.Domain.Modules.PlatformAdministration.Entities;
-using E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Infrastructure.Persistence.Seed;
@@ -190,3 +190,6 @@ public sealed class PlatformAuthRefreshIntegrationTests
         public DateTimeOffset UtcNow => Now;
     }
 }
+
+
+

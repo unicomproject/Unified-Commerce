@@ -1,5 +1,5 @@
-using E_POS.Domain.Modules.PricingTax.Entities;
-using E_POS.Infrastructure.Modules.PricingTax.Repositories;
+using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
+using E_POS.Infrastructure.Modules.Tenant.PricingTax.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -68,3 +68,5 @@ public sealed class PriceListItemsRepositoryTests
         return new EPosDbContext(options);
     }
 }
+
+

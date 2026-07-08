@@ -1,6 +1,6 @@
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Domain.Modules.SubscriptionBilling.Entities;
-using E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -85,3 +85,6 @@ public sealed class PlatformModulesCatalogRepositoryTests
         return new EPosDbContext(options);
     }
 }
+
+
+

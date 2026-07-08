@@ -1,11 +1,11 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.OutletTillDevice.Contracts;
-using E_POS.Application.Modules.OutletTillDevice.Dtos;
-using E_POS.Application.Modules.OutletTillDevice.Services;
-using E_POS.Application.Modules.OutletTillDevice.Validators;
-using E_POS.Domain.Modules.OutletTillDevice.Constants;
-using E_POS.Domain.Modules.OutletTillDevice.Entities;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using Xunit;
 
 namespace E_POS.UnitTests.OutletTillDevice;
@@ -219,3 +219,4 @@ public sealed class PosDeviceServiceTests
         return new TillDeviceAssignmentResponse(Guid.NewGuid(), tillId, "TILL001", "Main Till", posDeviceId, "DEV001", "Front Tablet", OutletId, "OUT001", "Main Outlet", Now.UtcDateTime.ToString("O"), Now, Now);
     }
 }
+

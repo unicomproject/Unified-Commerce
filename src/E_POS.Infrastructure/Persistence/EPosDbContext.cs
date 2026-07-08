@@ -1,25 +1,25 @@
-using E_POS.Domain.Modules.PlatformAdministration.Entities;
-using E_POS.Domain.Modules.TenantFoundation.Entities;
-using E_POS.Domain.Modules.SubscriptionBilling.Entities;
-using E_POS.Domain.Modules.AccessControl.Entities;
-using E_POS.Domain.Modules.AuthSecurity.Entities;
-using E_POS.Domain.Modules.OutletTillDevice.Entities;
-using E_POS.Domain.Modules.HardwareCash.Entities;
-using E_POS.Domain.Modules.CatalogProduct.Entities;
-using E_POS.Domain.Modules.PricingTax.Entities;
-using E_POS.Domain.Modules.Discount.Entities;
-using E_POS.Domain.Modules.Inventory.Entities;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
+using E_POS.Domain.Modules.Tenant.Discount.Entities;
+using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Customer.Entities;
-using E_POS.Domain.Modules.Orders.Entities;
-using E_POS.Domain.Modules.POSOperations.Entities;
-using E_POS.Domain.Modules.CartCheckout.Entities;
-using E_POS.Domain.Modules.FulfilmentPickup.Entities;
-using E_POS.Domain.Modules.Payment.Entities;
-using E_POS.Domain.Modules.Refund.Entities;
-using E_POS.Domain.Modules.ReturnExchange.Entities;
-using E_POS.Domain.Modules.Notification.Entities;
-using E_POS.Domain.Modules.Integration.Entities;
-using E_POS.Domain.Modules.OfflineSync.Entities;
+using E_POS.Domain.Modules.Tenant.Orders.Entities;
+using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
+using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
+using E_POS.Domain.Modules.Tenant.Payment.Entities;
+using E_POS.Domain.Modules.Shared.Refund.Entities;
+using E_POS.Domain.Modules.Shared.ReturnExchange.Entities;
+using E_POS.Domain.Modules.Shared.Notification.Entities;
+using E_POS.Domain.Modules.Shared.Integration.Entities;
+using E_POS.Domain.Modules.Tenant.OfflineSync.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Persistence;
@@ -310,12 +310,11 @@ public sealed class EPosDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Register PostgreSQL extensions required by the model
         modelBuilder.HasPostgresExtension("citext");
-
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(EPosDbContext).Assembly);
     }
 }
+
 
 
 

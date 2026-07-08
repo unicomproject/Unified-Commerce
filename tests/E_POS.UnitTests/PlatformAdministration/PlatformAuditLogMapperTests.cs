@@ -1,5 +1,5 @@
-using E_POS.Application.Modules.PlatformAdministration;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
+using E_POS.Application.Modules.Platform.PlatformAdmin;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using Xunit;
 
 namespace E_POS.UnitTests.PlatformAdministration;
@@ -36,3 +36,5 @@ public sealed class PlatformAuditLogMapperTests
         Assert.Equal(expected, resolved);
     }
 }
+
+

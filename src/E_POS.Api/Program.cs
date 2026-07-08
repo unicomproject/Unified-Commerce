@@ -5,8 +5,8 @@ using E_POS.Api.Middleware;
 using E_POS.Application;
 using E_POS.Application.Common.Security;
 using E_POS.Infrastructure;
-using E_POS.Infrastructure.Modules.AuthSecurity.Options;
-using E_POS.Infrastructure.Modules.PlatformAdministration.Options;
+using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
+using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -17,6 +17,15 @@ const string TenantIdentityType = "tenant_user";
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -131,6 +140,8 @@ var app = builder.Build();
 
 // Convert unexpected runtime failures into safe standard API errors.
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
+
+app.UseCors("AllowAll");
 
 if (app.Environment.IsDevelopment())
 {

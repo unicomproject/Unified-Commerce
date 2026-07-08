@@ -1,19 +1,21 @@
-using E_POS.Application.Modules.AuthSecurity.Contracts;
-using E_POS.Application.Modules.AuthSecurity.Services;
-using E_POS.Application.Modules.CatalogProduct.Contracts;
-using E_POS.Application.Modules.CatalogProduct.Services;
-using E_POS.Application.Modules.CatalogProduct.Validators;
-using E_POS.Application.Modules.OutletTillDevice.Contracts;
-using E_POS.Application.Modules.OutletTillDevice.Services;
-using E_POS.Application.Modules.OutletTillDevice.Validators;
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Application.Modules.PlatformAdministration.Services;
-using E_POS.Application.Modules.PlatformAdministration.Validators;
-using E_POS.Application.Modules.SubscriptionBilling.Contracts;
-using E_POS.Application.Modules.SubscriptionBilling.Services;
-using E_POS.Application.Modules.PricingTax.Contracts;
-using E_POS.Application.Modules.PricingTax.Services;
-using E_POS.Application.Modules.PricingTax.Validators;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
+using E_POS.Application.Modules.Tenant.TenantAuth.Services;
+using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
+using E_POS.Application.Modules.Tenant.TenantFoundation.Services;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Application.Modules.Platform.Subscription.Services;
+using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
+using E_POS.Application.Modules.Tenant.PricingTax.Services;
+using E_POS.Application.Modules.Tenant.PricingTax.Validators;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -35,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformAuditLogService, PlatformAuditLogService>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
+        services.AddScoped<ITenantAdminContextService, TenantAdminContextService>();
         services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
         services.AddScoped<IDepartmentRequestValidator, DepartmentRequestValidator>();
         services.AddScoped<ICategoryRequestValidator, CategoryRequestValidator>();
@@ -69,3 +72,4 @@ public static class DependencyInjection
         return services;
     }
 }
+

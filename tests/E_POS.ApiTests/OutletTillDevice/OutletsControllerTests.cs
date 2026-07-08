@@ -3,8 +3,8 @@ using System.Security.Claims;
 using E_POS.Api.Common;
 using E_POS.Api.Controllers;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.OutletTillDevice.Contracts;
-using E_POS.Application.Modules.OutletTillDevice.Dtos;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -171,3 +171,4 @@ public sealed class OutletsControllerTests
         }
     }
 }
+

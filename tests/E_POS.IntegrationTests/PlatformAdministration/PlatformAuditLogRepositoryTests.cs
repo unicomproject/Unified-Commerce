@@ -1,7 +1,7 @@
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
-using E_POS.Domain.Modules.PlatformAdministration.Entities;
-using E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -26,7 +26,7 @@ public sealed class PlatformAuditLogRepositoryTests
         IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
 
         var response = await repository.GetLoginSecurityAuditLogsAsync(
-            new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
             {
                 PageNumber = 1,
                 PageSize = 2
@@ -53,7 +53,7 @@ public sealed class PlatformAuditLogRepositoryTests
         IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
 
         var actionFiltered = await repository.GetLoginSecurityAuditLogsAsync(
-            new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
             {
                 Action = "platform.login.failed"
             },
@@ -63,7 +63,7 @@ public sealed class PlatformAuditLogRepositoryTests
         Assert.Equal(FailedAuditId, actionFiltered.Items[0].Id);
 
         var actorFiltered = await repository.GetLoginSecurityAuditLogsAsync(
-            new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
             {
                 ActorPlatformUserId = UserOneId
             },
@@ -73,7 +73,7 @@ public sealed class PlatformAuditLogRepositoryTests
         Assert.All(actorFiltered.Items, item => Assert.Equal(UserOneId, item.Actor.PlatformUserId));
 
         var searchFiltered = await repository.GetLoginSecurityAuditLogsAsync(
-            new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
             {
                 Search = "admin@nytroz.local"
             },
@@ -91,7 +91,7 @@ public sealed class PlatformAuditLogRepositoryTests
         IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
 
         var response = await repository.GetLoginSecurityAuditLogsAsync(
-            new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
             {
                 EntityType = "tenant"
             },
@@ -110,7 +110,7 @@ public sealed class PlatformAuditLogRepositoryTests
         IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
 
         var response = await repository.GetLoginSecurityAuditLogsAsync(
-            new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
             {
                 PageNumber = 2,
                 PageSize = 2
@@ -127,7 +127,7 @@ public sealed class PlatformAuditLogRepositoryTests
     {
         using var dbContext = CreatePostgreSqlDbContext();
 
-        var query = BuildPaginatedAuditQuery(dbContext, new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery
+        var query = BuildPaginatedAuditQuery(dbContext, new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
         {
             PageNumber = 1,
             PageSize = 10
@@ -142,7 +142,7 @@ public sealed class PlatformAuditLogRepositoryTests
 
     private static IQueryable<LoginAuditRow> BuildPaginatedAuditQuery(
         EPosDbContext dbContext,
-        Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery listQuery)
+        Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery listQuery)
     {
         var audits = dbContext.PlatformLoginAudits.AsNoTracking();
         var users = dbContext.PlatformUsers.AsNoTracking();
@@ -188,7 +188,7 @@ public sealed class PlatformAuditLogRepositoryTests
         IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
 
         var response = await repository.GetLoginSecurityAuditLogsAsync(
-            new Application.Modules.PlatformAdministration.Dtos.PlatformAuditLogListQuery(),
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery(),
             CancellationToken.None);
 
         Assert.Empty(response.Items);
@@ -241,3 +241,7 @@ public sealed class PlatformAuditLogRepositoryTests
         return new EPosDbContext(options);
     }
 }
+
+
+
+

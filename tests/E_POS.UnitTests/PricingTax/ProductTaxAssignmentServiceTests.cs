@@ -1,13 +1,13 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.CatalogProduct.Contracts;
-using E_POS.Application.Modules.PricingTax.Contracts;
-using E_POS.Application.Modules.PricingTax.Dtos;
-using E_POS.Application.Modules.PricingTax.Services;
-using E_POS.Application.Modules.PricingTax.Validators;
-using E_POS.Domain.Modules.CatalogProduct.Entities;
-using E_POS.Domain.Modules.PricingTax.Constants;
-using E_POS.Domain.Modules.PricingTax.Entities;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
+using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
+using E_POS.Application.Modules.Tenant.PricingTax.Dtos;
+using E_POS.Application.Modules.Tenant.PricingTax.Services;
+using E_POS.Application.Modules.Tenant.PricingTax.Validators;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.PricingTax.Constants;
+using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using Xunit;
 
 namespace E_POS.UnitTests.PricingTax;
@@ -144,8 +144,8 @@ public sealed class ProductTaxAssignmentServiceTests
         public Task<bool> ProductCodeExistsAsync(Guid tenantId, string productCode, Guid? excludeProductId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<bool> BarcodeExistsAsync(Guid tenantId, string barcodeValue, Guid? excludeProductId, CancellationToken cancellationToken) => throw new NotImplementedException();
-        public Task<E_POS.Application.Modules.CatalogProduct.Dtos.ProductListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => throw new NotImplementedException();
-        public Task<E_POS.Application.Modules.CatalogProduct.Dtos.ProductResponse?> GetByIdAsync(Guid tenantId, Guid productId, bool includeDeleted, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ProductListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ProductResponse?> GetByIdAsync(Guid tenantId, Guid productId, bool includeDeleted, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<Product?> GetEditableAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task AddAsync(Product product, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task AddVariantAsync(ProductVariant variant, CancellationToken cancellationToken) => throw new NotImplementedException();
@@ -164,3 +164,5 @@ public sealed class ProductTaxAssignmentServiceTests
         public Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }
+
+

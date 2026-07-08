@@ -1,5 +1,5 @@
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
-using E_POS.Domain.Modules.PlatformAdministration.Entities;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -96,3 +96,4 @@ public static class PlatformAdminPermissionSeedApplicator
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }
+

@@ -4,9 +4,9 @@ using E_POS.Api.Common.Cookies;
 using E_POS.Api.Controllers;
 using E_POS.Api.Models;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Application.Modules.PlatformAdministration.Dtos;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -358,3 +358,4 @@ public sealed class PlatformAuthControllerTests
         }
     }
 }
+

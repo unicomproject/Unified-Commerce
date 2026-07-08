@@ -1,6 +1,6 @@
 using E_POS.Domain.Modules.Customer.Entities;
 using CustomerEntity = E_POS.Domain.Modules.Customer.Entities.Customer;
-using E_POS.Domain.Modules.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -78,7 +78,7 @@ public sealed class CustomerAuthAccountConfiguration : IEntityTypeConfiguration<
             .HasMaxLength(40)
             .IsRequired();
 
-        builder.HasOne<Tenant>()
+        builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
@@ -106,3 +106,5 @@ public sealed class CustomerAuthAccountConfiguration : IEntityTypeConfiguration<
         });
     }
 }
+
+

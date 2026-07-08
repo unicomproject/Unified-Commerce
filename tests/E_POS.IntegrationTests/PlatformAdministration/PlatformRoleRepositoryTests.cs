@@ -1,7 +1,7 @@
-using E_POS.Application.Modules.PlatformAdministration.Contracts;
-using E_POS.Application.Modules.PlatformAdministration.Mappers;
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
-using E_POS.Infrastructure.Modules.PlatformAdministration.Repositories;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Mappers;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
+using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -40,7 +40,7 @@ public sealed class PlatformRoleRepositoryTests
         await PlatformAdminPermissionSeedApplicator.ApplyAsync(dbContext, Now);
 
         var roleId = Guid.NewGuid();
-        dbContext.PlatformRoles.Add(E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformRole.Create(
+        dbContext.PlatformRoles.Add(E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRole.Create(
             roleId,
             "integration_test_role",
             "Integration Test Role",
@@ -96,3 +96,6 @@ public sealed class PlatformRoleRepositoryTests
         return new EPosDbContext(options);
     }
 }
+
+
+

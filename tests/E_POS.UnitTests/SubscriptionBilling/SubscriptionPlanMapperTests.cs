@@ -1,5 +1,5 @@
-using E_POS.Application.Modules.SubscriptionBilling.Mappers;
-using E_POS.Domain.Modules.SubscriptionBilling.Constants;
+using E_POS.Application.Modules.Platform.Subscription.Mappers;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using Xunit;
 
 namespace E_POS.UnitTests.SubscriptionBilling;
@@ -24,3 +24,5 @@ public sealed class SubscriptionPlanMapperTests
         Assert.Equal(expected, SubscriptionPlanMapper.NormalizeApiStatus(status));
     }
 }
+
+

@@ -26,7 +26,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.OutletUserPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.OutletUserPermission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -71,7 +71,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("outlet_user_permissions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.OutletUserRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.OutletUserRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -116,7 +116,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("outlet_user_roles", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.PermissionDefinition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.PermissionDefinition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -162,7 +162,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.RoleTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplate", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -218,7 +218,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.RoleTemplateVersion", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplateVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -254,7 +254,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.RoleTemplateVersionPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplateVersionPermission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -293,7 +293,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("role_template_version_permissions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -353,7 +353,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantRolePermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantRolePermission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -392,7 +392,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_role_permissions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -450,7 +450,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantUserPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserPermission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -489,7 +489,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_user_permissions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantUserRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -528,7 +528,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_user_roles", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.EmailVerificationToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.EmailVerificationToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -574,7 +574,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.PasswordResetToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.PasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -620,7 +620,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.TenantAuthSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantAuthSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -666,7 +666,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.TenantLoginAudit", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantLoginAudit", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -703,7 +703,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.TenantRefreshToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -756,7 +756,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.UserInvite", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -800,7 +800,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.UserSetupToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserSetupToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -846,7 +846,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -882,7 +882,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -937,7 +937,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSessionLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -980,7 +980,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSessionLineComponent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLineComponent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1021,7 +1021,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSessionLineOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLineOption", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1062,7 +1062,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCart", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1106,7 +1106,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCartItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1149,7 +1149,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCartItemComponent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItemComponent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1190,7 +1190,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCartItemOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItemOption", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1231,7 +1231,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Brand", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Brand", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1281,7 +1281,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.BusinessTypeOptionTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.BusinessTypeOptionTemplate", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1332,7 +1332,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("business_type_option_templates", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Category", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1394,7 +1394,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceGroup", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceGroup", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1448,7 +1448,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceOption", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1496,7 +1496,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceOptionInventoryImpact", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceOptionInventoryImpact", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1537,7 +1537,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Collection", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Collection", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1587,7 +1587,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ComboComponent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboComponent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1640,7 +1640,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ComboDefinition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboDefinition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1696,7 +1696,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ComboGroup", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboGroup", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1750,7 +1750,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ComboGroupItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboGroupItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1796,7 +1796,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Department", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Department", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1846,7 +1846,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Product", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1900,7 +1900,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeDefinition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeDefinition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1941,7 +1941,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_attribute_definitions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeOption", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1988,7 +1988,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_attribute_options", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeValue", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeValue", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2023,7 +2023,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_attribute_values", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeValueOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeValueOption", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2064,7 +2064,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_attribute_value_options", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductBarcode", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductBarcode", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2111,7 +2111,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_barcodes", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductCategory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductCategory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2152,7 +2152,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_categories", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductChannelVisibility", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductChannelVisibility", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2187,7 +2187,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_channel_visibility", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductChoiceGroup", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductChoiceGroup", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2222,7 +2222,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_choice_groups", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductChoiceOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductChoiceOption", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2263,7 +2263,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_choice_options", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductCollection", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductCollection", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2298,7 +2298,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_collections", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductImage", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductImage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2340,7 +2340,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOption", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2394,7 +2394,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionTemplate", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2451,7 +2451,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_option_templates", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionTemplateValue", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionTemplateValue", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2499,7 +2499,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionValue", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionValue", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2547,7 +2547,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariant", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2611,7 +2611,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_variants", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariantOptionValue", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariantOptionValue", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2646,7 +2646,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_variant_option_values", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ReturnPolicy", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicy", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2694,7 +2694,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.UnitOfMeasure", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3104,7 +3104,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicy", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicy", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3159,7 +3159,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicyChannel", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyChannel", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3200,7 +3200,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("discount_policy_channels", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicyCondition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyCondition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3234,7 +3234,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicyOutlet", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyOutlet", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3275,7 +3275,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("discount_policy_outlets", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicyTarget", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyTarget", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3314,7 +3314,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("discount_policy_targets", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountType", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountType", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3355,7 +3355,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("discount_types", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.ExpiryDiscountApplication", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.ExpiryDiscountApplication", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3390,7 +3390,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("expiry_discount_applications", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.ExpiryDiscountRule", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.ExpiryDiscountRule", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3431,7 +3431,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("expiry_discount_rules", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.ExpiryDiscountRuleTier", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.ExpiryDiscountRuleTier", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3472,7 +3472,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentMethod", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethod", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3532,7 +3532,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentMethodOutlet", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethodOutlet", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3573,7 +3573,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("fulfillment_method_outlets", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrder", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrder", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3626,7 +3626,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("fulfillment_orders", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrderEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3662,7 +3662,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrderLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3703,7 +3703,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupOrder", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrder", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3756,7 +3756,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("pickup_orders", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupOrderEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrderEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3792,7 +3792,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupSlot", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlot", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3848,7 +3848,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupSlotReservation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlotReservation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3898,7 +3898,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.CashCountDenomination", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashCountDenomination", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3942,7 +3942,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.CashMovement", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashMovement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3983,7 +3983,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.CashMovementType", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashMovementType", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4033,7 +4033,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.CashReconciliation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashReconciliation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4077,7 +4077,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.HardwareDevice", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDevice", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4141,7 +4141,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("hardware_devices", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.HardwareDeviceAssignment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDeviceAssignment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4182,7 +4182,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("hardware_device_assignments", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.HardwareTestLog", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareTestLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4218,7 +4218,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.TillSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4279,7 +4279,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.IntegrationProvider", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationProvider", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4329,7 +4329,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.PlatformIntegration", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegration", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4388,7 +4388,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_integrations", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.PlatformIntegrationCredential", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegrationCredential", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4430,7 +4430,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.PlatformIntegrationRequestLog", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegrationRequestLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4482,7 +4482,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.PlatformIntegrationWebhookEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegrationWebhookEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4533,7 +4533,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_integration_webhook_events", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryBalance", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryBalance", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4591,7 +4591,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryChannelAllocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryChannelAllocation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4642,7 +4642,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryCostLayer", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryCostLayer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4684,7 +4684,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryLocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryLocation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4731,7 +4731,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("inventory_locations", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryReorderRule", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReorderRule", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4778,7 +4778,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryReservation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4822,7 +4822,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryReservationAllocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservationAllocation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4863,7 +4863,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryReservationLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservationLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4912,7 +4912,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.ProductBatch", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.ProductBatch", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -4976,7 +4976,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.ProductInventorySetting", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.ProductInventorySetting", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5011,7 +5011,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_inventory_settings", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.SerialNumber", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.SerialNumber", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5052,7 +5052,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("serial_numbers", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockAdjustment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockAdjustment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5096,7 +5096,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockAdjustmentLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockAdjustmentLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5145,7 +5145,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockAdjustmentReason", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockAdjustmentReason", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5190,7 +5190,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("stock_adjustment_reasons", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockMovement", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5233,7 +5233,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockMovementCostAllocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovementCostAllocation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5281,7 +5281,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockMovementReference", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovementReference", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5320,7 +5320,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("stock_movement_references", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockMovementSerial", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovementSerial", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5355,7 +5355,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("stock_movement_serials", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockTransfer", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockTransfer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5411,7 +5411,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockTransferLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockTransferLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5460,7 +5460,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockTransferStatusHistory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockTransferStatusHistory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5496,7 +5496,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StocktakeLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StocktakeLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5539,7 +5539,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("stocktake_lines", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StocktakeLineSerial", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StocktakeLineSerial", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5574,7 +5574,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("stocktake_line_serials", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StocktakeSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StocktakeSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5621,7 +5621,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("stocktake_sessions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationChannel", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationChannel", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5683,7 +5683,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationDeliveryAttempt", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationDeliveryAttempt", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5725,7 +5725,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5777,7 +5777,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("notification_events", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationEventType", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationEventType", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5837,7 +5837,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationInboxItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationInboxItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5875,7 +5875,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationMessage", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -5949,7 +5949,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationPreference", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationPreference", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6011,7 +6011,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationReadReceipt", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationReadReceipt", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6047,7 +6047,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationTemplate", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6122,7 +6122,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("notification_templates", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationTemplateVersion", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationTemplateVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6167,7 +6167,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.DeviceSyncState", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.DeviceSyncState", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6221,7 +6221,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineClient", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6291,7 +6291,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.OfflineIdMapping", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineIdMapping", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6350,7 +6350,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("offline_id_mappings", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.OfflineNumberBlock", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineNumberBlock", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6410,7 +6410,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.SyncBatch", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncBatch", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6477,7 +6477,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.SyncConflict", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncConflict", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6525,7 +6525,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.SyncItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6595,7 +6595,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("sync_items", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.DocumentNumberSequence", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.DocumentNumberSequence", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6657,7 +6657,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrder", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6719,7 +6719,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderCharge", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderCharge", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6760,7 +6760,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderDiscount", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderDiscount", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6807,7 +6807,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6857,7 +6857,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderLineComponent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLineComponent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6898,7 +6898,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderLineOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLineOption", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6939,7 +6939,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderLineStatusHistory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLineStatusHistory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -6975,7 +6975,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderStatusHistory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderStatusHistory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7011,7 +7011,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderTax", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderTax", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7059,7 +7059,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.CodeSequence", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.CodeSequence", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7113,7 +7113,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.HardwareProfile", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.HardwareProfile", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7154,7 +7154,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("hardware_profiles", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7230,7 +7230,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.OutletAddress", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.OutletAddress", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7305,7 +7305,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.OutletBusinessHour", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.OutletBusinessHour", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7351,7 +7351,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.PosDevice", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7415,7 +7415,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("pos_devices", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.Till", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7471,7 +7471,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.TillDeviceAssignment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.TillDeviceAssignment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7535,7 +7535,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.PosOrderHold", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.PosOrderHold", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7576,7 +7576,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("pos_order_holds", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.Receipt", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.Receipt", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7631,7 +7631,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.ReceiptPrintLog", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptPrintLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7667,7 +7667,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplate", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7730,7 +7730,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("receipt_templates", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplateAssignment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplateAssignment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7778,7 +7778,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplateVersion", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplateVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7814,7 +7814,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.TillCashMovement", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillCashMovement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7849,7 +7849,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.TillSessionEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillSessionEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7884,7 +7884,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.TillSessionPaymentSummary", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillSessionPaymentSummary", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7919,7 +7919,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("till_session_payment_summaries", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.TillSessionSummary", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillSessionSummary", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -7961,7 +7961,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Payment.Entities.PaymentMethod", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Payment.Entities.PaymentMethod", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8021,7 +8021,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Payment.Entities.SalesPayment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPayment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8089,7 +8089,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Payment.Entities.SalesPaymentEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPaymentEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8125,7 +8125,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Payment.Entities.SalesPaymentTransaction", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8171,7 +8171,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformAuthSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8217,7 +8217,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformLoginAudit", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformLoginAudit", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8254,7 +8254,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformPasswordResetToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformPasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8300,7 +8300,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformPermission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8350,7 +8350,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformRefreshToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8403,7 +8403,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8453,7 +8453,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformRolePermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRolePermission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8492,7 +8492,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_role_permissions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8546,7 +8546,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUserPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUserPermission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8585,7 +8585,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_user_permissions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUserRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUserRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8624,7 +8624,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_user_roles", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.PriceList", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceList", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8674,7 +8674,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.PriceListChannel", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceListChannel", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8715,7 +8715,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("price_list_channels", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.PriceListItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceListItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8764,7 +8764,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.PriceListOutlet", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceListOutlet", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8805,7 +8805,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("price_list_outlets", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.ProductTaxAssignment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.ProductTaxAssignment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8844,7 +8844,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_tax_assignments", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.TaxClass", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxClass", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8885,7 +8885,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_classes", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.TaxClassRate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxClassRate", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8920,7 +8920,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_class_rates", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.TaxJurisdiction", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxJurisdiction", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -8961,7 +8961,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_jurisdictions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.TaxRate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxRate", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9010,7 +9010,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Refund.Entities.SalesRefund", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Refund.Entities.SalesRefund", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9078,7 +9078,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Refund.Entities.SalesRefundLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Refund.Entities.SalesRefundLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9119,7 +9119,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Refund.Entities.SalesRefundPaymentAllocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Refund.Entities.SalesRefundPaymentAllocation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9160,7 +9160,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.ReturnInspection", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.ReturnInspection", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9209,7 +9209,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.ReturnReason", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.ReturnReason", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9263,7 +9263,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchange", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesExchange", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9331,7 +9331,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchangeEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesExchangeEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9367,7 +9367,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchangeLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesExchangeLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9415,7 +9415,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturn", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturn", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9477,7 +9477,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturnEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturnEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9513,7 +9513,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturnLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturnLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9554,7 +9554,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.FeatureFlag", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.FeatureFlag", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9606,7 +9606,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.FeatureLimitDefinition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.FeatureLimitDefinition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9654,7 +9654,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformFeature", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9714,7 +9714,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformModule", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformModule", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9770,7 +9770,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddon", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddon", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9827,7 +9827,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddonFeature", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddonFeature", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9878,7 +9878,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("subscription_addon_features", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddonLimit", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddonLimit", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9920,7 +9920,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionCreditNote", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionCreditNote", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -9969,7 +9969,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionCreditNoteLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionCreditNoteLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10012,7 +10012,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionInvoice", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10061,7 +10061,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionInvoiceLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoiceLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10111,7 +10111,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPaymentLink", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentLink", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10155,7 +10155,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPaymentTransaction", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10206,7 +10206,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlan", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10287,7 +10287,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlanAddon", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanAddon", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10332,7 +10332,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("subscription_plan_addons", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlanFeature", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeature", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10383,7 +10383,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("subscription_plan_features", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlanFeatureLimit", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeatureLimit", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10425,7 +10425,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantFeatureEntitlement", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantFeatureEntitlement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10469,7 +10469,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscription", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10519,7 +10519,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscriptionAddon", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscriptionAddon", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10564,7 +10564,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_subscription_addons", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscriptionHistory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscriptionHistory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10600,7 +10600,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantUsageCounter", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantUsageCounter", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10649,7 +10649,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.BusinessType", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.BusinessType", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10699,7 +10699,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.Currency", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Currency", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10743,7 +10743,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.SalesChannel", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10807,7 +10807,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.SettingDefinition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SettingDefinition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10847,7 +10847,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10947,7 +10947,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tenants", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.TenantAddress", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantAddress", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -10983,7 +10983,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.TenantDomain", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantDomain", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -11029,7 +11029,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.TenantProfile", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantProfile", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -11058,7 +11058,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_profiles", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.TenantSetting", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantSetting", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -11093,53 +11093,53 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_settings", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.OutletUserPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.OutletUserPermission", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outlet_user_permissions_outlet_id_outlets");
 
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.PermissionDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.PermissionDefinition", null)
                         .WithMany()
                         .HasForeignKey("PermissionDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_outlet_user_permissions_permission_definition_id_permission_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("TenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outlet_user_permissions_tenant_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.OutletUserRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.OutletUserRole", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outlet_user_roles_outlet_id_outlets");
 
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantRole", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantRole", null)
                         .WithMany()
                         .HasForeignKey("TenantRoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_outlet_user_roles_tenant_role_id_tenant_roles");
 
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("TenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outlet_user_roles_tenant_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.RoleTemplateVersion", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplateVersion", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.RoleTemplate", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplate", null)
                         .WithMany()
                         .HasForeignKey("RoleTemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11147,16 +11147,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_role_template_versions_role_template_id_role_templates");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.RoleTemplateVersionPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplateVersionPermission", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.PermissionDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.PermissionDefinition", null)
                         .WithMany()
                         .HasForeignKey("PermissionDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_role_template_version_permissions_permission_definition_id_permission_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.RoleTemplateVersion", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplateVersion", null)
                         .WithMany()
                         .HasForeignKey("RoleTemplateVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11164,16 +11164,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_role_template_version_permissions_role_template_version_id_role_template_versions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantRole", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.RoleTemplateVersion", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplateVersion", null)
                         .WithMany()
                         .HasForeignKey("RoleTemplateVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_roles_role_template_version_id_role_template_versions");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11181,16 +11181,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_roles_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantRolePermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantRolePermission", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.PermissionDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.PermissionDefinition", null)
                         .WithMany()
                         .HasForeignKey("PermissionDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_role_permissions_permission_definition_id_permission_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantRole", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantRole", null)
                         .WithMany()
                         .HasForeignKey("TenantRoleId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11198,9 +11198,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_role_permissions_tenant_role_id_tenant_roles");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11208,77 +11208,77 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_users_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantUserPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserPermission", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.PermissionDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.PermissionDefinition", null)
                         .WithMany()
                         .HasForeignKey("PermissionDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_user_permissions_permission_definition_id_permission_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("TenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tenant_user_permissions_tenant_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AccessControl.Entities.TenantUserRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserRole", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantRole", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantRole", null)
                         .WithMany()
                         .HasForeignKey("TenantRoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_user_roles_tenant_role_id_tenant_roles");
 
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("TenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tenant_user_roles_tenant_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.EmailVerificationToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.EmailVerificationToken", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("TenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_email_verification_tokens_tenant_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.PasswordResetToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.PasswordResetToken", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("TenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_password_reset_tokens_tenant_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.TenantAuthSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantAuthSession", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("TenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tenant_auth_sessions_tenant_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.TenantLoginAudit", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantLoginAudit", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("TenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tenant_login_audits_tenant_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.TenantRefreshToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantRefreshToken", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AuthSecurity.Entities.TenantAuthSession", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantAuthSession", null)
                         .WithMany()
                         .HasForeignKey("TenantAuthSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11286,9 +11286,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_refresh_tokens_tenant_auth_session_id_tenant_auth_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.UserInvite", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11296,9 +11296,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_user_invites_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.AuthSecurity.Entities.UserSetupToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserSetupToken", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AuthSecurity.Entities.UserInvite", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", null)
                         .WithMany()
                         .HasForeignKey("UserInviteId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11306,18 +11306,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_user_setup_tokens_user_invite_id_user_invites");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSession", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", null)
                         .WithMany()
                         .HasForeignKey("CheckoutSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_checkout_events_checkout_session_id_checkout_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCart", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", null)
                         .WithMany()
                         .HasForeignKey("ShoppingCartId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11325,18 +11325,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_checkout_sessions_shopping_cart_id_shopping_carts");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSessionLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSession", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", null)
                         .WithMany()
                         .HasForeignKey("CheckoutSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_checkout_session_lines_checkout_session_id_checkout_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSessionLineComponent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLineComponent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSessionLine", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLine", null)
                         .WithMany()
                         .HasForeignKey("CheckoutSessionLineId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11344,9 +11344,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_checkout_session_line_components_checkout_session_line_id_checkout_session_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSessionLineOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLineOption", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CartCheckout.Entities.CheckoutSessionLine", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLine", null)
                         .WithMany()
                         .HasForeignKey("CheckoutSessionLineId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11354,9 +11354,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_checkout_session_line_options_checkout_session_line_id_checkout_session_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCart", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11364,9 +11364,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_shopping_carts_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCartItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItem", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCart", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", null)
                         .WithMany()
                         .HasForeignKey("ShoppingCartId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11374,9 +11374,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_shopping_cart_items_shopping_cart_id_shopping_carts");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCartItemComponent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItemComponent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCartItem", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItem", null)
                         .WithMany()
                         .HasForeignKey("ShoppingCartItemId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11384,9 +11384,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_shopping_cart_item_components_shopping_cart_item_id_shopping_cart_items");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCartItemOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItemOption", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CartCheckout.Entities.ShoppingCartItem", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItem", null)
                         .WithMany()
                         .HasForeignKey("ShoppingCartItemId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11394,9 +11394,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_shopping_cart_item_options_shopping_cart_item_id_shopping_cart_items");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Brand", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Brand", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11404,16 +11404,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_brands_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.BusinessTypeOptionTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.BusinessTypeOptionTemplate", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.BusinessType", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.BusinessType", null)
                         .WithMany()
                         .HasForeignKey("BusinessTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_business_type_option_templates_business_type_id_business_types");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionTemplate", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionTemplate", null)
                         .WithMany()
                         .HasForeignKey("ProductOptionTemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11421,16 +11421,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_business_type_option_templates_product_option_template_id_product_option_templates");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Category", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Category", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", null)
                         .WithMany()
                         .HasForeignKey("ParentCategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_categories_parent_category_id_categories");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11438,9 +11438,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_categories_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceGroup", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceGroup", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11448,9 +11448,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_choice_groups_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceOption", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceGroup", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceGroup", null)
                         .WithMany()
                         .HasForeignKey("ChoiceGroupId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11458,16 +11458,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_choice_options_choice_group_id_choice_groups");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceOptionInventoryImpact", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceOptionInventoryImpact", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("IngredientProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_choice_option_inventory_impacts_ingredient_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductChoiceOption", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductChoiceOption", null)
                         .WithMany()
                         .HasForeignKey("ProductChoiceOptionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11475,9 +11475,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_choice_option_inventory_impacts_product_choice_option_id_product_choice_options");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Collection", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Collection", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11485,16 +11485,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_collections_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ComboComponent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboComponent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ComboDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboDefinition", null)
                         .WithMany()
                         .HasForeignKey("ComboDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_combo_components_combo_definition_id_combo_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ComponentProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11502,9 +11502,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_combo_components_component_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ComboDefinition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboDefinition", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11512,9 +11512,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_combo_definitions_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ComboGroup", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboGroup", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ComboDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboDefinition", null)
                         .WithMany()
                         .HasForeignKey("ComboDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11522,16 +11522,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_combo_groups_combo_definition_id_combo_definitions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ComboGroupItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboGroupItem", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ComboGroup", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ComboGroup", null)
                         .WithMany()
                         .HasForeignKey("ComboGroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_combo_group_items_combo_group_id_combo_groups");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11539,9 +11539,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_combo_group_items_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Department", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Department", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11549,9 +11549,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_departments_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.Product", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11559,9 +11559,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_products_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeDefinition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeDefinition", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11569,9 +11569,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_attribute_definitions_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeOption", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeDefinition", null)
                         .WithMany()
                         .HasForeignKey("AttributeDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11579,16 +11579,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_attribute_options_attribute_definition_id_product_attribute_definitions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeValue", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeValue", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeDefinition", null)
                         .WithMany()
                         .HasForeignKey("AttributeDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_attribute_values_attribute_definition_id_product_attribute_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11596,16 +11596,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_attribute_values_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeValueOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeValueOption", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeOption", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeOption", null)
                         .WithMany()
                         .HasForeignKey("AttributeOptionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_attribute_value_options_attribute_option_id_product_attribute_options");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductAttributeValue", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeValue", null)
                         .WithMany()
                         .HasForeignKey("ProductAttributeValueId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11613,32 +11613,32 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_attribute_value_options_product_attribute_value_id_product_attribute_values");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductBarcode", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductBarcode", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_barcodes_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
                         .WithMany()
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_barcodes_product_variant_id_product_variants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductCategory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductCategory", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Category", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", null)
                         .WithMany()
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_categories_category_id_categories");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11646,16 +11646,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_categories_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductChannelVisibility", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductChannelVisibility", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_channel_visibility_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.SalesChannel", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
                         .WithMany()
                         .HasForeignKey("SalesChannelId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11663,16 +11663,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_channel_visibility_sales_channel_id_sales_channels");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductChoiceGroup", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductChoiceGroup", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceGroup", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceGroup", null)
                         .WithMany()
                         .HasForeignKey("ChoiceGroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_choice_groups_choice_group_id_choice_groups");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11680,16 +11680,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_choice_groups_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductChoiceOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductChoiceOption", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ChoiceOption", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceOption", null)
                         .WithMany()
                         .HasForeignKey("ChoiceOptionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_choice_options_choice_option_id_choice_options");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductChoiceGroup", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductChoiceGroup", null)
                         .WithMany()
                         .HasForeignKey("ProductChoiceGroupId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11697,16 +11697,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_choice_options_product_choice_group_id_product_choice_groups");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductCollection", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductCollection", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Collection", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Collection", null)
                         .WithMany()
                         .HasForeignKey("CollectionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_collections_collection_id_collections");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11714,9 +11714,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_collections_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductImage", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductImage", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11724,16 +11724,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_images_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOption", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_options_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionTemplate", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionTemplate", null)
                         .WithMany()
                         .HasForeignKey("ProductOptionTemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11741,9 +11741,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_options_product_option_template_id_product_option_templates");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionTemplate", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11751,9 +11751,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_option_templates_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionTemplateValue", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionTemplateValue", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionTemplate", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionTemplate", null)
                         .WithMany()
                         .HasForeignKey("ProductOptionTemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11761,9 +11761,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_option_template_values_product_option_template_id_product_option_templates");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionValue", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionValue", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOption", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOption", null)
                         .WithMany()
                         .HasForeignKey("ProductOptionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11771,9 +11771,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_option_values_product_option_id_product_options");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariant", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11781,25 +11781,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_variants_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariantOptionValue", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariantOptionValue", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductOptionValue", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductOptionValue", null)
                         .WithMany()
                         .HasForeignKey("ProductOptionValueId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_variant_option_values_product_option_value_id_product_option_values");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
                         .WithMany()
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_variant_option_values_product_variant_id_product_variants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.ReturnPolicy", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicy", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11807,9 +11807,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_return_policies_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.CatalogProduct.Entities.UnitOfMeasure", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11819,7 +11819,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.Customer", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11890,16 +11890,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customer_verification_otps_customer_id_customers");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicy", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicy", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Discount.Entities.DiscountType", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountType", null)
                         .WithMany()
                         .HasForeignKey("DiscountTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_discount_policies_discount_type_id_discount_types");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11907,16 +11907,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_discount_policies_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicyChannel", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyChannel", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Discount.Entities.DiscountPolicy", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicy", null)
                         .WithMany()
                         .HasForeignKey("DiscountPolicyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_discount_policy_channels_discount_policy_id_discount_policies");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.SalesChannel", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
                         .WithMany()
                         .HasForeignKey("SalesChannelId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11924,9 +11924,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_discount_policy_channels_sales_channel_id_sales_channels");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicyCondition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyCondition", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Discount.Entities.DiscountPolicy", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicy", null)
                         .WithMany()
                         .HasForeignKey("DiscountPolicyId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11934,25 +11934,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_discount_policy_conditions_discount_policy_id_discount_policies");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicyOutlet", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyOutlet", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Discount.Entities.DiscountPolicy", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicy", null)
                         .WithMany()
                         .HasForeignKey("DiscountPolicyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_discount_policy_outlets_discount_policy_id_discount_policies");
 
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_discount_policy_outlets_outlet_id_outlets");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountPolicyTarget", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyTarget", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Discount.Entities.DiscountPolicy", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicy", null)
                         .WithMany()
                         .HasForeignKey("DiscountPolicyId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11960,9 +11960,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_discount_policy_targets_discount_policy_id_discount_policies");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.DiscountType", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountType", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11970,25 +11970,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_discount_types_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.ExpiryDiscountApplication", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.ExpiryDiscountApplication", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Discount.Entities.ExpiryDiscountRule", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.ExpiryDiscountRule", null)
                         .WithMany()
                         .HasForeignKey("ExpiryDiscountRuleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_expiry_discount_applications_expiry_discount_rule_id_expiry_discount_rules");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.ProductBatch", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.ProductBatch", null)
                         .WithMany()
                         .HasForeignKey("ProductBatchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_expiry_discount_applications_product_batch_id_product_batches");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.ExpiryDiscountRule", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.ExpiryDiscountRule", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -11996,9 +11996,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_expiry_discount_rules_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Discount.Entities.ExpiryDiscountRuleTier", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.ExpiryDiscountRuleTier", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Discount.Entities.ExpiryDiscountRule", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.ExpiryDiscountRule", null)
                         .WithMany()
                         .HasForeignKey("ExpiryDiscountRuleId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12006,41 +12006,41 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_expiry_discount_rule_tiers_expiry_discount_rule_id_expiry_discount_rules");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentMethodOutlet", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethodOutlet", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentMethod", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethod", null)
                         .WithMany()
                         .HasForeignKey("FulfillmentMethodId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_fulfillment_method_outlets_fulfillment_method_id_fulfillment_methods");
 
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_fulfillment_method_outlets_outlet_id_outlets");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrder", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrder", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentMethodOutlet", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethodOutlet", null)
                         .WithMany()
                         .HasForeignKey("FulfillmentMethodOutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_fulfillment_orders_fulfillment_method_outlet_id_fulfillment_method_outlets");
 
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_fulfillment_orders_sales_order_id_sales_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrderEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrder", null)
                         .WithMany()
                         .HasForeignKey("FulfillmentOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12048,32 +12048,32 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_fulfillment_order_events_fulfillment_order_id_fulfillment_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrderLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrder", null)
                         .WithMany()
                         .HasForeignKey("FulfillmentOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_fulfillment_order_lines_fulfillment_order_id_fulfillment_orders");
 
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_fulfillment_order_lines_sales_order_line_id_sales_order_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupOrder", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrder", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrder", null)
                         .WithMany()
                         .HasForeignKey("FulfillmentOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_pickup_orders_fulfillment_order_id_fulfillment_orders");
 
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupSlotReservation", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlotReservation", null)
                         .WithMany()
                         .HasForeignKey("PickupSlotReservationId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12081,9 +12081,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pickup_orders_pickup_slot_reservation_id_pickup_slot_reservations");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupOrderEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrderEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrder", null)
                         .WithMany()
                         .HasForeignKey("PickupOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12091,9 +12091,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pickup_order_events_pickup_order_id_pickup_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupSlot", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlot", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.FulfillmentMethodOutlet", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethodOutlet", null)
                         .WithMany()
                         .HasForeignKey("FulfillmentMethodOutletId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12101,9 +12101,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pickup_slots_fulfillment_method_outlet_id_fulfillment_method_outlets");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupSlotReservation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlotReservation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.FulfilmentPickup.Entities.PickupSlot", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlot", null)
                         .WithMany()
                         .HasForeignKey("PickupSlotId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12111,9 +12111,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pickup_slot_reservations_pickup_slot_id_pickup_slots");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.CashCountDenomination", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashCountDenomination", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.CashReconciliation", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashReconciliation", null)
                         .WithMany()
                         .HasForeignKey("CashReconciliationId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12121,16 +12121,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_cash_count_denominations_cash_reconciliation_id_cash_reconciliations");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.CashMovement", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashMovement", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.CashMovementType", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashMovementType", null)
                         .WithMany()
                         .HasForeignKey("CashMovementTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_cash_movements_cash_movement_type_id_cash_movement_types");
 
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.TillSession", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
                         .WithMany()
                         .HasForeignKey("TillSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12138,9 +12138,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_cash_movements_till_session_id_till_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.CashReconciliation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashReconciliation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.TillSession", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
                         .WithMany()
                         .HasForeignKey("TillSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12148,9 +12148,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_cash_reconciliations_till_session_id_till_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.HardwareDevice", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDevice", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12158,25 +12158,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_hardware_devices_outlet_id_outlets");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.HardwareDeviceAssignment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDeviceAssignment", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.HardwareDevice", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDevice", null)
                         .WithMany()
                         .HasForeignKey("HardwareDeviceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_hardware_device_assignments_hardware_device_id_hardware_devices");
 
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.PosDevice", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
                         .WithMany()
                         .HasForeignKey("PosDeviceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_hardware_device_assignments_pos_device_id_pos_devices");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.HardwareTestLog", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareTestLog", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.HardwareDevice", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDevice", null)
                         .WithMany()
                         .HasForeignKey("HardwareDeviceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12184,25 +12184,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_hardware_test_logs_hardware_device_id_hardware_devices");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.HardwareCash.Entities.TillSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.AccessControl.Entities.TenantUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("OpenedByTenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_till_sessions_opened_by_tenant_user_id_tenant_users");
 
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Till", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", null)
                         .WithMany()
                         .HasForeignKey("TillId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_till_sessions_till_id_tills");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.PlatformIntegration", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegration", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Integration.Entities.IntegrationProvider", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationProvider", null)
                         .WithMany()
                         .HasForeignKey("IntegrationProviderId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12210,9 +12210,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_integrations_integration_provider_id_integration_providers");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.PlatformIntegrationCredential", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegrationCredential", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Integration.Entities.PlatformIntegration", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegration", null)
                         .WithMany()
                         .HasForeignKey("PlatformIntegrationId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12220,16 +12220,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_integration_credentials_platform_integration_id_platform_integrations");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.PlatformIntegrationRequestLog", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegrationRequestLog", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Integration.Entities.IntegrationProvider", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationProvider", null)
                         .WithMany()
                         .HasForeignKey("IntegrationProviderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_platform_integration_request_logs_integration_provider_id_integration_providers");
 
-                    b.HasOne("E_POS.Domain.Modules.Integration.Entities.PlatformIntegration", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegration", null)
                         .WithMany()
                         .HasForeignKey("PlatformIntegrationId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12237,16 +12237,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_integration_request_logs_platform_integration_id_platform_integrations");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Integration.Entities.PlatformIntegrationWebhookEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegrationWebhookEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Integration.Entities.IntegrationProvider", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationProvider", null)
                         .WithMany()
                         .HasForeignKey("IntegrationProviderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_platform_integration_webhook_events_integration_provider_id_integration_providers");
 
-                    b.HasOne("E_POS.Domain.Modules.Integration.Entities.PlatformIntegration", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegration", null)
                         .WithMany()
                         .HasForeignKey("PlatformIntegrationId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12254,16 +12254,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_integration_webhook_events_platform_integration_id_platform_integrations");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryBalance", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryBalance", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryLocation", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryLocation", null)
                         .WithMany()
                         .HasForeignKey("InventoryLocationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_inventory_balances_inventory_location_id_inventory_locations");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12271,16 +12271,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_inventory_balances_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryChannelAllocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryChannelAllocation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryLocation", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryLocation", null)
                         .WithMany()
                         .HasForeignKey("InventoryLocationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_inventory_channel_allocations_inventory_location_id_inventory_locations");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.SalesChannel", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
                         .WithMany()
                         .HasForeignKey("SalesChannelId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12288,24 +12288,24 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_inventory_channel_allocations_sales_channel_id_sales_channels");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryCostLayer", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryCostLayer", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.ProductBatch", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.ProductBatch", null)
                         .WithMany()
                         .HasForeignKey("ProductBatchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_inventory_cost_layers_product_batch_id_product_batches");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryLocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryLocation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_inventory_locations_outlet_id_outlets");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12313,16 +12313,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_inventory_locations_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryReorderRule", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReorderRule", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryLocation", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryLocation", null)
                         .WithMany()
                         .HasForeignKey("InventoryLocationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_inventory_reorder_rules_inventory_location_id_inventory_locations");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12330,9 +12330,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_inventory_reorder_rules_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryReservation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12340,16 +12340,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_inventory_reservations_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryReservationAllocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservationAllocation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryBalance", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryBalance", null)
                         .WithMany()
                         .HasForeignKey("InventoryBalanceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_inventory_reservation_allocations_inventory_balance_id_inventory_balances");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryReservationLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservationLine", null)
                         .WithMany()
                         .HasForeignKey("InventoryReservationLineId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12357,16 +12357,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_inventory_reservation_allocations_inventory_reservation_line_id_inventory_reservation_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.InventoryReservationLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservationLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryReservation", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservation", null)
                         .WithMany()
                         .HasForeignKey("InventoryReservationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_inventory_reservation_lines_inventory_reservation_id_inventory_reservations");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12374,41 +12374,41 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_inventory_reservation_lines_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.ProductBatch", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.ProductBatch", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_batches_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
                         .WithMany()
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_batches_product_variant_id_product_variants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.ProductInventorySetting", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.ProductInventorySetting", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_inventory_settings_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
                         .WithMany()
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_inventory_settings_product_variant_id_product_variants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.SerialNumber", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.SerialNumber", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12416,9 +12416,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_serial_numbers_product_id_products");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockAdjustment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockAdjustment", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12426,16 +12426,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_adjustments_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockAdjustmentLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockAdjustmentLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stock_adjustment_lines_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.StockAdjustment", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockAdjustment", null)
                         .WithMany()
                         .HasForeignKey("StockAdjustmentId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12443,9 +12443,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_adjustment_lines_stock_adjustment_id_stock_adjustments");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockAdjustmentReason", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockAdjustmentReason", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12453,9 +12453,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_adjustment_reasons_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockMovement", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovement", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12463,16 +12463,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_movements_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockMovementCostAllocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovementCostAllocation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryCostLayer", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryCostLayer", null)
                         .WithMany()
                         .HasForeignKey("InventoryCostLayerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stock_movement_cost_allocations_inventory_cost_layer_id_inventory_cost_layers");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.StockMovement", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovement", null)
                         .WithMany()
                         .HasForeignKey("StockMovementId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12480,9 +12480,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_movement_cost_allocations_stock_movement_id_stock_movements");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockMovementReference", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovementReference", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.StockMovement", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovement", null)
                         .WithMany()
                         .HasForeignKey("StockMovementId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12490,16 +12490,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_movement_references_stock_movement_id_stock_movements");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockMovementSerial", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovementSerial", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.SerialNumber", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.SerialNumber", null)
                         .WithMany()
                         .HasForeignKey("SerialNumberId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stock_movement_serials_serial_number_id_serial_numbers");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.StockMovement", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockMovement", null)
                         .WithMany()
                         .HasForeignKey("StockMovementId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12507,16 +12507,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_movement_serials_stock_movement_id_stock_movements");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockTransfer", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockTransfer", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryLocation", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryLocation", null)
                         .WithMany()
                         .HasForeignKey("DestinationInventoryLocationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stock_transfers_destination_inventory_location_id_inventory_locations");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryLocation", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryLocation", null)
                         .WithMany()
                         .HasForeignKey("SourceInventoryLocationId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12524,16 +12524,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_transfers_source_inventory_location_id_inventory_locations");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockTransferLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockTransferLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stock_transfer_lines_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.StockTransfer", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockTransfer", null)
                         .WithMany()
                         .HasForeignKey("StockTransferId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12541,9 +12541,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_transfer_lines_stock_transfer_id_stock_transfers");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StockTransferStatusHistory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockTransferStatusHistory", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.StockTransfer", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.StockTransfer", null)
                         .WithMany()
                         .HasForeignKey("StockTransferId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12551,16 +12551,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stock_transfer_status_history_stock_transfer_id_stock_transfers");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StocktakeLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StocktakeLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stocktake_lines_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.StocktakeSession", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.StocktakeSession", null)
                         .WithMany()
                         .HasForeignKey("StocktakeSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12568,16 +12568,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stocktake_lines_stocktake_session_id_stocktake_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StocktakeLineSerial", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StocktakeLineSerial", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.SerialNumber", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.SerialNumber", null)
                         .WithMany()
                         .HasForeignKey("SerialNumberId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stocktake_line_serials_serial_number_id_serial_numbers");
 
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.StocktakeLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.StocktakeLine", null)
                         .WithMany()
                         .HasForeignKey("StocktakeLineId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12585,9 +12585,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stocktake_line_serials_stocktake_line_id_stocktake_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Inventory.Entities.StocktakeSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.StocktakeSession", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Inventory.Entities.InventoryLocation", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryLocation", null)
                         .WithMany()
                         .HasForeignKey("InventoryLocationId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12595,9 +12595,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stocktake_sessions_inventory_location_id_inventory_locations");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationChannel", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationChannel", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Integration.Entities.PlatformIntegration", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegration", null)
                         .WithMany()
                         .HasForeignKey("PlatformIntegrationId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12605,16 +12605,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_channels_platform_integration_id_platform_integrations");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationDeliveryAttempt", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationDeliveryAttempt", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationChannel", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationChannel", null)
                         .WithMany()
                         .HasForeignKey("NotificationChannelId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_notification_delivery_attempts_notification_channel_id_notification_channels");
 
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationMessage", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationMessage", null)
                         .WithMany()
                         .HasForeignKey("NotificationMessageId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12622,9 +12622,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_delivery_attempts_notification_message_id_notification_messages");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationEventType", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationEventType", null)
                         .WithMany()
                         .HasForeignKey("NotificationEventTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12632,9 +12632,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_events_notification_event_type_id_notification_event_types");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationInboxItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationInboxItem", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationMessage", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationMessage", null)
                         .WithMany()
                         .HasForeignKey("NotificationMessageId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12642,23 +12642,23 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_inbox_items_notification_message_id_notification_messages");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationMessage", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationMessage", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationChannel", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationChannel", null)
                         .WithMany()
                         .HasForeignKey("NotificationChannelId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_notification_messages_notification_channel_id_notification_channels");
 
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationEvent", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationEvent", null)
                         .WithMany()
                         .HasForeignKey("NotificationEventId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_notification_messages_notification_event_id_notification_events");
 
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationTemplateVersion", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationTemplateVersion", null)
                         .WithMany()
                         .HasForeignKey("NotificationTemplateVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12666,9 +12666,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_messages_notification_template_version_id_notification_template_versions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationPreference", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationPreference", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationEventType", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationEventType", null)
                         .WithMany()
                         .HasForeignKey("NotificationEventTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12676,9 +12676,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_preferences_notification_event_type_id_notification_event_types");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationReadReceipt", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationReadReceipt", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationInboxItem", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationInboxItem", null)
                         .WithMany()
                         .HasForeignKey("NotificationInboxItemId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12686,9 +12686,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_read_receipts_notification_inbox_item_id_notification_inbox_items");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationTemplate", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationEventType", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationEventType", null)
                         .WithMany()
                         .HasForeignKey("NotificationEventTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12696,9 +12696,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_templates_notification_event_type_id_notification_event_types");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Notification.Entities.NotificationTemplateVersion", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationTemplateVersion", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Notification.Entities.NotificationTemplate", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationTemplate", null)
                         .WithMany()
                         .HasForeignKey("NotificationTemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12706,9 +12706,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_template_versions_notification_template_id_notification_templates");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.DeviceSyncState", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.DeviceSyncState", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineClient", null)
                         .WithMany()
                         .HasForeignKey("OfflineClientId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12716,21 +12716,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_device_sync_states_offline_client_id_offline_clients");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineClient", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_offline_clients_outlet_id_outlets");
 
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.PosDevice", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
                         .WithMany()
                         .HasForeignKey("PosDeviceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_offline_clients_pos_device_id_pos_devices");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12738,16 +12738,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_offline_clients_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.OfflineIdMapping", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineIdMapping", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.SyncItem", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncItem", null)
                         .WithMany()
                         .HasForeignKey("CreatedFromSyncItemId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_offline_id_mappings_created_from_sync_item_id_sync_items");
 
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineClient", null)
                         .WithMany()
                         .HasForeignKey("OfflineClientId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12755,16 +12755,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_offline_id_mappings_offline_client_id_offline_clients");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.OfflineNumberBlock", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineNumberBlock", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.DocumentNumberSequence", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.DocumentNumberSequence", null)
                         .WithMany()
                         .HasForeignKey("DocumentNumberSequenceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_offline_number_blocks_document_number_sequence_id_document_number_sequences");
 
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineClient", null)
                         .WithMany()
                         .HasForeignKey("OfflineClientId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12772,9 +12772,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_offline_number_blocks_offline_client_id_offline_clients");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.SyncBatch", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncBatch", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineClient", null)
                         .WithMany()
                         .HasForeignKey("OfflineClientId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12782,23 +12782,23 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sync_batches_offline_client_id_offline_clients");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.SyncConflict", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncConflict", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineClient", null)
                         .WithMany()
                         .HasForeignKey("OfflineClientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sync_conflicts_offline_client_id_offline_clients");
 
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.SyncBatch", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncBatch", null)
                         .WithMany()
                         .HasForeignKey("SyncBatchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sync_conflicts_sync_batch_id_sync_batches");
 
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.SyncItem", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncItem", null)
                         .WithMany()
                         .HasForeignKey("SyncItemId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12806,16 +12806,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sync_conflicts_sync_item_id_sync_items");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OfflineSync.Entities.SyncItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncItem", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.OfflineClient", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.OfflineClient", null)
                         .WithMany()
                         .HasForeignKey("OfflineClientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sync_items_offline_client_id_offline_clients");
 
-                    b.HasOne("E_POS.Domain.Modules.OfflineSync.Entities.SyncBatch", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OfflineSync.Entities.SyncBatch", null)
                         .WithMany()
                         .HasForeignKey("SyncBatchId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12823,16 +12823,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sync_items_sync_batch_id_sync_batches");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrder", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.DocumentNumberSequence", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.DocumentNumberSequence", null)
                         .WithMany()
                         .HasForeignKey("DocumentNumberSequenceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sales_orders_document_number_sequence_id_document_number_sequences");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12840,99 +12840,99 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_orders_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderCharge", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderCharge", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_charges_sales_order_id_sales_orders");
 
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_charges_sales_order_line_id_sales_order_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderDiscount", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderDiscount", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_discounts_sales_order_id_sales_orders");
 
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_discounts_sales_order_line_id_sales_order_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_lines_sales_order_id_sales_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderLineComponent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLineComponent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_line_components_sales_order_line_id_sales_order_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderLineOption", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLineOption", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_line_options_sales_order_line_id_sales_order_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderLineStatusHistory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLineStatusHistory", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_line_status_history_sales_order_line_id_sales_order_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderStatusHistory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderStatusHistory", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_status_history_sales_order_id_sales_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Orders.Entities.SalesOrderTax", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderTax", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_taxes_sales_order_id_sales_orders");
 
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_order_taxes_sales_order_line_id_sales_order_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.CodeSequence", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.CodeSequence", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12940,9 +12940,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_code_sequences_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.HardwareProfile", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.HardwareProfile", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12950,9 +12950,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_hardware_profiles_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12960,27 +12960,27 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_outlets_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.OutletAddress", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.OutletAddress", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outlet_addresses_outlet_id_outlets");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.OutletBusinessHour", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.OutletBusinessHour", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outlet_business_hours_outlet_id_outlets");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.PosDevice", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -12988,58 +12988,58 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pos_devices_outlet_id_outlets");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.Till", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tills_outlet_id_outlets");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.OutletTillDevice.Entities.TillDeviceAssignment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.TillDeviceAssignment", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.PosDevice", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
                         .WithMany()
                         .HasForeignKey("PosDeviceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_till_device_assignments_pos_device_id_pos_devices");
 
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Till", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", null)
                         .WithMany()
                         .HasForeignKey("TillId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_till_device_assignments_till_id_tills");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.PosOrderHold", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.PosOrderHold", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_pos_order_holds_sales_order_id_sales_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.Receipt", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.Receipt", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.DocumentNumberSequence", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.DocumentNumberSequence", null)
                         .WithMany()
                         .HasForeignKey("DocumentNumberSequenceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_receipts_document_number_sequence_id_document_number_sequences");
 
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_receipts_sales_order_id_sales_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.ReceiptPrintLog", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptPrintLog", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.POSOperations.Entities.Receipt", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.POSOperations.Entities.Receipt", null)
                         .WithMany()
                         .HasForeignKey("ReceiptId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13047,18 +13047,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_receipt_print_logs_receipt_id_receipts");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplate", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplate", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplate", null)
                         .WithMany()
                         .HasForeignKey("ParentTemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_receipt_templates_parent_template_id_receipt_templates");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplateAssignment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplateAssignment", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplateVersion", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplateVersion", null)
                         .WithMany()
                         .HasForeignKey("ReceiptTemplateVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13066,9 +13066,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_receipt_template_assignments_receipt_template_version_id_receipt_template_versions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplateVersion", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplateVersion", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.POSOperations.Entities.ReceiptTemplate", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.POSOperations.Entities.ReceiptTemplate", null)
                         .WithMany()
                         .HasForeignKey("ReceiptTemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13076,9 +13076,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_receipt_template_versions_receipt_template_id_receipt_templates");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.TillCashMovement", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillCashMovement", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.TillSession", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
                         .WithMany()
                         .HasForeignKey("TillSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13086,9 +13086,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_till_cash_movements_till_session_id_till_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.TillSessionEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillSessionEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.TillSession", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
                         .WithMany()
                         .HasForeignKey("TillSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13096,16 +13096,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_till_session_events_till_session_id_till_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.TillSessionPaymentSummary", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillSessionPaymentSummary", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Payment.Entities.PaymentMethod", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Payment.Entities.PaymentMethod", null)
                         .WithMany()
                         .HasForeignKey("PaymentMethodId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_till_session_payment_summaries_payment_method_id_payment_methods");
 
-                    b.HasOne("E_POS.Domain.Modules.POSOperations.Entities.TillSessionSummary", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillSessionSummary", null)
                         .WithMany()
                         .HasForeignKey("TillSessionSummaryId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13113,9 +13113,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_till_session_payment_summaries_till_session_summary_id_till_session_summaries");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.POSOperations.Entities.TillSessionSummary", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.TillSessionSummary", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.HardwareCash.Entities.TillSession", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
                         .WithMany()
                         .HasForeignKey("TillSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13123,25 +13123,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_till_session_summaries_till_session_id_till_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Payment.Entities.SalesPayment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPayment", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Payment.Entities.PaymentMethod", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Payment.Entities.PaymentMethod", null)
                         .WithMany()
                         .HasForeignKey("PaymentMethodId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sales_payments_payment_method_id_payment_methods");
 
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_payments_sales_order_id_sales_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Payment.Entities.SalesPaymentEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPaymentEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Payment.Entities.SalesPayment", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPayment", null)
                         .WithMany()
                         .HasForeignKey("SalesPaymentId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13149,9 +13149,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_payment_events_sales_payment_id_sales_payments");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Payment.Entities.SalesPaymentTransaction", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPaymentTransaction", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Payment.Entities.SalesPayment", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPayment", null)
                         .WithMany()
                         .HasForeignKey("SalesPaymentId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13159,36 +13159,36 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_payment_transactions_sales_payment_id_sales_payments");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformAuthSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("PlatformUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_platform_auth_sessions_platform_user_id_platform_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformLoginAudit", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformLoginAudit", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("PlatformUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_platform_login_audits_platform_user_id_platform_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformPasswordResetToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformPasswordResetToken", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("PlatformUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_platform_password_reset_tokens_platform_user_id_platform_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformRefreshToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRefreshToken", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformAuthSession", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", null)
                         .WithMany()
                         .HasForeignKey("PlatformAuthSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13196,16 +13196,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_refresh_tokens_platform_auth_session_id_platform_auth_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformRolePermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRolePermission", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformPermission", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformPermission", null)
                         .WithMany()
                         .HasForeignKey("PlatformPermissionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_platform_role_permissions_platform_permission_id_platform_permissions");
 
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformRole", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRole", null)
                         .WithMany()
                         .HasForeignKey("PlatformRoleId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13213,41 +13213,41 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_role_permissions_platform_role_id_platform_roles");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUserPermission", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUserPermission", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformPermission", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformPermission", null)
                         .WithMany()
                         .HasForeignKey("PlatformPermissionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_platform_user_permissions_platform_permission_id_platform_permissions");
 
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("PlatformUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_platform_user_permissions_platform_user_id_platform_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUserRole", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUserRole", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformRole", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRole", null)
                         .WithMany()
                         .HasForeignKey("PlatformRoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_platform_user_roles_platform_role_id_platform_roles");
 
-                    b.HasOne("E_POS.Domain.Modules.PlatformAdministration.Entities.PlatformUser", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("PlatformUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_platform_user_roles_platform_user_id_platform_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.PriceList", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceList", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13255,16 +13255,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_price_lists_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.PriceListChannel", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceListChannel", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PricingTax.Entities.PriceList", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceList", null)
                         .WithMany()
                         .HasForeignKey("PriceListId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_price_list_channels_price_list_id_price_lists");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.SalesChannel", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
                         .WithMany()
                         .HasForeignKey("SalesChannelId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13272,38 +13272,38 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_price_list_channels_sales_channel_id_sales_channels");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.PriceListItem", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceListItem", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PricingTax.Entities.PriceList", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceList", null)
                         .WithMany()
                         .HasForeignKey("PriceListId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_price_list_items_price_list_id_price_lists");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_price_list_items_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.ProductVariant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
                         .WithMany()
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_price_list_items_product_variant_id_product_variants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.PriceListOutlet", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceListOutlet", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.OutletTillDevice.Entities.Outlet", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
                         .WithMany()
                         .HasForeignKey("OutletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_price_list_outlets_outlet_id_outlets");
 
-                    b.HasOne("E_POS.Domain.Modules.PricingTax.Entities.PriceList", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.PricingTax.Entities.PriceList", null)
                         .WithMany()
                         .HasForeignKey("PriceListId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13311,16 +13311,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_price_list_outlets_price_list_id_price_lists");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.ProductTaxAssignment", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.ProductTaxAssignment", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.CatalogProduct.Entities.Product", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
                         .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_tax_assignments_product_id_products");
 
-                    b.HasOne("E_POS.Domain.Modules.PricingTax.Entities.TaxClass", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxClass", null)
                         .WithMany()
                         .HasForeignKey("TaxClassId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13328,9 +13328,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_product_tax_assignments_tax_class_id_tax_classes");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.TaxClass", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxClass", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13338,16 +13338,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_classes_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.TaxClassRate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxClassRate", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PricingTax.Entities.TaxClass", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxClass", null)
                         .WithMany()
                         .HasForeignKey("TaxClassId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tax_class_rates_tax_class_id_tax_classes");
 
-                    b.HasOne("E_POS.Domain.Modules.PricingTax.Entities.TaxRate", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxRate", null)
                         .WithMany()
                         .HasForeignKey("TaxRateId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13355,9 +13355,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_class_rates_tax_rate_id_tax_rates");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.TaxJurisdiction", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxJurisdiction", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13365,9 +13365,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_jurisdictions_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.PricingTax.Entities.TaxRate", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxRate", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.PricingTax.Entities.TaxJurisdiction", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.PricingTax.Entities.TaxJurisdiction", null)
                         .WithMany()
                         .HasForeignKey("TaxJurisdictionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13375,31 +13375,31 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_rates_tax_jurisdiction_id_tax_jurisdictions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Refund.Entities.SalesRefund", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Refund.Entities.SalesRefund", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_refunds_sales_order_id_sales_orders");
 
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturn", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturn", null)
                         .WithMany()
                         .HasForeignKey("SalesReturnId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_refunds_sales_return_id_sales_returns");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Refund.Entities.SalesRefundLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Refund.Entities.SalesRefundLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Refund.Entities.SalesRefund", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Refund.Entities.SalesRefund", null)
                         .WithMany()
                         .HasForeignKey("SalesRefundId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sales_refund_lines_sales_refund_id_sales_refunds");
 
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturnLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturnLine", null)
                         .WithMany()
                         .HasForeignKey("SalesReturnLineId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13407,16 +13407,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_refund_lines_sales_return_line_id_sales_return_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Refund.Entities.SalesRefundPaymentAllocation", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Refund.Entities.SalesRefundPaymentAllocation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Payment.Entities.SalesPayment", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Payment.Entities.SalesPayment", null)
                         .WithMany()
                         .HasForeignKey("OriginalSalesPaymentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sales_refund_payment_allocations_original_sales_payment_id_sales_payments");
 
-                    b.HasOne("E_POS.Domain.Modules.Refund.Entities.SalesRefund", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.Refund.Entities.SalesRefund", null)
                         .WithMany()
                         .HasForeignKey("SalesRefundId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13424,9 +13424,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_refund_payment_allocations_sales_refund_id_sales_refunds");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.ReturnInspection", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.ReturnInspection", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturnLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturnLine", null)
                         .WithMany()
                         .HasForeignKey("SalesReturnLineId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13434,25 +13434,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_return_inspections_sales_return_line_id_sales_return_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchange", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesExchange", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("ReplacementOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sales_exchanges_replacement_order_id_sales_orders");
 
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturn", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturn", null)
                         .WithMany()
                         .HasForeignKey("SalesReturnId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_exchanges_sales_return_id_sales_returns");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchangeEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesExchangeEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchange", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesExchange", null)
                         .WithMany()
                         .HasForeignKey("SalesExchangeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13460,16 +13460,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_exchange_events_sales_exchange_id_sales_exchanges");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchangeLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesExchangeLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesExchange", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesExchange", null)
                         .WithMany()
                         .HasForeignKey("SalesExchangeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sales_exchange_lines_sales_exchange_id_sales_exchanges");
 
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturnLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturnLine", null)
                         .WithMany()
                         .HasForeignKey("SalesReturnLineId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13477,42 +13477,42 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_exchange_lines_sales_return_line_id_sales_return_lines");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturn", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturn", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrder", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_returns_sales_order_id_sales_orders");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturnEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturnEvent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturn", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturn", null)
                         .WithMany()
                         .HasForeignKey("SalesReturnId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_return_events_sales_return_id_sales_returns");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturnLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturnLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Orders.Entities.SalesOrderLine", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine", null)
                         .WithMany()
                         .HasForeignKey("SalesOrderLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_return_lines_sales_order_line_id_sales_order_lines");
 
-                    b.HasOne("E_POS.Domain.Modules.ReturnExchange.Entities.SalesReturn", null)
+                    b.HasOne("E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturn", null)
                         .WithMany()
                         .HasForeignKey("SalesReturnId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_return_lines_sales_return_id_sales_returns");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.FeatureFlag", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.FeatureFlag", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13520,9 +13520,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_feature_flags_platform_feature_id_platform_features");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.FeatureLimitDefinition", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.FeatureLimitDefinition", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13530,9 +13530,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_feature_limit_definitions_platform_feature_id_platform_features");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformFeature", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformModule", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformModule", null)
                         .WithMany()
                         .HasForeignKey("PlatformModuleId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13540,16 +13540,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_features_platform_module_id_platform_modules");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddonFeature", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddonFeature", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_addon_features_platform_feature_id_platform_features");
 
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddon", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddon", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionAddonId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13557,16 +13557,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_addon_features_subscription_addon_id_subscription_addons");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddonLimit", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddonLimit", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.FeatureLimitDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.FeatureLimitDefinition", null)
                         .WithMany()
                         .HasForeignKey("FeatureLimitDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_addon_limits_feature_limit_definition_id_feature_limit_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddonFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddonFeature", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionAddonFeatureId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13574,9 +13574,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_addon_limits_subscription_addon_feature_id_subscription_addon_features");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionCreditNote", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionCreditNote", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionInvoice", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13584,9 +13584,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_credit_notes_subscription_invoice_id_subscription_invoices");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionCreditNoteLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionCreditNoteLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionCreditNote", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionCreditNote", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionCreditNoteId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13594,16 +13594,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_credit_note_lines_subscription_credit_note_id_subscription_credit_notes");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionInvoice", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_invoices_tenant_id_tenants");
 
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscription", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", null)
                         .WithMany()
                         .HasForeignKey("TenantSubscriptionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13611,9 +13611,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_invoices_tenant_subscription_id_tenant_subscriptions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionInvoiceLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoiceLine", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionInvoice", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13621,9 +13621,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_invoice_lines_subscription_invoice_id_subscription_invoices");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPaymentLink", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentLink", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionInvoice", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13631,16 +13631,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_payment_links_subscription_invoice_id_subscription_invoices");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPaymentTransaction", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentTransaction", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionInvoice", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_payment_transactions_subscription_invoice_id_subscription_invoices");
 
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPaymentLink", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentLink", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionPaymentLinkId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13648,16 +13648,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_payment_transactions_subscription_payment_link_id_subscription_payment_links");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlanAddon", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanAddon", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddon", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddon", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionAddonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_plan_addons_subscription_addon_id_subscription_addons");
 
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlan", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionPlanId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13665,16 +13665,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_plan_addons_subscription_plan_id_subscription_plans");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlanFeature", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeature", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_plan_features_platform_feature_id_platform_features");
 
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlan", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionPlanId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13682,16 +13682,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_plan_features_subscription_plan_id_subscription_plans");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlanFeatureLimit", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeatureLimit", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.FeatureLimitDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.FeatureLimitDefinition", null)
                         .WithMany()
                         .HasForeignKey("FeatureLimitDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_plan_feature_limits_feature_limit_definition_id_feature_limit_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlanFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeature", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionPlanFeatureId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13699,16 +13699,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_plan_feature_limits_subscription_plan_feature_id_subscription_plan_features");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantFeatureEntitlement", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantFeatureEntitlement", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_feature_entitlements_platform_feature_id_platform_features");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13716,16 +13716,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_feature_entitlements_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscription", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionPlan", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionPlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_subscriptions_subscription_plan_id_subscription_plans");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13733,16 +13733,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_subscriptions_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscriptionAddon", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscriptionAddon", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.SubscriptionAddon", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddon", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionAddonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_subscription_addons_subscription_addon_id_subscription_addons");
 
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscription", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", null)
                         .WithMany()
                         .HasForeignKey("TenantSubscriptionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13750,9 +13750,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_subscription_addons_tenant_subscription_id_tenant_subscriptions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscriptionHistory", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscriptionHistory", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantSubscription", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", null)
                         .WithMany()
                         .HasForeignKey("TenantSubscriptionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13760,16 +13760,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_subscription_history_tenant_subscription_id_tenant_subscriptions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.SubscriptionBilling.Entities.TenantUsageCounter", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantUsageCounter", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.SubscriptionBilling.Entities.PlatformFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_usage_counters_platform_feature_id_platform_features");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13777,9 +13777,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_usage_counters_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.SalesChannel", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13787,9 +13787,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_channels_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.BusinessType", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.BusinessType", null)
                         .WithMany()
                         .HasForeignKey("BusinessTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13797,9 +13797,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenants_business_type_id_business_types");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.TenantAddress", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantAddress", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13807,9 +13807,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_addresses_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.TenantDomain", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantDomain", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13817,9 +13817,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_domains_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.TenantProfile", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantProfile", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13827,16 +13827,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_profiles_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.TenantFoundation.Entities.TenantSetting", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantSetting", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.SettingDefinition", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SettingDefinition", null)
                         .WithMany()
                         .HasForeignKey("SettingDefinitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_settings_setting_definition_id_setting_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.TenantFoundation.Entities.Tenant", null)
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -13847,3 +13847,4 @@ namespace E_POS.Infrastructure.Persistence.Migrations
         }
     }
 }
+

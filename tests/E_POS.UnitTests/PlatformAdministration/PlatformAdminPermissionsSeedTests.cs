@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.PlatformAdministration.Constants;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Infrastructure.Persistence.Seed;
 using Xunit;
 
@@ -41,3 +41,4 @@ public sealed class PlatformAdminPermissionsSeedTests
         Assert.Contains(PlatformRoleCodes.SuperAdministrator, sql, StringComparison.Ordinal);
     }
 }
+
