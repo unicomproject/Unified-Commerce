@@ -1,0 +1,387 @@
+{
+  "default_system_modules": [
+    {
+      "module_code": "authentication",
+      "name": "Authentication",
+      "is_system": true,
+      "features": [
+        { "feature_code": "auth_login", "name": "User Login" },
+        { "feature_code": "auth_session_management", "name": "Session Management" },
+        { "feature_code": "auth_password_reset", "name": "Password Reset" },
+        { "feature_code": "auth_multi_factor", "name": "Multi-Factor Authentication" },
+        { "feature_code": "auth_token_refresh", "name": "Token Refresh" }
+      ]
+    },
+    {
+      "module_code": "tenant_management",
+      "name": "Tenant Management",
+      "is_system": true,
+      "features": [
+        { "feature_code": "tenant_profile", "name": "Tenant Profile" },
+        { "feature_code": "tenant_settings", "name": "Tenant Settings" },
+        { "feature_code": "tenant_domains", "name": "Custom Domains" },
+        { "feature_code": "tenant_addresses", "name": "Tenant Addresses" },
+        { "feature_code": "tenant_onboarding", "name": "Tenant Onboarding Wizard" }
+      ]
+    },
+    {
+      "module_code": "user_management",
+      "name": "User Management",
+      "is_system": true,
+      "features": [
+        { "feature_code": "user_accounts", "name": "User Accounts" },
+        { "feature_code": "user_invitations", "name": "User Invitations" },
+        { "feature_code": "user_profiles", "name": "User Profiles" },
+        { "feature_code": "user_deactivation", "name": "User Deactivation" },
+        { "feature_code": "user_activity_status", "name": "User Activity Status" }
+      ]
+    },
+    {
+      "module_code": "role_permission_management",
+      "name": "Role & Permission Management",
+      "is_system": true,
+      "features": [
+        { "feature_code": "role_management", "name": "Role Management" },
+        { "feature_code": "permission_management", "name": "Permission Management" },
+        { "feature_code": "role_assignment", "name": "Role Assignment" },
+        { "feature_code": "permission_assignment", "name": "Direct Permission Assignment" },
+        { "feature_code": "access_policy_enforcement", "name": "Access Policy Enforcement" }
+      ]
+    },
+    {
+      "module_code": "billing_core",
+      "name": "Billing Core",
+      "is_system": true,
+      "features": [
+        { "feature_code": "subscription_overview", "name": "Subscription Overview" },
+        { "feature_code": "invoice_history", "name": "Invoice History" },
+        { "feature_code": "payment_method_management", "name": "Payment Method Management" },
+        { "feature_code": "billing_notifications", "name": "Billing Notifications" },
+        { "feature_code": "usage_summary", "name": "Usage Summary" }
+      ]
+    },
+    {
+      "module_code": "notification_system",
+      "name": "Notification System",
+      "is_system": true,
+      "features": [
+        { "feature_code": "in_app_notifications", "name": "In-App Notifications" },
+        { "feature_code": "notification_preferences", "name": "Notification Preferences" },
+        { "feature_code": "email_delivery_core", "name": "Core Email Delivery" },
+        { "feature_code": "notification_templates_core", "name": "Core Notification Templates" },
+        { "feature_code": "notification_event_dispatch", "name": "Event Dispatch" }
+      ]
+    },
+    {
+      "module_code": "integration_core",
+      "name": "Integration Core",
+      "is_system": true,
+      "features": [
+        { "feature_code": "api_key_management", "name": "API Key Management" },
+        { "feature_code": "webhook_management", "name": "Webhook Management" },
+        { "feature_code": "integration_logs", "name": "Integration Logs" },
+        { "feature_code": "integration_health_monitoring", "name": "Integration Health Monitoring" },
+        { "feature_code": "oauth_client_management", "name": "OAuth Client Management" }
+      ]
+    },
+    {
+      "module_code": "audit_logging",
+      "name": "Audit & Logging",
+      "is_system": true,
+      "features": [
+        { "feature_code": "audit_trail", "name": "Audit Trail" },
+        { "feature_code": "login_audit", "name": "Login Audit" },
+        { "feature_code": "activity_log", "name": "Activity Log" },
+        { "feature_code": "data_change_history", "name": "Data Change History" },
+        { "feature_code": "security_event_log", "name": "Security Event Log" }
+      ]
+    },
+    {
+      "module_code": "outlet_till_core",
+      "name": "Outlet & Till Core",
+      "is_system": true,
+      "features": [
+        { "feature_code": "outlet_management", "name": "Outlet Management" },
+        { "feature_code": "till_management", "name": "Till Management" },
+        { "feature_code": "device_registration", "name": "Device Registration" },
+        { "feature_code": "outlet_business_hours", "name": "Outlet Business Hours" },
+        { "feature_code": "sales_channel_configuration", "name": "Sales Channel Configuration" }
+      ]
+    },
+    {
+      "module_code": "master_data",
+      "name": "Master Data",
+      "is_system": true,
+      "features": [
+        { "feature_code": "currency_management", "name": "Currency Management" },
+        { "feature_code": "unit_of_measure", "name": "Unit of Measure" },
+        { "feature_code": "business_type_catalog", "name": "Business Type Catalog" },
+        { "feature_code": "tax_category_reference", "name": "Tax Category Reference" },
+        { "feature_code": "global_setting_definitions", "name": "Global Setting Definitions" }
+      ]
+    }
+  ],
+  "feature_modules": [
+    {
+      "module_code": "pos_sales",
+      "name": "POS Sales",
+      "features": [
+        { "feature_code": "pos_checkout", "name": "POS Checkout" },
+        { "feature_code": "pos_order_hold", "name": "Order Hold & Recall" },
+        { "feature_code": "pos_quick_sale", "name": "Quick Sale" },
+        { "feature_code": "pos_barcode_scan", "name": "Barcode Scanning" },
+        { "feature_code": "pos_receipt_print", "name": "Receipt Printing" },
+        { "feature_code": "pos_till_session", "name": "Till Session Management" }
+      ]
+    },
+    {
+      "module_code": "product_management",
+      "name": "Product Management",
+      "features": [
+        { "feature_code": "product_catalog", "name": "Product Catalog" },
+        { "feature_code": "product_categories", "name": "Categories & Departments" },
+        { "feature_code": "product_brands", "name": "Brand Management" },
+        { "feature_code": "product_barcodes", "name": "Product Barcodes" },
+        { "feature_code": "product_images", "name": "Product Images" },
+        { "feature_code": "product_variants", "name": "Product Variants" }
+      ]
+    },
+    {
+      "module_code": "catalog_extensions",
+      "name": "Catalog Extensions",
+      "features": [
+        { "feature_code": "product_attributes", "name": "Product Attributes" },
+        { "feature_code": "product_options", "name": "Product Options & Modifiers" },
+        { "feature_code": "combo_bundles", "name": "Combo & Bundle Products" },
+        { "feature_code": "product_collections", "name": "Product Collections" },
+        { "feature_code": "channel_visibility", "name": "Channel Visibility Rules" }
+      ]
+    },
+    {
+      "module_code": "inventory_management",
+      "name": "Inventory Management",
+      "features": [
+        { "feature_code": "inventory_tracking", "name": "Inventory Tracking" },
+        { "feature_code": "inventory_adjustments", "name": "Inventory Adjustments" },
+        { "feature_code": "inventory_transfers", "name": "Inter-Location Transfers" },
+        { "feature_code": "inventory_alerts", "name": "Low Stock Alerts" },
+        { "feature_code": "inventory_valuation", "name": "Inventory Valuation" }
+      ]
+    },
+    {
+      "module_code": "stock_management",
+      "name": "Stock Management",
+      "features": [
+        { "feature_code": "stock_movement", "name": "Stock Movement Ledger" },
+        { "feature_code": "stock_reconciliation", "name": "Stock Reconciliation" },
+        { "feature_code": "multi_location_stock", "name": "Multi-Location Stock" },
+        { "feature_code": "stock_reservations", "name": "Stock Reservations" },
+        { "feature_code": "stock_take_counts", "name": "Stock Take & Cycle Counts" }
+      ]
+    },
+    {
+      "module_code": "customer_management",
+      "name": "Customer Management",
+      "features": [
+        { "feature_code": "customer_profiles", "name": "Customer Profiles" },
+        { "feature_code": "customer_groups", "name": "Customer Groups" },
+        { "feature_code": "customer_addresses", "name": "Customer Addresses" },
+        { "feature_code": "customer_purchase_history", "name": "Purchase History" },
+        { "feature_code": "customer_notes", "name": "Customer Notes & Tags" }
+      ]
+    },
+    {
+      "module_code": "pricing_tax_engine",
+      "name": "Pricing & Tax Engine",
+      "features": [
+        { "feature_code": "price_lists", "name": "Price Lists" },
+        { "feature_code": "tax_rules", "name": "Tax Rules" },
+        { "feature_code": "tax_calculation", "name": "Tax Calculation" },
+        { "feature_code": "price_overrides", "name": "Price Overrides" },
+        { "feature_code": "inclusive_exclusive_tax", "name": "Inclusive / Exclusive Tax Modes" }
+      ]
+    },
+    {
+      "module_code": "discount_engine",
+      "name": "Pricing & Discount Engine",
+      "features": [
+        { "feature_code": "discount_rules", "name": "Discount Rules" },
+        { "feature_code": "promo_codes", "name": "Promo Codes" },
+        { "feature_code": "automatic_discounts", "name": "Automatic Discounts" },
+        { "feature_code": "line_item_discounts", "name": "Line Item Discounts" },
+        { "feature_code": "cart_level_discounts", "name": "Cart-Level Discounts" }
+      ]
+    },
+    {
+      "module_code": "orders_management",
+      "name": "Orders Management",
+      "features": [
+        { "feature_code": "sales_orders", "name": "Sales Orders" },
+        { "feature_code": "order_status_workflow", "name": "Order Status Workflow" },
+        { "feature_code": "order_fulfilment", "name": "Order Fulfilment" },
+        { "feature_code": "order_notes", "name": "Order Notes" },
+        { "feature_code": "order_document_numbers", "name": "Document Number Sequences" }
+      ]
+    },
+    {
+      "module_code": "cart_checkout",
+      "name": "Cart & Checkout",
+      "features": [
+        { "feature_code": "shopping_cart", "name": "Shopping Cart" },
+        { "feature_code": "checkout_flow", "name": "Checkout Flow" },
+        { "feature_code": "guest_checkout", "name": "Guest Checkout" },
+        { "feature_code": "online_store", "name": "Online Store Channel" },
+        { "feature_code": "checkout_events", "name": "Checkout Event Tracking" }
+      ]
+    },
+    {
+      "module_code": "payment_processing",
+      "name": "Payment Processing",
+      "features": [
+        { "feature_code": "payment_methods", "name": "Payment Methods" },
+        { "feature_code": "split_payments", "name": "Split Payments" },
+        { "feature_code": "payment_capture", "name": "Payment Capture" },
+        { "feature_code": "payment_void", "name": "Payment Void" },
+        { "feature_code": "payment_reconciliation", "name": "Payment Reconciliation" }
+      ]
+    },
+    {
+      "module_code": "returns_refunds",
+      "name": "Returns & Refunds",
+      "features": [
+        { "feature_code": "returns_processing", "name": "Returns Processing" },
+        { "feature_code": "refunds_processing", "name": "Refunds Processing" },
+        { "feature_code": "exchanges", "name": "Product Exchanges" },
+        { "feature_code": "return_reasons", "name": "Return Reason Codes" },
+        { "feature_code": "partial_returns", "name": "Partial Returns" }
+      ]
+    },
+    {
+      "module_code": "reporting_analytics",
+      "name": "Reporting & Analytics",
+      "features": [
+        { "feature_code": "sales_dashboard", "name": "Sales Dashboard" },
+        { "feature_code": "sales_reports", "name": "Sales Reports" },
+        { "feature_code": "inventory_reports", "name": "Inventory Reports" },
+        { "feature_code": "staff_performance_reports", "name": "Staff Performance Reports" },
+        { "feature_code": "report_export", "name": "Report Export" }
+      ]
+    },
+    {
+      "module_code": "fulfilment_pickup",
+      "name": "Fulfilment & Pickup",
+      "features": [
+        { "feature_code": "click_collect", "name": "Click & Collect" },
+        { "feature_code": "pickup_scheduling", "name": "Pickup Scheduling" },
+        { "feature_code": "order_ready_notifications", "name": "Order Ready Notifications" },
+        { "feature_code": "fulfilment_status_tracking", "name": "Fulfilment Status Tracking" },
+        { "feature_code": "pickup_verification", "name": "Pickup Verification" }
+      ]
+    },
+    {
+      "module_code": "hardware_cash_control",
+      "name": "Hardware & Cash Control",
+      "features": [
+        { "feature_code": "cash_drawer_control", "name": "Cash Drawer Control" },
+        { "feature_code": "cash_reconciliation", "name": "Cash Reconciliation" },
+        { "feature_code": "hardware_device_management", "name": "Hardware Device Management" },
+        { "feature_code": "receipt_templates", "name": "Receipt Templates" },
+        { "feature_code": "till_cash_movements", "name": "Till Cash Movements" }
+      ]
+    },
+    {
+      "module_code": "offline_sync",
+      "name": "Offline Operations",
+      "features": [
+        { "feature_code": "offline_operation_sync", "name": "Offline Operation Sync" },
+        { "feature_code": "offline_catalog_cache", "name": "Offline Catalog Cache" },
+        { "feature_code": "offline_transaction_queue", "name": "Offline Transaction Queue" },
+        { "feature_code": "conflict_resolution", "name": "Sync Conflict Resolution" },
+        { "feature_code": "offline_health_status", "name": "Offline Health Status" }
+      ]
+    }
+  ],
+  "addon_modules": [
+    {
+      "addon_code": "whatsapp_integration",
+      "name": "WhatsApp Integration",
+      "features": [
+        { "feature_code": "whatsapp_messaging", "name": "WhatsApp Messaging" },
+        { "feature_code": "whatsapp_order_updates", "name": "WhatsApp Order Updates" },
+        { "feature_code": "whatsapp_customer_notifications", "name": "WhatsApp Customer Notifications" },
+        { "feature_code": "whatsapp_template_messages", "name": "WhatsApp Template Messages" }
+      ]
+    },
+    {
+      "addon_code": "advanced_ai_analytics",
+      "name": "Advanced AI Analytics",
+      "features": [
+        { "feature_code": "ai_demand_forecasting", "name": "AI Demand Forecasting" },
+        { "feature_code": "ai_product_recommendations", "name": "AI Product Recommendations" },
+        { "feature_code": "ai_anomaly_detection", "name": "AI Anomaly Detection" },
+        { "feature_code": "ai_sales_insights", "name": "AI Sales Insights" }
+      ]
+    },
+    {
+      "addon_code": "loyalty_program",
+      "name": "Loyalty Program",
+      "features": [
+        { "feature_code": "loyalty_points_earn", "name": "Loyalty Points Earning" },
+        { "feature_code": "loyalty_points_redeem", "name": "Loyalty Points Redemption" },
+        { "feature_code": "loyalty_tier_management", "name": "Loyalty Tier Management" },
+        { "feature_code": "loyalty_rewards_catalog", "name": "Loyalty Rewards Catalog" }
+      ]
+    },
+    {
+      "addon_code": "delivery_integration",
+      "name": "Delivery Integration",
+      "features": [
+        { "feature_code": "delivery_uber_eats_sync", "name": "Uber Eats Integration" },
+        { "feature_code": "delivery_local_courier", "name": "Local Courier Integration" },
+        { "feature_code": "delivery_order_routing", "name": "Delivery Order Routing" },
+        { "feature_code": "delivery_status_tracking", "name": "Delivery Status Tracking" }
+      ]
+    },
+    {
+      "addon_code": "accounting_integration",
+      "name": "Accounting Integration",
+      "features": [
+        { "feature_code": "accounting_quickbooks_sync", "name": "QuickBooks Sync" },
+        { "feature_code": "accounting_xero_sync", "name": "Xero Sync" },
+        { "feature_code": "accounting_journal_export", "name": "Journal Entry Export" },
+        { "feature_code": "accounting_tax_mapping", "name": "Tax Account Mapping" }
+      ]
+    },
+    {
+      "addon_code": "marketing_automation",
+      "name": "SMS / Email Marketing Automation",
+      "features": [
+        { "feature_code": "marketing_sms_campaigns", "name": "SMS Campaigns" },
+        { "feature_code": "marketing_email_campaigns", "name": "Email Campaigns" },
+        { "feature_code": "marketing_customer_segments", "name": "Customer Segmentation" },
+        { "feature_code": "marketing_campaign_analytics", "name": "Campaign Analytics" }
+      ]
+    },
+    {
+      "addon_code": "extra_outlet",
+      "name": "Extra Outlet",
+      "features": [
+        { "feature_code": "capacity_extra_outlet", "name": "Additional Outlet Capacity" }
+      ]
+    },
+    {
+      "addon_code": "extra_till",
+      "name": "Extra Till",
+      "features": [
+        { "feature_code": "capacity_extra_till", "name": "Additional Till Capacity" }
+      ]
+    },
+    {
+      "addon_code": "extra_user",
+      "name": "Extra User",
+      "features": [
+        { "feature_code": "capacity_extra_user", "name": "Additional User Capacity" }
+      ]
+    }
+  ]
+}

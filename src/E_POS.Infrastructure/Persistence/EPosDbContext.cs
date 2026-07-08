@@ -310,6 +310,9 @@ public sealed class EPosDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Register PostgreSQL extensions required by the model
+        modelBuilder.HasPostgresExtension("citext");
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(EPosDbContext).Assembly);
     }
 }
