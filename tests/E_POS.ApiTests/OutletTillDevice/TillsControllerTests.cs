@@ -98,12 +98,12 @@ public sealed class TillsControllerTests
 
     private static TillCreateRequest CreateRequest()
     {
-        return new TillCreateRequest(Guid.NewGuid(), "Main Till", "MAIN-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE");
+        return new TillCreateRequest(Guid.NewGuid(), "Main Till", "Main", 1, "MAIN-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE");
     }
 
     private static TillResponse CreateResponse(Guid id)
     {
-        return new TillResponse(id, Guid.NewGuid(), "MAIN", "Main Outlet", "MAIN-01", "Main Till", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        return new TillResponse(id, Guid.NewGuid(), "MAIN", "Main Outlet", "Main", 1, "MAIN-01", "Main Till", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
     }
 
     private sealed class FakeTillService : ITillService

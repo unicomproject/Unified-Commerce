@@ -9,6 +9,8 @@ public class Till : AuditableEntity
     public Guid OutletId { get; protected set; }
     public string TillCode { get; protected set; } = string.Empty;
     public string TillName { get; protected set; } = string.Empty;
+    public string TillAreaName { get; protected set; } = string.Empty;
+    public int TillNumber { get; protected set; }
     public string TillType { get; protected set; } = string.Empty;
     public decimal DefaultOpeningFloatAmount { get; protected set; }
     public string CurrencyCode { get; protected set; } = string.Empty;
@@ -22,6 +24,8 @@ public class Till : AuditableEntity
         Guid tenantId,
         Guid outletId,
         string tillName,
+        string tillAreaName,
+        int tillNumber,
         string tillCode,
         string tillType,
         decimal defaultOpeningFloatAmount,
@@ -37,6 +41,8 @@ public class Till : AuditableEntity
             TenantId = tenantId,
             OutletId = outletId,
             TillName = tillName.Trim(),
+            TillAreaName = TillConstants.NormalizeAreaName(tillAreaName),
+            TillNumber = tillNumber,
             TillCode = TillConstants.NormalizeTillCode(tillCode),
             TillType = TillConstants.NormalizeTillType(tillType),
             DefaultOpeningFloatAmount = defaultOpeningFloatAmount,
@@ -53,6 +59,8 @@ public class Till : AuditableEntity
     public void UpdateProfile(
         Guid outletId,
         string tillName,
+        string tillAreaName,
+        int tillNumber,
         string tillCode,
         string tillType,
         decimal defaultOpeningFloatAmount,
@@ -64,6 +72,8 @@ public class Till : AuditableEntity
     {
         OutletId = outletId;
         TillName = tillName.Trim();
+        TillAreaName = TillConstants.NormalizeAreaName(tillAreaName);
+        TillNumber = tillNumber;
         TillCode = TillConstants.NormalizeTillCode(tillCode);
         TillType = TillConstants.NormalizeTillType(tillType);
         DefaultOpeningFloatAmount = defaultOpeningFloatAmount;

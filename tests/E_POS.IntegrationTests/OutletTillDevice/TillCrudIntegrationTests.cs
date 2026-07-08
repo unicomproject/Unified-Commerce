@@ -110,7 +110,7 @@ public sealed class TillCrudIntegrationTests
 
     private static TillCreateRequest CreateRequest(Guid outletId)
     {
-        return new TillCreateRequest(outletId, "Main Till", "main-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE");
+        return new TillCreateRequest(outletId, "Main Till", "Main", 1, "main-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE");
     }
 
     private static Outlet CreateOutlet(Guid tenantId, string outletCode, string status)

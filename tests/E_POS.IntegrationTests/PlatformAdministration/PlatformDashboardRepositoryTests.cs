@@ -80,6 +80,8 @@ public sealed class PlatformDashboardRepositoryTests
             tenantOneId,
             Guid.Parse("33333333-3333-4333-8333-333333333301"),
             "Front Till",
+            "Front",
+            1,
             "TILL-001",
             TillConstants.StandardTillType,
             0m,

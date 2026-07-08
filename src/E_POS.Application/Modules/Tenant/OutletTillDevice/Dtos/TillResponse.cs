@@ -5,6 +5,8 @@ public sealed record TillResponse(
     Guid OutletId,
     string OutletCode,
     string OutletName,
+    string TillAreaName,
+    int TillNumber,
     string TillCode,
     string TillName,
     string TillType,

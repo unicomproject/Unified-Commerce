@@ -42,6 +42,19 @@ public sealed class TillService : ITillService
             return ApplicationResult<TillResponse>.Failure(new ApplicationError("till.duplicate_code", "Till code already exists for this outlet."));
         }
 
+        var normalizedAreaName = TillConstants.NormalizeAreaName(request.TillAreaName);
+        if (await _repository.TillAreaNumberExistsAsync(
+                context.TenantId,
+                request.OutletId,
+                normalizedAreaName,
+                request.TillNumber,
+                null,
+                cancellationToken))
+        {
+            return ApplicationResult<TillResponse>.Failure(
+                new ApplicationError("till.duplicate_area_number", "Till number already exists for this area in the outlet."));
+        }
+
         var now = _dateTimeProvider.UtcNow;
         var tillId = Guid.NewGuid();
         var till = Till.Create(
@@ -49,6 +62,8 @@ public sealed class TillService : ITillService
             context.TenantId,
             request.OutletId,
             request.TillName,
+            normalizedAreaName,
+            request.TillNumber,
             normalizedTillCode,
             request.TillType,
             request.DefaultOpeningFloatAmount,
@@ -109,9 +124,24 @@ public sealed class TillService : ITillService
             return ApplicationResult<TillResponse>.Failure(new ApplicationError("till.duplicate_code", "Till code already exists for this outlet."));
         }
 
+        var normalizedAreaName = TillConstants.NormalizeAreaName(request.TillAreaName);
+        if (await _repository.TillAreaNumberExistsAsync(
+                context.TenantId,
+                request.OutletId,
+                normalizedAreaName,
+                request.TillNumber,
+                tillId,
+                cancellationToken))
+        {
+            return ApplicationResult<TillResponse>.Failure(
+                new ApplicationError("till.duplicate_area_number", "Till number already exists for this area in the outlet."));
+        }
+
         till.UpdateProfile(
             request.OutletId,
             request.TillName,
+            normalizedAreaName,
+            request.TillNumber,
             normalizedTillCode,
             request.TillType,
             request.DefaultOpeningFloatAmount,
