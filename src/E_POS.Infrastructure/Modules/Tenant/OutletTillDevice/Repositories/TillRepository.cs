@@ -67,9 +67,9 @@ public sealed class TillRepository : ITillRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToUpperInvariant();
-            query = query.Where(x => x.till.Name.ToUpper().Contains(term) ||
+            query = query.Where(x => x.till.TillName.ToUpper().Contains(term) ||
                                      x.till.TillCode.ToUpper().Contains(term) ||
-                                     x.outlet.Name.ToUpper().Contains(term) ||
+                                     x.outlet.OutletName.ToUpper().Contains(term) ||
                                      x.outlet.OutletCode.ToUpper().Contains(term));
         }
 
@@ -81,13 +81,14 @@ public sealed class TillRepository : ITillRepository
             .Take(pageSize)
             .Select(x => new TillSummaryResponse(
                 x.till.Id,
-                x.till.OutletId!.Value,
+                x.till.OutletId,
                 x.outlet.OutletCode,
-                x.outlet.Name,
+                x.outlet.OutletName,
                 x.till.TillCode,
-                x.till.Name,
+                x.till.TillName,
+                x.till.TillType,
                 x.till.Status,
-                _dbContext.TillDeviceAssignments.Any(assignment => assignment.TillId == x.till.Id),
+                _dbContext.TillDeviceAssignments.Any(assignment => assignment.TillId == x.till.Id && assignment.ReleasedAt == null),
                 x.till.CreatedAt,
                 x.till.UpdatedAt))
             .ToListAsync(cancellationToken);
@@ -117,15 +118,19 @@ public sealed class TillRepository : ITillRepository
 
         var isDeviceAssigned = await _dbContext.TillDeviceAssignments
             .AsNoTracking()
-            .AnyAsync(x => x.TillId == tillId, cancellationToken);
+            .AnyAsync(x => x.TillId == tillId && x.ReleasedAt == null, cancellationToken);
 
         return new TillResponse(
             row.till.Id,
-            row.till.OutletId!.Value,
+            row.till.OutletId,
             row.outlet.OutletCode,
-            row.outlet.Name,
+            row.outlet.OutletName,
             row.till.TillCode,
-            row.till.Name,
+            row.till.TillName,
+            row.till.TillType,
+            row.till.DefaultOpeningFloatAmount,
+            row.till.CurrencyCode,
+            row.till.IsCashManaged,
             row.till.Status,
             isDeviceAssigned,
             row.till.CreatedAt,
@@ -148,6 +153,7 @@ public sealed class TillRepository : ITillRepository
             .AsNoTracking()
             .AnyAsync(
                 assignment => assignment.TillId == tillId &&
+                              assignment.ReleasedAt == null &&
                               _dbContext.Tills.Any(till => till.Id == assignment.TillId && till.TenantId == tenantId),
                 cancellationToken);
     }
@@ -163,6 +169,3 @@ public sealed class TillRepository : ITillRepository
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
-
-
-

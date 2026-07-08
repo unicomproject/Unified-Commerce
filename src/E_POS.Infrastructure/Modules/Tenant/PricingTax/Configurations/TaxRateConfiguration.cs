@@ -33,7 +33,7 @@ public sealed class TaxRateConfiguration : IEntityTypeConfiguration<TaxRate>
         builder.Property(x => x.TaxJurisdictionId).HasColumnName("tax_jurisdiction_id").IsRequired();
         builder.Property(x => x.TaxRateCode).HasColumnName("tax_rate_code").HasColumnType("varchar(80)").HasMaxLength(80).IsRequired();
         builder.Property(x => x.TaxRateName).HasColumnName("tax_rate_name").HasColumnType("varchar(150)").HasMaxLength(150).IsRequired();
-        builder.Property(x => x.RatePercent).HasColumnName("rate_percent").HasPrecision(9, 4).IsRequired();
+        builder.Property(x => x.RatePercent).HasColumnName("rate_percent").HasPrecision(8, 4).IsRequired();
         builder.Property(x => x.IsCompound).HasColumnName("is_compound").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.ValidFrom).HasColumnName("valid_from").HasColumnType("date").IsRequired(false);
         builder.Property(x => x.ValidUntil).HasColumnName("valid_until").HasColumnType("date").IsRequired(false);

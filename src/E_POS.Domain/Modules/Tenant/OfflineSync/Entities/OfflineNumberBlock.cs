@@ -18,5 +18,41 @@ public class OfflineNumberBlock : AuditableEntity
     public DateTimeOffset AllocatedAt { get; protected set; }
     public DateTimeOffset? ExpiresAt { get; protected set; }
     public DateTimeOffset? ExhaustedAt { get; protected set; }
+
+    protected OfflineNumberBlock() { }
+
+    public static OfflineNumberBlock Create(
+        Guid id,
+        Guid tenantId,
+        Guid offlineClientId,
+        Guid? documentNumberSequenceId,
+        string documentType,
+        string? prefixSnapshot,
+        string? suffixSnapshot,
+        int paddingLengthSnapshot,
+        long rangeStart,
+        long rangeEnd,
+        string blockStatus,
+        DateTimeOffset now)
+    {
+        return new OfflineNumberBlock
+        {
+            Id = id,
+            TenantId = tenantId,
+            OfflineClientId = offlineClientId,
+            DocumentNumberSequenceId = documentNumberSequenceId,
+            DocumentType = documentType.Trim(),
+            PrefixSnapshot = prefixSnapshot?.Trim(),
+            SuffixSnapshot = suffixSnapshot?.Trim(),
+            PaddingLengthSnapshot = paddingLengthSnapshot,
+            RangeStart = rangeStart,
+            RangeEnd = rangeEnd,
+            NextValue = rangeStart,
+            BlockStatus = blockStatus.Trim(),
+            AllocatedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }
 

@@ -9,6 +9,7 @@ public static class OutletConstants
     public const string WarehouseOutletType = "WAREHOUSE";
     public const string PhysicalAddressType = "PHYSICAL";
     public const string PickupMethodType = "PICKUP";
+    public const string DefaultTimezone = "UTC";
     public const string ViewPermission = "tenant.outlets.view";
     public const string ManagePermission = "tenant.outlets.manage";
 

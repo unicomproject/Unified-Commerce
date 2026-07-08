@@ -31,22 +31,24 @@ public sealed class TillDeviceAssignmentService : ITillDeviceAssignmentService
             return ApplicationResult<TillDeviceAssignmentResponse>.Failure(new ApplicationError("till_device_assignment.validation_failed", "Till and POS device are required."));
         }
 
-        if (!await _repository.ActiveTillExistsAsync(context.TenantId, tillId, cancellationToken))
+        var tillContext = await _repository.GetTillContextAsync(context.TenantId, tillId, cancellationToken);
+        if (tillContext is null)
         {
             return ApplicationResult<TillDeviceAssignmentResponse>.Failure(TillNotFound);
         }
 
-        if (!await _repository.ActiveDeviceExistsAsync(context.TenantId, posDeviceId, cancellationToken))
+        var deviceContext = await _repository.GetDeviceContextAsync(context.TenantId, posDeviceId, cancellationToken);
+        if (deviceContext is null)
         {
             return ApplicationResult<TillDeviceAssignmentResponse>.Failure(DeviceNotFound);
         }
 
-        if (!await _repository.TillAndDeviceShareOutletAsync(context.TenantId, tillId, posDeviceId, cancellationToken))
+        if (tillContext.OutletId != deviceContext.OutletId)
         {
             return ApplicationResult<TillDeviceAssignmentResponse>.Failure(new ApplicationError("till_device_assignment.outlet_mismatch", "Till and POS device must belong to the same outlet."));
         }
 
-        if (await _repository.GetByTillAndDeviceAsync(context.TenantId, tillId, posDeviceId, cancellationToken) is not null)
+        if (await _repository.GetActiveByTillAndDeviceAsync(context.TenantId, tillId, posDeviceId, cancellationToken) is not null)
         {
             return ApplicationResult<TillDeviceAssignmentResponse>.Failure(new ApplicationError("till_device_assignment.duplicate", "POS device is already assigned to this till."));
         }
@@ -56,9 +58,22 @@ public sealed class TillDeviceAssignmentService : ITillDeviceAssignmentService
             return ApplicationResult<TillDeviceAssignmentResponse>.Failure(new ApplicationError("till_device_assignment.device_already_assigned", "POS device is already assigned to another till."));
         }
 
-        var assignment = TillDeviceAssignment.Create(Guid.NewGuid(), tillId, posDeviceId, _dateTimeProvider.UtcNow);
+        if (await _repository.TillAssignedToAnyDeviceAsync(context.TenantId, tillId, posDeviceId, cancellationToken))
+        {
+            return ApplicationResult<TillDeviceAssignmentResponse>.Failure(new ApplicationError("till_device_assignment.till_already_assigned", "Till is already assigned to another POS device."));
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var assignment = TillDeviceAssignment.Create(
+            Guid.NewGuid(),
+            context.TenantId,
+            tillContext.OutletId,
+            tillId,
+            posDeviceId,
+            context.UserId,
+            now);
         await _repository.AddAsync(assignment, cancellationToken);
-        var response = await _repository.GetByTillAndDeviceAsync(context.TenantId, tillId, posDeviceId, cancellationToken);
+        var response = await _repository.GetActiveByTillAndDeviceAsync(context.TenantId, tillId, posDeviceId, cancellationToken);
         return ApplicationResult<TillDeviceAssignmentResponse>.Success(response!);
     }
 
@@ -87,7 +102,7 @@ public sealed class TillDeviceAssignmentService : ITillDeviceAssignmentService
         var assignment = await _repository.GetEditableAsync(context.TenantId, tillId, posDeviceId, cancellationToken);
         if (assignment is null) return ApplicationResult.Failure(NotFound);
 
-        await _repository.RevokeAsync(assignment, _dateTimeProvider.UtcNow, cancellationToken);
+        await _repository.ReleaseAsync(assignment, context.UserId, null, _dateTimeProvider.UtcNow, cancellationToken);
         return ApplicationResult.Success();
     }
 
@@ -118,4 +133,3 @@ public sealed class TillDeviceAssignmentService : ITillDeviceAssignmentService
             : PermissionDenied;
     }
 }
-

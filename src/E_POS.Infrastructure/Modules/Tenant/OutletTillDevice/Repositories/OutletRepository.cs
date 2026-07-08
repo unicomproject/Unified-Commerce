@@ -78,13 +78,13 @@ public sealed class OutletRepository : IOutletRepository
             if (_dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
                 var pattern = $"%{term}%";
-                outlets = outlets.Where(x => EF.Functions.ILike(x.Name, pattern) ||
+                outlets = outlets.Where(x => EF.Functions.ILike(x.OutletName, pattern) ||
                                              EF.Functions.ILike(x.OutletCode, pattern));
             }
             else
             {
                 var normalizedTerm = term.ToUpperInvariant();
-                outlets = outlets.Where(x => x.Name.ToUpper().Contains(normalizedTerm) ||
+                outlets = outlets.Where(x => x.OutletName.ToUpper().Contains(normalizedTerm) ||
                                              x.OutletCode.ToUpper().Contains(normalizedTerm));
             }
         }
@@ -118,12 +118,13 @@ public sealed class OutletRepository : IOutletRepository
             {
                 x.Outlet.Id,
                 x.Outlet.OutletCode,
-                x.Outlet.Name,
+                x.Outlet.OutletName,
                 x.Outlet.Status,
                 x.Outlet.OutletType,
-                x.Outlet.IsOnlineVisible,
-                x.Outlet.ContactPhone,
-                x.Outlet.ContactEmail,
+                x.Outlet.Timezone,
+                x.Outlet.IsDefaultOutlet,
+                x.Outlet.Phone,
+                x.Outlet.Email,
                 x.CollectionEnabled,
                 TotalCount = query.Count()
             })
@@ -134,12 +135,13 @@ public sealed class OutletRepository : IOutletRepository
             .Select(x => new OutletSummaryResponse(
                 x.Id,
                 x.OutletCode,
-                x.Name,
+                x.OutletName,
                 x.Status,
                 x.OutletType,
-                x.IsOnlineVisible,
-                x.ContactPhone,
-                x.ContactEmail,
+                x.Timezone,
+                x.IsDefaultOutlet,
+                x.Phone,
+                x.Email,
                 x.CollectionEnabled))
             .ToList();
 
@@ -177,7 +179,11 @@ public sealed class OutletRepository : IOutletRepository
                 x.City,
                 x.StateOrProvince,
                 x.PostalCode,
-                x.CountryCode))
+                x.CountryCode,
+                x.ContactName,
+                x.ContactPhone,
+                x.IsPrimary,
+                x.Status))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (address is null)
@@ -192,19 +198,23 @@ public sealed class OutletRepository : IOutletRepository
             .Select(x => new OutletBusinessHourResponse(
                 x.Id,
                 x.DayOfWeek,
-                x.OpenTime,
-                x.CloseTime))
+                x.OpeningTime,
+                x.ClosingTime,
+                x.IsClosed,
+                x.ValidFrom,
+                x.ValidUntil))
             .ToListAsync(cancellationToken);
 
         return new OutletResponse(
             outlet.Id,
             outlet.OutletCode,
-            outlet.Name,
+            outlet.OutletName,
             outlet.Status,
             outlet.OutletType,
-            outlet.IsOnlineVisible,
-            outlet.ContactPhone,
-            outlet.ContactEmail,
+            outlet.Timezone,
+            outlet.IsDefaultOutlet,
+            outlet.Phone,
+            outlet.Email,
             address,
             businessHours,
             await IsCollectionEnabledAsync(tenantId, outletId, cancellationToken),

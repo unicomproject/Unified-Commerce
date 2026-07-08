@@ -19,5 +19,34 @@ public class SyncBatch : AuditableEntity
     public string? ClientAppVersion { get; protected set; }
     public DateTimeOffset? ClientLocalTime { get; protected set; }
     public string? IdempotencyKey { get; protected set; }
+
+    protected SyncBatch() { }
+
+    public static SyncBatch Create(
+        Guid id,
+        Guid tenantId,
+        Guid offlineClientId,
+        string syncType,
+        string syncStatus,
+        DateTimeOffset serverStartedAt,
+        int uploadedItemCount,
+        int downloadedItemCount,
+        int conflictCount,
+        DateTimeOffset now)
+    {
+        return new SyncBatch
+        {
+            Id = id,
+            TenantId = tenantId,
+            OfflineClientId = offlineClientId,
+            SyncType = syncType.Trim(),
+            SyncStatus = syncStatus.Trim(),
+            ServerStartedAt = serverStartedAt,
+            UploadedItemCount = uploadedItemCount,
+            DownloadedItemCount = downloadedItemCount,
+            ConflictCount = conflictCount,
+            CreatedAt = now
+        };
+    }
 }
 

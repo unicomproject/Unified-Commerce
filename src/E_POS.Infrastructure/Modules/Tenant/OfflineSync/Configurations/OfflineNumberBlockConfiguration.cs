@@ -42,6 +42,8 @@ public sealed class OfflineNumberBlockConfiguration : IEntityTypeConfiguration<O
 
         builder.Property(x => x.DocumentType)
             .HasColumnName("document_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.PrefixSnapshot)
@@ -74,6 +76,8 @@ public sealed class OfflineNumberBlockConfiguration : IEntityTypeConfiguration<O
 
         builder.Property(x => x.BlockStatus)
             .HasColumnName("block_status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.AllocatedAt)

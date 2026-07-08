@@ -110,12 +110,12 @@ public sealed class TillCrudIntegrationTests
 
     private static TillCreateRequest CreateRequest(Guid outletId)
     {
-        return new TillCreateRequest(outletId, "Main Till", "main-01", "ACTIVE");
+        return new TillCreateRequest(outletId, "Main Till", "main-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE");
     }
 
     private static Outlet CreateOutlet(Guid tenantId, string outletCode, string status)
     {
-        return Outlet.Create(Guid.NewGuid(), tenantId, "Outlet " + outletCode, outletCode, status, "STORE", true, null, null, Now);
+        return Outlet.Create(Guid.NewGuid(), tenantId, "Outlet " + outletCode, outletCode, status, "STORE", "UTC", false, null, null, null, Now);
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
@@ -128,6 +128,3 @@ public sealed class TillCrudIntegrationTests
         public DateTimeOffset UtcNow { get; }
     }
 }
-
-
-

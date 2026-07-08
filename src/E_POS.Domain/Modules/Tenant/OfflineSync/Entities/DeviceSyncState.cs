@@ -14,5 +14,29 @@ public class DeviceSyncState : AuditableEntity
     public long? LastServerVersion { get; protected set; }
     public long? LastClientVersion { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
+
+    protected DeviceSyncState() { }
+
+    public static DeviceSyncState Create(
+        Guid id,
+        Guid tenantId,
+        Guid offlineClientId,
+        string datasetName,
+        string syncDirection,
+        string status,
+        DateTimeOffset now)
+    {
+        return new DeviceSyncState
+        {
+            Id = id,
+            TenantId = tenantId,
+            OfflineClientId = offlineClientId,
+            DatasetName = datasetName.Trim(),
+            SyncDirection = syncDirection.Trim(),
+            Status = status.Trim(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }
 

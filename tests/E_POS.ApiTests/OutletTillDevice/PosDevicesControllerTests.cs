@@ -130,17 +130,17 @@ public sealed class PosDevicesControllerTests
 
     private static PosDeviceCreateRequest CreateDeviceRequest()
     {
-        return new PosDeviceCreateRequest(Guid.NewGuid(), "Front Tablet", "SN-001", "ACTIVE");
+        return new PosDeviceCreateRequest(Guid.NewGuid(), "Front Tablet", "TABLET", "ACTIVE");
     }
 
     private static PosDeviceResponse CreateDeviceResponse(Guid id)
     {
-        return new PosDeviceResponse(id, Guid.NewGuid(), "OUT001", "Main Outlet", "DEV001", "Front Tablet", "SN-001", "ACTIVE", null, null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        return new PosDeviceResponse(id, Guid.NewGuid(), "OUT001", "Main Outlet", "DEV001", "Front Tablet", "TABLET", "ACTIVE", false, null, null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
     }
 
     private static TillDeviceAssignmentResponse CreateAssignmentResponse(Guid tillId, Guid deviceId)
     {
-        return new TillDeviceAssignmentResponse(Guid.NewGuid(), tillId, "TILL001", "Main Till", deviceId, "DEV001", "Front Tablet", Guid.NewGuid(), "OUT001", "Main Outlet", DateTimeOffset.UtcNow.UtcDateTime.ToString("O"), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        return new TillDeviceAssignmentResponse(Guid.NewGuid(), tillId, "TILL001", "Main Till", deviceId, "DEV001", "Front Tablet", Guid.NewGuid(), "OUT001", "Main Outlet", DateTimeOffset.UtcNow, null);
     }
 
     private sealed class FakePosDeviceService : IPosDeviceService

@@ -11,6 +11,5 @@ public sealed record TillDeviceAssignmentResponse(
     Guid OutletId,
     string OutletCode,
     string OutletName,
-    string EffectiveFrom,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset AssignedAt,
+    DateTimeOffset? ReleasedAt);

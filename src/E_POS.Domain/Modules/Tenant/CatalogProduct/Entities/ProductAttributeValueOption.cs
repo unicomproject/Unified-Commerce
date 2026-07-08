@@ -27,8 +27,7 @@ public class ProductAttributeValueOption : AuditableEntity
             AttributeDefinitionId = attributeDefinitionId,
             AttributeOptionId = attributeOptionId,
             CreatedByTenantUserId = createdByTenantUserId,
-            CreatedAt = now,
-            UpdatedAt = now
+            CreatedAt = now
         };
     }
 }

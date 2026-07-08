@@ -44,7 +44,19 @@ public sealed class TillService : ITillService
 
         var now = _dateTimeProvider.UtcNow;
         var tillId = Guid.NewGuid();
-        var till = Till.Create(tillId, context.TenantId, request.OutletId, request.Name, normalizedTillCode, request.Status, now);
+        var till = Till.Create(
+            tillId,
+            context.TenantId,
+            request.OutletId,
+            request.TillName,
+            normalizedTillCode,
+            request.TillType,
+            request.DefaultOpeningFloatAmount,
+            request.CurrencyCode,
+            request.IsCashManaged,
+            request.Status,
+            context.UserId,
+            now);
         await _repository.AddAsync(till, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
         return ApplicationResult<TillResponse>.Success(response!);
@@ -97,7 +109,17 @@ public sealed class TillService : ITillService
             return ApplicationResult<TillResponse>.Failure(new ApplicationError("till.duplicate_code", "Till code already exists for this outlet."));
         }
 
-        till.UpdateProfile(request.OutletId, request.Name, normalizedTillCode, request.Status, _dateTimeProvider.UtcNow);
+        till.UpdateProfile(
+            request.OutletId,
+            request.TillName,
+            normalizedTillCode,
+            request.TillType,
+            request.DefaultOpeningFloatAmount,
+            request.CurrencyCode,
+            request.IsCashManaged,
+            request.Status,
+            context.UserId,
+            _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
         return response is null ? ApplicationResult<TillResponse>.Failure(NotFound) : ApplicationResult<TillResponse>.Success(response);
@@ -116,7 +138,7 @@ public sealed class TillService : ITillService
             return ApplicationResult.Failure(new ApplicationError("till.delete_conflict", "Till cannot be deleted while POS devices are assigned."));
         }
 
-        till.SoftDelete(_dateTimeProvider.UtcNow);
+        till.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }
@@ -133,5 +155,3 @@ public sealed class TillService : ITillService
             : PermissionDenied;
     }
 }
-
-

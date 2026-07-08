@@ -27,16 +27,6 @@ public sealed class PosDeviceRepository : IPosDeviceRepository
                 cancellationToken);
     }
 
-    public Task<bool> DeviceSerialNumberExistsAsync(string deviceSerialNumber, Guid? excludePosDeviceId, CancellationToken cancellationToken)
-    {
-        return _dbContext.PosDevices
-            .AsNoTracking()
-            .AnyAsync(
-                x => x.DeviceSerialNumber == deviceSerialNumber &&
-                     (!excludePosDeviceId.HasValue || x.Id != excludePosDeviceId.Value),
-                cancellationToken);
-    }
-
     public async Task<PosDeviceListResponse> ListAsync(
         Guid tenantId,
         Guid? outletId,
@@ -46,16 +36,16 @@ public sealed class PosDeviceRepository : IPosDeviceRepository
         CancellationToken cancellationToken)
     {
         var assignedTillQuery = from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
-                                where assignment.TillId.HasValue && assignment.PosDeviceId.HasValue && assignment.Status == TillDeviceAssignmentConstants.ActiveStatus
-                                join till in _dbContext.Tills.AsNoTracking() on assignment.TillId.GetValueOrDefault() equals till.Id
+                                where assignment.ReleasedAt == null
+                                join till in _dbContext.Tills.AsNoTracking() on assignment.TillId equals till.Id
                                 where till.TenantId == tenantId && till.Status != TillConstants.DeletedStatus
                                 select new
                                 {
-                                    PosDeviceId = assignment.PosDeviceId.GetValueOrDefault(),
+                                    PosDeviceId = assignment.PosDeviceId,
                                     TillId = till.Id,
-                                    OutletId = till.OutletId.GetValueOrDefault(),
+                                    OutletId = till.OutletId,
                                     till.TillCode,
-                                    till.Name
+                                    till.TillName
                                 };
 
         var query = from device in _dbContext.PosDevices.AsNoTracking()
@@ -75,10 +65,10 @@ public sealed class PosDeviceRepository : IPosDeviceRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var pattern = $"%{search.Trim()}%";
-            query = query.Where(x => EF.Functions.ILike(x.device.Name, pattern) ||
+            query = query.Where(x => EF.Functions.ILike(x.device.DeviceName, pattern) ||
                                      EF.Functions.ILike(x.device.DeviceCode, pattern) ||
-                                     EF.Functions.ILike(x.device.DeviceSerialNumber, pattern) ||
-                                     EF.Functions.ILike(x.outlet.Name, pattern) ||
+                                     EF.Functions.ILike(x.device.DeviceType, pattern) ||
+                                     EF.Functions.ILike(x.outlet.OutletName, pattern) ||
                                      EF.Functions.ILike(x.outlet.OutletCode, pattern));
         }
 
@@ -92,14 +82,15 @@ public sealed class PosDeviceRepository : IPosDeviceRepository
                 x.device.Id,
                 x.device.OutletId,
                 x.outlet.OutletCode,
-                x.outlet.Name,
+                x.outlet.OutletName,
                 x.device.DeviceCode,
-                x.device.Name,
-                x.device.DeviceSerialNumber,
+                x.device.DeviceName,
+                x.device.DeviceType,
                 x.device.Status,
+                x.device.IsTrusted,
                 x.assignedTill == null ? null : x.assignedTill.TillId,
                 x.assignedTill == null ? null : x.assignedTill.TillCode,
-                x.assignedTill == null ? null : x.assignedTill.Name,
+                x.assignedTill == null ? null : x.assignedTill.TillName,
                 x.device.CreatedAt,
                 x.device.UpdatedAt))
             .ToListAsync(cancellationToken);
@@ -110,16 +101,16 @@ public sealed class PosDeviceRepository : IPosDeviceRepository
     public async Task<PosDeviceResponse?> GetByIdAsync(Guid tenantId, Guid posDeviceId, bool includeDeleted, CancellationToken cancellationToken)
     {
         var assignedTillQuery = from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
-                                where assignment.TillId.HasValue && assignment.PosDeviceId.HasValue && assignment.Status == TillDeviceAssignmentConstants.ActiveStatus
-                                join till in _dbContext.Tills.AsNoTracking() on assignment.TillId.GetValueOrDefault() equals till.Id
+                                where assignment.ReleasedAt == null
+                                join till in _dbContext.Tills.AsNoTracking() on assignment.TillId equals till.Id
                                 where till.TenantId == tenantId && till.Status != TillConstants.DeletedStatus
                                 select new
                                 {
-                                    PosDeviceId = assignment.PosDeviceId.GetValueOrDefault(),
+                                    PosDeviceId = assignment.PosDeviceId,
                                     TillId = till.Id,
-                                    OutletId = till.OutletId.GetValueOrDefault(),
+                                    OutletId = till.OutletId,
                                     till.TillCode,
-                                    till.Name
+                                    till.TillName
                                 };
 
         return await (from device in _dbContext.PosDevices.AsNoTracking()
@@ -134,14 +125,15 @@ public sealed class PosDeviceRepository : IPosDeviceRepository
                           device.Id,
                           device.OutletId,
                           outlet.OutletCode,
-                          outlet.Name,
+                          outlet.OutletName,
                           device.DeviceCode,
-                          device.Name,
-                          device.DeviceSerialNumber,
+                          device.DeviceName,
+                          device.DeviceType,
                           device.Status,
+                          device.IsTrusted,
                           assignedTill == null ? null : assignedTill.TillId,
                           assignedTill == null ? null : assignedTill.TillCode,
-                          assignedTill == null ? null : assignedTill.Name,
+                          assignedTill == null ? null : assignedTill.TillName,
                           device.CreatedAt,
                           device.UpdatedAt))
             .FirstOrDefaultAsync(cancellationToken);
@@ -162,7 +154,8 @@ public sealed class PosDeviceRepository : IPosDeviceRepository
         return _dbContext.TillDeviceAssignments
             .AsNoTracking()
             .AnyAsync(
-                assignment => assignment.PosDeviceId == posDeviceId && assignment.Status == TillDeviceAssignmentConstants.ActiveStatus &&
+                assignment => assignment.PosDeviceId == posDeviceId &&
+                              assignment.ReleasedAt == null &&
                               _dbContext.Tills.Any(till => till.Id == assignment.TillId && till.TenantId == tenantId),
                 cancellationToken);
     }
@@ -178,5 +171,3 @@ public sealed class PosDeviceRepository : IPosDeviceRepository
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
-
-

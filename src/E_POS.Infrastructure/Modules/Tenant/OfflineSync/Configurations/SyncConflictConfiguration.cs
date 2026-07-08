@@ -38,7 +38,7 @@ public sealed class SyncConflictConfiguration : IEntityTypeConfiguration<SyncCon
 
         builder.Property(x => x.SyncBatchId)
             .HasColumnName("sync_batch_id")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.SyncItemId)
             .HasColumnName("sync_item_id")
@@ -62,6 +62,8 @@ public sealed class SyncConflictConfiguration : IEntityTypeConfiguration<SyncCon
 
         builder.Property(x => x.ConflictType)
             .HasColumnName("conflict_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.ClientPayloadJson)
@@ -76,10 +78,14 @@ public sealed class SyncConflictConfiguration : IEntityTypeConfiguration<SyncCon
 
         builder.Property(x => x.ResolutionStatus)
             .HasColumnName("resolution_status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.ResolutionStrategy)
             .HasColumnName("resolution_strategy")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired(false);
 
         builder.Property(x => x.ResolutionNote)
