@@ -102,7 +102,6 @@ public sealed class EPosDbContext : DbContext
     public DbSet<UserSetupToken> UserSetupTokens => Set<UserSetupToken>();
 
     // Outlet, Till and Device
-    public DbSet<CodeSequence> CodeSequences => Set<CodeSequence>();
     public DbSet<HardwareProfile> HardwareProfiles => Set<HardwareProfile>();
     public DbSet<Outlet> Outlets => Set<Outlet>();
     public DbSet<OutletAddress> OutletAddresses => Set<OutletAddress>();
@@ -215,9 +214,8 @@ public sealed class EPosDbContext : DbContext
 
     // Orders and Sales
     public DbSet<DocumentNumberSequence> DocumentNumberSequences => Set<DocumentNumberSequence>();
-    public DbSet<SalesOrderNumberSequence> SalesOrderNumberSequences => Set<SalesOrderNumberSequence>();
     public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
-    public DbSet<SalesOrderAddress> SalesOrderAddresses => Set<SalesOrderAddress>();    public DbSet<SalesOrderDiscount> SalesOrderDiscounts => Set<SalesOrderDiscount>();
+    public DbSet<SalesOrderDiscount> SalesOrderDiscounts => Set<SalesOrderDiscount>();
     public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
     public DbSet<SalesOrderLineComponent> SalesOrderLineComponents => Set<SalesOrderLineComponent>();
     public DbSet<SalesOrderLineOption> SalesOrderLineOptions => Set<SalesOrderLineOption>();

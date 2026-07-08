@@ -23,14 +23,15 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                 type: "integer",
                 nullable: true);
 
+            // Backfill any pre-existing tills so the NOT NULL + positive-number
+            // constraints below can be applied safely on populated databases.
             migrationBuilder.Sql("""
                 UPDATE tills
                 SET till_area_name = 'Front',
-                    till_number = 1,
-                    till_code = 'FRONT-01',
-                    name = 'Front Till 01'
-                WHERE lower(trim(name)) IN ('development front till', 'front till')
-                   OR lower(trim(name)) LIKE '%development front till%';
+                    till_number = 1
+                WHERE till_area_name IS NULL
+                  AND (lower(trim(till_name)) IN ('development front till', 'front till')
+                       OR lower(trim(till_name)) LIKE '%development front till%');
                 """);
 
             migrationBuilder.Sql("""
@@ -39,7 +40,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         id,
                         ROW_NUMBER() OVER (
                             PARTITION BY tenant_id, outlet_id
-                            ORDER BY created_at, till_code, name
+                            ORDER BY created_at, till_code, till_name
                         ) AS seq
                     FROM tills
                     WHERE till_area_name IS NULL

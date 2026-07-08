@@ -131,7 +131,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
         }
 
         deviceCode = device.DeviceCode;
-        deviceName = device.Name;
+        deviceName = device.DeviceName;
         deviceStatus = device.Status;
 
         _logger.LogDebug(
@@ -156,9 +156,8 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 join t in _dbContext.Tills.AsNoTracking() on row.TillId equals t.Id
                 where t.TenantId == context.TenantId &&
                       row.PosDeviceId == device.Id &&
-                      row.Status == TillDeviceAssignmentConstants.ActiveStatus &&
-                      row.EffectiveTo == null
-                orderby row.EffectiveFrom descending
+                      row.ReleasedAt == null
+                orderby row.AssignedAt descending
                 select new
                 {
                     TillId = t.Id,
@@ -202,7 +201,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 x => x.TenantId == context.TenantId && x.Id == assignedTillId,
                 cancellationToken);
 
-        if (till is null || till.OutletId is null)
+        if (till is null)
         {
             _logger.LogDebug(
                 "POS home context unresolved: till {TillId} not found for tenant {TenantId}.",
@@ -228,7 +227,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 "Activate the till or assign this device to an active till.");
         }
 
-        var resolvedOutletId = till.OutletId.Value;
+        var resolvedOutletId = till.OutletId;
         if (outletId is { } clientOutletId &&
             clientOutletId != Guid.Empty &&
             clientOutletId != resolvedOutletId)
@@ -289,7 +288,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
         var outletName = await _dbContext.Outlets
             .AsNoTracking()
             .Where(o => o.Id == resolvedOutletId && o.TenantId == context.TenantId)
-            .Select(o => o.Name)
+            .Select(o => o.OutletName)
             .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
 
         var outletTimezone = await _dbContext.Tenants
@@ -371,7 +370,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 DeviceStatus: deviceStatus,
                 TillId: till.Id,
                 TillCode: till.TillCode,
-                TillName: till.Name,
+                TillName: till.TillName,
                 TillAreaName: till.TillAreaName,
                 TillNumber: till.TillNumber,
                 TillSessionStatus: tillSession.Status,
@@ -398,9 +397,8 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 where t.TenantId == tenantId &&
                       d.TenantId == tenantId &&
                       d.Status == PosDeviceConstants.ActiveStatus &&
-                      assignment.Status == TillDeviceAssignmentConstants.ActiveStatus &&
-                      assignment.EffectiveTo == null
-                orderby assignment.EffectiveFrom descending
+                      assignment.ReleasedAt == null
+                orderby assignment.AssignedAt descending
                 select assignment.PosDeviceId)
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -414,10 +412,8 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 join t in _dbContext.Tills.AsNoTracking() on assignment.TillId equals t.Id
                 where t.TenantId == tenantId &&
                       t.Id == tillId &&
-                      assignment.Status == TillDeviceAssignmentConstants.ActiveStatus &&
-                      assignment.EffectiveTo == null &&
-                      assignment.PosDeviceId != null
-                orderby assignment.EffectiveFrom descending
+                      assignment.ReleasedAt == null
+                orderby assignment.AssignedAt descending
                 select assignment.PosDeviceId)
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -431,8 +427,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             .AsNoTracking()
             .AnyAsync(
                 x => x.PosDeviceId == deviceId &&
-                     x.Status == TillDeviceAssignmentConstants.ActiveStatus &&
-                     x.EffectiveTo == null,
+                     x.ReleasedAt == null,
                 cancellationToken);
 
         if (!hasActiveAssignment)

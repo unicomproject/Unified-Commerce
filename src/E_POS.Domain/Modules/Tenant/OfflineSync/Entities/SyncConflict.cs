@@ -6,7 +6,7 @@ public class SyncConflict : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
     public Guid OfflineClientId { get; protected set; }
-    public Guid SyncBatchId { get; protected set; }
+    public Guid? SyncBatchId { get; protected set; }
     public Guid? SyncItemId { get; protected set; }
     public string EntityName { get; protected set; } = string.Empty;
     public string? ClientRecordId { get; protected set; }
@@ -19,5 +19,37 @@ public class SyncConflict : AuditableEntity
     public string? ResolutionNote { get; protected set; }
     public Guid? ResolvedByTenantUserId { get; protected set; }
     public DateTimeOffset? ResolvedAt { get; protected set; }
+
+    protected SyncConflict() { }
+
+    public static SyncConflict Create(
+        Guid id,
+        Guid tenantId,
+        Guid offlineClientId,
+        Guid? syncBatchId,
+        Guid? syncItemId,
+        string entityName,
+        string conflictType,
+        string? clientPayloadJson,
+        string? serverPayloadJson,
+        string resolutionStatus,
+        DateTimeOffset now)
+    {
+        return new SyncConflict
+        {
+            Id = id,
+            TenantId = tenantId,
+            OfflineClientId = offlineClientId,
+            SyncBatchId = syncBatchId,
+            SyncItemId = syncItemId,
+            EntityName = entityName.Trim(),
+            ConflictType = conflictType.Trim(),
+            ClientPayloadJson = clientPayloadJson,
+            ServerPayloadJson = serverPayloadJson,
+            ResolutionStatus = resolutionStatus.Trim(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }
 

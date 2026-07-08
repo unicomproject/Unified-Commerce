@@ -54,6 +54,8 @@ public sealed class OfflineClientConfiguration : IEntityTypeConfiguration<Offlin
 
         builder.Property(x => x.OfflineType)
             .HasColumnName("offline_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.OfflineEnabled)
@@ -82,6 +84,8 @@ public sealed class OfflineClientConfiguration : IEntityTypeConfiguration<Offlin
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.CreatedByTenantUserId)

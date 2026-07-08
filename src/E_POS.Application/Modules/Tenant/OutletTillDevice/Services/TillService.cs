@@ -61,11 +61,16 @@ public sealed class TillService : ITillService
             tillId,
             context.TenantId,
             request.OutletId,
+            request.TillName,
             normalizedAreaName,
             request.TillNumber,
-            request.Name,
             normalizedTillCode,
+            request.TillType,
+            request.DefaultOpeningFloatAmount,
+            request.CurrencyCode,
+            request.IsCashManaged,
             request.Status,
+            context.UserId,
             now);
         await _repository.AddAsync(till, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
@@ -134,11 +139,16 @@ public sealed class TillService : ITillService
 
         till.UpdateProfile(
             request.OutletId,
+            request.TillName,
             normalizedAreaName,
             request.TillNumber,
-            request.Name,
             normalizedTillCode,
+            request.TillType,
+            request.DefaultOpeningFloatAmount,
+            request.CurrencyCode,
+            request.IsCashManaged,
             request.Status,
+            context.UserId,
             _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
@@ -158,7 +168,7 @@ public sealed class TillService : ITillService
             return ApplicationResult.Failure(new ApplicationError("till.delete_conflict", "Till cannot be deleted while POS devices are assigned."));
         }
 
-        till.SoftDelete(_dateTimeProvider.UtcNow);
+        till.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }
@@ -175,5 +185,3 @@ public sealed class TillService : ITillService
             : PermissionDenied;
     }
 }
-
-

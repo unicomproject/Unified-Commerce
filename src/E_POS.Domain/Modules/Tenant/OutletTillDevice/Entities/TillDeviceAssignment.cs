@@ -1,35 +1,46 @@
-using System.Globalization;
 using E_POS.Domain.Common.Entities;
-using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 
-public class TillDeviceAssignment : AuditableEntity
+public class TillDeviceAssignment : BaseEntity
 {
-    public Guid? TillId { get; protected set; }
-    public Guid? PosDeviceId { get; protected set; }
-    public string EffectiveFrom { get; protected set; } = string.Empty;
-    public DateTimeOffset? EffectiveTo { get; protected set; }
-    public string Status { get; protected set; } = string.Empty;
+    public Guid TenantId { get; protected set; }
+    public Guid OutletId { get; protected set; }
+    public Guid TillId { get; protected set; }
+    public Guid PosDeviceId { get; protected set; }
+    public DateTimeOffset AssignedAt { get; protected set; }
+    public Guid? AssignedByTenantUserId { get; protected set; }
+    public DateTimeOffset? ReleasedAt { get; protected set; }
+    public Guid? ReleasedByTenantUserId { get; protected set; }
+    public string? ReleaseReason { get; protected set; }
 
-    public static TillDeviceAssignment Create(Guid id, Guid tillId, Guid posDeviceId, DateTimeOffset now)
+    public bool IsActive => ReleasedAt is null;
+
+    public static TillDeviceAssignment Create(
+        Guid id,
+        Guid tenantId,
+        Guid outletId,
+        Guid tillId,
+        Guid posDeviceId,
+        Guid? assignedByTenantUserId,
+        DateTimeOffset now)
     {
         return new TillDeviceAssignment
         {
             Id = id,
+            TenantId = tenantId,
+            OutletId = outletId,
             TillId = tillId,
             PosDeviceId = posDeviceId,
-            EffectiveFrom = now.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
-            Status = TillDeviceAssignmentConstants.ActiveStatus,
-            CreatedAt = now,
-            UpdatedAt = now
+            AssignedAt = now,
+            AssignedByTenantUserId = assignedByTenantUserId
         };
     }
 
-    public void Revoke(DateTimeOffset now)
+    public void Release(Guid? releasedByTenantUserId, string? releaseReason, DateTimeOffset now)
     {
-        Status = TillDeviceAssignmentConstants.RevokedStatus;
-        EffectiveTo = now;
-        UpdatedAt = now;
+        ReleasedAt = now;
+        ReleasedByTenantUserId = releasedByTenantUserId;
+        ReleaseReason = string.IsNullOrWhiteSpace(releaseReason) ? null : releaseReason.Trim();
     }
 }

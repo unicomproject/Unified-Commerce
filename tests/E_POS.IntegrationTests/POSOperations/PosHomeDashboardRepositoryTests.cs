@@ -179,7 +179,9 @@ public sealed class PosHomeDashboardRepositoryTests
             "MAIN-01",
             "ACTIVE",
             "STORE",
+            "UTC",
             true,
+            null,
             null,
             null,
             now));
@@ -188,25 +190,31 @@ public sealed class PosHomeDashboardRepositoryTests
             tillId,
             tenantId,
             outletId,
+            "Front Till 01",
             "Front",
             1,
-            "Front Till 01",
             "FRONT-01",
+            "STANDARD",
+            0m,
+            "LKR",
+            true,
             "ACTIVE",
+            null,
             now));
 
         dbContext.PosDevices.Add(PosDevice.Create(
             deviceId,
             tenantId,
             outletId,
-            "Front POS Device",
             "POS-01",
-            "DEV-POS-01",
+            "Front POS Device",
+            "TABLET",
             "ACTIVE",
+            null,
             now));
 
         dbContext.TillDeviceAssignments.Add(
-            TillDeviceAssignment.Create(Guid.NewGuid(), tillId, deviceId, now));
+            TillDeviceAssignment.Create(Guid.NewGuid(), tenantId, outletId, tillId, deviceId, null, now));
 
         if (includeOpenSession)
         {

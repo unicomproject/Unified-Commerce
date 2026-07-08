@@ -16,54 +16,49 @@ public sealed class TillDeviceAssignmentRepository : ITillDeviceAssignmentReposi
         _dbContext = dbContext;
     }
 
-    public Task<bool> ActiveTillExistsAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken)
+    public Task<TillOutletContext?> GetTillContextAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken)
     {
         return _dbContext.Tills
             .AsNoTracking()
-            .AnyAsync(
-                x => x.TenantId == tenantId &&
-                     x.Id == tillId &&
-                     x.Status == TillConstants.ActiveStatus,
-                cancellationToken);
+            .Where(x => x.TenantId == tenantId && x.Id == tillId && x.Status == TillConstants.ActiveStatus)
+            .Select(x => new TillOutletContext(x.OutletId))
+            .FirstOrDefaultAsync(cancellationToken)!;
     }
 
-    public Task<bool> ActiveDeviceExistsAsync(Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken)
+    public Task<DeviceOutletContext?> GetDeviceContextAsync(Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken)
     {
         return _dbContext.PosDevices
             .AsNoTracking()
-            .AnyAsync(
-                x => x.TenantId == tenantId &&
-                     x.Id == posDeviceId &&
-                     x.Status == PosDeviceConstants.ActiveStatus,
-                cancellationToken);
-    }
-
-    public Task<bool> TillAndDeviceShareOutletAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken)
-    {
-        return (from till in _dbContext.Tills.AsNoTracking()
-                where till.OutletId.HasValue
-                join device in _dbContext.PosDevices.AsNoTracking() on till.OutletId.GetValueOrDefault() equals device.OutletId
-                where till.TenantId == tenantId &&
-                      device.TenantId == tenantId &&
-                      till.Id == tillId &&
-                      device.Id == posDeviceId
-                select till.Id)
-            .AnyAsync(cancellationToken);
+            .Where(x => x.TenantId == tenantId && x.Id == posDeviceId && x.Status == PosDeviceConstants.ActiveStatus)
+            .Select(x => new DeviceOutletContext(x.OutletId))
+            .FirstOrDefaultAsync(cancellationToken)!;
     }
 
     public Task<bool> DeviceAssignedToAnyTillAsync(Guid tenantId, Guid posDeviceId, Guid? excludeTillId, CancellationToken cancellationToken)
     {
-        return (from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
-                where assignment.TillId.HasValue && assignment.PosDeviceId.HasValue && assignment.Status == TillDeviceAssignmentConstants.ActiveStatus
-                join till in _dbContext.Tills.AsNoTracking() on assignment.TillId.GetValueOrDefault() equals till.Id
-                where till.TenantId == tenantId &&
-                      assignment.PosDeviceId.GetValueOrDefault() == posDeviceId &&
-                      (!excludeTillId.HasValue || till.Id != excludeTillId.Value)
-                select assignment.Id)
-            .AnyAsync(cancellationToken);
+        return _dbContext.TillDeviceAssignments
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.PosDeviceId == posDeviceId &&
+                     x.ReleasedAt == null &&
+                     (!excludeTillId.HasValue || x.TillId != excludeTillId.Value),
+                cancellationToken);
     }
 
-    public Task<TillDeviceAssignmentResponse?> GetByTillAndDeviceAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken)
+    public Task<bool> TillAssignedToAnyDeviceAsync(Guid tenantId, Guid tillId, Guid? excludePosDeviceId, CancellationToken cancellationToken)
+    {
+        return _dbContext.TillDeviceAssignments
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.TillId == tillId &&
+                     x.ReleasedAt == null &&
+                     (!excludePosDeviceId.HasValue || x.PosDeviceId != excludePosDeviceId.Value),
+                cancellationToken);
+    }
+
+    public Task<TillDeviceAssignmentResponse?> GetActiveByTillAndDeviceAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken)
     {
         return BuildAssignmentQuery(tenantId)
             .Where(x => x.TillId == tillId && x.PosDeviceId == posDeviceId)
@@ -95,16 +90,13 @@ public sealed class TillDeviceAssignmentRepository : ITillDeviceAssignmentReposi
 
     public Task<TillDeviceAssignment?> GetEditableAsync(Guid tenantId, Guid tillId, Guid posDeviceId, CancellationToken cancellationToken)
     {
-        return (from assignment in _dbContext.TillDeviceAssignments
-                where assignment.TillId.HasValue && assignment.PosDeviceId.HasValue && assignment.Status == TillDeviceAssignmentConstants.ActiveStatus
-                join till in _dbContext.Tills on assignment.TillId.GetValueOrDefault() equals till.Id
-                join device in _dbContext.PosDevices on assignment.PosDeviceId.GetValueOrDefault() equals device.Id
-                where till.TenantId == tenantId &&
-                      device.TenantId == tenantId &&
-                      assignment.TillId.GetValueOrDefault() == tillId &&
-                      assignment.PosDeviceId.GetValueOrDefault() == posDeviceId
-                select assignment)
-            .FirstOrDefaultAsync(cancellationToken);
+        return _dbContext.TillDeviceAssignments
+            .FirstOrDefaultAsync(
+                x => x.TenantId == tenantId &&
+                     x.TillId == tillId &&
+                     x.PosDeviceId == posDeviceId &&
+                     x.ReleasedAt == null,
+                cancellationToken);
     }
 
     public async Task AddAsync(TillDeviceAssignment assignment, CancellationToken cancellationToken)
@@ -113,41 +105,36 @@ public sealed class TillDeviceAssignmentRepository : ITillDeviceAssignmentReposi
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RevokeAsync(TillDeviceAssignment assignment, DateTimeOffset now, CancellationToken cancellationToken)
+    public async Task ReleaseAsync(TillDeviceAssignment assignment, Guid? releasedByTenantUserId, string? releaseReason, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        assignment.Revoke(now);
+        assignment.Release(releasedByTenantUserId, releaseReason, now);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private IQueryable<TillDeviceAssignmentResponse> BuildAssignmentQuery(Guid tenantId)
     {
         return from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
-               where assignment.TillId.HasValue && assignment.PosDeviceId.HasValue && assignment.Status == TillDeviceAssignmentConstants.ActiveStatus
-               join till in _dbContext.Tills.AsNoTracking() on assignment.TillId.GetValueOrDefault() equals till.Id
-               where till.OutletId.HasValue
-               join device in _dbContext.PosDevices.AsNoTracking() on assignment.PosDeviceId.GetValueOrDefault() equals device.Id
-               join outlet in _dbContext.Outlets.AsNoTracking() on till.OutletId.GetValueOrDefault() equals outlet.Id
+               where assignment.TenantId == tenantId && assignment.ReleasedAt == null
+               join till in _dbContext.Tills.AsNoTracking() on assignment.TillId equals till.Id
+               join device in _dbContext.PosDevices.AsNoTracking() on assignment.PosDeviceId equals device.Id
+               join outlet in _dbContext.Outlets.AsNoTracking() on assignment.OutletId equals outlet.Id
                where till.TenantId == tenantId &&
                      device.TenantId == tenantId &&
                      outlet.TenantId == tenantId &&
-                     device.OutletId == outlet.Id &&
                      till.Status != TillConstants.DeletedStatus &&
                      device.Status != PosDeviceConstants.DeletedStatus
                select new TillDeviceAssignmentResponse(
                    assignment.Id,
                    till.Id,
                    till.TillCode,
-                   till.Name,
+                   till.TillName,
                    device.Id,
                    device.DeviceCode,
-                   device.Name,
+                   device.DeviceName,
                    outlet.Id,
                    outlet.OutletCode,
-                   outlet.Name,
-                   assignment.EffectiveFrom,
-                   assignment.CreatedAt,
-                   assignment.UpdatedAt);
+                   outlet.OutletName,
+                   assignment.AssignedAt,
+                   assignment.ReleasedAt);
     }
 }
-
-

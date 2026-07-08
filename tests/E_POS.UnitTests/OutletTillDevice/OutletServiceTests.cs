@@ -42,8 +42,8 @@ public sealed class OutletServiceTests
         {
             BusinessHours =
             [
-                new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0)),
-                new OutletBusinessHourRequest(1, new TimeOnly(10, 0), new TimeOnly(18, 0))
+                new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null),
+                new OutletBusinessHourRequest(1, new TimeOnly(10, 0), new TimeOnly(18, 0), false, null, null)
             ]
         };
         var service = CreateService(new FakeOutletRepository());
@@ -86,10 +86,11 @@ public sealed class OutletServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("outlet.permission_denied", result.Error.Code);
     }
+
     [Fact]
     public async Task DeleteAsync_WithActiveTillOrDevice_ReturnsDeleteConflict()
     {
-        var outlet = Outlet.Create(Guid.NewGuid(), TenantId, "Main", "MAIN", "ACTIVE", "STORE", true, null, null, Now);
+        var outlet = Outlet.Create(Guid.NewGuid(), TenantId, "Main", "MAIN", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now);
         var service = CreateService(new FakeOutletRepository
         {
             EditAggregate = new OutletEditAggregate(outlet, null, [], null),
@@ -122,11 +123,12 @@ public sealed class OutletServiceTests
             "Main Outlet",
             "ACTIVE",
             "STORE",
-            true,
+            "UTC",
+            false,
             "+94770000000",
             "main@example.com",
-            new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "LK"),
-            [new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0))],
+            new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null),
+            [new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null)],
             false);
     }
 
@@ -177,10 +179,11 @@ public sealed class OutletServiceTests
                 "Main Outlet",
                 "ACTIVE",
                 "STORE",
-                true,
+                "UTC",
+                false,
                 null,
                 null,
-                new OutletAddressResponse(Guid.NewGuid(), "PHYSICAL", "1 Main Street", null, "Colombo", null, null, "LK"),
+                new OutletAddressResponse(Guid.NewGuid(), "PHYSICAL", "1 Main Street", null, "Colombo", null, null, "LK", null, null, true, "ACTIVE"),
                 [],
                 false,
                 Now,
@@ -188,5 +191,3 @@ public sealed class OutletServiceTests
         }
     }
 }
-
-

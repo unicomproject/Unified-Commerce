@@ -22,11 +22,7 @@ public sealed class SalesOrderChargeConfiguration : IEntityTypeConfiguration<Sal
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
-
+        builder.Ignore(x => x.UpdatedAt);
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 

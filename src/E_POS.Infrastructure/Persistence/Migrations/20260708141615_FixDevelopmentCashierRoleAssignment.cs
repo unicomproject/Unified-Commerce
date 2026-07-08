@@ -1,4 +1,4 @@
-using E_POS.Infrastructure.Persistence.Seed;
+﻿using E_POS.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable

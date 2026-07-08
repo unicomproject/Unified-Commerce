@@ -91,10 +91,14 @@ public sealed class TillServiceTests
     [Fact]
     public async Task UpdateAsync_WithUpdatePermission_ReturnsSuccess()
     {
-        var till = Till.Create(Guid.NewGuid(), TenantId, OutletId, "Main", 1, "Main Till 01", "MAIN-01", "ACTIVE", Now);
+        var till = Till.Create(Guid.NewGuid(), TenantId, OutletId, "Main Till", "Main", 1, "MAIN-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE", UserId, Now);
         var service = CreateService(new FakeTillRepository { EditableTill = till });
 
-        var result = await service.UpdateAsync(CreateContext([TillConstants.UpdatePermission]), till.Id, new TillUpdateRequest(OutletId, "Main", 1, "Updated Till 01", "main-02", "INACTIVE"), CancellationToken.None);
+        var result = await service.UpdateAsync(
+            CreateContext([TillConstants.UpdatePermission]),
+            till.Id,
+            new TillUpdateRequest(OutletId, "Updated Till", "Main", 1, "main-02", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "INACTIVE"),
+            CancellationToken.None);
 
         Assert.True(result.IsSuccess);
     }
@@ -102,7 +106,7 @@ public sealed class TillServiceTests
     [Fact]
     public async Task DeleteAsync_WithDeviceAssignment_ReturnsDeleteConflict()
     {
-        var till = Till.Create(Guid.NewGuid(), TenantId, OutletId, "Main", 1, "Main Till 01", "MAIN-01", "ACTIVE", Now);
+        var till = Till.Create(Guid.NewGuid(), TenantId, OutletId, "Main Till", "Main", 1, "MAIN-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE", UserId, Now);
         var service = CreateService(new FakeTillRepository
         {
             EditableTill = till,
@@ -132,7 +136,7 @@ public sealed class TillServiceTests
 
     private static TillCreateRequest CreateValidRequest()
     {
-        return new TillCreateRequest(OutletId, "Main", 1, "Main Till 01", "main-01", "ACTIVE");
+        return new TillCreateRequest(OutletId, "Main Till", "Main", 1, "main-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE");
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
@@ -166,9 +170,7 @@ public sealed class TillServiceTests
 
         private static TillResponse CreateResponse(Guid tillId)
         {
-            return new TillResponse(tillId, OutletId, "MAIN", "Main Outlet", "Main", 1, "MAIN-01", "Main Till 01", "ACTIVE", false, Now, Now);
+            return new TillResponse(tillId, OutletId, "MAIN", "Main Outlet", "Main", 1, "MAIN-01", "Main Till", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE", false, Now, Now);
         }
     }
 }
-
-
