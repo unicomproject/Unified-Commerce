@@ -16,6 +16,12 @@ public interface ITenantAdminTillRepository
         Guid? excludeTillId,
         CancellationToken cancellationToken);
 
+    Task<int> GetNextTillNumberAsync(
+        Guid tenantId,
+        Guid outletId,
+        string tillAreaName,
+        CancellationToken cancellationToken);
+
     Task<TenantAdminTillListResponse> ListAsync(
         Guid tenantId,
         string? search,

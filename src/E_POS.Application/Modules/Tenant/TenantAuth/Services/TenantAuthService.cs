@@ -3,6 +3,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
+using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
@@ -104,10 +105,11 @@ public sealed class TenantAuthService : ITenantAuthService
             account.TenantUserId,
             account.TenantId,
             cancellationToken);
+        var effectivePermissions = TenantPermissionAliases.Expand(permissions);
 
         var sessionId = Guid.NewGuid();
         var jwtId = Guid.NewGuid().ToString("N");
-        var accessToken = _jwtTokenFactory.CreateAccessToken(CreateTokenDescriptor(account, sessionId, jwtId, permissions));
+        var accessToken = _jwtTokenFactory.CreateAccessToken(CreateTokenDescriptor(account, sessionId, jwtId, effectivePermissions));
         var refreshToken = _refreshTokenGenerator.CreateRefreshToken(_jwtSettings.RefreshTokenDays);
 
         // Persist only token identifiers and hashes, never raw access or refresh tokens.
@@ -158,7 +160,7 @@ public sealed class TenantAuthService : ITenantAuthService
                 account.Email,
                 account.UserStatus,
                 account.TenantStatus),
-            permissions);
+            effectivePermissions);
 
         return ApplicationResult<TenantLoginResponse>.Success(response);
     }

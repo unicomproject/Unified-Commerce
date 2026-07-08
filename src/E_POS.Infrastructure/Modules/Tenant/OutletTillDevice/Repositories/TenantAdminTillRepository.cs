@@ -10,7 +10,6 @@ namespace E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
 {
     private const string OpenSessionStatus = "OPEN";
-    private const string ActiveAssignmentStatus = "ACTIVE";
 
     private readonly EPosDbContext _dbContext;
 
@@ -47,6 +46,25 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                      x.Status != TillConstants.DeletedStatus &&
                      (!excludeTillId.HasValue || x.Id != excludeTillId.Value),
                 cancellationToken);
+    }
+
+    public async Task<int> GetNextTillNumberAsync(
+        Guid tenantId,
+        Guid outletId,
+        string tillAreaName,
+        CancellationToken cancellationToken)
+    {
+        var normalizedAreaName = TillConstants.NormalizeAreaName(tillAreaName);
+        var maxNumber = await _dbContext.Tills
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.OutletId == outletId &&
+                x.TillAreaName == normalizedAreaName)
+            .Select(x => (int?)x.TillNumber)
+            .MaxAsync(cancellationToken);
+
+        return (maxNumber ?? 0) + 1;
     }
 
     public async Task<TenantAdminTillListResponse> ListAsync(
@@ -168,7 +186,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
             .AnyAsync(
                 assignment =>
                     assignment.TillId == tillId &&
-                    assignment.Status == ActiveAssignmentStatus &&
+                    assignment.ReleasedAt == null &&
                     _dbContext.Tills.Any(till =>
                         till.Id == assignment.TillId &&
                         till.TenantId == tenantId),
@@ -231,10 +249,10 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
         return await _dbContext.Outlets
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Status != OutletConstants.DeletedStatus)
-            .OrderBy(x => x.Name)
+            .OrderBy(x => x.OutletName)
             .Select(x => new TenantAdminOutletOptionResponse(
                 x.Id,
-                x.Name,
+                x.OutletName,
                 x.OutletCode,
                 x.Status))
             .ToListAsync(cancellationToken);
@@ -251,8 +269,8 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                let activeAssignment = _dbContext.TillDeviceAssignments
                    .Where(assignment =>
                        assignment.TillId == till.Id &&
-                       assignment.Status == ActiveAssignmentStatus)
-                   .OrderByDescending(assignment => assignment.UpdatedAt)
+                       assignment.ReleasedAt == null)
+                   .OrderByDescending(assignment => assignment.AssignedAt)
                    .FirstOrDefault()
                let assignedDevice = activeAssignment == null
                    ? null
@@ -267,10 +285,10 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                select new TillRow
                {
                    TillId = till.Id,
-                   TillName = till.Name,
+                   TillName = till.TillName,
                    TillCode = till.TillCode,
                    OutletId = outlet.Id,
-                   OutletName = outlet.Name,
+                   OutletName = outlet.OutletName,
                    OutletCode = outlet.OutletCode,
                    TillStatus = till.Status,
                    DeviceName = till.DeviceName,

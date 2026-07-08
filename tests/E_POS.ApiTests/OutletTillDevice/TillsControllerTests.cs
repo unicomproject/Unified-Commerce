@@ -4,6 +4,7 @@ using E_POS.Api.Controllers;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -97,12 +98,12 @@ public sealed class TillsControllerTests
 
     private static TillCreateRequest CreateRequest()
     {
-        return new TillCreateRequest(Guid.NewGuid(), "Main Till", "MAIN-01", "ACTIVE");
+        return new TillCreateRequest(Guid.NewGuid(), "Main Till", "Main", 1, "MAIN-01", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE");
     }
 
     private static TillResponse CreateResponse(Guid id)
     {
-        return new TillResponse(id, Guid.NewGuid(), "MAIN", "Main Outlet", "MAIN-01", "Main Till", "ACTIVE", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        return new TillResponse(id, Guid.NewGuid(), "MAIN", "Main Outlet", "Main", 1, "MAIN-01", "Main Till", TillConstants.StandardTillType, 0m, TillConstants.DefaultCurrencyCode, true, "ACTIVE", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
     }
 
     private sealed class FakeTillService : ITillService

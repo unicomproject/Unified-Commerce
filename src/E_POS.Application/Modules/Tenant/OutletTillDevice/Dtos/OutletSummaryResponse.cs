@@ -1,3 +1,13 @@
 namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 
-public sealed record OutletSummaryResponse(Guid Id, string OutletCode, string Name, string Status, string OutletType, bool IsOnlineVisible, string? ContactPhone, string? ContactEmail, bool CollectionEnabled);
+public sealed record OutletSummaryResponse(
+    Guid Id,
+    string OutletCode,
+    string OutletName,
+    string Status,
+    string OutletType,
+    string Timezone,
+    bool IsDefaultOutlet,
+    string? Phone,
+    string? Email,
+    bool CollectionEnabled);

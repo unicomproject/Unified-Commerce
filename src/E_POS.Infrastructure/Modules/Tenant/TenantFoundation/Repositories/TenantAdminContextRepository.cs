@@ -56,7 +56,7 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
         var outlets = await _dbContext.Outlets
             .AsNoTracking()
             .Where(o => o.TenantId == tenantId && o.Status.ToUpper() != "DELETED")
-            .Select(o => new TenantAdminContextOutletDto(o.Id, o.Name))
+            .Select(o => new TenantAdminContextOutletDto(o.Id, o.OutletName))
             .ToListAsync(cancellationToken);
 
         // Effective permissions: direct + role-based

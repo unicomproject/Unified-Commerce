@@ -31,7 +31,7 @@ public sealed class SyncItemConfiguration : IEntityTypeConfiguration<SyncItem>
 
         builder.Property(x => x.SyncBatchId)
             .HasColumnName("sync_batch_id")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.OfflineClientId)
             .HasColumnName("offline_client_id")
@@ -39,6 +39,8 @@ public sealed class SyncItemConfiguration : IEntityTypeConfiguration<SyncItem>
 
         builder.Property(x => x.Direction)
             .HasColumnName("direction")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.EntityName)
@@ -59,6 +61,8 @@ public sealed class SyncItemConfiguration : IEntityTypeConfiguration<SyncItem>
 
         builder.Property(x => x.OperationType)
             .HasColumnName("operation_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.PayloadJson)
@@ -74,6 +78,8 @@ public sealed class SyncItemConfiguration : IEntityTypeConfiguration<SyncItem>
 
         builder.Property(x => x.ItemStatus)
             .HasColumnName("item_status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.ErrorCode)

@@ -18,6 +18,8 @@ using E_POS.Application.Modules.Platform.Subscription.Services;
 using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
 using E_POS.Application.Modules.Tenant.PricingTax.Services;
 using E_POS.Application.Modules.Tenant.PricingTax.Validators;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -73,6 +75,9 @@ public static class DependencyInjection
         services.AddScoped<IProductTaxAssignmentRequestValidator, ProductTaxAssignmentRequestValidator>();
         services.AddScoped<ITaxSetupService, TaxSetupService>();
         services.AddScoped<IProductTaxAssignmentService, ProductTaxAssignmentService>();
+
+        // POS Home (cashier dashboard)
+        services.AddScoped<IPosHomeDashboardService, PosHomeDashboardService>();
 
         return services;
     }

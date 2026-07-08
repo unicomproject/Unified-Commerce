@@ -126,13 +126,27 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
 
         var now = _dateTimeProvider.UtcNow;
         var tillId = Guid.NewGuid();
+        var actingUserId = context.UserId == Guid.Empty ? (Guid?)null : context.UserId;
+        var tillAreaName = request.TillName.Trim();
+        var tillNumber = await _repository.GetNextTillNumberAsync(
+            context.TenantId,
+            request.OutletId,
+            tillAreaName,
+            cancellationToken);
         var till = Till.Create(
             tillId,
             context.TenantId,
             request.OutletId,
             request.TillName,
+            tillAreaName,
+            tillNumber,
             normalizedTillCode,
+            TillConstants.StandardTillType,
+            0m,
+            TillConstants.DefaultCurrencyCode,
+            true,
             request.Status,
+            actingUserId,
             now,
             request.DeviceName,
             request.PrinterName,
@@ -213,11 +227,19 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
                 "Till code already exists for this tenant."));
         }
 
+        var actingUserId = context.UserId == Guid.Empty ? (Guid?)null : context.UserId;
         till.UpdateProfile(
             request.OutletId,
             request.TillName,
+            till.TillAreaName,
+            till.TillNumber,
             normalizedTillCode,
+            till.TillType,
+            till.DefaultOpeningFloatAmount,
+            till.CurrencyCode,
+            till.IsCashManaged,
             request.Status,
+            actingUserId,
             _dateTimeProvider.UtcNow,
             request.DeviceName,
             request.PrinterName,
@@ -281,7 +303,8 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
                 "Till cannot be deleted while a trusted device is assigned."));
         }
 
-        till.SoftDelete(_dateTimeProvider.UtcNow);
+        var actingUserId = context.UserId == Guid.Empty ? (Guid?)null : context.UserId;
+        till.SoftDelete(actingUserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }

@@ -1,14 +1,13 @@
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
-    [DbContext(typeof(EPosDbContext))]
-    [Migration("20260708170000_SeedTenantAdminUserManagementPermissions")]
+    /// <inheritdoc />
     public partial class SeedTenantAdminUserManagementPermissions : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""
@@ -98,6 +97,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                 """);
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""

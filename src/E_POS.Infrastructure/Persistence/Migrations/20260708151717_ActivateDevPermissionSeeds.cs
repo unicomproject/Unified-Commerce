@@ -1,12 +1,10 @@
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
-    [DbContext(typeof(EPosDbContext))]
-    [Migration("20260708120000_ActivateDevPermissionSeeds")]
+    /// <inheritdoc />
     public partial class ActivateDevPermissionSeeds : Migration
     {
         /// <inheritdoc />

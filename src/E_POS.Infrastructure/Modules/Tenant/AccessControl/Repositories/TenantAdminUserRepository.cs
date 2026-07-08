@@ -95,8 +95,8 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         return await _dbContext.Outlets
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Status != OutletConstants.DeletedStatus)
-            .OrderBy(x => x.Name)
-            .Select(x => new OutletOptionResponse(x.Id, x.Name, x.OutletCode, x.Status))
+            .OrderBy(x => x.OutletName)
+            .Select(x => new OutletOptionResponse(x.Id, x.OutletName, x.OutletCode, x.Status))
             .ToListAsync(cancellationToken);
     }
 
@@ -264,8 +264,8 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             : await _dbContext.Outlets
                 .AsNoTracking()
                 .Where(x => outletIds.Contains(x.Id))
-                .OrderBy(x => x.Name)
-                .Select(x => new OutletOptionResponse(x.Id, x.Name, x.OutletCode, x.Status))
+                .OrderBy(x => x.OutletName)
+                .Select(x => new OutletOptionResponse(x.Id, x.OutletName, x.OutletCode, x.Status))
                 .ToListAsync(cancellationToken);
 
         var overriddenPermissionIds = await _dbContext.TenantUserPermissions
@@ -501,7 +501,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             where userRole.TenantId == tenantId &&
                   userIds.Contains(userRole.TenantUserId) &&
                   userRole.RevokedAt == null
-            select new { userRole.TenantUserId, outlet.Id, outlet.Name }
+            select new { userRole.TenantUserId, outlet.Id, Name = outlet.OutletName }
         ).ToListAsync(cancellationToken);
 
         var byUser = assignments

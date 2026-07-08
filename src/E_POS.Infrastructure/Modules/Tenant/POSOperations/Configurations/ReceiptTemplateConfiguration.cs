@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -26,8 +27,11 @@ public sealed class ReceiptTemplateConfiguration : IEntityTypeConfiguration<Rece
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Ignore(x => x.CreatedBy);
-        builder.Ignore(x => x.UpdatedBy);
+        builder.Property(x => x.CreatedBy)
+            .HasColumnName("created_by_tenant_user_id");
+
+        builder.Property(x => x.UpdatedBy)
+            .HasColumnName("updated_by_tenant_user_id");
 
         builder.Property(x => x.TenantId)
             .HasColumnName("tenant_id")
@@ -35,14 +39,14 @@ public sealed class ReceiptTemplateConfiguration : IEntityTypeConfiguration<Rece
 
         builder.Property(x => x.TemplateCode)
             .HasColumnName("template_code")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80)
+            .HasColumnType("varchar(50)")
+            .HasMaxLength(50)
             .IsRequired();
 
-        builder.Property(x => x.Name)
-            .HasColumnName("name")
-            .HasColumnType("varchar(200)")
-            .HasMaxLength(200)
+        builder.Property(x => x.TemplateName)
+            .HasColumnName("template_name")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
             .IsRequired();
 
         builder.Property(x => x.TemplateType)
@@ -68,16 +72,23 @@ public sealed class ReceiptTemplateConfiguration : IEntityTypeConfiguration<Rece
             .HasMaxLength(40)
             .IsRequired();
 
-        builder.Property(x => x.SortOrder)
-            .HasColumnName("sort_order")
-            .IsRequired()
-            .HasDefaultValue(0);
-
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_receipt_templates_tenant_id_tenants");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_receipt_templates_created_by_tenant_users");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_receipt_templates_updated_by_tenant_users");
 
         builder.HasOne<ReceiptTemplate>()
             .WithMany()

@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
@@ -54,7 +55,9 @@ public sealed class PlatformDashboardRepositoryTests
             "OUT-001",
             "ACTIVE",
             "STORE",
+            "UTC",
             true,
+            null,
             null,
             null,
             Now));
@@ -65,7 +68,9 @@ public sealed class PlatformDashboardRepositoryTests
             "OUT-002",
             "DELETED",
             "STORE",
+            "UTC",
             false,
+            null,
             null,
             null,
             Now));
@@ -75,8 +80,15 @@ public sealed class PlatformDashboardRepositoryTests
             tenantOneId,
             Guid.Parse("33333333-3333-4333-8333-333333333301"),
             "Front Till",
+            "Front",
+            1,
             "TILL-001",
+            TillConstants.StandardTillType,
+            0m,
+            TillConstants.DefaultCurrencyCode,
+            true,
             "ACTIVE",
+            null,
             Now));
 
         dbContext.TenantUsers.Add(TenantUser.Create(

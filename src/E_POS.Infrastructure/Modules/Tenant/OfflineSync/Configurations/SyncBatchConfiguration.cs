@@ -35,10 +35,14 @@ public sealed class SyncBatchConfiguration : IEntityTypeConfiguration<SyncBatch>
 
         builder.Property(x => x.SyncType)
             .HasColumnName("sync_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.SyncStatus)
             .HasColumnName("sync_status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.ClientStartedAt)

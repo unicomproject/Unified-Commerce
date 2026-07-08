@@ -9,6 +9,7 @@ using E_POS.Infrastructure.Modules.Tenant.AccessControl.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Infrastructure.Common;
@@ -17,6 +18,7 @@ using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
@@ -90,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<ITaxSetupRepository, TaxSetupRepository>();
         services.AddScoped<IProductTaxAssignmentRepository, ProductTaxAssignmentRepository>();
         services.AddScoped<ITenantLookupRepository, TenantLookupRepository>();
+        services.AddScoped<IPosHomeDashboardRepository, PosHomeDashboardRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;

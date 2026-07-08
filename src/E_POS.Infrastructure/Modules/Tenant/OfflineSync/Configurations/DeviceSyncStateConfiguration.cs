@@ -38,10 +38,14 @@ public sealed class DeviceSyncStateConfiguration : IEntityTypeConfiguration<Devi
 
         builder.Property(x => x.DatasetName)
             .HasColumnName("dataset_name")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.SyncDirection)
             .HasColumnName("sync_direction")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.Property(x => x.SyncFilterJson)
@@ -69,6 +73,8 @@ public sealed class DeviceSyncStateConfiguration : IEntityTypeConfiguration<Devi
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         // <second-brain-constraints>

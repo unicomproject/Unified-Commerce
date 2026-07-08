@@ -44,6 +44,25 @@ public sealed class TillRepository : ITillRepository
                 cancellationToken);
     }
 
+    public Task<bool> TillAreaNumberExistsAsync(
+        Guid tenantId,
+        Guid outletId,
+        string tillAreaName,
+        int tillNumber,
+        Guid? excludeTillId,
+        CancellationToken cancellationToken)
+    {
+        return _dbContext.Tills
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.OutletId == outletId &&
+                     x.TillAreaName == tillAreaName &&
+                     x.TillNumber == tillNumber &&
+                     (!excludeTillId.HasValue || x.Id != excludeTillId.Value),
+                cancellationToken);
+    }
+
     public async Task<TillListResponse> ListAsync(
         Guid tenantId,
         Guid? outletId,
@@ -67,27 +86,32 @@ public sealed class TillRepository : ITillRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToUpperInvariant();
-            query = query.Where(x => x.till.Name.ToUpper().Contains(term) ||
+            query = query.Where(x => x.till.TillName.ToUpper().Contains(term) ||
                                      x.till.TillCode.ToUpper().Contains(term) ||
-                                     x.outlet.Name.ToUpper().Contains(term) ||
+                                     x.till.TillAreaName.ToUpper().Contains(term) ||
+                                     x.outlet.OutletName.ToUpper().Contains(term) ||
                                      x.outlet.OutletCode.ToUpper().Contains(term));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query
             .OrderBy(x => x.outlet.OutletCode)
-            .ThenBy(x => x.till.TillCode)
+            .ThenBy(x => x.till.TillAreaName)
+            .ThenBy(x => x.till.TillNumber)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new TillSummaryResponse(
                 x.till.Id,
-                x.till.OutletId!.Value,
+                x.till.OutletId,
                 x.outlet.OutletCode,
-                x.outlet.Name,
+                x.outlet.OutletName,
+                x.till.TillAreaName,
+                x.till.TillNumber,
                 x.till.TillCode,
-                x.till.Name,
+                x.till.TillName,
+                x.till.TillType,
                 x.till.Status,
-                _dbContext.TillDeviceAssignments.Any(assignment => assignment.TillId == x.till.Id),
+                _dbContext.TillDeviceAssignments.Any(assignment => assignment.TillId == x.till.Id && assignment.ReleasedAt == null),
                 x.till.CreatedAt,
                 x.till.UpdatedAt))
             .ToListAsync(cancellationToken);
@@ -117,15 +141,21 @@ public sealed class TillRepository : ITillRepository
 
         var isDeviceAssigned = await _dbContext.TillDeviceAssignments
             .AsNoTracking()
-            .AnyAsync(x => x.TillId == tillId, cancellationToken);
+            .AnyAsync(x => x.TillId == tillId && x.ReleasedAt == null, cancellationToken);
 
         return new TillResponse(
             row.till.Id,
-            row.till.OutletId!.Value,
+            row.till.OutletId,
             row.outlet.OutletCode,
-            row.outlet.Name,
+            row.outlet.OutletName,
+            row.till.TillAreaName,
+            row.till.TillNumber,
             row.till.TillCode,
-            row.till.Name,
+            row.till.TillName,
+            row.till.TillType,
+            row.till.DefaultOpeningFloatAmount,
+            row.till.CurrencyCode,
+            row.till.IsCashManaged,
             row.till.Status,
             isDeviceAssigned,
             row.till.CreatedAt,
@@ -148,6 +178,7 @@ public sealed class TillRepository : ITillRepository
             .AsNoTracking()
             .AnyAsync(
                 assignment => assignment.TillId == tillId &&
+                              assignment.ReleasedAt == null &&
                               _dbContext.Tills.Any(till => till.Id == assignment.TillId && till.TenantId == tenantId),
                 cancellationToken);
     }
@@ -163,6 +194,3 @@ public sealed class TillRepository : ITillRepository
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
-
-
-

@@ -47,9 +47,21 @@ public sealed class OutletService : IOutletService
             }
 
             var outletId = Guid.NewGuid();
-            var outlet = Outlet.Create(outletId, context.TenantId, request.Name, outletCode, request.Status, request.OutletType, request.IsOnlineVisible, request.ContactPhone, request.ContactEmail, now);
-            var address = CreateAddress(outletId, request.Address, now);
-            var hours = CreateBusinessHours(outletId, request.BusinessHours, now);
+            var outlet = Outlet.Create(
+                outletId,
+                context.TenantId,
+                request.OutletName,
+                outletCode,
+                request.Status,
+                request.OutletType,
+                request.Timezone,
+                request.IsDefaultOutlet,
+                request.Phone,
+                request.Email,
+                context.UserId,
+                now);
+            var address = CreateAddress(context.TenantId, outletId, request.Address, context.UserId, now);
+            var hours = CreateBusinessHours(context.TenantId, outletId, request.BusinessHours, now);
             var pickupMapping = await CreatePickupMappingAsync(context.TenantId, outletId, request.CollectionEnabled, now, cancellationToken);
             if (pickupMapping.Error is not null) return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
 
@@ -109,9 +121,19 @@ public sealed class OutletService : IOutletService
         }
 
         var now = _dateTimeProvider.UtcNow;
-        aggregate.Outlet.UpdateProfile(request.Name, normalizedOutletCode, request.Status, request.OutletType, request.IsOnlineVisible, request.ContactPhone, request.ContactEmail, now);
-        var address = UpdateOrCreateAddress(aggregate.PhysicalAddress, outletId, request.Address, now);
-        var hours = CreateBusinessHours(outletId, request.BusinessHours, now);
+        aggregate.Outlet.UpdateProfile(
+            request.OutletName,
+            normalizedOutletCode,
+            request.Status,
+            request.OutletType,
+            request.Timezone,
+            request.IsDefaultOutlet,
+            request.Phone,
+            request.Email,
+            context.UserId,
+            now);
+        var address = UpdateOrCreateAddress(context.TenantId, aggregate.PhysicalAddress, outletId, request.Address, context.UserId, now);
+        var hours = CreateBusinessHours(context.TenantId, outletId, request.BusinessHours, now);
         var enableCollection = aggregate.Outlet.Status != OutletConstants.DeletedStatus && request.CollectionEnabled;
         var pickupMapping = await UpdatePickupMappingAsync(context.TenantId, outletId, aggregate.PickupMapping, enableCollection, now, cancellationToken);
         if (pickupMapping.Error is not null) return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
@@ -140,7 +162,7 @@ public sealed class OutletService : IOutletService
         }
 
         var now = _dateTimeProvider.UtcNow;
-        aggregate.Outlet.SoftDelete(now);
+        aggregate.Outlet.SoftDelete(context.UserId, now);
         aggregate.PickupMapping?.SetStatus(OutletConstants.InactiveStatus, now);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
@@ -212,24 +234,58 @@ public sealed class OutletService : IOutletService
         return _codeSequenceRepository.GetNextCodeAsync(tenantId, OutletCodeSequenceKey, OutletCodePrefix, GeneratedCodePaddingLength, now, cancellationToken);
     }
 
+    private static OutletAddress CreateAddress(Guid tenantId, Guid outletId, OutletAddressRequest request, Guid? createdByTenantUserId, DateTimeOffset now) =>
+        OutletAddress.Create(
+            Guid.NewGuid(),
+            tenantId,
+            outletId,
+            request.AddressLine1,
+            request.AddressLine2,
+            request.City,
+            request.StateOrProvince,
+            request.PostalCode,
+            request.CountryCode,
+            request.ContactName,
+            request.ContactPhone,
+            createdByTenantUserId,
+            now);
 
-    private static OutletAddress CreateAddress(Guid outletId, OutletAddressRequest request, DateTimeOffset now) => OutletAddress.Create(Guid.NewGuid(), outletId, request.AddressLine1, request.AddressLine2, request.City, request.StateOrProvince, request.PostalCode, request.CountryCode, now);
-
-    private static OutletAddress UpdateOrCreateAddress(OutletAddress? currentAddress, Guid outletId, OutletAddressRequest request, DateTimeOffset now)
+    private static OutletAddress UpdateOrCreateAddress(Guid tenantId, OutletAddress? currentAddress, Guid outletId, OutletAddressRequest request, Guid? updatedByTenantUserId, DateTimeOffset now)
     {
-        if (currentAddress is null) return CreateAddress(outletId, request, now);
-        currentAddress.UpdatePhysicalAddress(request.AddressLine1, request.AddressLine2, request.City, request.StateOrProvince, request.PostalCode, request.CountryCode, now);
+        if (currentAddress is null) return CreateAddress(tenantId, outletId, request, updatedByTenantUserId, now);
+        currentAddress.UpdatePhysicalAddress(
+            request.AddressLine1,
+            request.AddressLine2,
+            request.City,
+            request.StateOrProvince,
+            request.PostalCode,
+            request.CountryCode,
+            request.ContactName,
+            request.ContactPhone,
+            updatedByTenantUserId,
+            now);
         return currentAddress;
     }
 
-    private static IReadOnlyList<OutletBusinessHour> CreateBusinessHours(Guid outletId, IReadOnlyList<OutletBusinessHourRequest>? request, DateTimeOffset now)
+    private static IReadOnlyList<OutletBusinessHour> CreateBusinessHours(Guid tenantId, Guid outletId, IReadOnlyList<OutletBusinessHourRequest>? request, DateTimeOffset now)
     {
-        return (request ?? []).OrderBy(x => x.DayOfWeek).Select(x => OutletBusinessHour.Create(Guid.NewGuid(), outletId, x.DayOfWeek, x.OpenTime, x.CloseTime, now)).ToList();
+        return (request ?? [])
+            .OrderBy(x => x.DayOfWeek)
+            .Select(x => OutletBusinessHour.Create(
+                Guid.NewGuid(),
+                tenantId,
+                outletId,
+                (short)x.DayOfWeek,
+                x.OpeningTime,
+                x.ClosingTime,
+                x.IsClosed,
+                x.ValidFrom,
+                x.ValidUntil,
+                now))
+            .ToList();
     }
 
     private static ApplicationError CreateDuplicateCodeError() => new("outlet.duplicate_code", "Outlet code already exists for this tenant.");
     private static ApplicationError CreateDeleteConflict() => new("outlet.delete_conflict", "Outlet cannot be deleted while active tills or POS devices are assigned.");
     private sealed record PickupMappingResult(FulfillmentMethodOutlet? Value, ApplicationError? Error);
 }
-
-

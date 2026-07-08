@@ -52,12 +52,12 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
             select new
             {
                 outlet.Id,
-                outlet.Name,
+                outlet.OutletName,
                 outlet.OutletCode,
                 outlet.OutletType,
                 outlet.Status,
-                outlet.ContactPhone,
-                outlet.ContactEmail,
+                ContactPhone = outlet.Phone,
+                ContactEmail = outlet.Email,
                 outlet.CreatedAt,
                 AddressLine1 = address != null ? address.AddressLine1 : null,
                 AddressLine2 = address != null ? address.AddressLine2 : null,
@@ -76,7 +76,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
             .AsNoTracking()
             .Where(x => x.OutletId == outletId)
             .OrderBy(x => x.DayOfWeek)
-            .Select(x => new BusinessHourRow(x.DayOfWeek, x.OpenTime, x.CloseTime))
+            .Select(x => new BusinessHourRow(x.DayOfWeek, x.OpeningTime, x.ClosingTime))
             .ToListAsync(cancellationToken);
 
         var managerName = await (
@@ -95,7 +95,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
 
         return new TenantAdminOutletDetailResponse(
             OutletId: row.Id,
-            OutletName: row.Name,
+            OutletName: row.OutletName,
             OutletCode: row.OutletCode,
             OutletType: row.OutletType,
             Status: row.Status,
@@ -275,7 +275,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
             .Select(x => new
             {
                 x.Id,
-                x.Name,
+                x.TillName,
                 x.TillCode,
                 x.Status,
             })
@@ -347,12 +347,11 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
                 from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
                 join device in _dbContext.PosDevices.AsNoTracking()
                     on assignment.PosDeviceId equals device.Id
-                where assignment.TillId != null &&
-                      tillIds.Contains(assignment.TillId!.Value) &&
-                      assignment.Status == TillDeviceAssignmentConstants.ActiveStatus
+                where tillIds.Contains(assignment.TillId) &&
+                      assignment.ReleasedAt == null
                 select new
                 {
-                    TillId = assignment.TillId!.Value,
+                    TillId = assignment.TillId,
                     device.Status,
                 })
                 .ToListAsync(cancellationToken);
@@ -397,7 +396,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
                 {
                     Item = new TenantAdminOutletTillItemResponse(
                         till.Id,
-                        till.Name,
+                        till.TillName,
                         till.TillCode,
                         till.Status,
                         openSession is null ? summary?.ExpectedCashAmount : summary?.ExpectedCashAmount,
@@ -491,10 +490,12 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
         return string.Join(
             ", ",
             businessHours.Select(hour =>
-                $"{DayLabel(hour.DayOfWeek)} {hour.OpenTime:HH:mm}-{hour.CloseTime:HH:mm}"));
+                hour.OpeningTime.HasValue && hour.ClosingTime.HasValue
+                    ? $"{DayLabel(hour.DayOfWeek)} {hour.OpeningTime.Value:HH:mm}-{hour.ClosingTime.Value:HH:mm}"
+                    : $"{DayLabel(hour.DayOfWeek)} Closed"));
     }
 
-    private sealed record BusinessHourRow(int DayOfWeek, TimeOnly OpenTime, TimeOnly CloseTime);
+    private sealed record BusinessHourRow(short DayOfWeek, TimeOnly? OpeningTime, TimeOnly? ClosingTime);
 
     private static string DayLabel(int dayOfWeek) =>
         dayOfWeek switch

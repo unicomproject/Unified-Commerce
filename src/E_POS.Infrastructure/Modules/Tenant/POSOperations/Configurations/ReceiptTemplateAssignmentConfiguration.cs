@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
@@ -27,8 +28,11 @@ public sealed class ReceiptTemplateAssignmentConfiguration : IEntityTypeConfigur
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Ignore(x => x.CreatedBy);
-        builder.Ignore(x => x.UpdatedBy);
+        builder.Property(x => x.CreatedBy)
+            .HasColumnName("created_by_tenant_user_id");
+
+        builder.Property(x => x.UpdatedBy)
+            .HasColumnName("updated_by_tenant_user_id");
 
         builder.Property(x => x.TenantId)
             .HasColumnName("tenant_id")
@@ -77,6 +81,18 @@ public sealed class ReceiptTemplateAssignmentConfiguration : IEntityTypeConfigur
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_receipt_template_assignments_tenant_id_tenants");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_receipt_template_assignments_created_by_tenant_users");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_receipt_template_assignments_updated_by_tenant_users");
 
         builder.HasOne<ReceiptTemplateVersion>()
             .WithMany()

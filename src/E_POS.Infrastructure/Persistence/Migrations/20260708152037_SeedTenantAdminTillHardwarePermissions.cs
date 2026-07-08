@@ -1,29 +1,16 @@
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
-    [DbContext(typeof(EPosDbContext))]
-    [Migration("20260708160000_AddTenantAdminTillManagementSupport")]
-    public partial class AddTenantAdminTillManagementSupport : Migration
+    /// <inheritdoc />
+    public partial class SeedTenantAdminTillHardwarePermissions : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""
-                ALTER TABLE tills DROP CONSTRAINT IF EXISTS ck_tills_status;
-                ALTER TABLE tills
-                    ADD CONSTRAINT ck_tills_status
-                    CHECK (status IN ('ACTIVE', 'INACTIVE', 'MAINTENANCE', 'DELETED'));
-
-                ALTER TABLE tills ADD COLUMN IF NOT EXISTS device_name varchar(120);
-                ALTER TABLE tills ADD COLUMN IF NOT EXISTS printer_name varchar(120);
-                ALTER TABLE tills ADD COLUMN IF NOT EXISTS scanner_name varchar(120);
-                ALTER TABLE tills ADD COLUMN IF NOT EXISTS cash_drawer_name varchar(120);
-                ALTER TABLE tills ADD COLUMN IF NOT EXISTS card_reader_name varchar(120);
-                ALTER TABLE tills ADD COLUMN IF NOT EXISTS internal_note varchar(500);
-
                 INSERT INTO permission_definitions (
                     id,
                     permission_code,
@@ -39,8 +26,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                 SELECT
                     seed.id,
                     seed.permission_code,
-                    outlet_template.module_id,
-                    outlet_template.feature_id,
+                    till_template.module_id,
+                    till_template.feature_id,
                     seed.action_type,
                     seed.description,
                     true,
@@ -59,7 +46,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     FROM permission_definitions
                     WHERE permission_code = 'tenant.tills.view'
                     LIMIT 1
-                ) AS outlet_template
+                ) AS till_template
                 WHERE NOT EXISTS (
                     SELECT 1
                     FROM permission_definitions existing
@@ -100,6 +87,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                 """);
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""
@@ -120,18 +108,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     'tenant.hardware.view',
                     'tenant.hardware.manage'
                 );
-
-                ALTER TABLE tills DROP COLUMN IF EXISTS device_name;
-                ALTER TABLE tills DROP COLUMN IF EXISTS printer_name;
-                ALTER TABLE tills DROP COLUMN IF EXISTS scanner_name;
-                ALTER TABLE tills DROP COLUMN IF EXISTS cash_drawer_name;
-                ALTER TABLE tills DROP COLUMN IF EXISTS card_reader_name;
-                ALTER TABLE tills DROP COLUMN IF EXISTS internal_note;
-
-                ALTER TABLE tills DROP CONSTRAINT IF EXISTS ck_tills_status;
-                ALTER TABLE tills
-                    ADD CONSTRAINT ck_tills_status
-                    CHECK (status IN ('ACTIVE', 'INACTIVE', 'DELETED'));
                 """);
         }
     }
