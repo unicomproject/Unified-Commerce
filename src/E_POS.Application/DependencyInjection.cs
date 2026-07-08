@@ -8,6 +8,8 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
+using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
+using E_POS.Application.Modules.Tenant.AccessControl.Services;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
@@ -57,6 +59,9 @@ public static class DependencyInjection
         services.AddScoped<ITillRequestValidator, TillRequestValidator>();
         services.AddScoped<IPosDeviceRequestValidator, PosDeviceRequestValidator>();
         services.AddScoped<IOutletService, OutletService>();
+        services.AddScoped<ITenantAdminOutletService, TenantAdminOutletService>();
+        services.AddScoped<ITenantAdminTillService, TenantAdminTillService>();
+        services.AddScoped<ITenantAdminUserService, TenantAdminUserService>();
         services.AddScoped<ITillService, TillService>();
         services.AddScoped<IPosDeviceService, PosDeviceService>();
         services.AddScoped<ITillDeviceAssignmentService, TillDeviceAssignmentService>();

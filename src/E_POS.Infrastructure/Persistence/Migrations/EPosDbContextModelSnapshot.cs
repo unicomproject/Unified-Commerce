@@ -15749,6 +15749,26 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CardReaderName")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("card_reader_name");
+
+                    b.Property<string>("CashDrawerName")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("cash_drawer_name");
+
+                    b.Property<string>("DeviceName")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("device_name");
+
+                    b.Property<string>("InternalNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("internal_note");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -15758,6 +15778,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("OutletId")
                         .HasColumnType("uuid")
                         .HasColumnName("outlet_id");
+
+                    b.Property<string>("PrinterName")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("printer_name");
+
+                    b.Property<string>("ScannerName")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("scanner_name");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -15794,7 +15824,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("tills", null, t =>
                         {
-                            t.HasCheckConstraint("ck_tills_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+                            t.HasCheckConstraint("ck_tills_status", "status IN ('ACTIVE', 'INACTIVE', 'MAINTENANCE', 'DELETED')");
                         });
                 });
 

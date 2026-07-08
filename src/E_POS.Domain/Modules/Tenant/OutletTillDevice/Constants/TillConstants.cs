@@ -4,6 +4,7 @@ public static class TillConstants
 {
     public const string ActiveStatus = "ACTIVE";
     public const string InactiveStatus = "INACTIVE";
+    public const string MaintenanceStatus = "MAINTENANCE";
     public const string DeletedStatus = "DELETED";
     public const string ViewPermission = "tenant.tills.view";
     public const string CreatePermission = "tenant.tills.create";
@@ -17,12 +18,12 @@ public static class TillConstants
     public static bool IsValidStatus(string status)
     {
         var normalized = NormalizeStatus(status);
-        return normalized is ActiveStatus or InactiveStatus or DeletedStatus;
+        return normalized is ActiveStatus or InactiveStatus or MaintenanceStatus or DeletedStatus;
     }
 
     public static bool IsValidWriteStatus(string status)
     {
         var normalized = NormalizeStatus(status);
-        return normalized is ActiveStatus or InactiveStatus;
+        return normalized is ActiveStatus or InactiveStatus or MaintenanceStatus;
     }
 }

@@ -51,6 +51,36 @@ public sealed class TillConfiguration : IEntityTypeConfiguration<Till>
             .HasColumnType("varchar(80)")
             .HasMaxLength(80);
 
+        builder.Property(x => x.DeviceName)
+            .HasColumnName("device_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
+        builder.Property(x => x.PrinterName)
+            .HasColumnName("printer_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
+        builder.Property(x => x.ScannerName)
+            .HasColumnName("scanner_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
+        builder.Property(x => x.CashDrawerName)
+            .HasColumnName("cash_drawer_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
+        builder.Property(x => x.CardReaderName)
+            .HasColumnName("card_reader_name")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
+        builder.Property(x => x.InternalNote)
+            .HasColumnName("internal_note")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500);
+
         builder.HasOne<Outlet>()
             .WithMany()
             .HasForeignKey(x => x.OutletId)
@@ -65,7 +95,7 @@ public sealed class TillConfiguration : IEntityTypeConfiguration<Till>
             .IsUnique()
             .HasDatabaseName("uq_tills_tenant_id_id");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_tills_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_tills_status", "status IN ('ACTIVE', 'INACTIVE', 'MAINTENANCE', 'DELETED')"));
     }
 }
 

@@ -103,6 +103,27 @@ public class TenantUser : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void UpdateProfile(
+        string fullName,
+        string email,
+        string? phone,
+        string accountStatus,
+        DateTimeOffset now)
+    {
+        FullName = fullName.Trim();
+        Email = NormalizeEmail(email);
+        Phone = phone;
+        UnmaskedPhone = phone;
+        AccountStatus = accountStatus;
+        UpdatedAt = now;
+    }
+
+    public void Disable(DateTimeOffset now)
+    {
+        AccountStatus = TenantUserConstants.StatusInactive;
+        UpdatedAt = now;
+    }
+
     public static string NormalizeEmail(string email)
     {
         return email.Trim().ToUpperInvariant();

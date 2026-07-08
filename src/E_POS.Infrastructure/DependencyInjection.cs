@@ -4,6 +4,8 @@ using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
+using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
+using E_POS.Infrastructure.Modules.Tenant.AccessControl.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
@@ -77,6 +79,9 @@ public static class DependencyInjection
         services.AddScoped<IReturnPolicyRepository, ReturnPolicyRepository>();
         services.AddScoped<ICodeSequenceRepository, CodeSequenceRepository>();
         services.AddScoped<IOutletRepository, OutletRepository>();
+        services.AddScoped<ITenantAdminOutletRepository, TenantAdminOutletRepository>();
+        services.AddScoped<ITenantAdminTillRepository, TenantAdminTillRepository>();
+        services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();
         services.AddScoped<ITillDeviceAssignmentRepository, TillDeviceAssignmentRepository>();

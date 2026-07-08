@@ -1,0 +1,12 @@
+<Project>
+  <!-- Windows Application Control blocks DLLs built under Desktop. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'E_POS.Api'">
+    <_TrustedApiRun>$([System.Environment]::GetEnvironmentVariable('NYTROZ_API_TRUSTED_RUN'))</_TrustedApiRun>
+    <_RunApiScript>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)scripts\run-api.ps1'))</_RunApiScript>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'E_POS.Api' AND '$(OS)' == 'Windows_NT' AND '$(_TrustedApiRun)' != 'true'">
+    <RunCommand>powershell.exe</RunCommand>
+    <RunArguments>-NoProfile -ExecutionPolicy Bypass -File &quot;$(_RunApiScript)&quot;</RunArguments>
+  </PropertyGroup>
+</Project>

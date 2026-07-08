@@ -22,7 +22,7 @@ public sealed class TillRequestValidator : ITillRequestValidator
         if (outletId == Guid.Empty) return ValidationFailed("Outlet is required.");
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200) return ValidationFailed("Till name is required and must be 200 characters or less.");
         if (string.IsNullOrWhiteSpace(tillCode) || tillCode.Trim().Length > 80) return ValidationFailed("Till code is required and must be 80 characters or less.");
-        if (string.IsNullOrWhiteSpace(status) || !TillConstants.IsValidWriteStatus(status)) return ValidationFailed("Till status must be ACTIVE or INACTIVE.");
+        if (string.IsNullOrWhiteSpace(status) || !TillConstants.IsValidWriteStatus(status)) return ValidationFailed("Till status must be ACTIVE, INACTIVE, or MAINTENANCE.");
         return null;
     }
 
