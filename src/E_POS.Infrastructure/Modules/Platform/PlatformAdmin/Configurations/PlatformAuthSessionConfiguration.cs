@@ -42,19 +42,56 @@ public sealed class PlatformAuthSessionConfiguration : IEntityTypeConfiguration<
             .HasColumnType("varchar(255)")
             .HasMaxLength(255);
 
+        builder.Property(x => x.IpAddress)
+            .HasColumnName("ip_address")
+            .HasColumnType("varchar(45)");
+
+        builder.Property(x => x.UserAgent)
+            .HasColumnName("user_agent")
+            .HasColumnType("text");
+
+        builder.Property(x => x.DeviceName)
+            .HasColumnName("device_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150);
+
+        builder.Property(x => x.LastSeenAt)
+            .HasColumnName("last_seen_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.RevokedAt)
+            .HasColumnName("revoked_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.RevokedByPlatformUserId)
+            .HasColumnName("revoked_by_platform_user_id");
+
+        builder.Property(x => x.RevokeReason)
+            .HasColumnName("revoke_reason")
+            .HasColumnType("varchar(250)")
+            .HasMaxLength(250);
+
         builder.HasOne<PlatformUser>()
             .WithMany()
             .HasForeignKey(x => x.PlatformUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_platform_auth_sessions_platform_user_id_platform_users");
 
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.RevokedByPlatformUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_platform_auth_sessions_revoked_by_platform_user_id_platform_users");
+
         builder.HasIndex(x => x.SessionTokenHash)
             .IsUnique()
             .HasDatabaseName("uq_platform_auth_sessions_session_token_hash");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_auth_sessions_status", "status IN ('ACTIVE', 'EXPIRED', 'REVOKED')")); 
+        builder.HasIndex(x => new { x.PlatformUserId, x.RevokedAt })
+            .HasDatabaseName("ix_platform_auth_sessions_platform_user_id_revoked_at");
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_platform_auth_sessions_status",
+            "status IN ('ACTIVE', 'EXPIRED', 'REVOKED')"));
     }
 }
-
-
-
