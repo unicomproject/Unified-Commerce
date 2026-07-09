@@ -324,6 +324,76 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.Equal(60m, repository.LastWriteModel.DraftInvoice.BalanceDue);
         Assert.Equal("LKR", repository.LastWriteModel.DraftInvoice.CurrencyCode);
         Assert.Equal(SubscriptionBillingAlignmentConstants.InvoiceTypeSubscription, repository.LastWriteModel.DraftInvoice.InvoiceType);
+
+        var lines = repository.LastWriteModel.DraftInvoiceLines;
+        Assert.Equal(2, lines.Count);
+
+        var planLine = lines[0];
+        Assert.Equal(SubscriptionBillingAlignmentConstants.InvoiceLineTypePlan, planLine.ItemType);
+        Assert.Equal(1, planLine.LineNumberInt);
+        Assert.Equal("1", planLine.LineNumber);
+        Assert.Equal(50m, planLine.UnitPrice);
+        Assert.Equal(1m, planLine.Quantity);
+        Assert.Equal(50m, planLine.LineTotalAmount);
+        Assert.Equal(50m, planLine.LineTotal);
+        Assert.Equal(repository.LastWriteModel.DraftInvoice.Id, planLine.SubscriptionInvoiceId);
+        Assert.Equal(repository.LastWriteModel.DraftInvoice.Id, planLine.InvoiceId);
+
+        var addonLine = lines[1];
+        Assert.Equal(SubscriptionBillingAlignmentConstants.InvoiceLineTypeAddon, addonLine.ItemType);
+        Assert.Equal(2, addonLine.LineNumberInt);
+        Assert.Equal("2", addonLine.LineNumber);
+        Assert.Equal(5m, addonLine.UnitPrice);
+        Assert.Equal(2m, addonLine.Quantity);
+        Assert.Equal(10m, addonLine.LineTotalAmount);
+        Assert.Equal(10m, addonLine.LineTotal);
+        Assert.Equal(repository.LastWriteModel.DraftInvoice.Id, addonLine.SubscriptionInvoiceId);
+        Assert.Equal(repository.LastWriteModel.DraftInvoice.Id, addonLine.InvoiceId);
+
+        Assert.Equal(
+            repository.LastWriteModel.DraftInvoice.TotalAmount,
+            lines.Sum(line => line.LineTotalAmount));
+        Assert.Equal(
+            repository.LastWriteModel.DraftInvoice.SubtotalAmount,
+            lines.Sum(line => line.LineTotal));
+        Assert.Equal(
+            repository.LastWriteModel.DraftInvoice.BalanceDue,
+            lines.Sum(line => line.LineTotalAmount));
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardWithPaidBilling_SkipsDraftInvoiceAndLines()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-NOINV",
+                Name = "Wizard Tenant",
+                BillingStatus = TenantBillingStatusConstants.Paid,
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "No",
+                    Email = "noinv@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastWriteModel);
+        Assert.Null(repository.LastWriteModel!.DraftInvoice);
+        Assert.Empty(repository.LastWriteModel.DraftInvoiceLines);
     }
 
     [Fact]

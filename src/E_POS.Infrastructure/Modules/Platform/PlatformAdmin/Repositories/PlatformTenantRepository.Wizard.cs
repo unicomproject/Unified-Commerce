@@ -333,6 +333,10 @@ public sealed partial class PlatformTenantRepository
             if (model.DraftInvoice is not null)
             {
                 _dbContext.SubscriptionInvoices.Add(model.DraftInvoice);
+                if (model.DraftInvoiceLines.Count > 0)
+                {
+                    _dbContext.SubscriptionInvoiceLines.AddRange(model.DraftInvoiceLines);
+                }
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);

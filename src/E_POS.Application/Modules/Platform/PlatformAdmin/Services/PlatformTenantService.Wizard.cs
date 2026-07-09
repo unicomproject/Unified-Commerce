@@ -334,12 +334,14 @@ public sealed partial class PlatformTenantService
                                        string.Equals(billingStatus, TenantBillingStatusConstants.Pending, StringComparison.OrdinalIgnoreCase);
 
         SubscriptionInvoice? draftInvoice = null;
+        IReadOnlyList<SubscriptionInvoiceLine> draftInvoiceLines = [];
         if (shouldCreateDraftInvoice)
         {
+            var invoiceId = Guid.NewGuid();
             var addonsTotal = addonSelections.Sum(selection => addonMap[selection.AddonId].UnitPrice * selection.Quantity);
             var invoiceAmount = Math.Max(0m, plan.PriceAmount + addonsTotal);
             draftInvoice = SubscriptionInvoice.CreateDraft(
-                Guid.NewGuid(),
+                invoiceId,
                 tenantId,
                 subscriptionId,
                 GenerateDraftInvoiceNumber(now),
@@ -349,6 +351,12 @@ public sealed partial class PlatformTenantService
                 plan.BaseCurrency,
                 subscriptionRequest?.BillingStartAt ?? now,
                 subscriptionRequest?.NextBillingAt,
+                now);
+            draftInvoiceLines = BuildDraftInvoiceLines(
+                invoiceId,
+                plan,
+                addonSelections,
+                addonMap,
                 now);
         }
 
@@ -365,7 +373,8 @@ public sealed partial class PlatformTenantService
             TenantAdminUser = tenantAdminUser,
             TenantAdminUserRole = tenantAdminUserRole,
             TenantAdminInvite = invite,
-            DraftInvoice = draftInvoice
+            DraftInvoice = draftInvoice,
+            DraftInvoiceLines = draftInvoiceLines
         };
 
         try
@@ -711,6 +720,61 @@ public sealed partial class PlatformTenantService
         $"INV-{now:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..32];
 
     private sealed record ResolvedAddonSelection(Guid AddonId, int Quantity);
+
+    private static IReadOnlyList<SubscriptionInvoiceLine> BuildDraftInvoiceLines(
+        Guid invoiceId,
+        SubscriptionPlan plan,
+        IReadOnlyList<ResolvedAddonSelection> addonSelections,
+        IReadOnlyDictionary<Guid, PlatformTenantCreateAddonOptionDto> addonMap,
+        DateTimeOffset now)
+    {
+        var lines = new List<SubscriptionInvoiceLine>();
+        var lineNumber = 1;
+        var planDescription = !string.IsNullOrWhiteSpace(plan.Name)
+            ? plan.Name
+            : !string.IsNullOrWhiteSpace(plan.PlanName)
+                ? plan.PlanName
+                : plan.PlanCode;
+
+        lines.Add(SubscriptionInvoiceLine.Create(
+            Guid.NewGuid(),
+            invoiceId,
+            lineNumber.ToString(),
+            lineNumber,
+            SubscriptionBillingAlignmentConstants.InvoiceLineTypePlan,
+            planDescription,
+            1m,
+            plan.PriceAmount,
+            plan.PriceAmount,
+            now));
+
+        lineNumber++;
+
+        foreach (var selection in addonSelections)
+        {
+            var addon = addonMap[selection.AddonId];
+            var lineTotal = addon.UnitPrice * selection.Quantity;
+            var addonDescription = !string.IsNullOrWhiteSpace(addon.Name)
+                ? addon.Name
+                : addon.AddonCode;
+
+            lines.Add(SubscriptionInvoiceLine.Create(
+                Guid.NewGuid(),
+                invoiceId,
+                lineNumber.ToString(),
+                lineNumber,
+                SubscriptionBillingAlignmentConstants.InvoiceLineTypeAddon,
+                addonDescription,
+                selection.Quantity,
+                addon.UnitPrice,
+                lineTotal,
+                now));
+
+            lineNumber++;
+        }
+
+        return lines;
+    }
 }
 
 
