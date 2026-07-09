@@ -112,7 +112,8 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             new FakePlatformPermissionChecker(permissions),
             new FakePlatformPermissionRepository(permissions),
             new FakeDateTimeProvider(),
-            new FakePasswordHashService());
+            new FakePasswordHashService(),
+            new FakeTenantUsageCounterService());
     }
 
     private static HashSet<string> AllTenantPermissions() =>

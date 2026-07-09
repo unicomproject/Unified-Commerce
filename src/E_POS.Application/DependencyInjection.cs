@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformUserService, PlatformUserService>();
         services.AddScoped<IPlatformAuditLogService, PlatformAuditLogService>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
+        services.AddScoped<ITenantUsageCounterService, TenantUsageCounterService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
         services.AddScoped<ITenantAdminContextService, TenantAdminContextService>();
         services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();

@@ -57,6 +57,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
     private readonly IPlatformPermissionRepository _permissionRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IPasswordHashService _passwordHashService;
+    private readonly ITenantUsageCounterService _tenantUsageCounterService;
 
     public PlatformTenantService(
         IPlatformTenantRepository repository,
@@ -64,7 +65,8 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         IPlatformPermissionChecker permissionChecker,
         IPlatformPermissionRepository permissionRepository,
         IDateTimeProvider dateTimeProvider,
-        IPasswordHashService passwordHashService)
+        IPasswordHashService passwordHashService,
+        ITenantUsageCounterService tenantUsageCounterService)
     {
         _repository = repository;
         _subscriptionPlanRepository = subscriptionPlanRepository;
@@ -72,6 +74,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         _permissionRepository = permissionRepository;
         _dateTimeProvider = dateTimeProvider;
         _passwordHashService = passwordHashService;
+        _tenantUsageCounterService = tenantUsageCounterService;
     }
 
     public async Task<ApplicationResult<PlatformTenantListResponse>> GetTenantsAsync(

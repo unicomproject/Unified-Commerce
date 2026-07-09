@@ -392,7 +392,8 @@ public sealed class PlatformTenantLifecycleServiceTests
             new FakeLifecyclePermissionChecker(permissions),
             new FakeLifecyclePermissionRepository(permissions),
             new FakeLifecycleDateTimeProvider(),
-            new FakeLifecyclePasswordHashService());
+            new FakeLifecyclePasswordHashService(),
+            new FakeTenantUsageCounterService());
     }
 
     private static HashSet<string> AllTenantPermissions() =>

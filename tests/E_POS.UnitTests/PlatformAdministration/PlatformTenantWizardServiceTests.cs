@@ -282,10 +282,132 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.Equal(SubscriptionBillingAlignmentConstants.InvoiceTypeSubscription, repository.LastWriteModel.DraftInvoice.InvoiceType);
     }
 
+    [Fact]
+    public async Task CreateTenantAsync_WizardRequest_ValidatesAndSeedsUsageCounters()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var usageCounterService = new FakeTenantUsageCounterService();
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate },
+            tenantUsageCounterService: usageCounterService);
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-COUNTERS",
+                Name = "Wizard Tenant",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada-counters@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(usageCounterService.ValidateCalled);
+        Assert.True(usageCounterService.SeedCalled);
+        Assert.NotNull(usageCounterService.LastSeedRequest);
+        Assert.NotNull(repository.LastWriteModel);
+        Assert.Equal(repository.LastWriteModel!.Tenant.Id, usageCounterService.LastSeedRequest!.TenantId);
+        Assert.Equal(Now, usageCounterService.LastSeedRequest.PeriodStart);
+        Assert.Null(usageCounterService.LastSeedRequest.PeriodEnd);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxOutlets);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxUsers);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxTills);
+        Assert.Equal(CreateDetail(tenantId).Code, result.Value!.Code);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardWithAddons_SeedsCountersWithEffectiveLimits()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var usageCounterService = new FakeTenantUsageCounterService();
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate },
+            tenantUsageCounterService: usageCounterService);
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-ADDON-COUNTERS",
+                Name = "Wizard Tenant",
+                SubscriptionPlanId = PlanId,
+                Addons = [new CreatePlatformTenantAddonSelectionRequest { AddonId = AddonId, Quantity = 2 }],
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Jude",
+                    Email = "jude-counters@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(usageCounterService.LastSeedRequest);
+        Assert.Equal(7, usageCounterService.LastSeedRequest!.MaxOutlets);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxUsers);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxTills);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardWhenCanonicalLimitsMissing_ReturnsValidationFailureBeforeSave()
+    {
+        var repository = new FakeWizardTenantRepository();
+        var usageCounterService = new FakeTenantUsageCounterService
+        {
+            ValidateException = new MissingCanonicalCapacityLimitDefinitionException(
+                SubscriptionCatalogLimitSeedConstants.MaxOutletsLimitKey,
+                SubscriptionCatalogLimitSeedConstants.MaxOutletsLimitDefinitionId)
+        };
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate },
+            tenantUsageCounterService: usageCounterService);
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-MISSING-LIMITS",
+                Name = "Wizard Tenant",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    Email = "ada-missing@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_tenants.validation_failed", result.Error.Code);
+        Assert.Contains("max_outlets", result.Error.Message, StringComparison.Ordinal);
+        Assert.False(repository.CreateWizardCalled);
+        Assert.False(usageCounterService.SeedCalled);
+    }
+
     private static PlatformTenantService CreateService(
         FakeWizardTenantRepository repository,
         IReadOnlySet<string> permissions,
-        IPasswordHashService? passwordHashService = null)
+        IPasswordHashService? passwordHashService = null,
+        FakeTenantUsageCounterService? tenantUsageCounterService = null)
     {
         var subscriptionRepository = new FakePlatformSubscriptionPlanRepository
         {
@@ -308,7 +430,8 @@ public sealed class PlatformTenantWizardServiceTests
             new FakePermissionChecker(permissions),
             new FakePermissionRepository(permissions),
             new FakeDateTimeProvider(),
-            passwordHashService ?? new FakePasswordHashService());
+            passwordHashService ?? new FakePasswordHashService(),
+            tenantUsageCounterService ?? new FakeTenantUsageCounterService());
     }
 
     private static PlatformTenantDetailResponse CreateDetail(Guid tenantId) =>

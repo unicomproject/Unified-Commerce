@@ -1,6 +1,7 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
@@ -367,7 +368,57 @@ public sealed partial class PlatformTenantService
             DraftInvoice = draftInvoice
         };
 
+        try
+        {
+            await _tenantUsageCounterService.ValidateCanonicalCapacityLimitDefinitionsAsync(cancellationToken);
+        }
+        catch (MissingCanonicalCapacityLimitDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Canonical capacity limit definition '{ex.LimitKey}' is missing or inactive."
+                });
+        }
+        catch (InactiveFeatureLimitDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Capacity limit definition '{ex.FeatureLimitDefinitionId}' is missing or inactive."
+                });
+        }
+
         await _repository.CreateTenantWizardAsync(writeModel, cancellationToken);
+
+        try
+        {
+            await _tenantUsageCounterService.SeedTenantCapacityCountersAsync(
+                tenantId,
+                subscription.CurrentPeriodStart,
+                subscription.CurrentPeriodEnd,
+                maxOutlets,
+                maxUsers,
+                maxTills,
+                cancellationToken);
+        }
+        catch (MissingCanonicalCapacityLimitDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Canonical capacity limit definition '{ex.LimitKey}' is missing or inactive."
+                });
+        }
+        catch (InactiveFeatureLimitDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Capacity limit definition '{ex.FeatureLimitDefinitionId}' is missing or inactive."
+                });
+        }
+
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
     }
 

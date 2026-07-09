@@ -102,6 +102,31 @@ public class TenantUsageCounter : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void IncrementCurrentValue(decimal incrementBy, DateTimeOffset now)
+    {
+        SetCurrentValue(CurrentValue + incrementBy, now);
+    }
+
+    public void UpdateFromUpsert(
+        Guid platformFeatureId,
+        DateTimeOffset periodStart,
+        DateTimeOffset? periodEnd,
+        decimal? limitValue,
+        DateTimeOffset now)
+    {
+        PlatformFeatureId = platformFeatureId;
+        PeriodStart = periodStart;
+        UsagePeriodStart = periodStart.ToString("O");
+        PeriodEnd = periodEnd;
+
+        if (limitValue.HasValue)
+        {
+            LimitValue = Math.Max(0m, limitValue.Value);
+        }
+
+        UpdatedAt = now;
+    }
+
     public void ApplyAlignmentBackfill(
         Guid featureLimitDefinitionId,
         string usageScope,
