@@ -198,4 +198,3 @@ public sealed class PlatformAdminAuditLogsControllerTests
         }
     }
 }
-
