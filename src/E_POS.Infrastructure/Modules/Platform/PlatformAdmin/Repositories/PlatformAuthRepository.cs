@@ -168,6 +168,7 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         }
 
         refreshToken.MarkUsed(now);
+        refreshToken.LinkReplacement(replacementRefreshToken.Id, now);
         session.RotateSessionToken(replacementSessionTokenHash, now);
         session.TouchLastSeen(now);
         _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);

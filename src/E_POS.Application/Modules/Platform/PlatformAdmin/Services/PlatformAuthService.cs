@@ -131,6 +131,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
         var jwtId = Guid.NewGuid().ToString("N");
         var accessToken = _jwtTokenFactory.CreateAccessToken(CreateTokenDescriptor(user, sessionId, jwtId, permissions));
         var refreshToken = _refreshTokenGenerator.CreateRefreshToken(_jwtSettings.RefreshTokenDays);
+        var refreshTokenId = Guid.NewGuid();
 
         // Persist only token identifiers and hashes, never raw access or refresh tokens.
         var session = PlatformAuthSession.Create(
@@ -143,11 +144,13 @@ public sealed class PlatformAuthService : IPlatformAuthService
             clientContext?.DeviceName);
 
         var refreshTokenEntity = PlatformRefreshToken.Create(
-            Guid.NewGuid(),
+            refreshTokenId,
             sessionId,
             _tokenHashService.HashToken(refreshToken.Token, _jwtSettings.SigningKey),
             refreshToken.ExpiresAt,
-            now);
+            now,
+            platformUserId: user.Id,
+            tokenFamilyId: refreshTokenId);
 
         var audit = PlatformLoginAudit.Create(
             Guid.NewGuid(),
@@ -321,12 +324,17 @@ public sealed class PlatformAuthService : IPlatformAuthService
             jwtId,
             permissions));
         var replacementRefreshToken = _refreshTokenGenerator.CreateRefreshToken(_jwtSettings.RefreshTokenDays);
+        var oldRefreshToken = refreshContext.RefreshToken;
+        var tokenFamilyId = oldRefreshToken.TokenFamilyId ?? oldRefreshToken.Id;
+        var platformUserId = oldRefreshToken.PlatformUserId ?? refreshContext.User.Id;
         var replacementRefreshTokenEntity = PlatformRefreshToken.Create(
             Guid.NewGuid(),
             refreshContext.Session.Id,
             _tokenHashService.HashToken(replacementRefreshToken.Token, _jwtSettings.SigningKey),
             replacementRefreshToken.ExpiresAt,
-            now);
+            now,
+            platformUserId: platformUserId,
+            tokenFamilyId: tokenFamilyId);
 
         var rotated = await _repository.TryRotateRefreshTokenAsync(
             refreshContext.RefreshToken.Id,
