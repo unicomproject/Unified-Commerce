@@ -108,6 +108,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<OutletBusinessHour> OutletBusinessHours => Set<OutletBusinessHour>();
     public DbSet<PosDevice> PosDevices => Set<PosDevice>();
     public DbSet<Till> Tills => Set<Till>();
+    public DbSet<TillActivationCode> TillActivationCodes => Set<TillActivationCode>();
     public DbSet<TillDeviceAssignment> TillDeviceAssignments => Set<TillDeviceAssignment>();
 
     // Hardware and Cash Control
