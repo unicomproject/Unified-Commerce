@@ -185,7 +185,9 @@ public sealed class PlatformAuthServiceTests
             Guid platformUserId,
             Guid sessionId,
             DateTimeOffset now,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Guid? revokedByPlatformUserId = null,
+            string? revokeReason = null)
         {
             RevokedPlatformUserId = platformUserId;
             RevokedSessionId = sessionId;

@@ -97,7 +97,9 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         Guid platformUserId,
         Guid sessionId,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? revokedByPlatformUserId = null,
+        string? revokeReason = null)
     {
         var session = await _dbContext.PlatformAuthSessions
             .FirstOrDefaultAsync(
@@ -109,7 +111,7 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
             return;
         }
 
-        session.Revoke(now);
+        session.Revoke(now, revokedByPlatformUserId, revokeReason);
 
         var activeRefreshTokens = await _dbContext.PlatformRefreshTokens
             .Where(x => x.PlatformAuthSessionId == sessionId && x.Status == PlatformAuthConstants.ActiveTokenStatus)
@@ -117,7 +119,7 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
 
         foreach (var refreshToken in activeRefreshTokens)
         {
-            refreshToken.Revoke(now);
+            refreshToken.Revoke(now, revokedByPlatformUserId, revokeReason);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -167,6 +169,7 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
 
         refreshToken.MarkUsed(now);
         session.RotateSessionToken(replacementSessionTokenHash, now);
+        session.TouchLastSeen(now);
         _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 

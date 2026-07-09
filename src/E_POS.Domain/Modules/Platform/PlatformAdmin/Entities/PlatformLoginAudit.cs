@@ -22,7 +22,11 @@ public class PlatformLoginAudit : AuditableEntity
         string loginResult,
         DateTimeOffset now,
         string? authenticationMethod = null,
-        DateTimeOffset? attemptedAt = null)
+        DateTimeOffset? attemptedAt = null,
+        Guid? platformAuthSessionId = null,
+        string? ipAddress = null,
+        string? userAgent = null,
+        string? failureReason = null)
     {
         return new PlatformLoginAudit
         {
@@ -34,6 +38,10 @@ public class PlatformLoginAudit : AuditableEntity
             AuthenticationMethod = string.IsNullOrWhiteSpace(authenticationMethod)
                 ? PlatformAuthAlignmentConstants.AuthenticationMethod.Password
                 : authenticationMethod,
+            PlatformAuthSessionId = platformAuthSessionId,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
+            FailureReason = failureReason,
             CreatedAt = now,
             UpdatedAt = now
         };

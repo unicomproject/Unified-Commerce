@@ -26,7 +26,9 @@ public interface IPlatformAuthRepository
         Guid platformUserId,
         Guid sessionId,
         DateTimeOffset now,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Guid? revokedByPlatformUserId = null,
+        string? revokeReason = null);
 
     Task<PlatformAuthRefreshContext?> FindRefreshContextByTokenHashAsync(
         string refreshTokenHash,

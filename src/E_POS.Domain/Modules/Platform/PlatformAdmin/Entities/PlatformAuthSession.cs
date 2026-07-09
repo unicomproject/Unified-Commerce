@@ -16,7 +16,14 @@ public class PlatformAuthSession : AuditableEntity
     public Guid? RevokedByPlatformUserId { get; protected set; }
     public string? RevokeReason { get; protected set; }
 
-    public static PlatformAuthSession Create(Guid id, Guid platformUserId, string sessionTokenHash, DateTimeOffset now)
+    public static PlatformAuthSession Create(
+        Guid id,
+        Guid platformUserId,
+        string sessionTokenHash,
+        DateTimeOffset now,
+        string? ipAddress = null,
+        string? userAgent = null,
+        string? deviceName = null)
     {
         return new PlatformAuthSession
         {
@@ -24,6 +31,9 @@ public class PlatformAuthSession : AuditableEntity
             PlatformUserId = platformUserId,
             Status = PlatformAuthConstants.ActiveTokenStatus,
             SessionTokenHash = sessionTokenHash,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
+            DeviceName = deviceName,
             CreatedAt = now,
             UpdatedAt = now
         };

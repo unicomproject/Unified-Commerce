@@ -11,6 +11,14 @@ public static class PlatformAuthAlignmentConstants
         public const string Password = "PASSWORD";
     }
 
+    public static class FailureReason
+    {
+        public const string InvalidCredentials = "INVALID_CREDENTIALS";
+        public const string UserLocked = "USER_LOCKED";
+        public const string UserInactive = "USER_INACTIVE";
+        public const string PlatformAccessDenied = "PLATFORM_ACCESS_DENIED";
+    }
+
     public static class RevokeReason
     {
         public const string Logout = "LOGOUT";

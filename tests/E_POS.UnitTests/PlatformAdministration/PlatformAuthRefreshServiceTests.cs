@@ -208,7 +208,9 @@ public sealed class PlatformAuthRefreshServiceTests
             Guid platformUserId,
             Guid sessionId,
             DateTimeOffset now,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Guid? revokedByPlatformUserId = null,
+            string? revokeReason = null)
         {
             RevokedSessionId = sessionId;
             return Task.CompletedTask;
