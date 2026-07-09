@@ -102,11 +102,26 @@ public sealed class PlatformRefreshTokenConfiguration : IEntityTypeConfiguration
             .IsUnique()
             .HasDatabaseName("uq_platform_refresh_tokens_token_hash");
 
+        builder.HasIndex(x => x.PlatformAuthSessionId)
+            .IsUnique()
+            .HasFilter("status = 'ACTIVE'")
+            .HasDatabaseName("uq_platform_refresh_tokens_platform_auth_session_id_active");
+
         builder.HasIndex(x => new { x.PlatformAuthSessionId, x.Status })
             .HasDatabaseName("ix_platform_refresh_tokens_platform_auth_session_id_status");
 
         builder.HasIndex(x => x.TokenFamilyId)
             .HasDatabaseName("ix_platform_refresh_tokens_token_family_id");
+
+        builder.HasIndex(x => x.TokenFamilyId)
+            .IsUnique()
+            .HasFilter("status = 'ACTIVE'")
+            .HasDatabaseName("uq_platform_refresh_tokens_token_family_id_active");
+
+        builder.HasIndex(x => x.ReplacedByTokenId)
+            .IsUnique()
+            .HasFilter("replaced_by_token_id IS NOT NULL")
+            .HasDatabaseName("uq_platform_refresh_tokens_replaced_by_token_id");
 
         builder.HasIndex(x => new { x.PlatformUserId, x.Status })
             .HasDatabaseName("ix_platform_refresh_tokens_platform_user_id_status");

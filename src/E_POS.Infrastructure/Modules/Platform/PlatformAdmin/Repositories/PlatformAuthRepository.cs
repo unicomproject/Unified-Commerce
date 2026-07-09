@@ -168,11 +168,37 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         }
 
         refreshToken.MarkUsed(now);
-        refreshToken.LinkReplacement(replacementRefreshToken.Id, now);
         session.RotateSessionToken(replacementSessionTokenHash, now);
         session.TouchLastSeen(now);
-        _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (_dbContext.Database.IsRelational())
+        {
+            var ownsTransaction = _dbContext.Database.CurrentTransaction is null;
+            var transaction = ownsTransaction
+                ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+                : _dbContext.Database.CurrentTransaction!;
+
+            // Persist USED state before inserting the replacement ACTIVE token so partial unique
+            // indexes on ACTIVE rows do not reject rotation within PostgreSQL.
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            refreshToken.LinkReplacement(replacementRefreshToken.Id, now);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            if (ownsTransaction)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        else
+        {
+            refreshToken.LinkReplacement(replacementRefreshToken.Id, now);
+            _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         return true;
     }

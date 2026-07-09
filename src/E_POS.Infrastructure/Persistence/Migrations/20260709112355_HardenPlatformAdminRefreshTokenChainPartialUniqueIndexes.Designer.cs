@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260709112355_HardenPlatformAdminRefreshTokenChainPartialUniqueIndexes")]
+    partial class HardenPlatformAdminRefreshTokenChainPartialUniqueIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2205,9 +2208,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasFilter("replaced_by_token_id IS NOT NULL");
 
                     b.HasIndex("RevokedByPlatformUserId");
-
-                    b.HasIndex("TokenFamilyId")
-                        .HasDatabaseName("ix_platform_refresh_tokens_token_family_id");
 
                     b.HasIndex("TokenFamilyId")
                         .IsUnique()
