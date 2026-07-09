@@ -47,6 +47,81 @@ public sealed class PlatformUserConfiguration : IEntityTypeConfiguration<Platfor
             .HasColumnType("varchar(30)")
             .HasMaxLength(30);
 
+        builder.Property(x => x.FirstName)
+            .HasColumnName("first_name")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(x => x.LastName)
+            .HasColumnName("last_name")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(x => x.DisplayName)
+            .HasColumnName("display_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired(false);
+
+        builder.Property(x => x.Phone)
+            .HasColumnName("phone")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired(false);
+
+        builder.Property(x => x.JobTitle)
+            .HasColumnName("job_title")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired(false);
+
+        builder.Property(x => x.EmailVerifiedAt)
+            .HasColumnName("email_verified_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.FailedLoginCount)
+            .HasColumnName("failed_login_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(x => x.LockedUntil)
+            .HasColumnName("locked_until")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.LastLoginAt)
+            .HasColumnName("last_login_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.PasswordChangedAt)
+            .HasColumnName("password_changed_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_platform_users_created_by_platform_user_id_platform_users");
+
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_platform_users_updated_by_platform_user_id_platform_users");
+
         builder.HasIndex(x => x.Email)
             .IsUnique()
             .HasDatabaseName("uq_platform_users_email");
@@ -58,5 +133,3 @@ public sealed class PlatformUserConfiguration : IEntityTypeConfiguration<Platfor
         builder.ToTable(t => t.HasCheckConstraint("ck_platform_users_status", "status IN ('ACTIVE', 'INACTIVE', 'LOCKED', 'DELETED')"));
     }
 }
-
-

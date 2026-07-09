@@ -214,8 +214,8 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         tenant.Activate(platformUserId, now);
         subscription.Activate(now);
 
-        await _repository.UpdateTenantAsync(tenant, cancellationToken);
         await _repository.UpdateTenantSubscriptionAsync(subscription, cancellationToken);
+        await _repository.UpdateTenantAsync(tenant, cancellationToken);
 
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
     }
@@ -279,19 +279,20 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         }
 
         var planId = subscription.SubscriptionPlanId;
+        SubscriptionPlan? selectedPlan = null;
         if (request.SubscriptionPlanId is not null && request.SubscriptionPlanId != Guid.Empty)
         {
-            var plan = await _subscriptionPlanRepository.GetPlanEntityByIdAsync(
+            selectedPlan = await _subscriptionPlanRepository.GetPlanEntityByIdAsync(
                 request.SubscriptionPlanId.Value,
                 cancellationToken);
 
-            if (plan is null || !IsActivePlan(plan.Status))
+            if (selectedPlan is null || !IsActivePlan(selectedPlan.Status))
             {
                 return ApplicationResult<PlatformTenantDetailResponse>.Failure(
                     ValidationFailed with { Message = "Subscription plan was not found or is not active." });
             }
 
-            planId = plan.Id;
+            planId = selectedPlan.Id;
         }
 
         var featureResolution = await ResolveEnabledFeaturesForPlanAsync(
@@ -309,7 +310,11 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
 
         if (planId != subscription.SubscriptionPlanId)
         {
-            subscription.ChangePlan(planId, now);
+            subscription.ChangePlan(
+                planId,
+                selectedPlan?.BaseCurrency,
+                selectedPlan?.PriceAmount,
+                now);
             await _repository.UpdateTenantSubscriptionAsync(subscription, cancellationToken);
         }
 
@@ -317,6 +322,8 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             tenantId,
             featureResolution.Value!,
             now,
+            platformUserId,
+            "Removed by platform admin entitlement update.",
             cancellationToken);
 
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);

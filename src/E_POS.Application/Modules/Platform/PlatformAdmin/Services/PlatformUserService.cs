@@ -288,6 +288,7 @@ public sealed class PlatformUserService : IPlatformUserService
             userId,
             roles.Select(role => role.Id).ToList(),
             now,
+            platformUserId,
             cancellationToken);
 
         var updatedUser = await _userRepository.GetUserByIdAsync(userId, cancellationToken);

@@ -298,6 +298,8 @@ public sealed class PlatformTenantServiceTests
             Guid tenantId,
             IReadOnlyList<Guid> enabledFeatureIds,
             DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            string? revokedReason,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
@@ -415,6 +417,20 @@ public sealed class PlatformTenantServiceTests
             throw new NotImplementedException();
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task UpsertLegacyPlanLimitsAsync(
+            Guid planId,
+            int? maxOutlets,
+            int? maxUsers,
+            int? maxTills,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+            Guid planId,
+            CancellationToken cancellationToken) =>
             throw new NotImplementedException();
     }
 }

@@ -39,6 +39,12 @@ public sealed class PlatformPermissionConfiguration : IEntityTypeConfiguration<P
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(x => x.ModuleKey)
+            .HasColumnName("module_key")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired();
+
         builder.Property(x => x.Description)
             .HasColumnName("description")
             .HasColumnType("text")
@@ -49,13 +55,30 @@ public sealed class PlatformPermissionConfiguration : IEntityTypeConfiguration<P
             .HasColumnType("varchar(30)")
             .HasMaxLength(30);
 
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_platform_permissions_created_by_platform_user_id_platform_users");
+
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_platform_permissions_updated_by_platform_user_id_platform_users");
+
         builder.HasIndex(x => x.PermissionCode)
             .IsUnique()
             .HasDatabaseName("uq_platform_permissions_permission_code");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_permissions_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_platform_permissions_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-
-
-

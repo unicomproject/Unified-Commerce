@@ -99,11 +99,152 @@ public sealed class PlatformUserRepositoryTests
         await dbContext.SaveChangesAsync();
 
         IPlatformUserRepository repository = new PlatformUserRepository(dbContext);
-        await repository.ReplaceUserRolesAsync(userId, [replacementRoleId], Now, CancellationToken.None);
+        await repository.ReplaceUserRolesAsync(userId, [replacementRoleId], Now, null, CancellationToken.None);
 
         var roleCodes = await repository.GetUserActiveRoleCodesAsync(userId, CancellationToken.None);
 
         Assert.Equal(["replacement_role"], roleCodes);
+    }
+
+    [Fact]
+    public async Task ReplaceUserRolesAsync_RevokesRemovedRolesAndPreservesHistory()
+    {
+        await using var dbContext = CreateDbContext();
+        await PlatformAdminPermissionSeedApplicator.ApplyAsync(dbContext, Now);
+
+        var initialRoleId = Guid.NewGuid();
+        var replacementRoleId = Guid.NewGuid();
+        dbContext.PlatformRoles.AddRange(
+            PlatformRole.Create(
+                initialRoleId,
+                "initial_role",
+                "Initial Role",
+                "Initial role.",
+                PlatformAuthConstants.ActiveStatus,
+                Now),
+            PlatformRole.Create(
+                replacementRoleId,
+                "replacement_role",
+                "Replacement Role",
+                "Replacement role.",
+                PlatformAuthConstants.ActiveStatus,
+                Now));
+        await dbContext.SaveChangesAsync();
+
+        var userId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        dbContext.PlatformUsers.Add(PlatformUser.CreatePendingInvite(userId, "soft.revoke@example.com", Now));
+        dbContext.PlatformUserRoles.Add(PlatformUserRole.Create(
+            Guid.NewGuid(),
+            userId,
+            initialRoleId,
+            "Initial assignment.",
+            Now));
+        await dbContext.SaveChangesAsync();
+
+        IPlatformUserRepository repository = new PlatformUserRepository(dbContext);
+        await repository.ReplaceUserRolesAsync(userId, [replacementRoleId], Now, actorId, CancellationToken.None);
+
+        var assignments = await dbContext.PlatformUserRoles
+            .Where(item => item.PlatformUserId == userId)
+            .ToListAsync();
+
+        Assert.Equal(2, assignments.Count);
+        Assert.Single(assignments, item => item.PlatformRoleId == initialRoleId && item.RevokedAt != null);
+        Assert.Single(assignments, item => item.PlatformRoleId == replacementRoleId && item.RevokedAt == null);
+    }
+
+    [Fact]
+    public async Task ReplaceUserRolesAsync_ReassignAfterRevokeCreatesNewActiveRow()
+    {
+        await using var dbContext = CreateDbContext();
+        await PlatformAdminPermissionSeedApplicator.ApplyAsync(dbContext, Now);
+
+        var roleId = Guid.NewGuid();
+        dbContext.PlatformRoles.Add(PlatformRole.Create(
+            roleId,
+            "reassign_role",
+            "Reassign Role",
+            "Reassign role.",
+            PlatformAuthConstants.ActiveStatus,
+            Now));
+        await dbContext.SaveChangesAsync();
+
+        var userId = Guid.NewGuid();
+        var revokedAssignmentId = Guid.NewGuid();
+        dbContext.PlatformUsers.Add(PlatformUser.CreatePendingInvite(userId, "reassign@example.com", Now));
+
+        var revokedAssignment = PlatformUserRole.Create(
+            revokedAssignmentId,
+            userId,
+            roleId,
+            "Initial assignment.",
+            Now);
+        revokedAssignment.Revoke(Guid.NewGuid(), "Previous revocation.", Now);
+        dbContext.PlatformUserRoles.Add(revokedAssignment);
+        await dbContext.SaveChangesAsync();
+
+        IPlatformUserRepository repository = new PlatformUserRepository(dbContext);
+        await repository.ReplaceUserRolesAsync(userId, [roleId], Now, null, CancellationToken.None);
+
+        var assignments = await dbContext.PlatformUserRoles
+            .Where(item => item.PlatformUserId == userId)
+            .ToListAsync();
+
+        Assert.Equal(2, assignments.Count);
+        Assert.Single(assignments, item => item.Id == revokedAssignmentId && item.RevokedAt != null);
+        Assert.Single(assignments, item => item.Id != revokedAssignmentId && item.RevokedAt == null);
+    }
+
+    [Fact]
+    public async Task GetUserActiveRoleCodesAsync_IgnoresRevokedAssignments()
+    {
+        await using var dbContext = CreateDbContext();
+        await PlatformAdminPermissionSeedApplicator.ApplyAsync(dbContext, Now);
+
+        var activeRoleId = Guid.NewGuid();
+        var revokedRoleId = Guid.NewGuid();
+        dbContext.PlatformRoles.AddRange(
+            PlatformRole.Create(
+                activeRoleId,
+                "active_role",
+                "Active Role",
+                "Active role.",
+                PlatformAuthConstants.ActiveStatus,
+                Now),
+            PlatformRole.Create(
+                revokedRoleId,
+                "revoked_role",
+                "Revoked Role",
+                "Revoked role.",
+                PlatformAuthConstants.ActiveStatus,
+                Now));
+        await dbContext.SaveChangesAsync();
+
+        var userId = Guid.NewGuid();
+        dbContext.PlatformUsers.Add(PlatformUser.CreatePendingInvite(userId, "active.only@example.com", Now));
+        dbContext.PlatformUserRoles.Add(PlatformUserRole.Create(
+            Guid.NewGuid(),
+            userId,
+            activeRoleId,
+            "Active assignment.",
+            Now));
+
+        var revokedAssignment = PlatformUserRole.Create(
+            Guid.NewGuid(),
+            userId,
+            revokedRoleId,
+            "Revoked assignment.",
+            Now);
+        revokedAssignment.Revoke(null, "Revoked for test.", Now);
+        dbContext.PlatformUserRoles.Add(revokedAssignment);
+        await dbContext.SaveChangesAsync();
+
+        IPlatformUserRepository repository = new PlatformUserRepository(dbContext);
+
+        var roleCodes = await repository.GetUserActiveRoleCodesAsync(userId, CancellationToken.None);
+
+        Assert.Equal(["active_role"], roleCodes);
     }
 
     private static async Task SeedSuperAdminAsync(EPosDbContext dbContext)

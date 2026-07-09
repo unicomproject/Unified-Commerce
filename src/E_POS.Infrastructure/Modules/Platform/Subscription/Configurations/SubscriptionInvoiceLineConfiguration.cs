@@ -45,21 +45,73 @@ public sealed class SubscriptionInvoiceLineConfiguration : IEntityTypeConfigurat
             .HasColumnName("subscription_invoice_id")
             .IsRequired();
 
+        builder.Property(x => x.InvoiceId)
+            .HasColumnName("invoice_id");
+
+        builder.Property(x => x.LineNumberInt)
+            .HasColumnName("line_number_int");
+
+        builder.Property(x => x.ItemType)
+            .HasColumnName("item_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40);
+
+        builder.Property(x => x.ItemReferenceId)
+            .HasColumnName("item_reference_id");
+
+        builder.Property(x => x.ItemCode)
+            .HasColumnName("item_code")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasColumnType("varchar(250)")
+            .HasMaxLength(250);
+
+        builder.Property(x => x.UnitPrice)
+            .HasColumnName("unit_price")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.DiscountAmount)
+            .HasColumnName("discount_amount")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.TaxAmount)
+            .HasColumnName("tax_amount")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.LineTotal)
+            .HasColumnName("line_total")
+            .HasPrecision(18, 4);
+
         builder.HasOne<SubscriptionInvoice>()
             .WithMany()
             .HasForeignKey(x => x.SubscriptionInvoiceId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_subscription_invoice_lines_subscription_invoice_id_subscription_invoices");
 
+        builder.HasOne<SubscriptionInvoice>()
+            .WithMany()
+            .HasForeignKey(x => x.InvoiceId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_subscription_invoice_lines_invoice_id_subscription_invoices");
+
         builder.HasIndex(x => new { x.SubscriptionInvoiceId, x.LineNumber })
             .IsUnique()
             .HasDatabaseName("uq_subscription_invoice_lines_subscription_invoice_id_line_number");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_subscription_invoice_lines_quantity", "quantity > 0")); 
+        builder.HasIndex(x => x.InvoiceId)
+            .HasDatabaseName("ix_subscription_invoice_lines_invoice_id");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_subscription_invoice_lines_line_total_amount", "line_total_amount >= 0")); 
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_subscription_invoice_lines_quantity", "quantity > 0");
+            t.HasCheckConstraint("ck_subscription_invoice_lines_line_total_amount", "line_total_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_invoice_lines_unit_price", "unit_price IS NULL OR unit_price >= 0");
+            t.HasCheckConstraint("ck_subscription_invoice_lines_discount_amount", "discount_amount IS NULL OR discount_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_invoice_lines_tax_amount", "tax_amount IS NULL OR tax_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_invoice_lines_line_total", "line_total IS NULL OR line_total >= 0");
+        });
     }
 }
-
-
-

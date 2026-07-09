@@ -209,6 +209,31 @@ public sealed class PlatformTenantRepositoryTests
     }
 
     [Fact]
+    public async Task TenantReads_ExcludeRevokedEntitlementsEvenIfLegacyStatusIsEnabled()
+    {
+        await using var dbContext = CreateDbContext();
+        var planId = Guid.Parse("77777777-7777-4777-8777-777777777712");
+        var tenantId = Guid.Parse("11111111-1111-4111-8111-111111111112");
+        await SeedAsync(dbContext, planId, tenantId, Guid.NewGuid(), Guid.NewGuid());
+
+        var entitlement = await dbContext.TenantFeatureEntitlements
+            .SingleAsync(item => item.TenantId == tenantId);
+        entitlement.Disable(Now.AddMinutes(1), null, "revoked for test", null);
+        dbContext.Entry(entitlement).Property(nameof(TenantFeatureEntitlement.EntitlementStatus)).CurrentValue = TenantEntitlementStatusConstants.Enabled;
+        await dbContext.SaveChangesAsync();
+
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+        var detail = await repository.GetTenantDetailAsync(tenantId, CancellationToken.None);
+        var options = await repository.GetEntitlementOptionsAsync(tenantId, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.NotNull(options);
+        Assert.False(detail!.OnlineStoreEnabled);
+        Assert.Empty(detail.EnabledFeatureIds);
+        Assert.Empty(options!.EnabledFeatureIds);
+    }
+
+    [Fact]
     public async Task GetEntitlementOptionsAsync_WhenTenantMissing_ReturnsNull()
     {
         await using var dbContext = CreateDbContext();

@@ -2,6 +2,7 @@ using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -147,15 +148,23 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on entitlement.PlatformFeatureId equals feature.Id
             where entitlement.TenantId == tenantId
-            select new { entitlement.EntitlementStatus, feature.Id, feature.FeatureCode })
+            select new EntitlementReadRow(
+                entitlement.EntitlementStatus,
+                entitlement.IsEnabled,
+                entitlement.RevokedAt,
+                entitlement.EffectiveFrom,
+                entitlement.EffectiveUntil,
+                feature.Id,
+                feature.FeatureCode))
             .ToListAsync(cancellationToken);
 
+        var now = DateTimeOffset.UtcNow;
         var enabled = enabledFeatures
-            .Where(x => IsStatus(x.EntitlementStatus, "ENABLED"))
+            .Where(x => IsEntitlementEnabledForRead(x, now))
             .ToList();
 
         var enabledFeatureIds = enabled
-            .Select(x => x.Id)
+            .Select(x => x.FeatureId)
             .Distinct()
             .ToList();
 
@@ -272,6 +281,16 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 now));
         }
 
+        _dbContext.TenantSubscriptionHistory.Add(TenantSubscriptionHistory.CreateEvent(
+            Guid.NewGuid(),
+            tenant.Id,
+            subscription.Id,
+            sequenceNumber: 1,
+            changeType: TenantSubscriptionHistoryChangeTypeConstants.Created,
+            changedAt: now,
+            newPlanId: subscription.SubscriptionPlanId,
+            newStatus: subscription.SubscriptionStatus));
+
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -292,33 +311,70 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task UpdateTenantSubscriptionAsync(
+    public async Task UpdateTenantSubscriptionAsync(
         TenantSubscription subscription,
         CancellationToken cancellationToken)
     {
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        await AddHistoryRowsForSubscriptionMutationsAsync(subscription, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task ReplaceTenantEntitlementsAsync(
         Guid tenantId,
         IReadOnlyList<Guid> enabledFeatureIds,
         DateTimeOffset now,
+        Guid? actorPlatformUserId,
+        string? revokedReason,
         CancellationToken cancellationToken)
     {
+        var requestedFeatureIds = enabledFeatureIds
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToHashSet();
+
         var existing = await _dbContext.TenantFeatureEntitlements
             .Where(entitlement => entitlement.TenantId == tenantId)
             .ToListAsync(cancellationToken);
 
-        _dbContext.TenantFeatureEntitlements.RemoveRange(existing);
+        var normalizedRevokedReason = string.IsNullOrWhiteSpace(revokedReason)
+            ? "Removed by platform admin entitlement update."
+            : revokedReason.Trim();
 
-        foreach (var featureId in enabledFeatureIds.Distinct())
+        foreach (var entitlement in existing)
+        {
+            if (requestedFeatureIds.Remove(entitlement.PlatformFeatureId))
+            {
+                entitlement.Enable(
+                    entitlement.PlatformFeatureId,
+                    now,
+                    actorPlatformUserId,
+                    TenantEntitlementSourceTypeConstants.Manual,
+                    sourceReferenceId: null);
+                continue;
+            }
+
+            entitlement.Disable(
+                now,
+                actorPlatformUserId,
+                normalizedRevokedReason,
+                actorPlatformUserId);
+        }
+
+        foreach (var featureId in requestedFeatureIds)
         {
             _dbContext.TenantFeatureEntitlements.Add(TenantFeatureEntitlement.Create(
                 Guid.NewGuid(),
                 tenantId,
                 featureId,
                 TenantEntitlementStatusConstants.Enabled,
-                now));
+                TenantEntitlementSourceTypeConstants.Manual,
+                sourceReferenceId: null,
+                isEnabled: true,
+                effectiveFrom: now,
+                effectiveUntil: null,
+                createdByPlatformUserId: actorPlatformUserId,
+                updatedByPlatformUserId: actorPlatformUserId,
+                createdAt: now));
         }
 
         var tenant = await _dbContext.Tenants
@@ -456,11 +512,27 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             from entitlement in _dbContext.TenantFeatureEntitlements.AsNoTracking()
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on entitlement.PlatformFeatureId equals feature.Id
-            select new { entitlement.TenantId, entitlement.EntitlementStatus, feature.FeatureCode })
+            select new
+            {
+                entitlement.TenantId,
+                entitlement.EntitlementStatus,
+                entitlement.IsEnabled,
+                entitlement.RevokedAt,
+                entitlement.EffectiveFrom,
+                entitlement.EffectiveUntil,
+                feature.FeatureCode
+            })
             .ToListAsync(cancellationToken);
 
+        var now = DateTimeOffset.UtcNow;
         var enabledFeatures = entitlementRows
-            .Where(x => IsStatus(x.EntitlementStatus, "ENABLED"))
+            .Where(x => TenantEntitlementEffectivePredicate.IsEnabled(
+                x.EntitlementStatus,
+                x.IsEnabled,
+                x.RevokedAt,
+                x.EffectiveFrom,
+                x.EffectiveUntil,
+                now))
             .Select(x => new { x.TenantId, x.FeatureCode })
             .ToList();
 
@@ -617,7 +689,89 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
     private static bool IsAnyStatus(string value, IReadOnlyList<string> expectedValues) =>
         expectedValues.Any(expected => IsStatus(value, expected));
 
+    private static bool IsEntitlementEnabledForRead(EntitlementReadRow row, DateTimeOffset now) =>
+        TenantEntitlementEffectivePredicate.IsEnabled(
+            row.EntitlementStatus,
+            row.IsEnabled,
+            row.RevokedAt,
+            row.EffectiveFrom,
+            row.EffectiveUntil,
+            now);
+
+    private async Task AddHistoryRowsForSubscriptionMutationsAsync(
+        TenantSubscription subscription,
+        CancellationToken cancellationToken)
+    {
+        var entry = _dbContext.Entry(subscription);
+        if (entry.State != EntityState.Modified)
+        {
+            return;
+        }
+
+        var planProperty = entry.Property<Guid>(nameof(TenantSubscription.SubscriptionPlanId));
+        var statusProperty = entry.Property<string>(nameof(TenantSubscription.SubscriptionStatus));
+        var planChanged = planProperty.IsModified &&
+                          planProperty.OriginalValue != planProperty.CurrentValue;
+        var statusChanged = statusProperty.IsModified &&
+                            !IsStatus(statusProperty.OriginalValue, statusProperty.CurrentValue);
+
+        if (!planChanged && !statusChanged)
+        {
+            return;
+        }
+
+        var nextSequence = await GetNextHistorySequenceAsync(subscription.Id, cancellationToken);
+        var changedAt = subscription.UpdatedAt ?? DateTimeOffset.UtcNow;
+
+        if (planChanged)
+        {
+            _dbContext.TenantSubscriptionHistory.Add(TenantSubscriptionHistory.CreateEvent(
+                Guid.NewGuid(),
+                subscription.TenantId,
+                subscription.Id,
+                nextSequence++,
+                TenantSubscriptionHistoryChangeTypeConstants.PlanChanged,
+                changedAt,
+                oldPlanId: planProperty.OriginalValue,
+                newPlanId: planProperty.CurrentValue));
+        }
+
+        if (statusChanged)
+        {
+            _dbContext.TenantSubscriptionHistory.Add(TenantSubscriptionHistory.CreateEvent(
+                Guid.NewGuid(),
+                subscription.TenantId,
+                subscription.Id,
+                nextSequence,
+                TenantSubscriptionHistoryChangeTypeConstants.StatusChanged,
+                changedAt,
+                oldStatus: statusProperty.OriginalValue,
+                newStatus: statusProperty.CurrentValue));
+        }
+    }
+
+    private async Task<int> GetNextHistorySequenceAsync(
+        Guid subscriptionId,
+        CancellationToken cancellationToken)
+    {
+        var lastSequence = await _dbContext.TenantSubscriptionHistory
+            .Where(item => item.TenantSubscriptionId == subscriptionId)
+            .Select(item => (int?)item.SequenceNumber)
+            .MaxAsync(cancellationToken);
+
+        return (lastSequence ?? 0) + 1;
+    }
+
     private sealed record TenantCountRow(Guid TenantId, string Status);
+
+    private sealed record EntitlementReadRow(
+        string EntitlementStatus,
+        bool IsEnabled,
+        DateTimeOffset? RevokedAt,
+        DateTimeOffset EffectiveFrom,
+        DateTimeOffset? EffectiveUntil,
+        Guid FeatureId,
+        string FeatureCode);
 
     private sealed class TenantRow
     {

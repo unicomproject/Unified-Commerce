@@ -162,22 +162,38 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
         Guid userId,
         IReadOnlyList<Guid> roleIds,
         DateTimeOffset now,
+        Guid? actorPlatformUserId,
         CancellationToken cancellationToken)
     {
-        var existingRoles = await _dbContext.PlatformUserRoles
-            .Where(userRole => userRole.PlatformUserId == userId)
+        var targetRoleIds = roleIds
+            .Where(roleId => roleId != Guid.Empty)
+            .Distinct()
+            .ToHashSet();
+
+        var activeAssignments = await _dbContext.PlatformUserRoles
+            .Where(userRole =>
+                userRole.PlatformUserId == userId &&
+                userRole.RevokedAt == null)
             .ToListAsync(cancellationToken);
 
-        _dbContext.PlatformUserRoles.RemoveRange(existingRoles);
+        foreach (var assignment in activeAssignments.Where(item => !targetRoleIds.Contains(item.PlatformRoleId)))
+        {
+            assignment.Revoke(actorPlatformUserId, "Platform user role reassignment.", now);
+        }
 
-        foreach (var roleId in roleIds.Distinct())
+        var activeRoleIds = activeAssignments
+            .Select(item => item.PlatformRoleId)
+            .ToHashSet();
+
+        foreach (var roleId in targetRoleIds.Where(item => !activeRoleIds.Contains(item)))
         {
             _dbContext.PlatformUserRoles.Add(PlatformUserRole.Create(
                 Guid.NewGuid(),
                 userId,
                 roleId,
                 "Platform user role assignment.",
-                now));
+                now,
+                actorPlatformUserId));
         }
 
         var user = await _dbContext.PlatformUsers
@@ -240,6 +256,7 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             .AnyAsync(
                 userRole =>
                     userRole.PlatformUserId == userId &&
+                    userRole.RevokedAt == null &&
                     _dbContext.PlatformRoles.Any(role =>
                         role.Id == userRole.PlatformRoleId &&
                         role.RoleCode == roleCode &&
@@ -258,6 +275,7 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             join role in _dbContext.PlatformRoles.AsNoTracking()
                 on userRole.PlatformRoleId equals role.Id
             where user.Status == PlatformAuthConstants.ActiveStatus &&
+                  userRole.RevokedAt == null &&
                   role.RoleCode == PlatformRoleCodes.SuperAdministrator &&
                   role.Status == PlatformAuthConstants.ActiveStatus
             select user.Id;
@@ -279,6 +297,7 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             join role in _dbContext.PlatformRoles.AsNoTracking()
                 on userRole.PlatformRoleId equals role.Id
             where userRole.PlatformUserId == userId &&
+                  userRole.RevokedAt == null &&
                   role.Status == PlatformAuthConstants.ActiveStatus
             orderby role.RoleCode
             select role.RoleCode)
@@ -294,6 +313,7 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             join role in _dbContext.PlatformRoles.AsNoTracking()
                 on userRole.PlatformRoleId equals role.Id
             where userRole.PlatformUserId != null &&
+                  userRole.RevokedAt == null &&
                   userIds.Contains(userRole.PlatformUserId.Value)
             orderby role.RoleCode
             select new
@@ -322,6 +342,7 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             join permission in _dbContext.PlatformPermissions.AsNoTracking()
                 on userPermission.PlatformPermissionId equals permission.Id
             where userPermission.PlatformUserId != null &&
+                  userPermission.RevokedAt == null &&
                   userIds.Contains(userPermission.PlatformUserId.Value) &&
                   permission.Status == PlatformAuthConstants.ActiveStatus
             select new
@@ -340,8 +361,10 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             join permission in _dbContext.PlatformPermissions.AsNoTracking()
                 on rolePermission.PlatformPermissionId equals permission.Id
             where userRole.PlatformUserId != null &&
+                  userRole.RevokedAt == null &&
                   userIds.Contains(userRole.PlatformUserId.Value) &&
                   role.Status == PlatformAuthConstants.ActiveStatus &&
+                  rolePermission.RevokedAt == null &&
                   permission.Status == PlatformAuthConstants.ActiveStatus
             select new
             {

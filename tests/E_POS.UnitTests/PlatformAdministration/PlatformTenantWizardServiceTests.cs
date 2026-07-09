@@ -276,6 +276,10 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.NotNull(repository.LastWriteModel);
         Assert.NotNull(repository.LastWriteModel!.DraftInvoice);
         Assert.Equal(60m, repository.LastWriteModel.DraftInvoice!.TotalAmount);
+        Assert.Equal(60m, repository.LastWriteModel.DraftInvoice.SubtotalAmount);
+        Assert.Equal(60m, repository.LastWriteModel.DraftInvoice.BalanceDue);
+        Assert.Equal("LKR", repository.LastWriteModel.DraftInvoice.CurrencyCode);
+        Assert.Equal(SubscriptionBillingAlignmentConstants.InvoiceTypeSubscription, repository.LastWriteModel.DraftInvoice.InvoiceType);
     }
 
     private static PlatformTenantService CreateService(
@@ -398,6 +402,8 @@ public sealed class PlatformTenantWizardServiceTests
             Guid tenantId,
             IReadOnlyList<Guid> enabledFeatureIds,
             DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            string? revokedReason,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
@@ -578,6 +584,20 @@ public sealed class PlatformTenantWizardServiceTests
             throw new NotImplementedException();
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task UpsertLegacyPlanLimitsAsync(
+            Guid planId,
+            int? maxOutlets,
+            int? maxUsers,
+            int? maxTills,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+            Guid planId,
+            CancellationToken cancellationToken) =>
             throw new NotImplementedException();
     }
 }

@@ -230,6 +230,12 @@ public sealed partial class PlatformTenantService
             maxOutlets,
             maxTills,
             maxUsers,
+            plan.BaseCurrency,
+            plan.PriceAmount,
+            subscriptionRequest?.BillingStartAt ?? now,
+            subscriptionRequest?.BillingStartAt ?? now,
+            currentPeriodEnd: null,
+            assignedByPlatformUserId: platformUserId,
             now);
 
         var entitlements = resolvedFeatureIds
@@ -249,6 +255,13 @@ public sealed partial class PlatformTenantService
                 selection.AddonId,
                 selection.Quantity,
                 status: "ACTIVE",
+                unitPrice: addonMap[selection.AddonId].UnitPrice,
+                currencyCode: plan.BaseCurrency,
+                autoRenew: true,
+                startsAt: now,
+                endsAt: null,
+                createdByPlatformUserId: platformUserId,
+                updatedByPlatformUserId: platformUserId,
                 now))
             .ToList();
 
@@ -332,6 +345,9 @@ public sealed partial class PlatformTenantService
                 invoiceAmount,
                 billingCycle,
                 subscriptionRequest?.NextBillingAt ?? subscriptionRequest?.BillingStartAt ?? now.AddDays(7),
+                plan.BaseCurrency,
+                subscriptionRequest?.BillingStartAt ?? now,
+                subscriptionRequest?.NextBillingAt,
                 now);
         }
 
@@ -434,6 +450,27 @@ public sealed partial class PlatformTenantService
             tenantId,
             request.SubscriptionPlanId.Value,
             TenantSubscriptionStatusConstants.Trial,
+            TenantSubscriptionBillingConstants.BillingCycleMonthly,
+            trialStartAt: null,
+            trialEndAt: null,
+            billingStartAt: now,
+            nextBillingAt: null,
+            autoRenew: true,
+            discountType: null,
+            discountValue: null,
+            taxPercentage: 0m,
+            invoiceEmail: null,
+            paymentMethod: null,
+            notes: null,
+            maxOutletsOverride: null,
+            maxTillsOverride: null,
+            maxUsersOverride: null,
+            currencyCode: plan.BaseCurrency,
+            planPrice: plan.PriceAmount,
+            startedAt: now,
+            currentPeriodStart: now,
+            currentPeriodEnd: null,
+            assignedByPlatformUserId: platformUserId,
             now);
 
         await _repository.AddTenantWithSubscriptionAndEntitlementsAsync(
