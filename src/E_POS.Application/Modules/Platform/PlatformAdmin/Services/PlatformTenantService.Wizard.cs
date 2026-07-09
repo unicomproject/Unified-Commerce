@@ -277,7 +277,7 @@ public sealed partial class PlatformTenantService
             "Bootstrap tenant admin role",
             false, // isCustom
             true, // isActive
-            platformUserId,
+            null, // createdByTenantUserId: system-created during platform wizard; no tenant user exists yet
             now);
 
         var bootstrapPermissionIds = await _repository.GetTenantAdminBootstrapPermissionIdsAsync(cancellationToken);
@@ -288,7 +288,7 @@ public sealed partial class PlatformTenantService
                 tenantId,
                 roleId,
                 permissionId,
-                platformUserId,
+                null, // grantedByTenantUserId: system-granted during platform wizard; no tenant user exists yet
                 now))
             .ToList();
 

@@ -244,6 +244,90 @@ public sealed class PlatformTenantRepositoryTests
         Assert.Null(options);
     }
 
+    [Fact]
+    public async Task GetCreateOptionsAsync_WithAddonMissingLimitRow_DoesNotThrow()
+    {
+        await using var dbContext = CreateDbContext();
+        var planId = Guid.NewGuid();
+        var moduleId = Guid.NewGuid();
+        var featureId = Guid.NewGuid();
+        var limitDefinitionId = Guid.NewGuid();
+        var addonWithLimitId = Guid.NewGuid();
+        var addonWithoutLimitId = Guid.NewGuid();
+
+        dbContext.SubscriptionPlans.Add(SubscriptionPlan.Create(
+            planId,
+            "WIZARD_PLAN",
+            "Wizard Plan",
+            SubscriptionPlanConstants.Status.Active,
+            "MONTHLY",
+            49.99m,
+            Now));
+
+        dbContext.PlatformModules.Add(PlatformModule.Create(
+            moduleId,
+            "wizard_module",
+            "Wizard Module",
+            "Wizard module",
+            "ACTIVE",
+            1,
+            Now));
+
+        dbContext.PlatformFeatures.Add(PlatformFeature.Create(
+            featureId,
+            moduleId,
+            "outlet_management",
+            "Outlet Management",
+            "ACTIVE",
+            Now));
+
+        dbContext.FeatureLimitDefinitions.Add(FeatureLimitDefinition.Create(
+            limitDefinitionId,
+            featureId,
+            "MAX_OUTLETS",
+            "Max Outlets",
+            1m,
+            Now));
+
+        dbContext.SubscriptionAddons.AddRange(
+            SubscriptionAddon.Create(
+                addonWithLimitId,
+                "ADDON_WITH_LIMIT",
+                "Addon With Limit",
+                "ACTIVE",
+                10m,
+                Now),
+            SubscriptionAddon.Create(
+                addonWithoutLimitId,
+                "ADDON_WITHOUT_LIMIT",
+                "Addon Without Limit",
+                "ACTIVE",
+                5m,
+                Now));
+
+        dbContext.SubscriptionAddonLimits.Add(SubscriptionAddonLimit.Create(
+            Guid.NewGuid(),
+            addonWithLimitId,
+            limitDefinitionId,
+            2m,
+            Now));
+
+        await dbContext.SaveChangesAsync();
+
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+
+        var options = await repository.GetCreateOptionsAsync(CancellationToken.None);
+
+        Assert.Single(options.Plans);
+        Assert.Equal(2, options.Addons.Count);
+
+        var addonWithLimit = options.Addons.Single(addon => addon.AddonCode == "ADDON_WITH_LIMIT");
+        Assert.Equal(2, addonWithLimit.LimitIncrementByKey["max_outlets"]);
+
+        var addonWithoutLimit = options.Addons.Single(addon => addon.AddonCode == "ADDON_WITHOUT_LIMIT");
+        Assert.Empty(addonWithoutLimit.LimitIncrementByKey);
+    }
+
     private static async Task SeedAsync(
         EPosDbContext dbContext,
         Guid planId,

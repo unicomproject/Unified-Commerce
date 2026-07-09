@@ -100,7 +100,7 @@ public sealed partial class PlatformTenantRepository
                 addon.PriceAmount,
                 RelatedFeatureCode = feature != null ? feature.FeatureCode : null,
                 LimitCode = limitDefinition != null ? limitDefinition.LimitCode : null,
-                addonLimit.IncrementValue
+                IncrementValue = addonLimit != null ? (decimal?)addonLimit.IncrementValue : null
             })
             .ToListAsync(cancellationToken);
 
@@ -119,12 +119,14 @@ public sealed partial class PlatformTenantRepository
                 foreach (var row in group)
                 {
                     var normalizedKey = NormalizeLimitKey(row.LimitCode);
-                    if (normalizedKey is null || row.IncrementValue <= 0)
+                    if (normalizedKey is null ||
+                        !row.IncrementValue.HasValue ||
+                        row.IncrementValue.Value <= 0m)
                     {
                         continue;
                     }
 
-                    increments[normalizedKey] = (int)row.IncrementValue;
+                    increments[normalizedKey] = (int)row.IncrementValue.Value;
                 }
 
                 return new PlatformTenantCreateAddonOptionDto(

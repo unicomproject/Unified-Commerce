@@ -7480,7 +7480,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<Guid>("CreatedByTenantUserId")
+                    b.Property<Guid?>("CreatedByTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_tenant_user_id");
 
@@ -7524,7 +7524,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<Guid>("UpdatedByTenantUserId")
+                    b.Property<Guid?>("UpdatedByTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("updated_by_tenant_user_id");
 

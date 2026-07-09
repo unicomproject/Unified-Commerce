@@ -93,6 +93,50 @@ public sealed class PlatformTenantWizardServiceTests
     }
 
     [Fact]
+    public async Task CreateTenantAsync_WizardRequest_CreatesBootstrapTenantRoleWithoutTenantUserAudit()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-ROLE",
+                Name = "Wizard Tenant",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada.role@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastWriteModel);
+
+        var adminRole = repository.LastWriteModel!.TenantAdminRole;
+        Assert.NotNull(adminRole);
+        // Bootstrap role is system-created during the platform wizard; no tenant user exists yet,
+        // so tenant-user audit FKs (fk_tenant_roles_created_by / _updated_by) must be null, never the platform user id.
+        Assert.Null(adminRole!.CreatedByTenantUserId);
+        Assert.Null(adminRole.UpdatedByTenantUserId);
+
+        Assert.All(
+            repository.LastWriteModel.TenantAdminRolePermissions,
+            permission => Assert.Null(permission.GrantedByTenantUserId));
+    }
+
+    [Fact]
     public async Task CreateTenantAsync_WizardWithPassword_ReturnsValidationFailureBecauseTempPasswordIsDeferred()
     {
         var repository = new FakeWizardTenantRepository();
