@@ -34,7 +34,7 @@ public class PlatformRefreshToken : AuditableEntity
             TokenHash = tokenHash,
             ExpiresAt = expiresAt,
             PlatformUserId = platformUserId,
-            TokenFamilyId = tokenFamilyId,
+            TokenFamilyId = tokenFamilyId ?? id,
             CreatedAt = now,
             UpdatedAt = now
         };

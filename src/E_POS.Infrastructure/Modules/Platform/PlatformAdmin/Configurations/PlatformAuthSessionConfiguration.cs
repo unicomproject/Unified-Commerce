@@ -30,7 +30,7 @@ public sealed class PlatformAuthSessionConfiguration : IEntityTypeConfiguration<
 
         builder.Property(x => x.PlatformUserId)
             .HasColumnName("platform_user_id")
-            .IsRequired(false);
+            .IsRequired();
 
         builder.Property(x => x.Status)
             .HasColumnName("status")

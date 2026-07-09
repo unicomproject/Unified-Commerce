@@ -98,4 +98,19 @@ public class PlatformPasswordResetToken : AuditableEntity
             RevokedAt = UpdatedAt ?? CreatedAt;
         }
     }
+
+    /// <summary>
+    /// Applies Phase 8G-b backfill for password-reset expiry required by NOT NULL hardening.
+    /// </summary>
+    public void ApplyHardeningBackfill()
+    {
+        if (ExpiresAt is not null)
+        {
+            return;
+        }
+
+        var requestedAt = RequestedAt ?? CreatedAt;
+        RequestedAt = requestedAt;
+        ExpiresAt = requestedAt.AddHours(PlatformPasswordResetConstants.DefaultLifetimeHours);
+    }
 }

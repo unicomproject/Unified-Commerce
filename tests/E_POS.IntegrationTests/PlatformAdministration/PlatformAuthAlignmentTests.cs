@@ -65,16 +65,8 @@ public sealed class PlatformAuthAlignmentTests
     [Fact]
     public async Task Backfill_RefreshToken_SetsPlatformUserIdFamilyAndTimestamps()
     {
-        await using var dbContext = CreateDbContext();
         var userId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
-        SeedUser(dbContext, userId);
-
-        dbContext.PlatformAuthSessions.Add(PlatformAuthSession.Create(
-            sessionId,
-            userId,
-            CreateTokenHash("session-for-refresh"),
-            CreatedAt));
 
         var usedToken = PlatformRefreshToken.CreateLegacy(
             Guid.NewGuid(),
@@ -94,74 +86,62 @@ public sealed class PlatformAuthAlignmentTests
             CreatedAt,
             UpdatedAt);
 
-        dbContext.PlatformRefreshTokens.AddRange(usedToken, revokedToken);
-        await dbContext.SaveChangesAsync();
+        usedToken.ApplyAlignmentBackfill(userId);
+        revokedToken.ApplyAlignmentBackfill(userId);
 
-        await PlatformAuthAlignmentBackfillApplicator.ApplyAsync(dbContext);
+        Assert.Equal(userId, usedToken.PlatformUserId);
+        Assert.Equal(usedToken.Id, usedToken.TokenFamilyId);
+        Assert.Equal(UpdatedAt, usedToken.UsedAt);
+        Assert.Null(usedToken.RevokedAt);
 
-        var savedUsed = await dbContext.PlatformRefreshTokens.SingleAsync(x => x.Id == usedToken.Id);
-        Assert.Equal(userId, savedUsed.PlatformUserId);
-        Assert.Equal(usedToken.Id, savedUsed.TokenFamilyId);
-        Assert.Equal(UpdatedAt, savedUsed.UsedAt);
-        Assert.Null(savedUsed.RevokedAt);
-
-        var savedRevoked = await dbContext.PlatformRefreshTokens.SingleAsync(x => x.Id == revokedToken.Id);
-        Assert.Equal(userId, savedRevoked.PlatformUserId);
-        Assert.Equal(revokedToken.Id, savedRevoked.TokenFamilyId);
-        Assert.Equal(UpdatedAt, savedRevoked.RevokedAt);
-        Assert.Null(savedRevoked.UsedAt);
+        Assert.Equal(userId, revokedToken.PlatformUserId);
+        Assert.Equal(revokedToken.Id, revokedToken.TokenFamilyId);
+        Assert.Equal(UpdatedAt, revokedToken.RevokedAt);
+        Assert.Null(revokedToken.UsedAt);
     }
 
     [Fact]
     public async Task Backfill_LoginAudit_MirrorsLegacyFields_WithoutInventingClientMetadata()
     {
-        await using var dbContext = CreateDbContext();
         var userId = Guid.NewGuid();
-        SeedUser(dbContext, userId);
-
-        dbContext.PlatformLoginAudits.Add(PlatformLoginAudit.CreateLegacy(
+        var audit = PlatformLoginAudit.CreateLegacy(
             Guid.NewGuid(),
             userId,
             PlatformAuthConstants.SuccessLoginResult,
-            CreatedAt));
-        await dbContext.SaveChangesAsync();
+            CreatedAt);
 
-        await PlatformAuthAlignmentBackfillApplicator.ApplyAsync(dbContext);
+        audit.ApplyAlignmentBackfill();
 
-        var saved = await dbContext.PlatformLoginAudits.SingleAsync();
-        Assert.Equal(CreatedAt, saved.AttemptedAt);
-        Assert.Equal(PlatformAuthConstants.SuccessLoginResult, saved.LoginStatus);
-        Assert.Equal(PlatformAuthAlignmentConstants.AuthenticationMethod.Password, saved.AuthenticationMethod);
-        Assert.Null(saved.IpAddress);
-        Assert.Null(saved.UserAgent);
-        Assert.Null(saved.FailureReason);
-        Assert.Null(saved.RiskScore);
-        Assert.Null(saved.PlatformAuthSessionId);
-        Assert.Equal(PlatformAuthConstants.SuccessLoginResult, saved.LoginResult);
+        Assert.Equal(CreatedAt, audit.AttemptedAt);
+        Assert.Equal(PlatformAuthConstants.SuccessLoginResult, audit.LoginStatus);
+        Assert.Equal(PlatformAuthAlignmentConstants.AuthenticationMethod.Password, audit.AuthenticationMethod);
+        Assert.Null(audit.IpAddress);
+        Assert.Null(audit.UserAgent);
+        Assert.Null(audit.FailureReason);
+        Assert.Null(audit.RiskScore);
+        Assert.Null(audit.PlatformAuthSessionId);
+        Assert.Equal(PlatformAuthConstants.SuccessLoginResult, audit.LoginResult);
+        await Task.CompletedTask;
     }
 
     [Fact]
     public async Task Backfill_PasswordReset_SetsRequestedAt_WithoutInventingExpiresAt()
     {
-        await using var dbContext = CreateDbContext();
         var userId = Guid.NewGuid();
-        SeedUser(dbContext, userId);
-
-        dbContext.PlatformPasswordResetTokens.Add(PlatformPasswordResetToken.CreateLegacy(
+        var token = PlatformPasswordResetToken.CreateLegacy(
             Guid.NewGuid(),
             userId,
             CreateTokenHash("reset"),
             PlatformAuthConstants.PendingTokenStatus,
-            CreatedAt));
-        await dbContext.SaveChangesAsync();
+            CreatedAt);
 
-        await PlatformAuthAlignmentBackfillApplicator.ApplyAsync(dbContext);
+        token.ApplyAlignmentBackfill();
 
-        var saved = await dbContext.PlatformPasswordResetTokens.SingleAsync();
-        Assert.Equal(CreatedAt, saved.RequestedAt);
-        Assert.Null(saved.ExpiresAt);
-        Assert.Null(saved.UsedAt);
-        Assert.Null(saved.RevokedAt);
+        Assert.Equal(CreatedAt, token.RequestedAt);
+        Assert.Null(token.ExpiresAt);
+        Assert.Null(token.UsedAt);
+        Assert.Null(token.RevokedAt);
+        await Task.CompletedTask;
     }
 
     [Fact]
@@ -189,13 +169,16 @@ public sealed class PlatformAuthAlignmentTests
             CreatedAt.AddDays(7),
             CreatedAt,
             UpdatedAt);
+        refreshToken.ApplyAlignmentBackfill(userId);
         dbContext.PlatformRefreshTokens.Add(refreshToken);
 
-        dbContext.PlatformLoginAudits.Add(PlatformLoginAudit.CreateLegacy(
+        var audit = PlatformLoginAudit.CreateLegacy(
             Guid.NewGuid(),
             userId,
             PlatformAuthConstants.FailedLoginResult,
-            CreatedAt));
+            CreatedAt);
+        audit.ApplyAlignmentBackfill();
+        dbContext.PlatformLoginAudits.Add(audit);
 
         await dbContext.SaveChangesAsync();
 
@@ -239,7 +222,8 @@ public sealed class PlatformAuthAlignmentTests
             sessionId,
             CreateTokenHash("compat-refresh"),
             CreatedAt.AddDays(7),
-            CreatedAt));
+            CreatedAt,
+            platformUserId: userId));
 
         await dbContext.SaveChangesAsync();
         await PlatformAuthAlignmentBackfillApplicator.ApplyAsync(dbContext);

@@ -138,12 +138,15 @@ public sealed class PlatformPasswordResetServiceTests
         await using var dbContext = CreateDbContext();
         SeedUser(dbContext);
         var tokenHash = new TokenHashService().HashToken("legacy-expired-token", JwtSettings.SigningKey);
-        dbContext.PlatformPasswordResetTokens.Add(PlatformPasswordResetToken.CreateLegacy(
+        var legacyToken = PlatformPasswordResetToken.CreateLegacy(
             Guid.NewGuid(),
             PlatformUserId,
             tokenHash,
             PlatformAuthConstants.ExpiredTokenStatus,
-            Now.AddHours(-3)));
+            Now.AddHours(-3));
+        legacyToken.ApplyAlignmentBackfill();
+        legacyToken.ApplyHardeningBackfill();
+        dbContext.PlatformPasswordResetTokens.Add(legacyToken);
         await dbContext.SaveChangesAsync();
 
         var service = CreateService(dbContext);

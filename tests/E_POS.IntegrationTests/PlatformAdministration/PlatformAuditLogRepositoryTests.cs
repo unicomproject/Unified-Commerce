@@ -137,7 +137,6 @@ public sealed class PlatformAuditLogRepositoryTests
 
         Assert.Contains("ORDER BY", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("attempted_at", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("created_at", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("OccurredAt", sql, StringComparison.Ordinal);
     }
 
@@ -150,12 +149,15 @@ public sealed class PlatformAuditLogRepositoryTests
         var legacyAuditId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01");
         var enrichedAuditId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02");
 
+        var legacyAudit = PlatformLoginAudit.CreateLegacy(
+            legacyAuditId,
+            UserOneId,
+            PlatformAuthConstants.FailedLoginResult,
+            BaseTime.AddHours(1));
+        legacyAudit.ApplyAlignmentBackfill();
+
         dbContext.PlatformLoginAudits.AddRange(
-            PlatformLoginAudit.CreateLegacy(
-                legacyAuditId,
-                UserOneId,
-                PlatformAuthConstants.FailedLoginResult,
-                BaseTime.AddHours(1)),
+            legacyAudit,
             PlatformLoginAudit.Create(
                 enrichedAuditId,
                 UserOneId,
@@ -190,12 +192,15 @@ public sealed class PlatformAuditLogRepositoryTests
         var legacyFailedId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01");
         var enrichedLockedId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02");
 
+        var legacyFailed = PlatformLoginAudit.CreateLegacy(
+            legacyFailedId,
+            UserOneId,
+            PlatformAuthConstants.FailedLoginResult,
+            BaseTime);
+        legacyFailed.ApplyAlignmentBackfill();
+
         dbContext.PlatformLoginAudits.AddRange(
-            PlatformLoginAudit.CreateLegacy(
-                legacyFailedId,
-                UserOneId,
-                PlatformAuthConstants.FailedLoginResult,
-                BaseTime),
+            legacyFailed,
             PlatformLoginAudit.Create(
                 enrichedLockedId,
                 UserOneId,

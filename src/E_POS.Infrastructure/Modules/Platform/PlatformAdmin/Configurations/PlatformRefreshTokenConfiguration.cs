@@ -48,10 +48,12 @@ public sealed class PlatformRefreshTokenConfiguration : IEntityTypeConfiguration
             .IsRequired();
 
         builder.Property(x => x.PlatformUserId)
-            .HasColumnName("platform_user_id");
+            .HasColumnName("platform_user_id")
+            .IsRequired();
 
         builder.Property(x => x.TokenFamilyId)
-            .HasColumnName("token_family_id");
+            .HasColumnName("token_family_id")
+            .IsRequired();
 
         builder.Property(x => x.ReplacedByTokenId)
             .HasColumnName("replaced_by_token_id");

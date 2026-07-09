@@ -137,12 +137,13 @@ public sealed class PlatformAuthDualWriteTests
     }
 
     [Fact]
-    public void RefreshToken_Create_WithoutAlignmentArguments_LeavesNewColumnsNull()
+    public void RefreshToken_Create_WithoutAlignmentArguments_DefaultsTokenFamilyIdAndLeavesPlatformUserIdNull()
     {
-        var token = PlatformRefreshToken.Create(Guid.NewGuid(), Guid.NewGuid(), "refresh-hash", CreatedAt.AddDays(7), CreatedAt);
+        var tokenId = Guid.NewGuid();
+        var token = PlatformRefreshToken.Create(tokenId, Guid.NewGuid(), "refresh-hash", CreatedAt.AddDays(7), CreatedAt);
 
         Assert.Null(token.PlatformUserId);
-        Assert.Null(token.TokenFamilyId);
+        Assert.Equal(tokenId, token.TokenFamilyId);
         Assert.Null(token.ReplacedByTokenId);
     }
 
