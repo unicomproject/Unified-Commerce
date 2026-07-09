@@ -136,8 +136,95 @@ public sealed class PlatformAuditLogRepositoryTests
         var sql = query.ToQueryString();
 
         Assert.Contains("ORDER BY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("attempted_at", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("created_at", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("OccurredAt", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetLoginSecurityAuditLogsAsync_SortsByAttemptedAtWithCreatedAtFallback()
+    {
+        await using var dbContext = CreateDbContext();
+        SeedUser(dbContext, UserOneId, "admin@nytroz.local");
+
+        var legacyAuditId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01");
+        var enrichedAuditId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02");
+
+        dbContext.PlatformLoginAudits.AddRange(
+            PlatformLoginAudit.CreateLegacy(
+                legacyAuditId,
+                UserOneId,
+                PlatformAuthConstants.FailedLoginResult,
+                BaseTime.AddHours(1)),
+            PlatformLoginAudit.Create(
+                enrichedAuditId,
+                UserOneId,
+                PlatformAuthConstants.SuccessLoginResult,
+                BaseTime,
+                attemptedAt: BaseTime.AddHours(2)));
+        await dbContext.SaveChangesAsync();
+
+        IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
+
+        var response = await repository.GetLoginSecurityAuditLogsAsync(
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
+            {
+                PageNumber = 1,
+                PageSize = 10
+            },
+            CancellationToken.None);
+
+        Assert.Equal(2, response.Items.Count);
+        Assert.Equal(enrichedAuditId, response.Items[0].Id);
+        Assert.Equal(legacyAuditId, response.Items[1].Id);
+        Assert.Equal(BaseTime.AddHours(2), response.Items[0].OccurredAt);
+        Assert.Equal(BaseTime.AddHours(1), response.Items[1].OccurredAt);
+    }
+
+    [Fact]
+    public async Task GetLoginSecurityAuditLogsAsync_FiltersUsingLoginStatusWithLoginResultFallback()
+    {
+        await using var dbContext = CreateDbContext();
+        SeedUser(dbContext, UserOneId, "admin@nytroz.local");
+
+        var legacyFailedId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01");
+        var enrichedLockedId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02");
+
+        dbContext.PlatformLoginAudits.AddRange(
+            PlatformLoginAudit.CreateLegacy(
+                legacyFailedId,
+                UserOneId,
+                PlatformAuthConstants.FailedLoginResult,
+                BaseTime),
+            PlatformLoginAudit.Create(
+                enrichedLockedId,
+                UserOneId,
+                PlatformAuthConstants.LockedLoginResult,
+                BaseTime.AddMinutes(1)));
+        await dbContext.SaveChangesAsync();
+
+        IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
+
+        var failedOnly = await repository.GetLoginSecurityAuditLogsAsync(
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
+            {
+                Action = "platform.login.failed"
+            },
+            CancellationToken.None);
+
+        Assert.Single(failedOnly.Items);
+        Assert.Equal(legacyFailedId, failedOnly.Items[0].Id);
+
+        var lockedOnly = await repository.GetLoginSecurityAuditLogsAsync(
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
+            {
+                Action = "platform.login.locked"
+            },
+            CancellationToken.None);
+
+        Assert.Single(lockedOnly.Items);
+        Assert.Equal(enrichedLockedId, lockedOnly.Items[0].Id);
+        Assert.Equal("platform.login.locked", lockedOnly.Items[0].Action);
     }
 
     private static IQueryable<LoginAuditRow> BuildPaginatedAuditQuery(
@@ -152,16 +239,16 @@ public sealed class PlatformAuditLogRepositoryTests
             join user in users on audit.PlatformUserId equals user.Id into matchedUsers
             from user in matchedUsers.DefaultIfEmpty()
             select new { audit, Email = user != null ? user.Email : null })
-            .OrderByDescending(x => x.audit.CreatedAt)
+            .OrderByDescending(x => x.audit.AttemptedAt ?? x.audit.CreatedAt)
             .ThenByDescending(x => x.audit.Id)
             .Skip((listQuery.PageNumber - 1) * listQuery.PageSize)
             .Take(listQuery.PageSize)
             .Select(x => new LoginAuditRow(
                 x.audit.Id,
-                x.audit.CreatedAt,
+                x.audit.AttemptedAt ?? x.audit.CreatedAt,
                 x.audit.PlatformUserId,
                 x.Email,
-                x.audit.LoginResult));
+                x.audit.LoginStatus ?? x.audit.LoginResult));
     }
 
     private sealed record LoginAuditRow(
@@ -198,19 +285,8 @@ public sealed class PlatformAuditLogRepositoryTests
 
     private static void SeedAuditLogs(EPosDbContext dbContext)
     {
-        dbContext.PlatformUsers.AddRange(
-            PlatformUser.Create(
-                UserOneId,
-                "admin@nytroz.local",
-                "hash",
-                PlatformAuthConstants.ActiveStatus,
-                BaseTime),
-            PlatformUser.Create(
-                UserTwoId,
-                "support@nytroz.local",
-                "hash",
-                PlatformAuthConstants.ActiveStatus,
-                BaseTime));
+        SeedUser(dbContext, UserOneId, "admin@nytroz.local");
+        SeedUser(dbContext, UserTwoId, "support@nytroz.local");
 
         dbContext.PlatformLoginAudits.AddRange(
             PlatformLoginAudit.Create(
@@ -230,6 +306,16 @@ public sealed class PlatformAuditLogRepositoryTests
                 BaseTime.AddMinutes(2)));
 
         dbContext.SaveChanges();
+    }
+
+    private static void SeedUser(EPosDbContext dbContext, Guid userId, string email)
+    {
+        dbContext.PlatformUsers.Add(PlatformUser.Create(
+            userId,
+            email,
+            "hash",
+            PlatformAuthConstants.ActiveStatus,
+            BaseTime));
     }
 
     private static EPosDbContext CreateDbContext()

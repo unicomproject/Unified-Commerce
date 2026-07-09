@@ -77,6 +77,16 @@ public static class PlatformAuditLogMapper
             _ => normalized.ToUpperInvariant()
         };
     }
+
+    public static string ResolveEffectiveLoginResult(string loginResult, string? loginStatus)
+    {
+        return string.IsNullOrWhiteSpace(loginStatus) ? loginResult : loginStatus;
+    }
+
+    public static DateTimeOffset ResolveEffectiveOccurredAt(DateTimeOffset createdAt, DateTimeOffset? attemptedAt)
+    {
+        return attemptedAt ?? createdAt;
+    }
 }
 
 

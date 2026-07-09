@@ -104,6 +104,38 @@ public sealed class PlatformAuthFlowMetadataTests
     }
 
     [Fact]
+    public async Task LoginLocked_AuditStoresAlignmentFieldsAndFailureReason()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.PlatformUsers.Add(PlatformUser.Create(
+            PlatformAdminSeedConstants.DevelopmentPlatformUserId,
+            DevelopmentPlatformAdminSeedData.Email,
+            DevelopmentPlatformAdminSeedData.PasswordHash,
+            PlatformAuthConstants.LockedStatus,
+            Now));
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(new PlatformAuthRepository(dbContext, new PlatformPermissionRepository(dbContext)));
+
+        var login = await service.LoginAsync(
+            new PlatformAdminLoginRequest(DevelopmentPlatformAdminSeedData.Email, DevelopmentPlatformAdminSeedData.Password),
+            CancellationToken.None,
+            ClientContext);
+
+        Assert.True(login.IsFailure);
+
+        var audit = await dbContext.PlatformLoginAudits.SingleAsync();
+        Assert.Equal(PlatformAuthConstants.LockedLoginResult, audit.LoginResult);
+        Assert.Equal(PlatformAuthConstants.LockedLoginResult, audit.LoginStatus);
+        Assert.Equal(Now, audit.AttemptedAt);
+        Assert.Equal(PlatformAuthAlignmentConstants.AuthenticationMethod.Password, audit.AuthenticationMethod);
+        Assert.Equal(PlatformAuthAlignmentConstants.FailureReason.UserLocked, audit.FailureReason);
+        Assert.Equal(ClientContext.IpAddress, audit.IpAddress);
+        Assert.Equal(ClientContext.UserAgent, audit.UserAgent);
+        Assert.Null(audit.PlatformAuthSessionId);
+    }
+
+    [Fact]
     public async Task RefreshSuccess_SetsUsedAtOnOldTokenAndLastSeenAtOnSession()
     {
         await using var dbContext = CreateDbContext();
