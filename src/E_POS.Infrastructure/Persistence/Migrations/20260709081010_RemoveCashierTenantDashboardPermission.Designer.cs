@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260709081010_RemoveCashierTenantDashboardPermission")]
+    partial class RemoveCashierTenantDashboardPermission
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -15798,81 +15801,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.TillActivationCode", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("ActivationCodeHash")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)")
-                        .HasColumnName("activation_code_hash");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<Guid>("IssuedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("issued_by_tenant_user_id");
-
-                    b.Property<Guid>("OutletId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("outlet_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid>("TillId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("till_id");
-
-                    b.Property<DateTimeOffset?>("UsedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("used_at");
-
-                    b.Property<Guid?>("UsedByPosDeviceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("used_by_pos_device_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_till_activation_codes");
-
-                    b.HasIndex("ActivationCodeHash")
-                        .IsUnique()
-                        .HasDatabaseName("uq_till_activation_codes_activation_code_hash");
-
-                    b.HasIndex("IssuedByTenantUserId");
-
-                    b.HasIndex("OutletId");
-
-                    b.HasIndex("TillId");
-
-                    b.HasIndex("UsedByPosDeviceId");
-
-                    b.HasIndex("TenantId", "TillId", "Status")
-                        .HasDatabaseName("ix_till_activation_codes_tenant_id_till_id_status");
-
-                    b.ToTable("till_activation_codes", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_till_activation_codes_status", "status IN ('ACTIVE', 'USED', 'EXPIRED', 'REVOKED')");
-                        });
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.TillDeviceAssignment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -24308,43 +24236,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedByTenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tills_updated_by_tenant_user_id_tenant_users");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.TillActivationCode", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
-                        .WithMany()
-                        .HasForeignKey("IssuedByTenantUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_till_activation_codes_issued_by_tenant_user_id_tenant_users");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
-                        .WithMany()
-                        .HasForeignKey("OutletId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_till_activation_codes_outlet_id_outlets");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_till_activation_codes_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", null)
-                        .WithMany()
-                        .HasForeignKey("TillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_till_activation_codes_till_id_tills");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
-                        .WithMany()
-                        .HasForeignKey("UsedByPosDeviceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_till_activation_codes_used_by_pos_device_id_pos_devices");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.TillDeviceAssignment", b =>
