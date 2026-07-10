@@ -10,14 +10,14 @@ public sealed class PlatformAuditLogMapperTests
     [InlineData("SUCCESS", "platform.login.success", "Platform login succeeded.")]
     [InlineData("FAILED", "platform.login.failed", "Platform login failed.")]
     [InlineData("LOCKED", "platform.login.locked", "Platform login blocked because the account is locked.")]
-    public void MapLoginAudit_MapsKnownLoginResults(string loginResult, string action, string summary)
+    public void MapLoginAudit_MapsKnownLoginStatuses(string loginStatus, string action, string summary)
     {
         var item = PlatformAuditLogMapper.MapLoginAudit(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             new DateTimeOffset(2026, 7, 3, 12, 0, 0, TimeSpan.Zero),
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             "admin@nytroz.local",
-            loginResult);
+            loginStatus);
 
         Assert.Equal(action, item.Action);
         Assert.Equal(summary, item.Summary);
@@ -36,28 +36,6 @@ public sealed class PlatformAuditLogMapperTests
         Assert.Equal(expected, resolved);
     }
 
-    [Theory]
-    [InlineData("FAILED", null, "FAILED")]
-    [InlineData("FAILED", "LOCKED", "LOCKED")]
-    [InlineData("SUCCESS", "", "SUCCESS")]
-    public void ResolveEffectiveLoginResult_PrefersLoginStatusWhenPresent(
-        string loginResult,
-        string? loginStatus,
-        string expected)
-    {
-        var resolved = PlatformAuditLogMapper.ResolveEffectiveLoginResult(loginResult, loginStatus);
-        Assert.Equal(expected, resolved);
-    }
-
-    [Fact]
-    public void ResolveEffectiveOccurredAt_PrefersAttemptedAtWhenPresent()
-    {
-        var createdAt = new DateTimeOffset(2026, 7, 3, 12, 0, 0, TimeSpan.Zero);
-        var attemptedAt = createdAt.AddMinutes(5);
-
-        Assert.Equal(attemptedAt, PlatformAuditLogMapper.ResolveEffectiveOccurredAt(createdAt, attemptedAt));
-        Assert.Equal(createdAt, PlatformAuditLogMapper.ResolveEffectiveOccurredAt(createdAt, null));
-    }
 }
 
 

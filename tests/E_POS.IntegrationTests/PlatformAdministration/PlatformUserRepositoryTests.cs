@@ -33,6 +33,40 @@ public sealed class PlatformUserRepositoryTests
     }
 
     [Fact]
+    public async Task GetUsersAsync_UsesLoginStatusAndAttemptedAtForLastLogin()
+    {
+        await using var dbContext = CreateDbContext();
+        await SeedSuperAdminAsync(dbContext);
+
+        var userId = PlatformAdminSeedConstants.DevelopmentPlatformUserId;
+        var successfulAudit = PlatformLoginAudit.Create(
+            Guid.NewGuid(),
+            userId,
+            PlatformAuthConstants.SuccessLoginResult,
+            Now,
+            attemptedAt: Now.AddMinutes(5));
+        var failedAudit = PlatformLoginAudit.Create(
+            Guid.NewGuid(),
+            userId,
+            PlatformAuthConstants.FailedLoginResult,
+            Now,
+            attemptedAt: Now.AddMinutes(30));
+
+        dbContext.PlatformLoginAudits.AddRange(successfulAudit, failedAudit);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.Entry(successfulAudit).Property(nameof(PlatformLoginAudit.LoginResult)).CurrentValue = PlatformAuthConstants.FailedLoginResult;
+        dbContext.Entry(successfulAudit).Property(nameof(PlatformLoginAudit.CreatedAt)).CurrentValue = Now.AddHours(3);
+        await dbContext.SaveChangesAsync();
+
+        IPlatformUserRepository repository = new PlatformUserRepository(dbContext);
+        var users = await repository.GetUsersAsync(CancellationToken.None);
+        var superAdmin = users.Users.Single(user => user.Id == userId);
+
+        Assert.Equal(Now.AddMinutes(5), superAdmin.LastLoginAt);
+    }
+
+    [Fact]
     public async Task AddUserWithRolesAsync_PersistsPendingInviteUserAndRoles()
     {
         await using var dbContext = CreateDbContext();

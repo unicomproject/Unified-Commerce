@@ -16,9 +16,9 @@ public static class PlatformAuditLogMapper
         DateTimeOffset occurredAt,
         Guid? platformUserId,
         string? email,
-        string loginResult)
+        string loginStatus)
     {
-        var action = MapAction(loginResult);
+        var action = MapAction(loginStatus);
         return new PlatformAuditLogListItemDto(
             id,
             occurredAt,
@@ -27,34 +27,34 @@ public static class PlatformAuditLogMapper
             Area,
             EntityType,
             platformUserId,
-            MapSummary(loginResult),
+            MapSummary(loginStatus),
             IpAddress: null,
             UserAgent: null);
     }
 
-    public static string MapAction(string loginResult)
+    public static string MapAction(string loginStatus)
     {
-        return loginResult switch
+        return loginStatus switch
         {
-            _ when string.Equals(loginResult, PlatformAuthConstants.SuccessLoginResult, StringComparison.Ordinal) =>
+            _ when string.Equals(loginStatus, PlatformAuthConstants.SuccessLoginResult, StringComparison.Ordinal) =>
                 "platform.login.success",
-            _ when string.Equals(loginResult, PlatformAuthConstants.FailedLoginResult, StringComparison.Ordinal) =>
+            _ when string.Equals(loginStatus, PlatformAuthConstants.FailedLoginResult, StringComparison.Ordinal) =>
                 "platform.login.failed",
-            _ when string.Equals(loginResult, PlatformAuthConstants.LockedLoginResult, StringComparison.Ordinal) =>
+            _ when string.Equals(loginStatus, PlatformAuthConstants.LockedLoginResult, StringComparison.Ordinal) =>
                 "platform.login.locked",
             _ => "platform.login.unknown"
         };
     }
 
-    public static string MapSummary(string loginResult)
+    public static string MapSummary(string loginStatus)
     {
-        return loginResult switch
+        return loginStatus switch
         {
-            _ when string.Equals(loginResult, PlatformAuthConstants.SuccessLoginResult, StringComparison.Ordinal) =>
+            _ when string.Equals(loginStatus, PlatformAuthConstants.SuccessLoginResult, StringComparison.Ordinal) =>
                 "Platform login succeeded.",
-            _ when string.Equals(loginResult, PlatformAuthConstants.FailedLoginResult, StringComparison.Ordinal) =>
+            _ when string.Equals(loginStatus, PlatformAuthConstants.FailedLoginResult, StringComparison.Ordinal) =>
                 "Platform login failed.",
-            _ when string.Equals(loginResult, PlatformAuthConstants.LockedLoginResult, StringComparison.Ordinal) =>
+            _ when string.Equals(loginStatus, PlatformAuthConstants.LockedLoginResult, StringComparison.Ordinal) =>
                 "Platform login blocked because the account is locked.",
             _ => "Platform login event recorded."
         };
@@ -76,16 +76,6 @@ public static class PlatformAuditLogMapper
             "platform.login.locked" or "LOCKED" => PlatformAuthConstants.LockedLoginResult,
             _ => normalized.ToUpperInvariant()
         };
-    }
-
-    public static string ResolveEffectiveLoginResult(string loginResult, string? loginStatus)
-    {
-        return string.IsNullOrWhiteSpace(loginStatus) ? loginResult : loginStatus;
-    }
-
-    public static DateTimeOffset ResolveEffectiveOccurredAt(DateTimeOffset createdAt, DateTimeOffset? attemptedAt)
-    {
-        return attemptedAt ?? createdAt;
     }
 }
 

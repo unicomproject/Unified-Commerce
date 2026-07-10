@@ -418,7 +418,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
 
     private Task SaveFailedAuditAsync(
         Guid? platformUserId,
-        string loginResult,
+        string loginStatus,
         DateTimeOffset now,
         CancellationToken cancellationToken,
         PlatformAuthClientContext? clientContext = null,
@@ -428,7 +428,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
         var audit = PlatformLoginAudit.Create(
             Guid.NewGuid(),
             platformUserId,
-            loginResult,
+            loginStatus,
             now,
             ipAddress: clientContext?.IpAddress,
             userAgent: clientContext?.UserAgent,

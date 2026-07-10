@@ -19,7 +19,7 @@ public class PlatformLoginAudit : AuditableEntity
     public static PlatformLoginAudit Create(
         Guid id,
         Guid? platformUserId,
-        string loginResult,
+        string loginStatus,
         DateTimeOffset now,
         string? authenticationMethod = null,
         DateTimeOffset? attemptedAt = null,
@@ -28,12 +28,18 @@ public class PlatformLoginAudit : AuditableEntity
         string? userAgent = null,
         string? failureReason = null)
     {
+        if (string.IsNullOrWhiteSpace(loginStatus))
+        {
+            throw new ArgumentException("Login status is required.", nameof(loginStatus));
+        }
+
         return new PlatformLoginAudit
         {
             Id = id,
             PlatformUserId = platformUserId,
-            LoginResult = loginResult,
-            LoginStatus = loginResult,
+            LoginStatus = loginStatus,
+            // Compatibility write retained until legacy login_result retirement migration.
+            LoginResult = loginStatus,
             AttemptedAt = attemptedAt ?? now,
             AuthenticationMethod = string.IsNullOrWhiteSpace(authenticationMethod)
                 ? PlatformAuthAlignmentConstants.AuthenticationMethod.Password

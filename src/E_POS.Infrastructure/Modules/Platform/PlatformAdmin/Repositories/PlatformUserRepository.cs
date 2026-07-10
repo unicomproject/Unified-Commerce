@@ -390,12 +390,12 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             .Where(audit =>
                 audit.PlatformUserId != null &&
                 userIds.Contains(audit.PlatformUserId.Value) &&
-                (audit.LoginStatus ?? audit.LoginResult) == PlatformAuthConstants.SuccessLoginResult)
+                audit.LoginStatus == PlatformAuthConstants.SuccessLoginResult)
             .GroupBy(audit => audit.PlatformUserId!.Value)
             .Select(group => new
             {
                 UserId = group.Key,
-                LastLoginAt = group.Max(item => item.AttemptedAt ?? item.CreatedAt)
+                LastLoginAt = group.Max(item => item.AttemptedAt!.Value)
             })
             .ToListAsync(cancellationToken);
 

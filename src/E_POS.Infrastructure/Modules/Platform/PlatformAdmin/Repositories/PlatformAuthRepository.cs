@@ -63,8 +63,8 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
             .AsNoTracking()
             .CountAsync(
                 x => x.PlatformUserId == audit.PlatformUserId &&
-                     (x.LoginStatus ?? x.LoginResult) == PlatformAuthConstants.FailedLoginResult &&
-                     (x.AttemptedAt ?? x.CreatedAt) >= failedAttemptWindowStart,
+                     x.LoginStatus == PlatformAuthConstants.FailedLoginResult &&
+                     x.AttemptedAt >= failedAttemptWindowStart,
                 cancellationToken);
 
         if (failedAttempts < maxFailedAttempts)
@@ -78,7 +78,7 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(x => x.Status, PlatformAuthConstants.LockedStatus)
-                    .SetProperty(x => x.UpdatedAt, audit.AttemptedAt ?? audit.CreatedAt),
+                    .SetProperty(x => x.UpdatedAt, audit.AttemptedAt ?? throw new InvalidOperationException("AttemptedAt is required.")),
                 cancellationToken);
     }
 

@@ -141,7 +141,7 @@ public sealed class PlatformAuditLogRepositoryTests
     }
 
     [Fact]
-    public async Task GetLoginSecurityAuditLogsAsync_SortsByAttemptedAtWithCreatedAtFallback()
+    public async Task GetLoginSecurityAuditLogsAsync_SortsByAttemptedAt()
     {
         await using var dbContext = CreateDbContext();
         SeedUser(dbContext, UserOneId, "admin@nytroz.local");
@@ -184,7 +184,7 @@ public sealed class PlatformAuditLogRepositoryTests
     }
 
     [Fact]
-    public async Task GetLoginSecurityAuditLogsAsync_FiltersUsingLoginStatusWithLoginResultFallback()
+    public async Task GetLoginSecurityAuditLogsAsync_FiltersUsingLoginStatus()
     {
         await using var dbContext = CreateDbContext();
         SeedUser(dbContext, UserOneId, "admin@nytroz.local");
@@ -232,6 +232,38 @@ public sealed class PlatformAuditLogRepositoryTests
         Assert.Equal("platform.login.locked", lockedOnly.Items[0].Action);
     }
 
+    [Fact]
+    public async Task GetLoginSecurityAuditLogsAsync_IgnoresTamperedLoginResultWhenLoginStatusUnchanged()
+    {
+        await using var dbContext = CreateDbContext();
+        SeedUser(dbContext, UserOneId, "admin@nytroz.local");
+
+        var auditId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var audit = PlatformLoginAudit.Create(
+            auditId,
+            UserOneId,
+            PlatformAuthConstants.FailedLoginResult,
+            BaseTime);
+
+        dbContext.PlatformLoginAudits.Add(audit);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.Entry(audit).Property(nameof(PlatformLoginAudit.LoginResult)).CurrentValue = PlatformAuthConstants.SuccessLoginResult;
+        await dbContext.SaveChangesAsync();
+
+        IPlatformAuditLogRepository repository = new PlatformAuditLogRepository(dbContext);
+        var failedOnly = await repository.GetLoginSecurityAuditLogsAsync(
+            new Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery
+            {
+                Action = "platform.login.failed"
+            },
+            CancellationToken.None);
+
+        Assert.Single(failedOnly.Items);
+        Assert.Equal(auditId, failedOnly.Items[0].Id);
+        Assert.Equal("platform.login.failed", failedOnly.Items[0].Action);
+    }
+
     private static IQueryable<LoginAuditRow> BuildPaginatedAuditQuery(
         EPosDbContext dbContext,
         Application.Modules.Platform.PlatformAdmin.Dtos.PlatformAuditLogListQuery listQuery)
@@ -244,16 +276,16 @@ public sealed class PlatformAuditLogRepositoryTests
             join user in users on audit.PlatformUserId equals user.Id into matchedUsers
             from user in matchedUsers.DefaultIfEmpty()
             select new { audit, Email = user != null ? user.Email : null })
-            .OrderByDescending(x => x.audit.AttemptedAt ?? x.audit.CreatedAt)
+            .OrderByDescending(x => x.audit.AttemptedAt)
             .ThenByDescending(x => x.audit.Id)
             .Skip((listQuery.PageNumber - 1) * listQuery.PageSize)
             .Take(listQuery.PageSize)
             .Select(x => new LoginAuditRow(
                 x.audit.Id,
-                x.audit.AttemptedAt ?? x.audit.CreatedAt,
+                x.audit.AttemptedAt!.Value,
                 x.audit.PlatformUserId,
                 x.Email,
-                x.audit.LoginStatus ?? x.audit.LoginResult));
+                x.audit.LoginStatus!));
     }
 
     private sealed record LoginAuditRow(
@@ -261,7 +293,7 @@ public sealed class PlatformAuditLogRepositoryTests
         DateTimeOffset OccurredAt,
         Guid? PlatformUserId,
         string? Email,
-        string LoginResult);
+        string LoginStatus);
 
     private static EPosDbContext CreatePostgreSqlDbContext()
     {
