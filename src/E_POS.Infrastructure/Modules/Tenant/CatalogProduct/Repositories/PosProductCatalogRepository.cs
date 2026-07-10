@@ -9,7 +9,6 @@ namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
 {
     private const string ActiveImageStatus = "ACTIVE";
-    private const int LowStockThreshold = 5;
 
     private readonly EPosDbContext _dbContext;
 
@@ -154,6 +153,23 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                 x => x.AvailableQuantity);
         }
 
+        var lowStockThresholdsByProduct = new Dictionary<Guid, decimal>();
+        if (productIds.Count > 0)
+        {
+            var settingsRows = await _dbContext.ProductInventorySettings
+                .AsNoTracking()
+                .Where(x =>
+                    x.TenantId == tenantId &&
+                    productIds.Contains(x.ProductId) &&
+                    x.ProductVariantId == null)
+                .Select(x => new { x.ProductId, x.LowStockThreshold })
+                .ToListAsync(cancellationToken);
+
+            lowStockThresholdsByProduct = settingsRows.ToDictionary(
+                x => x.ProductId,
+                x => x.LowStockThreshold);
+        }
+
         var imageRows = await _dbContext.ProductImages
             .AsNoTracking()
             .Where(x =>
@@ -216,7 +232,10 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                 availableQuantity = quantity;
             }
 
-            var stockStatus = ResolveStockStatus(availableQuantity);
+            lowStockThresholdsByProduct.TryGetValue(product.Id, out var lowStockThreshold);
+            var thresholdToUse = lowStockThreshold > 0m ? lowStockThreshold : 5m;
+
+            var stockStatus = ResolveStockStatus(availableQuantity, thresholdToUse);
 
             summaries.Add(new PosProductSummaryResponseDto(
                 product.Id,
@@ -363,7 +382,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         return hiddenProductIds;
     }
 
-    private static string ResolveStockStatus(decimal? availableQuantity)
+    private static string ResolveStockStatus(decimal? availableQuantity, decimal lowStockThreshold)
     {
         if (!availableQuantity.HasValue)
         {
@@ -375,7 +394,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             return "out_of_stock";
         }
 
-        if (availableQuantity.Value <= LowStockThreshold)
+        if (availableQuantity.Value <= lowStockThreshold)
         {
             return "low_stock";
         }

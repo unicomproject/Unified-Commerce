@@ -22,5 +22,6 @@ public record ProductUpdateRequest(
     Guid[]? CategoryIds,
     Guid[]? CollectionIds,
     string[]? ImageUrls,
-    Guid[]? SalesChannelIds);
+    Guid[]? SalesChannelIds,
+    decimal? LowStockThreshold);
 

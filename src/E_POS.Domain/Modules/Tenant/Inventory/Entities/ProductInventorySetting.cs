@@ -14,6 +14,7 @@ public class ProductInventorySetting : AuditableEntity
     public bool RequiresExpiryTracking { get; protected set; }
     public bool RequiresSerialTracking { get; protected set; }
     public string CostingMethod { get; protected set; } = string.Empty;
+    public decimal LowStockThreshold { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
@@ -32,6 +33,7 @@ public class ProductInventorySetting : AuditableEntity
         bool requiresExpiryTracking,
         bool requiresSerialTracking,
         string costingMethod,
+        decimal lowStockThreshold,
         string status,
         Guid? createdByTenantUserId,
         DateTimeOffset now)
@@ -49,6 +51,7 @@ public class ProductInventorySetting : AuditableEntity
             RequiresExpiryTracking = requiresExpiryTracking,
             RequiresSerialTracking = requiresSerialTracking,
             CostingMethod = costingMethod.Trim(),
+            LowStockThreshold = lowStockThreshold,
             Status = status.Trim(),
             CreatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
@@ -64,6 +67,7 @@ public class ProductInventorySetting : AuditableEntity
         bool requiresExpiryTracking,
         bool requiresSerialTracking,
         string costingMethod,
+        decimal lowStockThreshold,
         Guid? updatedByTenantUserId,
         DateTimeOffset now)
     {
@@ -74,6 +78,7 @@ public class ProductInventorySetting : AuditableEntity
         RequiresExpiryTracking = requiresExpiryTracking;
         RequiresSerialTracking = requiresSerialTracking;
         CostingMethod = costingMethod.Trim();
+        LowStockThreshold = lowStockThreshold;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

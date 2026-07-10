@@ -33,6 +33,7 @@ public sealed class ProductInventorySettingConfiguration : IEntityTypeConfigurat
         builder.Property(x => x.RequiresExpiryTracking).HasColumnName("requires_expiry_tracking").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.RequiresSerialTracking).HasColumnName("requires_serial_tracking").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.CostingMethod).HasColumnName("costing_method").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
+        builder.Property(x => x.LowStockThreshold).HasColumnName("low_stock_threshold").HasColumnType("numeric(18,4)").HasDefaultValue(0m).IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(30)").HasMaxLength(30).IsRequired();
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_product_inventory_settings_tenant_id_tenants");

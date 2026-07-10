@@ -46,7 +46,8 @@ public sealed class ProductServiceTests
                 CategoryIds: null, 
                 CollectionIds: null, 
                 ImageUrls: null, 
-                SalesChannelIds: null),
+                SalesChannelIds: null,
+                LowStockThreshold: null),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -83,7 +84,8 @@ public sealed class ProductServiceTests
                 CategoryIds: null, 
                 CollectionIds: null, 
                 ImageUrls: null, 
-                SalesChannelIds: null),
+                SalesChannelIds: null,
+                LowStockThreshold: null),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);

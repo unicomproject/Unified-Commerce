@@ -9,4 +9,7 @@ public static class DevelopmentPosHomeContextSeedConstants
     public static readonly Guid DevelopmentTillSessionId = Guid.Parse("bbbbbbbb-0005-4000-8000-000000000001");
     public static readonly Guid DevelopmentTillActivationCodeId = Guid.Parse("bbbbbbbb-0006-4000-8000-000000000001");
     public const string DevelopmentActivationCode = "TILL-8K92-POS";
+
+    public static readonly Guid DevelopmentTillActivationCodeId2 = Guid.Parse("bbbbbbbb-0006-4000-8000-000000000002");
+    public const string DevelopmentActivationCode2 = "TILL-NEW-POS";
 }
