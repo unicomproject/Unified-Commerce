@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<IBrandRepository, BrandRepository>();
         services.AddScoped<ICollectionRepository, CollectionRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IPosProductCatalogRepository, PosProductCatalogRepository>();
         services.AddScoped<IReturnPolicyTemplateRepository, ReturnPolicyTemplateRepository>();
         services.AddScoped<IReturnPolicyRepository, ReturnPolicyRepository>();
         services.AddScoped<ICodeSequenceRepository, CodeSequenceRepository>();
@@ -95,6 +96,8 @@ public static class DependencyInjection
         services.AddScoped<ITenantLookupRepository, TenantLookupRepository>();
         services.AddScoped<IPosHomeDashboardRepository, PosHomeDashboardRepository>();
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
+        services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
+        services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;

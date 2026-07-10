@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IPosProductCatalogService, PosProductCatalogService>();
         services.AddScoped<ICollectionService, CollectionService>();
         services.AddScoped<IReturnPolicyTemplateService, ReturnPolicyTemplateService>();
         services.AddScoped<IReturnPolicyService, ReturnPolicyService>();
@@ -80,6 +81,8 @@ public static class DependencyInjection
         // POS Home (cashier dashboard)
         services.AddScoped<IPosHomeDashboardService, PosHomeDashboardService>();
         services.AddScoped<IPosTillSessionService, PosTillSessionService>();
+        services.AddScoped<IPosCheckoutService, PosCheckoutService>();
+        services.AddScoped<IPosReceiptService, PosReceiptService>();
 
         return services;
     }

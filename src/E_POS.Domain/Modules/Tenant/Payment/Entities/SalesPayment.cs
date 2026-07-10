@@ -27,5 +27,46 @@ public class SalesPayment : AuditableEntity
     public string? CancellationReason { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    public static SalesPayment CreateCompletedPosPayment(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        string paymentNumber,
+        Guid paymentMethodId,
+        Guid tillId,
+        Guid tillSessionId,
+        string currencyCode,
+        decimal requestedAmount,
+        decimal? tenderedAmount,
+        decimal paidAmount,
+        decimal changeAmount,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        return new SalesPayment
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            PaymentNumber = paymentNumber.Trim(),
+            PaymentMethodId = paymentMethodId,
+            TillId = tillId,
+            TillSessionId = tillSessionId,
+            PaymentStatus = "PAID",
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            RequestedAmount = requestedAmount,
+            TenderedAmount = tenderedAmount,
+            PaidAmount = paidAmount,
+            ChangeAmount = changeAmount,
+            RefundedAmount = 0,
+            InitiatedAt = now,
+            PaidAt = now,
+            CreatedByTenantUserId = createdByTenantUserId,
+            UpdatedByTenantUserId = createdByTenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }
 
