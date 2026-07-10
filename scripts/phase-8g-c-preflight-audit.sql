@@ -38,23 +38,23 @@ SELECT COUNT(*) AS cnt FROM platform_refresh_tokens t
 WHERE replaced_by_token_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM platform_refresh_tokens r WHERE r.id = t.replaced_by_token_id);
 
-\echo '5 active sessions'
-SELECT COUNT(*) FROM platform_auth_sessions WHERE status = 'ACTIVE';
+\echo '5 active sessions (revoked_at IS NULL)'
+SELECT COUNT(*) FROM platform_auth_sessions WHERE revoked_at IS NULL;
 
 \echo '6 active tokens'
 SELECT COUNT(*) FROM platform_refresh_tokens WHERE status = 'ACTIVE';
 
-\echo '7 ACTIVE session without ACTIVE token'
+\echo '7 active session (revoked_at IS NULL) without ACTIVE token'
 SELECT COUNT(*) FROM platform_auth_sessions s
-WHERE s.status = 'ACTIVE' AND NOT EXISTS (
+WHERE s.revoked_at IS NULL AND NOT EXISTS (
   SELECT 1 FROM platform_refresh_tokens t WHERE t.platform_auth_session_id = s.id AND t.status = 'ACTIVE');
 
-\echo '8 ACTIVE token without ACTIVE session'
+\echo '8 ACTIVE token without active session (revoked_at IS NULL)'
 SELECT COUNT(*) FROM platform_refresh_tokens t
 WHERE t.status = 'ACTIVE' AND NOT EXISTS (
-  SELECT 1 FROM platform_auth_sessions s WHERE s.id = t.platform_auth_session_id AND s.status = 'ACTIVE');
+  SELECT 1 FROM platform_auth_sessions s WHERE s.id = t.platform_auth_session_id AND s.revoked_at IS NULL);
 
-\echo '9 multi ACTIVE sessions per user (allowed)'
+\echo '9 multi active sessions per user (allowed)'
 SELECT platform_user_id, COUNT(*) AS active_sessions
-FROM platform_auth_sessions WHERE status = 'ACTIVE'
+FROM platform_auth_sessions WHERE revoked_at IS NULL
 GROUP BY platform_user_id HAVING COUNT(*) > 1;

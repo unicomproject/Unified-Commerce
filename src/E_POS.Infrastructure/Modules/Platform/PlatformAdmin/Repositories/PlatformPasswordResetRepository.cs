@@ -39,7 +39,7 @@ public sealed class PlatformPasswordResetRepository : IPlatformPasswordResetRepo
         var token = await _dbContext.PlatformPasswordResetTokens
             .FirstOrDefaultAsync(x => x.Id == tokenId, cancellationToken);
 
-        if (token is null || token.Status != PlatformAuthConstants.PendingTokenStatus)
+        if (token is null || !IsPendingToken(token, now))
         {
             return false;
         }
@@ -55,7 +55,14 @@ public sealed class PlatformPasswordResetRepository : IPlatformPasswordResetRepo
         CancellationToken cancellationToken)
     {
         var pendingTokens = await _dbContext.PlatformPasswordResetTokens
-            .Where(x => x.PlatformUserId == platformUserId && x.Status == PlatformAuthConstants.PendingTokenStatus)
+            .Where(x => x.PlatformUserId == platformUserId &&
+                        x.UsedAt == null &&
+                        x.RevokedAt == null &&
+                        x.ExpiresAt != null &&
+                        x.ExpiresAt > now &&
+                        x.Status != PlatformAuthConstants.UsedTokenStatus &&
+                        x.Status != PlatformAuthConstants.RevokedTokenStatus &&
+                        x.Status != PlatformAuthConstants.ExpiredTokenStatus)
             .ToListAsync(cancellationToken);
 
         foreach (var token in pendingTokens)
@@ -70,5 +77,25 @@ public sealed class PlatformPasswordResetRepository : IPlatformPasswordResetRepo
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return pendingTokens.Count;
+    }
+
+    private static bool IsPendingToken(PlatformPasswordResetToken token, DateTimeOffset now)
+    {
+        var isUsed = token.Status == PlatformAuthConstants.UsedTokenStatus || token.UsedAt is not null;
+        if (isUsed)
+        {
+            return false;
+        }
+
+        var isRevoked = token.Status == PlatformAuthConstants.RevokedTokenStatus || token.RevokedAt is not null;
+        if (isRevoked)
+        {
+            return false;
+        }
+
+        var isExpired = token.Status == PlatformAuthConstants.ExpiredTokenStatus ||
+                        token.ExpiresAt is null ||
+                        token.ExpiresAt <= now;
+        return !isExpired;
     }
 }

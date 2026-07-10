@@ -137,7 +137,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
         var session = PlatformAuthSession.Create(
             sessionId,
             user.Id,
-            _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey),
+            HashSessionTokenIdentifier(jwtId),
             now,
             clientContext?.IpAddress,
             clientContext?.UserAgent,
@@ -242,7 +242,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
                 "Invalid platform refresh token."));
         }
 
-        if (refreshContext.RefreshToken.Status == PlatformAuthConstants.UsedTokenStatus)
+        if (IsRefreshTokenUsed(refreshContext.RefreshToken))
         {
             await _repository.RevokeCurrentSessionAsync(
                 refreshContext.User.Id,
@@ -256,21 +256,14 @@ public sealed class PlatformAuthService : IPlatformAuthService
                 "Platform refresh token has already been used."));
         }
 
-        if (refreshContext.RefreshToken.Status != PlatformAuthConstants.ActiveTokenStatus)
+        if (!IsRefreshTokenActive(refreshContext.RefreshToken, now))
         {
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
                 "platform_auth.invalid_refresh_token",
                 "Invalid platform refresh token."));
         }
 
-        if (refreshContext.Session.Status != PlatformAuthConstants.ActiveTokenStatus)
-        {
-            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
-                "platform_auth.invalid_session",
-                "Invalid platform session."));
-        }
-
-        if (refreshContext.RefreshToken.ExpiresAt <= now)
+        if (!IsSessionActive(refreshContext.Session))
         {
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
                 "platform_auth.invalid_session",
@@ -339,7 +332,7 @@ public sealed class PlatformAuthService : IPlatformAuthService
         var rotated = await _repository.TryRotateRefreshTokenAsync(
             refreshContext.RefreshToken.Id,
             replacementRefreshTokenEntity,
-            _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey),
+            HashSessionTokenIdentifier(jwtId),
             now,
             cancellationToken);
 
@@ -382,6 +375,45 @@ public sealed class PlatformAuthService : IPlatformAuthService
                 ["jti"] = jwtId,
                 ["permissions"] = permissions
             });
+    }
+
+    // Session token hash remains a compatibility write-path until a dedicated
+    // session-validator redesign decides whether to enforce JWT jti binding.
+    private string HashSessionTokenIdentifier(string jwtId)
+    {
+        return _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey);
+    }
+
+    private static bool IsSessionActive(PlatformAuthSession session)
+    {
+        return session.RevokedAt is null;
+    }
+
+    private static bool IsRefreshTokenUsed(PlatformRefreshToken refreshToken)
+    {
+        return refreshToken.Status == PlatformAuthConstants.UsedTokenStatus
+            || refreshToken.UsedAt is not null
+            || refreshToken.ReplacedByTokenId is not null;
+    }
+
+    private static bool IsRefreshTokenActive(PlatformRefreshToken refreshToken, DateTimeOffset now)
+    {
+        if (IsRefreshTokenUsed(refreshToken))
+        {
+            return false;
+        }
+
+        if (refreshToken.Status == PlatformAuthConstants.RevokedTokenStatus || refreshToken.RevokedAt is not null)
+        {
+            return false;
+        }
+
+        if (refreshToken.Status == PlatformAuthConstants.ExpiredTokenStatus || refreshToken.ExpiresAt <= now)
+        {
+            return false;
+        }
+
+        return refreshToken.Status == PlatformAuthConstants.ActiveTokenStatus;
     }
 
     private Task SaveFailedAuditAsync(

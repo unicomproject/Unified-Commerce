@@ -83,7 +83,7 @@ public sealed class PlatformAuthRefreshServiceTests
         var result = await service.RefreshAsync("refresh-token", CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("platform_auth.invalid_session", result.Error.Code);
+        Assert.Equal("platform_auth.invalid_refresh_token", result.Error.Code);
     }
 
     [Fact]

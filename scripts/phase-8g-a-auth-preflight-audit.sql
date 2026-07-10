@@ -12,12 +12,12 @@ UNION ALL SELECT 'platform_password_reset_tokens', COUNT(*) FROM platform_passwo
 SELECT COUNT(*) AS cnt FROM platform_auth_sessions WHERE platform_user_id IS NULL;
 SELECT id, status, created_at FROM platform_auth_sessions WHERE platform_user_id IS NULL ORDER BY created_at DESC LIMIT 20;
 
-\echo '-- 1b ACTIVE with revoked_at not null'
+\echo '-- 1b status says ACTIVE but revoked_at is not null (drift)'
 SELECT COUNT(*) AS cnt FROM platform_auth_sessions WHERE status = 'ACTIVE' AND revoked_at IS NOT NULL;
 SELECT id, platform_user_id, status, revoked_at, revoke_reason, created_at
 FROM platform_auth_sessions WHERE status = 'ACTIVE' AND revoked_at IS NOT NULL ORDER BY created_at DESC LIMIT 20;
 
-\echo '-- 1c REVOKED with revoked_at null'
+\echo '-- 1c status says REVOKED but revoked_at is null (drift)'
 SELECT COUNT(*) AS cnt FROM platform_auth_sessions WHERE status = 'REVOKED' AND revoked_at IS NULL;
 SELECT id, platform_user_id, status, revoked_at, revoke_reason, created_at
 FROM platform_auth_sessions WHERE status = 'REVOKED' AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 20;
@@ -178,10 +178,10 @@ SELECT id, status, created_at FROM platform_password_reset_tokens WHERE status N
 
 \echo '========== 5. 8G-b/c readiness signals =========='
 
-\echo '-- Active sessions per user (8G-c partial unique index risk preview)'
+\echo '-- Active sessions per user (revoked_at IS NULL)'
 SELECT platform_user_id, COUNT(*) AS active_sessions
 FROM platform_auth_sessions
-WHERE status = 'ACTIVE' AND platform_user_id IS NOT NULL
+WHERE revoked_at IS NULL AND platform_user_id IS NOT NULL
 GROUP BY platform_user_id
 HAVING COUNT(*) > 1
 ORDER BY active_sessions DESC
