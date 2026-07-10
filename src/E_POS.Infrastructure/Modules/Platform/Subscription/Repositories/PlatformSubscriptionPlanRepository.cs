@@ -297,6 +297,99 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
                 cancellationToken);
     }
 
+    public async Task UpsertLegacyPlanLimitsAsync(
+        Guid planId,
+        int? maxOutlets,
+        int? maxUsers,
+        int? maxTills,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await UpsertPlanLimitAsync(
+            planId,
+            SubscriptionCatalogLimitSeedConstants.MaxOutletsLimitDefinitionId,
+            maxOutlets,
+            now,
+            cancellationToken);
+
+        await UpsertPlanLimitAsync(
+            planId,
+            SubscriptionCatalogLimitSeedConstants.MaxUsersLimitDefinitionId,
+            maxUsers,
+            now,
+            cancellationToken);
+
+        await UpsertPlanLimitAsync(
+            planId,
+            SubscriptionCatalogLimitSeedConstants.MaxTillsLimitDefinitionId,
+            maxTills,
+            now,
+            cancellationToken);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+        Guid planId,
+        CancellationToken cancellationToken)
+    {
+        var limits = await (
+            from planLimit in _dbContext.SubscriptionPlanFeatureLimits.AsNoTracking()
+            join limitDefinition in _dbContext.FeatureLimitDefinitions.AsNoTracking()
+                on planLimit.FeatureLimitDefinitionId equals limitDefinition.Id
+            where planLimit.SubscriptionPlanId == planId
+            select new
+            {
+                limitDefinition.LimitKey,
+                planLimit.LimitValue
+            })
+            .ToListAsync(cancellationToken);
+
+        return limits.ToDictionary(
+            item => item.LimitKey,
+            item => item.LimitValue,
+            StringComparer.Ordinal);
+    }
+
+    private async Task UpsertPlanLimitAsync(
+        Guid planId,
+        Guid featureLimitDefinitionId,
+        int? legacyLimitValue,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _dbContext.SubscriptionPlanFeatureLimits
+            .FirstOrDefaultAsync(
+                item =>
+                    item.SubscriptionPlanId == planId &&
+                    item.FeatureLimitDefinitionId == featureLimitDefinitionId,
+                cancellationToken);
+
+        if (legacyLimitValue is null)
+        {
+            if (existing is not null)
+            {
+                _dbContext.SubscriptionPlanFeatureLimits.Remove(existing);
+            }
+
+            return;
+        }
+
+        if (existing is null)
+        {
+            _dbContext.SubscriptionPlanFeatureLimits.Add(SubscriptionPlanFeatureLimit.Create(
+                Guid.NewGuid(),
+                planId,
+                featureLimitDefinitionId,
+                legacyLimitValue.Value,
+                isUnlimited: false,
+                now));
+            return;
+        }
+
+        existing.UpdateLimit(legacyLimitValue.Value, isUnlimited: false, now);
+    }
+
     private static SubscriptionPlanMutationResponse ToMutationResponse(
         Guid id,
         string planCode,

@@ -15,6 +15,15 @@ public class SubscriptionPlan : AuditableEntity
     public int? MaxOutlets { get; protected set; }
     public int? MaxUsers { get; protected set; }
     public int? MaxTills { get; protected set; }
+    public string PlanName { get; protected set; } = string.Empty;
+    public string BillingCycle { get; protected set; } = SubscriptionCatalogConstants.DefaultBillingCycle;
+    public string BaseCurrencyCode { get; protected set; } = SubscriptionCatalogConstants.DefaultBaseCurrency;
+    public decimal BasePrice { get; protected set; }
+    public int TrialDays { get; protected set; }
+    public bool IsPublic { get; protected set; } = true;
+    public bool IsCustomPlan { get; protected set; }
+    public Guid? CreatedByPlatformUserId { get; protected set; }
+    public Guid? UpdatedByPlatformUserId { get; protected set; }
 
     public static SubscriptionPlan CreateDraft(
         Guid id,
@@ -27,7 +36,11 @@ public class SubscriptionPlan : AuditableEntity
         int? maxOutlets,
         int? maxUsers,
         int? maxTills,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid? createdByPlatformUserId = null,
+        int trialDays = 0,
+        bool isPublic = true,
+        bool isCustomPlan = false)
     {
         return new SubscriptionPlan
         {
@@ -42,6 +55,14 @@ public class SubscriptionPlan : AuditableEntity
             MaxOutlets = maxOutlets,
             MaxUsers = maxUsers,
             MaxTills = maxTills,
+            PlanName = name,
+            BillingCycle = billingInterval,
+            BaseCurrencyCode = baseCurrency,
+            BasePrice = priceAmount,
+            TrialDays = trialDays,
+            IsPublic = isPublic,
+            IsCustomPlan = isCustomPlan,
+            CreatedByPlatformUserId = createdByPlatformUserId,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -58,7 +79,11 @@ public class SubscriptionPlan : AuditableEntity
         string baseCurrency = SubscriptionPlanConstants.DefaultBaseCurrency,
         int? maxOutlets = null,
         int? maxUsers = null,
-        int? maxTills = null)
+        int? maxTills = null,
+        Guid? createdByPlatformUserId = null,
+        int trialDays = 0,
+        bool isPublic = true,
+        bool isCustomPlan = false)
     {
         return new SubscriptionPlan
         {
@@ -72,34 +97,57 @@ public class SubscriptionPlan : AuditableEntity
             MaxOutlets = maxOutlets,
             MaxUsers = maxUsers,
             MaxTills = maxTills,
+            PlanName = name,
+            BillingCycle = billingInterval,
+            BaseCurrencyCode = baseCurrency,
+            BasePrice = priceAmount,
+            TrialDays = trialDays,
+            IsPublic = isPublic,
+            IsCustomPlan = isCustomPlan,
+            CreatedByPlatformUserId = createdByPlatformUserId,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
     }
 
-    public void UpdatePricing(string baseCurrency, decimal priceAmount, DateTimeOffset now)
+    public void UpdatePricing(
+        string baseCurrency,
+        decimal priceAmount,
+        DateTimeOffset now,
+        Guid? updatedByPlatformUserId = null)
     {
         BaseCurrency = baseCurrency;
         PriceAmount = priceAmount;
+        BaseCurrencyCode = baseCurrency;
+        BasePrice = priceAmount;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
         UpdatedAt = now;
     }
 
-    public void UpdateLimits(int? maxOutlets, int? maxUsers, int? maxTills, DateTimeOffset now)
+    public void UpdateLimits(
+        int? maxOutlets,
+        int? maxUsers,
+        int? maxTills,
+        DateTimeOffset now,
+        Guid? updatedByPlatformUserId = null)
     {
         MaxOutlets = maxOutlets;
         MaxUsers = maxUsers;
         MaxTills = maxTills;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
         UpdatedAt = now;
     }
 
-    public void Publish(DateTimeOffset now)
+    public void Publish(DateTimeOffset now, Guid? updatedByPlatformUserId = null)
     {
         Status = SubscriptionPlanConstants.Status.Active;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
         UpdatedAt = now;
     }
 
-    public void TouchUpdatedAt(DateTimeOffset now)
+    public void TouchUpdatedAt(DateTimeOffset now, Guid? updatedByPlatformUserId = null)
     {
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
         UpdatedAt = now;
     }
 
@@ -108,4 +156,3 @@ public class SubscriptionPlan : AuditableEntity
         return MaxOutlets is >= 0 || MaxUsers is >= 0 || MaxTills is >= 0;
     }
 }
-

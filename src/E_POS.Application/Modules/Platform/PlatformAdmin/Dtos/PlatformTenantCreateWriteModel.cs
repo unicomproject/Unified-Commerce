@@ -30,6 +30,8 @@ public sealed class PlatformTenantCreateWriteModel
     public UserInvite? TenantAdminInvite { get; init; }
 
     public SubscriptionInvoice? DraftInvoice { get; init; }
+
+    public IReadOnlyList<SubscriptionInvoiceLine> DraftInvoiceLines { get; init; } = [];
 }
 
 

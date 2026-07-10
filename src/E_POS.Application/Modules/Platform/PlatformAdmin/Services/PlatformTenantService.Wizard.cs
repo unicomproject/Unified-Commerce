@@ -1,6 +1,7 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
@@ -230,6 +231,12 @@ public sealed partial class PlatformTenantService
             maxOutlets,
             maxTills,
             maxUsers,
+            plan.BaseCurrency,
+            plan.PriceAmount,
+            subscriptionRequest?.BillingStartAt ?? now,
+            subscriptionRequest?.BillingStartAt ?? now,
+            currentPeriodEnd: null,
+            assignedByPlatformUserId: platformUserId,
             now);
 
         var entitlements = resolvedFeatureIds
@@ -249,6 +256,13 @@ public sealed partial class PlatformTenantService
                 selection.AddonId,
                 selection.Quantity,
                 status: "ACTIVE",
+                unitPrice: addonMap[selection.AddonId].UnitPrice,
+                currencyCode: plan.BaseCurrency,
+                autoRenew: true,
+                startsAt: now,
+                endsAt: null,
+                createdByPlatformUserId: platformUserId,
+                updatedByPlatformUserId: platformUserId,
                 now))
             .ToList();
 
@@ -263,7 +277,7 @@ public sealed partial class PlatformTenantService
             "Bootstrap tenant admin role",
             false, // isCustom
             true, // isActive
-            platformUserId,
+            null, // createdByTenantUserId: system-created during platform wizard; no tenant user exists yet
             now);
 
         var bootstrapPermissionIds = await _repository.GetTenantAdminBootstrapPermissionIdsAsync(cancellationToken);
@@ -274,7 +288,7 @@ public sealed partial class PlatformTenantService
                 tenantId,
                 roleId,
                 permissionId,
-                platformUserId,
+                null, // grantedByTenantUserId: system-granted during platform wizard; no tenant user exists yet
                 now))
             .ToList();
 
@@ -320,18 +334,29 @@ public sealed partial class PlatformTenantService
                                        string.Equals(billingStatus, TenantBillingStatusConstants.Pending, StringComparison.OrdinalIgnoreCase);
 
         SubscriptionInvoice? draftInvoice = null;
+        IReadOnlyList<SubscriptionInvoiceLine> draftInvoiceLines = [];
         if (shouldCreateDraftInvoice)
         {
+            var invoiceId = Guid.NewGuid();
             var addonsTotal = addonSelections.Sum(selection => addonMap[selection.AddonId].UnitPrice * selection.Quantity);
             var invoiceAmount = Math.Max(0m, plan.PriceAmount + addonsTotal);
             draftInvoice = SubscriptionInvoice.CreateDraft(
-                Guid.NewGuid(),
+                invoiceId,
                 tenantId,
                 subscriptionId,
                 GenerateDraftInvoiceNumber(now),
                 invoiceAmount,
                 billingCycle,
                 subscriptionRequest?.NextBillingAt ?? subscriptionRequest?.BillingStartAt ?? now.AddDays(7),
+                plan.BaseCurrency,
+                subscriptionRequest?.BillingStartAt ?? now,
+                subscriptionRequest?.NextBillingAt,
+                now);
+            draftInvoiceLines = BuildDraftInvoiceLines(
+                invoiceId,
+                plan,
+                addonSelections,
+                addonMap,
                 now);
         }
 
@@ -348,10 +373,61 @@ public sealed partial class PlatformTenantService
             TenantAdminUser = tenantAdminUser,
             TenantAdminUserRole = tenantAdminUserRole,
             TenantAdminInvite = invite,
-            DraftInvoice = draftInvoice
+            DraftInvoice = draftInvoice,
+            DraftInvoiceLines = draftInvoiceLines
         };
 
+        try
+        {
+            await _tenantUsageCounterService.ValidateCanonicalCapacityLimitDefinitionsAsync(cancellationToken);
+        }
+        catch (MissingCanonicalCapacityLimitDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Canonical capacity limit definition '{ex.LimitKey}' is missing or inactive."
+                });
+        }
+        catch (InactiveFeatureLimitDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Capacity limit definition '{ex.FeatureLimitDefinitionId}' is missing or inactive."
+                });
+        }
+
         await _repository.CreateTenantWizardAsync(writeModel, cancellationToken);
+
+        try
+        {
+            await _tenantUsageCounterService.SeedTenantCapacityCountersAsync(
+                tenantId,
+                subscription.CurrentPeriodStart,
+                subscription.CurrentPeriodEnd,
+                maxOutlets,
+                maxUsers,
+                maxTills,
+                cancellationToken);
+        }
+        catch (MissingCanonicalCapacityLimitDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Canonical capacity limit definition '{ex.LimitKey}' is missing or inactive."
+                });
+        }
+        catch (InactiveFeatureLimitDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Capacity limit definition '{ex.FeatureLimitDefinitionId}' is missing or inactive."
+                });
+        }
+
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
     }
 
@@ -434,6 +510,27 @@ public sealed partial class PlatformTenantService
             tenantId,
             request.SubscriptionPlanId.Value,
             TenantSubscriptionStatusConstants.Trial,
+            TenantSubscriptionBillingConstants.BillingCycleMonthly,
+            trialStartAt: null,
+            trialEndAt: null,
+            billingStartAt: now,
+            nextBillingAt: null,
+            autoRenew: true,
+            discountType: null,
+            discountValue: null,
+            taxPercentage: 0m,
+            invoiceEmail: null,
+            paymentMethod: null,
+            notes: null,
+            maxOutletsOverride: null,
+            maxTillsOverride: null,
+            maxUsersOverride: null,
+            currencyCode: plan.BaseCurrency,
+            planPrice: plan.PriceAmount,
+            startedAt: now,
+            currentPeriodStart: now,
+            currentPeriodEnd: null,
+            assignedByPlatformUserId: platformUserId,
             now);
 
         await _repository.AddTenantWithSubscriptionAndEntitlementsAsync(
@@ -623,6 +720,61 @@ public sealed partial class PlatformTenantService
         $"INV-{now:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..32];
 
     private sealed record ResolvedAddonSelection(Guid AddonId, int Quantity);
+
+    private static IReadOnlyList<SubscriptionInvoiceLine> BuildDraftInvoiceLines(
+        Guid invoiceId,
+        SubscriptionPlan plan,
+        IReadOnlyList<ResolvedAddonSelection> addonSelections,
+        IReadOnlyDictionary<Guid, PlatformTenantCreateAddonOptionDto> addonMap,
+        DateTimeOffset now)
+    {
+        var lines = new List<SubscriptionInvoiceLine>();
+        var lineNumber = 1;
+        var planDescription = !string.IsNullOrWhiteSpace(plan.Name)
+            ? plan.Name
+            : !string.IsNullOrWhiteSpace(plan.PlanName)
+                ? plan.PlanName
+                : plan.PlanCode;
+
+        lines.Add(SubscriptionInvoiceLine.Create(
+            Guid.NewGuid(),
+            invoiceId,
+            lineNumber.ToString(),
+            lineNumber,
+            SubscriptionBillingAlignmentConstants.InvoiceLineTypePlan,
+            planDescription,
+            1m,
+            plan.PriceAmount,
+            plan.PriceAmount,
+            now));
+
+        lineNumber++;
+
+        foreach (var selection in addonSelections)
+        {
+            var addon = addonMap[selection.AddonId];
+            var lineTotal = addon.UnitPrice * selection.Quantity;
+            var addonDescription = !string.IsNullOrWhiteSpace(addon.Name)
+                ? addon.Name
+                : addon.AddonCode;
+
+            lines.Add(SubscriptionInvoiceLine.Create(
+                Guid.NewGuid(),
+                invoiceId,
+                lineNumber.ToString(),
+                lineNumber,
+                SubscriptionBillingAlignmentConstants.InvoiceLineTypeAddon,
+                addonDescription,
+                selection.Quantity,
+                addon.UnitPrice,
+                lineTotal,
+                now));
+
+            lineNumber++;
+        }
+
+        return lines;
+    }
 }
 
 

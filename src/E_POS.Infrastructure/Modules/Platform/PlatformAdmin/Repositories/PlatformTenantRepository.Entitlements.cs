@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
@@ -44,15 +45,29 @@ public sealed partial class PlatformTenantRepository
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on entitlement.PlatformFeatureId equals feature.Id
             where entitlement.TenantId == tenantId
-            select new { entitlement.EntitlementStatus, feature.Id, feature.FeatureCode })
+            select new EntitlementReadRow(
+                entitlement.EntitlementStatus,
+                entitlement.IsEnabled,
+                entitlement.RevokedAt,
+                entitlement.EffectiveFrom,
+                entitlement.EffectiveUntil,
+                feature.Id,
+                feature.FeatureCode))
             .ToListAsync(cancellationToken);
 
+        var now = DateTimeOffset.UtcNow;
         var enabled = enabledFeatures
-            .Where(x => IsStatus(x.EntitlementStatus, "ENABLED"))
+            .Where(x => TenantEntitlementEffectivePredicate.IsEnabled(
+                x.EntitlementStatus,
+                x.IsEnabled,
+                x.RevokedAt,
+                x.EffectiveFrom,
+                x.EffectiveUntil,
+                now))
             .ToList();
 
         var enabledFeatureIds = enabled
-            .Select(x => x.Id)
+            .Select(x => x.FeatureId)
             .Distinct()
             .ToList();
 

@@ -49,7 +49,8 @@ public sealed class PlatformAuthService : IPlatformAuthService
 
     public async Task<ApplicationResult<PlatformAdminLoginResponse>> LoginAsync(
         PlatformAdminLoginRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        PlatformAuthClientContext? clientContext = null)
     {
         var validationError = _requestValidator.ValidateLogin(request);
         if (validationError is not null) return ApplicationResult<PlatformAdminLoginResponse>.Failure(validationError);
@@ -61,27 +62,52 @@ public sealed class PlatformAuthService : IPlatformAuthService
         if (user is null)
         {
             // Return the same failure for missing users to avoid account enumeration.
-            await SaveFailedAuditAsync(null, PlatformAuthConstants.FailedLoginResult, now, cancellationToken);
+            await SaveFailedAuditAsync(
+                null,
+                PlatformAuthConstants.FailedLoginResult,
+                now,
+                cancellationToken,
+                clientContext,
+                PlatformAuthAlignmentConstants.FailureReason.InvalidCredentials);
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
         if (user.Status == PlatformAuthConstants.LockedStatus)
         {
             // Keep locked-account responses generic so attackers cannot identify valid accounts.
-            await SaveFailedAuditAsync(user.Id, PlatformAuthConstants.LockedLoginResult, now, cancellationToken);
+            await SaveFailedAuditAsync(
+                user.Id,
+                PlatformAuthConstants.LockedLoginResult,
+                now,
+                cancellationToken,
+                clientContext,
+                PlatformAuthAlignmentConstants.FailureReason.UserLocked);
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
         if (user.Status != PlatformAuthConstants.ActiveStatus || string.IsNullOrWhiteSpace(user.PasswordHash))
         {
-            await SaveFailedAuditAsync(user.Id, PlatformAuthConstants.FailedLoginResult, now, cancellationToken);
+            await SaveFailedAuditAsync(
+                user.Id,
+                PlatformAuthConstants.FailedLoginResult,
+                now,
+                cancellationToken,
+                clientContext,
+                PlatformAuthAlignmentConstants.FailureReason.UserInactive);
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
         if (!_passwordHashService.VerifyPassword(request.Password, user.PasswordHash))
         {
             // Count only real bad-password attempts toward lockout, not inactive/access-denied states.
-            await SaveFailedAuditAsync(user.Id, PlatformAuthConstants.FailedLoginResult, now, cancellationToken, applyCredentialLockout: true);
+            await SaveFailedAuditAsync(
+                user.Id,
+                PlatformAuthConstants.FailedLoginResult,
+                now,
+                cancellationToken,
+                clientContext,
+                PlatformAuthAlignmentConstants.FailureReason.InvalidCredentials,
+                applyCredentialLockout: true);
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(InvalidCredentials);
         }
 
@@ -89,7 +115,13 @@ public sealed class PlatformAuthService : IPlatformAuthService
         var permissions = await _repository.GetActivePermissionCodesAsync(user.Id, cancellationToken);
         if (permissions.Count == 0)
         {
-            await SaveFailedAuditAsync(user.Id, PlatformAuthConstants.FailedLoginResult, now, cancellationToken);
+            await SaveFailedAuditAsync(
+                user.Id,
+                PlatformAuthConstants.FailedLoginResult,
+                now,
+                cancellationToken,
+                clientContext,
+                PlatformAuthAlignmentConstants.FailureReason.PlatformAccessDenied);
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
                 "platform_auth.platform_access_denied",
                 "Platform access denied."));
@@ -99,26 +131,35 @@ public sealed class PlatformAuthService : IPlatformAuthService
         var jwtId = Guid.NewGuid().ToString("N");
         var accessToken = _jwtTokenFactory.CreateAccessToken(CreateTokenDescriptor(user, sessionId, jwtId, permissions));
         var refreshToken = _refreshTokenGenerator.CreateRefreshToken(_jwtSettings.RefreshTokenDays);
+        var refreshTokenId = Guid.NewGuid();
 
         // Persist only token identifiers and hashes, never raw access or refresh tokens.
         var session = PlatformAuthSession.Create(
             sessionId,
             user.Id,
-            _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey),
-            now);
+            HashSessionTokenIdentifier(jwtId),
+            now,
+            clientContext?.IpAddress,
+            clientContext?.UserAgent,
+            clientContext?.DeviceName);
 
         var refreshTokenEntity = PlatformRefreshToken.Create(
-            Guid.NewGuid(),
+            refreshTokenId,
             sessionId,
             _tokenHashService.HashToken(refreshToken.Token, _jwtSettings.SigningKey),
             refreshToken.ExpiresAt,
-            now);
+            now,
+            platformUserId: user.Id,
+            tokenFamilyId: refreshTokenId);
 
         var audit = PlatformLoginAudit.Create(
             Guid.NewGuid(),
             user.Id,
             PlatformAuthConstants.SuccessLoginResult,
-            now);
+            now,
+            platformAuthSessionId: sessionId,
+            ipAddress: clientContext?.IpAddress,
+            userAgent: clientContext?.UserAgent);
 
         await _repository.SaveSuccessfulLoginAsync(session, refreshTokenEntity, audit, cancellationToken);
 
@@ -145,7 +186,9 @@ public sealed class PlatformAuthService : IPlatformAuthService
             platformUserId,
             sessionId,
             _dateTimeProvider.UtcNow,
-            cancellationToken);
+            cancellationToken,
+            revokedByPlatformUserId: platformUserId,
+            revokeReason: PlatformAuthAlignmentConstants.RevokeReason.Logout);
 
         return ApplicationResult.Success();
     }
@@ -171,12 +214,15 @@ public sealed class PlatformAuthService : IPlatformAuthService
             refreshContext.User.Id,
             refreshContext.Session.Id,
             _dateTimeProvider.UtcNow,
-            cancellationToken);
+            cancellationToken,
+            revokedByPlatformUserId: refreshContext.User.Id,
+            revokeReason: PlatformAuthAlignmentConstants.RevokeReason.Logout);
     }
 
     public async Task<ApplicationResult<PlatformAdminLoginResponse>> RefreshAsync(
         string refreshToken,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        PlatformAuthClientContext? clientContext = null)
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
@@ -196,34 +242,28 @@ public sealed class PlatformAuthService : IPlatformAuthService
                 "Invalid platform refresh token."));
         }
 
-        if (refreshContext.RefreshToken.Status == PlatformAuthConstants.UsedTokenStatus)
+        if (IsRefreshTokenUsed(refreshContext.RefreshToken))
         {
             await _repository.RevokeCurrentSessionAsync(
                 refreshContext.User.Id,
                 refreshContext.Session.Id,
                 now,
-                cancellationToken);
+                cancellationToken,
+                revokeReason: PlatformAuthAlignmentConstants.RevokeReason.RefreshTokenReuse);
 
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
                 "platform_auth.refresh_token_reused",
                 "Platform refresh token has already been used."));
         }
 
-        if (refreshContext.RefreshToken.Status != PlatformAuthConstants.ActiveTokenStatus)
+        if (!IsRefreshTokenActive(refreshContext.RefreshToken, now))
         {
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
                 "platform_auth.invalid_refresh_token",
                 "Invalid platform refresh token."));
         }
 
-        if (refreshContext.Session.Status != PlatformAuthConstants.ActiveTokenStatus)
-        {
-            return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
-                "platform_auth.invalid_session",
-                "Invalid platform session."));
-        }
-
-        if (refreshContext.RefreshToken.ExpiresAt <= now)
+        if (!IsSessionActive(refreshContext.Session))
         {
             return ApplicationResult<PlatformAdminLoginResponse>.Failure(new ApplicationError(
                 "platform_auth.invalid_session",
@@ -277,17 +317,22 @@ public sealed class PlatformAuthService : IPlatformAuthService
             jwtId,
             permissions));
         var replacementRefreshToken = _refreshTokenGenerator.CreateRefreshToken(_jwtSettings.RefreshTokenDays);
+        var oldRefreshToken = refreshContext.RefreshToken;
+        var tokenFamilyId = oldRefreshToken.TokenFamilyId ?? oldRefreshToken.Id;
+        var platformUserId = oldRefreshToken.PlatformUserId ?? refreshContext.User.Id;
         var replacementRefreshTokenEntity = PlatformRefreshToken.Create(
             Guid.NewGuid(),
             refreshContext.Session.Id,
             _tokenHashService.HashToken(replacementRefreshToken.Token, _jwtSettings.SigningKey),
             replacementRefreshToken.ExpiresAt,
-            now);
+            now,
+            platformUserId: platformUserId,
+            tokenFamilyId: tokenFamilyId);
 
         var rotated = await _repository.TryRotateRefreshTokenAsync(
             refreshContext.RefreshToken.Id,
             replacementRefreshTokenEntity,
-            _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey),
+            HashSessionTokenIdentifier(jwtId),
             now,
             cancellationToken);
 
@@ -332,14 +377,62 @@ public sealed class PlatformAuthService : IPlatformAuthService
             });
     }
 
+    // Session token hash remains a compatibility write-path until a dedicated
+    // session-validator redesign decides whether to enforce JWT jti binding.
+    private string HashSessionTokenIdentifier(string jwtId)
+    {
+        return _tokenHashService.HashToken(jwtId, _jwtSettings.SigningKey);
+    }
+
+    private static bool IsSessionActive(PlatformAuthSession session)
+    {
+        return session.RevokedAt is null;
+    }
+
+    private static bool IsRefreshTokenUsed(PlatformRefreshToken refreshToken)
+    {
+        return refreshToken.Status == PlatformAuthConstants.UsedTokenStatus
+            || refreshToken.UsedAt is not null
+            || refreshToken.ReplacedByTokenId is not null;
+    }
+
+    private static bool IsRefreshTokenActive(PlatformRefreshToken refreshToken, DateTimeOffset now)
+    {
+        if (IsRefreshTokenUsed(refreshToken))
+        {
+            return false;
+        }
+
+        if (refreshToken.Status == PlatformAuthConstants.RevokedTokenStatus || refreshToken.RevokedAt is not null)
+        {
+            return false;
+        }
+
+        if (refreshToken.Status == PlatformAuthConstants.ExpiredTokenStatus || refreshToken.ExpiresAt <= now)
+        {
+            return false;
+        }
+
+        return refreshToken.Status == PlatformAuthConstants.ActiveTokenStatus;
+    }
+
     private Task SaveFailedAuditAsync(
         Guid? platformUserId,
-        string loginResult,
+        string loginStatus,
         DateTimeOffset now,
         CancellationToken cancellationToken,
+        PlatformAuthClientContext? clientContext = null,
+        string? failureReason = null,
         bool applyCredentialLockout = false)
     {
-        var audit = PlatformLoginAudit.Create(Guid.NewGuid(), platformUserId, loginResult, now);
+        var audit = PlatformLoginAudit.Create(
+            Guid.NewGuid(),
+            platformUserId,
+            loginStatus,
+            now,
+            ipAddress: clientContext?.IpAddress,
+            userAgent: clientContext?.UserAgent,
+            failureReason: failureReason);
 
         if (!applyCredentialLockout)
         {
@@ -353,4 +446,3 @@ public sealed class PlatformAuthService : IPlatformAuthService
             cancellationToken);
     }
 }
-

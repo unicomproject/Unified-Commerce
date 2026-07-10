@@ -1845,9 +1845,35 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<Guid?>("PlatformUserId")
+                    b.Property<string>("DeviceName")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("device_name");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("varchar(45)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<Guid>("PlatformUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("platform_user_id");
+
+                    b.Property<string>("RevokeReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("revoke_reason");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_platform_user_id");
 
                     b.Property<string>("SessionTokenHash")
                         .IsRequired()
@@ -1865,14 +1891,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text")
+                        .HasColumnName("user_agent");
+
                     b.HasKey("Id")
                         .HasName("pk_platform_auth_sessions");
 
-                    b.HasIndex("PlatformUserId");
+                    b.HasIndex("RevokedByPlatformUserId");
 
                     b.HasIndex("SessionTokenHash")
                         .IsUnique()
                         .HasDatabaseName("uq_platform_auth_sessions_session_token_hash");
+
+                    b.HasIndex("PlatformUserId", "RevokedAt")
+                        .HasDatabaseName("ix_platform_auth_sessions_platform_user_id_revoked_at");
 
                     b.ToTable("platform_auth_sessions", null, t =>
                         {
@@ -1887,9 +1920,28 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset>("AttemptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attempted_at");
+
+                    b.Property<string>("AuthenticationMethod")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("authentication_method");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("varchar(45)")
+                        .HasColumnName("ip_address");
 
                     b.Property<string>("LoginResult")
                         .IsRequired()
@@ -1897,16 +1949,40 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(255)")
                         .HasColumnName("login_result");
 
+                    b.Property<string>("LoginStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("login_status");
+
+                    b.Property<Guid?>("PlatformAuthSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_auth_session_id");
+
                     b.Property<Guid?>("PlatformUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("platform_user_id");
+
+                    b.Property<int?>("RiskScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("risk_score");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text")
+                        .HasColumnName("user_agent");
+
                     b.HasKey("Id")
                         .HasName("pk_platform_login_audits");
+
+                    b.HasIndex("AttemptedAt")
+                        .HasDatabaseName("ix_platform_login_audits_attempted_at");
+
+                    b.HasIndex("PlatformAuthSessionId")
+                        .HasDatabaseName("ix_platform_login_audits_platform_auth_session_id");
 
                     b.HasIndex("PlatformUserId", "LoginResult", "CreatedAt")
                         .HasDatabaseName("ix_platform_login_audits_platform_user_id_login_result_created_at");
@@ -1914,6 +1990,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_login_audits", null, t =>
                         {
                             t.HasCheckConstraint("ck_platform_login_audits_login_result", "login_result IN ('SUCCESS', 'FAILED', 'LOCKED')");
+
+                            t.HasCheckConstraint("ck_platform_login_audits_login_status", "login_status IN ('SUCCESS', 'FAILED', 'LOCKED')");
                         });
                 });
 
@@ -1928,9 +2006,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
                     b.Property<Guid?>("PlatformUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("platform_user_id");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1948,6 +2038,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
                     b.HasKey("Id")
                         .HasName("pk_platform_password_reset_tokens");
 
@@ -1959,6 +2053,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("platform_password_reset_tokens", null, t =>
                         {
+                            t.HasCheckConstraint("ck_platform_password_reset_tokens_expires_after_requested", "expires_at > requested_at");
+
                             t.HasCheckConstraint("ck_platform_password_reset_tokens_status", "status IN ('PENDING', 'USED', 'EXPIRED', 'REVOKED')");
                         });
                 });
@@ -1974,9 +2070,19 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<string>("ModuleKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("module_key");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2000,12 +2106,20 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UpdatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_platform_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_platform_permissions");
+
+                    b.HasIndex("CreatedByPlatformUserId");
 
                     b.HasIndex("PermissionCode")
                         .IsUnique()
                         .HasDatabaseName("uq_platform_permissions_permission_code");
+
+                    b.HasIndex("UpdatedByPlatformUserId");
 
                     b.ToTable("platform_permissions", null, t =>
                         {
@@ -2032,11 +2146,36 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("platform_auth_session_id");
 
+                    b.Property<Guid>("PlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_user_id");
+
+                    b.Property<Guid?>("ReplacedByTokenId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replaced_by_token_id");
+
+                    b.Property<string>("RevokeReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("revoke_reason");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_platform_user_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)")
                         .HasColumnName("status");
+
+                    b.Property<Guid>("TokenFamilyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("token_family_id");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -2048,8 +2187,32 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
                     b.HasKey("Id")
                         .HasName("pk_platform_refresh_tokens");
+
+                    b.HasIndex("PlatformAuthSessionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_refresh_tokens_platform_auth_session_id_active")
+                        .HasFilter("status = 'ACTIVE'");
+
+                    b.HasIndex("ReplacedByTokenId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_refresh_tokens_replaced_by_token_id")
+                        .HasFilter("replaced_by_token_id IS NOT NULL");
+
+                    b.HasIndex("RevokedByPlatformUserId");
+
+                    b.HasIndex("TokenFamilyId")
+                        .HasDatabaseName("ix_platform_refresh_tokens_token_family_id");
+
+                    b.HasIndex("TokenFamilyId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_refresh_tokens_token_family_id_active")
+                        .HasFilter("status = 'ACTIVE'");
 
                     b.HasIndex("TokenHash")
                         .IsUnique()
@@ -2057,6 +2220,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PlatformAuthSessionId", "Status")
                         .HasDatabaseName("ix_platform_refresh_tokens_platform_auth_session_id_status");
+
+                    b.HasIndex("PlatformUserId", "Status")
+                        .HasDatabaseName("ix_platform_refresh_tokens_platform_user_id_status");
 
                     b.ToTable("platform_refresh_tokens", null, t =>
                         {
@@ -2077,9 +2243,19 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<bool>("IsSystemRole")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_system_role");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2103,12 +2279,20 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UpdatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_platform_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_platform_roles");
+
+                    b.HasIndex("CreatedByPlatformUserId");
 
                     b.HasIndex("RoleCode")
                         .IsUnique()
                         .HasDatabaseName("uq_platform_roles_role_code");
+
+                    b.HasIndex("UpdatedByPlatformUserId");
 
                     b.ToTable("platform_roles", null, t =>
                         {
@@ -2131,6 +2315,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<DateTimeOffset?>("GrantedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at");
+
+                    b.Property<Guid?>("GrantedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("granted_by_platform_user_id");
+
                     b.Property<Guid>("PlatformPermissionId")
                         .HasColumnType("uuid")
                         .HasColumnName("platform_permission_id");
@@ -2139,6 +2331,19 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("platform_role_id");
 
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_platform_user_id");
+
+                    b.Property<string>("RevokedReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("revoked_reason");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -2146,11 +2351,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_platform_role_permissions");
 
+                    b.HasIndex("GrantedByPlatformUserId");
+
                     b.HasIndex("PlatformPermissionId");
+
+                    b.HasIndex("RevokedByPlatformUserId");
 
                     b.HasIndex("PlatformRoleId", "PlatformPermissionId")
                         .IsUnique()
-                        .HasDatabaseName("uq_platform_role_permissions_platform_role_id_platform_permission_id");
+                        .HasDatabaseName("uq_platform_role_permissions_platform_role_id_platform_permission_id")
+                        .HasFilter("revoked_at IS NULL");
 
                     b.ToTable("platform_role_permissions", (string)null);
                 });
@@ -2218,21 +2428,72 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("display_name");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("citext")
                         .HasColumnName("email");
+
+                    b.Property<DateTimeOffset?>("EmailVerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("email_verified_at");
+
+                    b.Property<int>("FailedLoginCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("failed_login_count");
+
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("first_name");
+
+                    b.Property<string>("JobTitle")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("job_title");
+
+                    b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_login_at");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("last_name");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
 
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
                         .HasColumnType("citext")
                         .HasColumnName("normalized_email");
 
+                    b.Property<DateTimeOffset?>("PasswordChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("password_changed_at");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
                         .HasColumnName("password_hash");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("phone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2244,8 +2505,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UpdatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_platform_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_platform_users");
+
+                    b.HasIndex("CreatedByPlatformUserId");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -2254,6 +2521,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("NormalizedEmail")
                         .IsUnique()
                         .HasDatabaseName("uq_platform_users_normalized_email");
+
+                    b.HasIndex("UpdatedByPlatformUserId");
 
                     b.ToTable("platform_users", null, t =>
                         {
@@ -2267,6 +2536,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid?>("AssignedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_by_platform_user_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2284,6 +2561,19 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("platform_user_id");
 
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_platform_user_id");
+
+                    b.Property<string>("RevokedReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("revoked_reason");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -2291,11 +2581,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_platform_user_permissions");
 
+                    b.HasIndex("AssignedByPlatformUserId");
+
                     b.HasIndex("PlatformPermissionId");
+
+                    b.HasIndex("RevokedByPlatformUserId");
 
                     b.HasIndex("PlatformUserId", "PlatformPermissionId")
                         .IsUnique()
-                        .HasDatabaseName("uq_platform_user_permissions_platform_user_id_platform_permission_id");
+                        .HasDatabaseName("uq_platform_user_permissions_platform_user_id_platform_permission_id")
+                        .HasFilter("revoked_at IS NULL");
 
                     b.ToTable("platform_user_permissions", (string)null);
                 });
@@ -2306,6 +2601,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid?>("AssignedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_by_platform_user_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2323,6 +2626,19 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("platform_user_id");
 
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_platform_user_id");
+
+                    b.Property<string>("RevokedReason")
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("revoked_reason");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -2330,11 +2646,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_platform_user_roles");
 
+                    b.HasIndex("AssignedByPlatformUserId");
+
                     b.HasIndex("PlatformRoleId");
+
+                    b.HasIndex("RevokedByPlatformUserId");
 
                     b.HasIndex("PlatformUserId", "PlatformRoleId")
                         .IsUnique()
-                        .HasDatabaseName("uq_platform_user_roles_platform_user_id_platform_role_id");
+                        .HasDatabaseName("uq_platform_user_roles_platform_user_id_platform_role_id")
+                        .HasFilter("revoked_at IS NULL");
 
                     b.ToTable("platform_user_roles", (string)null);
                 });
@@ -2402,15 +2723,34 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int?>("DefaultLimitValue")
-                        .HasColumnType("integer")
+                    b.Property<decimal?>("DefaultLimitValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
                         .HasColumnName("default_limit_value");
+
+                    b.Property<bool>("IsHardLimit")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_hard_limit");
 
                     b.Property<string>("LimitCode")
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)")
                         .HasColumnName("limit_code");
+
+                    b.Property<string>("LimitKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("limit_key");
+
+                    b.Property<string>("LimitName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("limit_name");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2422,9 +2762,26 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("platform_feature_id");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("UnitCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("unit_code");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<string>("ValueType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("value_type");
 
                     b.HasKey("Id")
                         .HasName("pk_feature_limit_definitions");
@@ -2432,6 +2789,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("PlatformFeatureId", "LimitCode")
                         .IsUnique()
                         .HasDatabaseName("uq_feature_limit_definitions_platform_feature_id_limit_code");
+
+                    b.HasIndex("PlatformFeatureId", "LimitKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_feature_limit_definitions_platform_feature_id_limit_key");
 
                     b.ToTable("feature_limit_definitions", null, t =>
                         {
@@ -2459,6 +2820,24 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)")
                         .HasColumnName("feature_code");
+
+                    b.Property<string>("FeatureKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("feature_key");
+
+                    b.Property<string>("FeatureName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("feature_name");
+
+                    b.Property<bool>("IsCoreFeature")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_core_feature");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2489,6 +2868,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_platform_features");
 
+                    b.HasIndex("FeatureKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_features_feature_key");
+
                     b.HasIndex("PlatformModuleId", "FeatureCode")
                         .IsUnique()
                         .HasDatabaseName("uq_platform_features_platform_module_id_feature_code");
@@ -2514,11 +2897,29 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<bool>("IsCoreModule")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_core_module");
+
                     b.Property<string>("ModuleCode")
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)")
                         .HasColumnName("module_code");
+
+                    b.Property<string>("ModuleKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("module_key");
+
+                    b.Property<string>("ModuleName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("module_name");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2549,6 +2950,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_platform_modules_module_code");
 
+                    b.HasIndex("ModuleKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_modules_module_key");
+
                     b.ToTable("platform_modules", null, t =>
                         {
                             t.HasCheckConstraint("ck_platform_modules_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
@@ -2568,9 +2973,42 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(80)")
                         .HasColumnName("addon_code");
 
+                    b.Property<string>("AddonName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("addon_name");
+
+                    b.Property<string>("AddonType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("addon_type");
+
+                    b.Property<string>("BaseCurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("base_currency_code");
+
+                    b.Property<decimal>("BasePrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("base_price");
+
+                    b.Property<string>("BillingCycle")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("billing_cycle");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
 
                     b.Property<string>("Description")
                         .HasColumnType("text")
@@ -2587,6 +3025,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("price_amount");
 
+                    b.Property<bool>("QuantityBased")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("quantity_based");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -2597,6 +3041,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UpdatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_platform_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_subscription_addons");
 
@@ -2604,8 +3052,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_subscription_addons_addon_code");
 
+                    b.HasIndex("CreatedByPlatformUserId");
+
+                    b.HasIndex("UpdatedByPlatformUserId");
+
                     b.ToTable("subscription_addons", null, t =>
                         {
+                            t.HasCheckConstraint("ck_subscription_addons_base_price", "base_price >= 0");
+
                             t.HasCheckConstraint("ck_subscription_addons_price_amount", "price_amount >= 0");
 
                             t.HasCheckConstraint("ck_subscription_addons_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
@@ -2618,6 +3072,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("ConfigJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config_json");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2678,13 +3136,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("feature_limit_definition_id");
 
-                    b.Property<int?>("LimitValue")
-                        .HasColumnType("integer")
-                        .HasColumnName("limit_value");
+                    b.Property<decimal>("IncrementValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("increment_value");
 
-                    b.Property<Guid>("SubscriptionAddonFeatureId")
+                    b.Property<Guid>("SubscriptionAddonId")
                         .HasColumnType("uuid")
-                        .HasColumnName("subscription_addon_feature_id");
+                        .HasColumnName("subscription_addon_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2695,13 +3154,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FeatureLimitDefinitionId");
 
-                    b.HasIndex("SubscriptionAddonFeatureId", "FeatureLimitDefinitionId")
+                    b.HasIndex("SubscriptionAddonId", "FeatureLimitDefinitionId")
                         .IsUnique()
-                        .HasDatabaseName("uq_subscription_addon_limits_subscription_addon_feature_id_feature_limit_definition_id");
+                        .HasDatabaseName("uq_subscription_addon_limits_subscription_addon_id_feature_limit_definition_id");
 
                     b.ToTable("subscription_addon_limits", null, t =>
                         {
-                            t.HasCheckConstraint("ck_subscription_addon_limits_limit_value", "limit_value IS NULL OR limit_value >= 0");
+                            t.HasCheckConstraint("ck_subscription_addon_limits_increment_value", "increment_value > 0");
                         });
                 });
 
@@ -2712,9 +3171,17 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("applied_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
 
                     b.Property<string>("CreditNoteNumber")
                         .IsRequired()
@@ -2722,13 +3189,52 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(80)")
                         .HasColumnName("credit_note_number");
 
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<DateTimeOffset?>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("status");
+
                     b.Property<Guid>("SubscriptionInvoiceId")
                         .HasColumnType("uuid")
                         .HasColumnName("subscription_invoice_id");
 
+                    b.Property<decimal>("SubtotalAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("subtotal_amount");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("tax_amount");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("total_amount");
 
                     b.Property<decimal>("TotalCreditAmount")
                         .HasPrecision(18, 2)
@@ -2742,6 +3248,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_subscription_credit_notes");
 
+                    b.HasIndex("CreatedByPlatformUserId");
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("ix_subscription_credit_notes_invoice_id");
+
                     b.HasIndex("SubscriptionInvoiceId");
 
                     b.HasIndex("TenantId", "CreditNoteNumber")
@@ -2750,6 +3261,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("subscription_credit_notes", null, t =>
                         {
+                            t.HasCheckConstraint("ck_subscription_credit_notes_subtotal_amount", "subtotal_amount IS NULL OR subtotal_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_credit_notes_tax_amount", "tax_amount IS NULL OR tax_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_credit_notes_total_amount", "total_amount IS NULL OR total_amount >= 0");
+
                             t.HasCheckConstraint("ck_subscription_credit_notes_total_credit_amount", "total_credit_amount >= 0");
                         });
                 });
@@ -2765,6 +3282,20 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid>("CreditNoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("credit_note_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid?>("InvoiceLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_line_id");
+
                     b.Property<decimal>("LineCreditAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -2776,9 +3307,33 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(80)")
                         .HasColumnName("line_number");
 
+                    b.Property<int?>("LineNumberInt")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number_int");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_total");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
                     b.Property<Guid>("SubscriptionCreditNoteId")
                         .HasColumnType("uuid")
                         .HasColumnName("subscription_credit_note_id");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("tax_amount");
+
+                    b.Property<decimal>("UnitAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_amount");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2787,6 +3342,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_subscription_credit_note_lines");
 
+                    b.HasIndex("CreditNoteId")
+                        .HasDatabaseName("ix_subscription_credit_note_lines_credit_note_id");
+
+                    b.HasIndex("InvoiceLineId");
+
                     b.HasIndex("SubscriptionCreditNoteId", "LineNumber")
                         .IsUnique()
                         .HasDatabaseName("uq_subscription_credit_note_lines_subscription_credit_note_id_line_number");
@@ -2794,6 +3354,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("subscription_credit_note_lines", null, t =>
                         {
                             t.HasCheckConstraint("ck_subscription_credit_note_lines_line_credit_amount", "line_credit_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_credit_note_lines_line_total", "line_total IS NULL OR line_total >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_credit_note_lines_quantity", "quantity IS NULL OR quantity > 0");
+
+                            t.HasCheckConstraint("ck_subscription_credit_note_lines_tax_amount", "tax_amount IS NULL OR tax_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_credit_note_lines_unit_amount", "unit_amount IS NULL OR unit_amount >= 0");
                         });
                 });
 
@@ -2804,14 +3372,42 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<decimal>("BalanceDue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("balance_due");
+
                     b.Property<string>("BillingCycle")
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
                         .HasColumnName("billing_cycle");
 
+                    b.Property<string>("BillingDetailsJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("billing_details_json");
+
+                    b.Property<DateTimeOffset?>("BillingPeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("billing_period_end");
+
+                    b.Property<DateTimeOffset?>("BillingPeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("billing_period_start");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("discount_amount");
 
                     b.Property<DateTimeOffset?>("DueAt")
                         .HasColumnType("timestamp with time zone")
@@ -2831,6 +3427,39 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("DRAFT")
                         .HasColumnName("invoice_status");
 
+                    b.Property<string>("InvoiceType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("invoice_type");
+
+                    b.Property<DateTimeOffset?>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("paid_amount");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<decimal>("SubtotalAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("subtotal_amount");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("tax_amount");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -2848,8 +3477,15 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at");
+
                     b.HasKey("Id")
                         .HasName("pk_subscription_invoices");
+
+                    b.HasIndex("SubscriptionId")
+                        .HasDatabaseName("ix_subscription_invoices_subscription_id");
 
                     b.HasIndex("TenantSubscriptionId");
 
@@ -2859,6 +3495,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("subscription_invoices", null, t =>
                         {
+                            t.HasCheckConstraint("ck_subscription_invoices_balance_due", "balance_due IS NULL OR balance_due >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_invoices_discount_amount", "discount_amount IS NULL OR discount_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_invoices_paid_amount", "paid_amount IS NULL OR paid_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_invoices_subtotal_amount", "subtotal_amount IS NULL OR subtotal_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_invoices_tax_amount", "tax_amount IS NULL OR tax_amount >= 0");
+
                             t.HasCheckConstraint("ck_subscription_invoices_total_amount", "total_amount >= 0");
                         });
                 });
@@ -2874,11 +3520,50 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("description");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<string>("ItemCode")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("item_code");
+
+                    b.Property<Guid?>("ItemReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("item_reference_id");
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("item_type");
+
                     b.Property<string>("LineNumber")
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)")
                         .HasColumnName("line_number");
+
+                    b.Property<int?>("LineNumberInt")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number_int");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_total");
 
                     b.Property<decimal>("LineTotalAmount")
                         .HasPrecision(18, 2)
@@ -2894,6 +3579,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("subscription_invoice_id");
 
+                    b.Property<decimal>("TaxAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("tax_amount");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_price");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -2901,15 +3596,26 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_subscription_invoice_lines");
 
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("ix_subscription_invoice_lines_invoice_id");
+
                     b.HasIndex("SubscriptionInvoiceId", "LineNumber")
                         .IsUnique()
                         .HasDatabaseName("uq_subscription_invoice_lines_subscription_invoice_id_line_number");
 
                     b.ToTable("subscription_invoice_lines", null, t =>
                         {
+                            t.HasCheckConstraint("ck_subscription_invoice_lines_discount_amount", "discount_amount IS NULL OR discount_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_invoice_lines_line_total", "line_total IS NULL OR line_total >= 0");
+
                             t.HasCheckConstraint("ck_subscription_invoice_lines_line_total_amount", "line_total_amount >= 0");
 
                             t.HasCheckConstraint("ck_subscription_invoice_lines_quantity", "quantity > 0");
+
+                            t.HasCheckConstraint("ck_subscription_invoice_lines_tax_amount", "tax_amount IS NULL OR tax_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_invoice_lines_unit_price", "unit_price IS NULL OR unit_price >= 0");
                         });
                 });
 
@@ -2924,9 +3630,27 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
+
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<DateTimeOffset?>("LastReminderAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_reminder_at");
+
+                    b.Property<string>("LinkStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("link_status");
 
                     b.Property<string>("PaymentLinkTokenHash")
                         .IsRequired()
@@ -2934,16 +3658,70 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(255)")
                         .HasColumnName("payment_link_token_hash");
 
+                    b.Property<string>("PaymentUrl")
+                        .IsRequired()
+                        .HasMaxLength(700)
+                        .HasColumnType("varchar(700)")
+                        .HasColumnName("payment_url");
+
+                    b.Property<string>("ProviderName")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("provider_name");
+
+                    b.Property<string>("ProviderPaymentLinkId")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("provider_payment_link_id");
+
+                    b.Property<int>("ReminderCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("reminder_count");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("SentToEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("sent_to_email");
+
                     b.Property<Guid>("SubscriptionInvoiceId")
                         .HasColumnType("uuid")
                         .HasColumnName("subscription_invoice_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("token_hash");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
                     b.HasKey("Id")
                         .HasName("pk_subscription_payment_links");
+
+                    b.HasIndex("CreatedByPlatformUserId");
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("ix_subscription_payment_links_invoice_id");
 
                     b.HasIndex("PaymentLinkTokenHash")
                         .IsUnique()
@@ -2951,9 +3729,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SubscriptionInvoiceId");
 
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_subscription_payment_links_tenant_id");
+
                     b.ToTable("subscription_payment_links", null, t =>
                         {
                             t.HasCheckConstraint("ck_subscription_payment_links_expires_at_created_at", "expires_at IS NULL OR expires_at > created_at");
+
+                            t.HasCheckConstraint("ck_subscription_payment_links_reminder_count", "reminder_count IS NULL OR reminder_count >= 0");
                         });
                 });
 
@@ -2973,6 +3756,63 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<DateTimeOffset?>("FailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("failed_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("text")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("net_amount");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<Guid?>("PaymentLinkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_link_id");
+
+                    b.Property<decimal>("ProviderFee")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("provider_fee");
+
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("provider_name");
+
+                    b.Property<string>("ProviderResponseJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("provider_response_json");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("provider_transaction_id");
+
                     b.Property<string>("ProviderTransactionReference")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -2987,12 +3827,34 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("subscription_payment_link_id");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TransactionStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("transaction_status");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("transaction_type");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id")
                         .HasName("pk_subscription_payment_transactions");
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("ix_subscription_payment_transactions_invoice_id");
+
+                    b.HasIndex("PaymentLinkId")
+                        .HasDatabaseName("ix_subscription_payment_transactions_payment_link_id");
 
                     b.HasIndex("ProviderTransactionReference")
                         .IsUnique()
@@ -3002,9 +3864,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SubscriptionPaymentLinkId");
 
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_subscription_payment_transactions_tenant_id");
+
                     b.ToTable("subscription_payment_transactions", null, t =>
                         {
                             t.HasCheckConstraint("ck_subscription_payment_transactions_amount", "amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_payment_transactions_net_amount", "net_amount IS NULL OR net_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_payment_transactions_provider_fee", "provider_fee IS NULL OR provider_fee >= 0");
                         });
                 });
 
@@ -3021,6 +3890,23 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("char(3)")
                         .HasColumnName("base_currency");
 
+                    b.Property<string>("BaseCurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("base_currency_code");
+
+                    b.Property<decimal>("BasePrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("base_price");
+
+                    b.Property<string>("BillingCycle")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("billing_cycle");
+
                     b.Property<string>("BillingInterval")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -3031,9 +3917,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<bool>("IsCustomPlan")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_custom_plan");
+
+                    b.Property<bool>("IsPublic")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_public");
 
                     b.Property<int?>("MaxOutlets")
                         .HasColumnType("integer")
@@ -3059,6 +3961,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(80)")
                         .HasColumnName("plan_code");
 
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("plan_name");
+
                     b.Property<decimal>("PriceAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -3070,22 +3978,40 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(30)")
                         .HasColumnName("status");
 
+                    b.Property<int>("TrialDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("trial_days");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UpdatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_platform_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_subscription_plans");
+
+                    b.HasIndex("CreatedByPlatformUserId");
 
                     b.HasIndex("PlanCode")
                         .IsUnique()
                         .HasDatabaseName("uq_subscription_plans_plan_code");
 
+                    b.HasIndex("UpdatedByPlatformUserId");
+
                     b.ToTable("subscription_plans", null, t =>
                         {
+                            t.HasCheckConstraint("ck_subscription_plans_base_price", "base_price >= 0");
+
                             t.HasCheckConstraint("ck_subscription_plans_billing_interval", "billing_interval IN ('MONTHLY', 'YEARLY', 'ONE_TIME')");
 
                             t.HasCheckConstraint("ck_subscription_plans_price_amount", "price_amount >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_plans_trial_days", "trial_days >= 0");
                         });
                 });
 
@@ -3103,6 +4029,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<int?>("MaxQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_quantity");
+
+                    b.Property<int>("MinQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("min_quantity");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -3131,7 +4067,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_subscription_plan_addons_subscription_plan_id_subscription_addon_id");
 
-                    b.ToTable("subscription_plan_addons", (string)null);
+                    b.ToTable("subscription_plan_addons", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_subscription_plan_addons_max_quantity", "max_quantity IS NULL OR max_quantity >= min_quantity");
+
+                            t.HasCheckConstraint("ck_subscription_plan_addons_min_quantity", "min_quantity >= 1");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeature", b =>
@@ -3141,9 +4082,17 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ConfigJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config_json");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
 
                     b.Property<string>("Description")
                         .HasColumnType("text")
@@ -3173,10 +4122,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UpdatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_platform_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_subscription_plan_features");
 
+                    b.HasIndex("CreatedByPlatformUserId");
+
                     b.HasIndex("PlatformFeatureId");
+
+                    b.HasIndex("UpdatedByPlatformUserId");
 
                     b.HasIndex("SubscriptionPlanId", "PlatformFeatureId")
                         .IsUnique()
@@ -3200,13 +4157,20 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("feature_limit_definition_id");
 
-                    b.Property<int?>("LimitValue")
-                        .HasColumnType("integer")
+                    b.Property<bool>("IsUnlimited")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_unlimited");
+
+                    b.Property<decimal?>("LimitValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
                         .HasColumnName("limit_value");
 
-                    b.Property<Guid>("SubscriptionPlanFeatureId")
+                    b.Property<Guid>("SubscriptionPlanId")
                         .HasColumnType("uuid")
-                        .HasColumnName("subscription_plan_feature_id");
+                        .HasColumnName("subscription_plan_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -3217,9 +4181,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FeatureLimitDefinitionId");
 
-                    b.HasIndex("SubscriptionPlanFeatureId", "FeatureLimitDefinitionId")
+                    b.HasIndex("SubscriptionPlanId", "FeatureLimitDefinitionId")
                         .IsUnique()
-                        .HasDatabaseName("uq_subscription_plan_feature_limits_subscription_plan_feature_id_feature_limit_definition_id");
+                        .HasDatabaseName("uq_subscription_plan_feature_limits_subscription_plan_id_feature_limit_definition_id");
 
                     b.ToTable("subscription_plan_feature_limits", null, t =>
                         {
@@ -3238,15 +4202,57 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
+
+                    b.Property<DateTimeOffset>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTimeOffset?>("EffectiveUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_until");
+
                     b.Property<string>("EntitlementStatus")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)")
                         .HasColumnName("entitlement_status");
 
+                    b.Property<Guid>("FeatureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("feature_id");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
                     b.Property<Guid>("PlatformFeatureId")
                         .HasColumnType("uuid")
                         .HasColumnName("platform_feature_id");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_platform_user_id");
+
+                    b.Property<string>("RevokedReason")
+                        .HasColumnType("text")
+                        .HasColumnName("revoked_reason");
+
+                    b.Property<Guid?>("SourceReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_reference_id");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("source_type");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -3256,10 +4262,20 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UpdatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_platform_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_tenant_feature_entitlements");
 
+                    b.HasIndex("CreatedByPlatformUserId");
+
                     b.HasIndex("PlatformFeatureId");
+
+                    b.HasIndex("RevokedByPlatformUserId");
+
+                    b.HasIndex("UpdatedByPlatformUserId");
 
                     b.HasIndex("TenantId", "PlatformFeatureId")
                         .IsUnique()
@@ -3267,6 +4283,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("tenant_feature_entitlements", null, t =>
                         {
+                            t.HasCheckConstraint("ck_tenant_feature_entitlements_effective_dates", "effective_until IS NULL OR effective_until > effective_from");
+
                             t.HasCheckConstraint("ck_tenant_feature_entitlements_entitlement_status", "entitlement_status IN ('ENABLED', 'DISABLED', 'EXPIRED')");
                         });
                 });
@@ -3277,6 +4295,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<Guid?>("AssignedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_by_platform_user_id");
 
                     b.Property<bool>("AutoRenew")
                         .ValueGeneratedOnAdd()
@@ -3296,9 +4318,31 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("billing_start_at");
 
+                    b.Property<string>("CancellationReason")
+                        .HasColumnType("text")
+                        .HasColumnName("cancellation_reason");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<DateTimeOffset?>("CurrentPeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_end");
+
+                    b.Property<DateTimeOffset>("CurrentPeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_start");
 
                     b.Property<string>("DiscountType")
                         .HasMaxLength(20)
@@ -3309,6 +4353,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("discount_value");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
 
                     b.Property<string>("InvoiceEmail")
                         .HasMaxLength(255)
@@ -3331,6 +4379,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("next_billing_at");
 
+                    b.Property<DateTimeOffset?>("NextBillingDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_billing_date");
+
                     b.Property<string>("Notes")
                         .HasColumnType("text")
                         .HasColumnName("notes");
@@ -3339,6 +4391,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)")
                         .HasColumnName("payment_method");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.Property<decimal>("PlanPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("plan_price");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("status");
 
                     b.Property<string>("SubscriptionNumber")
                         .IsRequired()
@@ -3371,9 +4442,17 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("trial_end_at");
 
+                    b.Property<DateTimeOffset?>("TrialEndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_ends_at");
+
                     b.Property<DateTimeOffset?>("TrialStartAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("trial_start_at");
+
+                    b.Property<DateTimeOffset?>("TrialStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_started_at");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -3382,7 +4461,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_tenant_subscriptions");
 
+                    b.HasIndex("AssignedByPlatformUserId");
+
                     b.HasIndex("SubscriptionPlanId");
+
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("ix_tenant_subscriptions_tenant_id_status");
 
                     b.HasIndex("TenantId", "SubscriptionNumber")
                         .IsUnique()
@@ -3390,6 +4474,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("tenant_subscriptions", null, t =>
                         {
+                            t.HasCheckConstraint("ck_tenant_subscriptions_plan_price", "plan_price >= 0");
+
                             t.HasCheckConstraint("ck_tenant_subscriptions_subscription_status", "subscription_status IN ('TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED')");
                         });
                 });
@@ -3401,19 +4487,47 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("AddonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("addon_id");
+
+                    b.Property<bool>("AutoRenew")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("auto_renew");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CreatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_platform_user_id");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
 
                     b.Property<int>("Quantity")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(1)
                         .HasColumnName("quantity");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -3425,24 +4539,46 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("subscription_addon_id");
 
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
                     b.Property<Guid>("TenantSubscriptionId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_subscription_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_price");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UpdatedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_platform_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_tenant_subscription_addons");
 
+                    b.HasIndex("CreatedByPlatformUserId");
+
                     b.HasIndex("SubscriptionAddonId");
+
+                    b.HasIndex("UpdatedByPlatformUserId");
 
                     b.HasIndex("TenantSubscriptionId", "SubscriptionAddonId")
                         .IsUnique()
                         .HasDatabaseName("uq_tenant_subscription_addons_tenant_subscription_id_subscription_addon_id");
 
-                    b.ToTable("tenant_subscription_addons", (string)null);
+                    b.ToTable("tenant_subscription_addons", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_subscription_addons_quantity", "quantity > 0");
+
+                            t.HasCheckConstraint("ck_tenant_subscription_addons_unit_price", "unit_price >= 0");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscriptionHistory", b =>
@@ -3452,13 +4588,61 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ChangeData")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("change_data");
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("change_type");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<Guid?>("ChangedByPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_platform_user_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("NewPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_plan_id");
+
+                    b.Property<string>("NewStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("new_status");
+
+                    b.Property<Guid?>("OldPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("old_plan_id");
+
+                    b.Property<string>("OldStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("old_status");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
                     b.Property<int>("SequenceNumber")
                         .HasColumnType("integer")
                         .HasColumnName("sequence_number");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
 
                     b.Property<Guid>("TenantSubscriptionId")
                         .HasColumnType("uuid")
@@ -3470,6 +4654,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_tenant_subscription_history");
+
+                    b.HasIndex("ChangedByPlatformUserId");
+
+                    b.HasIndex("NewPlanId");
+
+                    b.HasIndex("OldPlanId");
+
+                    b.HasIndex("SubscriptionId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("TenantSubscriptionId", "SequenceNumber")
                         .IsUnique()
@@ -3492,9 +4686,45 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<decimal>("CurrentValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("current_value");
+
+                    b.Property<Guid>("FeatureLimitDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("feature_limit_definition_id");
+
+                    b.Property<DateTimeOffset?>("LastCalculatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_calculated_at");
+
+                    b.Property<decimal?>("LimitValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("limit_value");
+
+                    b.Property<DateTimeOffset?>("PeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_end");
+
+                    b.Property<DateTimeOffset>("PeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_start");
+
                     b.Property<Guid>("PlatformFeatureId")
                         .HasColumnType("uuid")
                         .HasColumnName("platform_feature_id");
+
+                    b.Property<Guid?>("ScopeReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_reference_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("status");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -3510,6 +4740,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(255)")
                         .HasColumnName("usage_period_start");
 
+                    b.Property<string>("UsageScope")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("usage_scope");
+
                     b.Property<decimal>("UsedQuantity")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
@@ -3517,6 +4753,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_tenant_usage_counters");
+
+                    b.HasIndex("FeatureLimitDefinitionId")
+                        .HasDatabaseName("ix_tenant_usage_counters_feature_limit_definition_id");
 
                     b.HasIndex("PlatformFeatureId");
 
@@ -3526,6 +4765,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("tenant_usage_counters", null, t =>
                         {
+                            t.HasCheckConstraint("ck_tenant_usage_counters_current_value", "current_value >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_counters_limit_value", "limit_value IS NULL OR limit_value >= 0");
+
                             t.HasCheckConstraint("ck_tenant_usage_counters_used_quantity", "used_quantity >= 0");
                         });
                 });
@@ -6252,7 +7495,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<Guid>("CreatedByTenantUserId")
+                    b.Property<Guid?>("CreatedByTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_tenant_user_id");
 
@@ -6296,7 +7539,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<Guid>("UpdatedByTenantUserId")
+                    b.Property<Guid?>("UpdatedByTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("updated_by_tenant_user_id");
 
@@ -19902,11 +21145,24 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PlatformUserId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
                         .HasConstraintName("fk_platform_auth_sessions_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_platform_auth_sessions_revoked_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformLoginAudit", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", null)
+                        .WithMany()
+                        .HasForeignKey("PlatformAuthSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_platform_login_audits_platform_auth_session_id_platform_auth_sessions");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("PlatformUserId")
@@ -19923,6 +21179,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_password_reset_tokens_platform_user_id_platform_users");
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformPermission", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_permissions_created_by_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_permissions_updated_by_platform_user_id_platform_users");
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRefreshToken", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", null)
@@ -19931,10 +21202,50 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_platform_refresh_tokens_platform_auth_session_id_platform_auth_sessions");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("PlatformUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_platform_refresh_tokens_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRefreshToken", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacedByTokenId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_platform_refresh_tokens_replaced_by_token_id_platform_refresh_tokens");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_platform_refresh_tokens_revoked_by_platform_user_id_platform_users");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRole", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_roles_created_by_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_roles_updated_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRolePermission", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("GrantedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_role_permissions_granted_by_platform_user_id_platform_users");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformPermission", null)
                         .WithMany()
                         .HasForeignKey("PlatformPermissionId")
@@ -19948,6 +21259,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_platform_role_permissions_platform_role_id_platform_roles");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_role_permissions_revoked_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformSetting", b =>
@@ -19959,8 +21276,29 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_settings_updated_by_platform_user_id_platform_users");
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_users_created_by_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_users_updated_by_platform_user_id_platform_users");
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUserPermission", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_user_permissions_assigned_by_platform_user_id_platform_users");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformPermission", null)
                         .WithMany()
                         .HasForeignKey("PlatformPermissionId")
@@ -19973,10 +21311,22 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PlatformUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_platform_user_permissions_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_user_permissions_revoked_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUserRole", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_user_roles_assigned_by_platform_user_id_platform_users");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRole", null)
                         .WithMany()
                         .HasForeignKey("PlatformRoleId")
@@ -19989,6 +21339,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PlatformUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_platform_user_roles_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_platform_user_roles_revoked_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.FeatureFlag", b =>
@@ -20021,6 +21377,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_features_platform_module_id_platform_modules");
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddon", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_subscription_addons_created_by_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_subscription_addons_updated_by_platform_user_id_platform_users");
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddonFeature", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
@@ -20047,16 +21418,29 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_subscription_addon_limits_feature_limit_definition_id_feature_limit_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddonFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddon", null)
                         .WithMany()
-                        .HasForeignKey("SubscriptionAddonFeatureId")
+                        .HasForeignKey("SubscriptionAddonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_subscription_addon_limits_subscription_addon_feature_id_subscription_addon_features");
+                        .HasConstraintName("fk_subscription_addon_limits_subscription_addon_id_subscription_addons");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionCreditNote", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_subscription_credit_notes_created_by_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_credit_notes_invoice_id_subscription_invoices");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
@@ -20069,6 +21453,19 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionCreditNote", null)
                         .WithMany()
+                        .HasForeignKey("CreditNoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_credit_note_lines_credit_note_id_subscription_credit_notes");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoiceLine", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_subscription_credit_note_lines_invoice_line_id_subscription_invoice_lines");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionCreditNote", null)
+                        .WithMany()
                         .HasForeignKey("SubscriptionCreditNoteId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -20077,6 +21474,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_invoices_subscription_id_tenant_subscriptions");
+
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -20096,6 +21500,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_invoice_lines_invoice_id_subscription_invoices");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
+                        .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -20104,16 +21515,49 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentLink", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_subscription_payment_links_created_by_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_payment_links_invoice_id_subscription_invoices");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_payment_links_subscription_invoice_id_subscription_invoices");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_payment_links_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentTransaction", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_payment_transactions_invoice_id_subscription_invoices");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentLink", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentLinkId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_subscription_payment_transactions_payment_link_id_subscription_payment_links");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
@@ -20127,6 +21571,28 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_payment_transactions_subscription_payment_link_id_subscription_payment_links");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_payment_transactions_tenant_id_tenants");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_subscription_plans_created_by_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_subscription_plans_updated_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanAddon", b =>
@@ -20148,6 +21614,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeature", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_subscription_plan_features_created_by_platform_user_id_platform_users");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
@@ -20161,6 +21633,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_plan_features_subscription_plan_id_subscription_plans");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_subscription_plan_features_updated_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeatureLimit", b =>
@@ -20172,16 +21650,22 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_subscription_plan_feature_limits_feature_limit_definition_id_feature_limit_definitions");
 
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlanFeature", null)
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", null)
                         .WithMany()
-                        .HasForeignKey("SubscriptionPlanFeatureId")
+                        .HasForeignKey("SubscriptionPlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_subscription_plan_feature_limits_subscription_plan_feature_id_subscription_plan_features");
+                        .HasConstraintName("fk_subscription_plan_feature_limits_subscription_plan_id_subscription_plans");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantFeatureEntitlement", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_feature_entitlements_created_by_platform_user_id_platform_users");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
@@ -20189,16 +21673,34 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_tenant_feature_entitlements_platform_feature_id_platform_features");
 
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_feature_entitlements_revoked_by_platform_user_id_platform_users");
+
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_feature_entitlements_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_feature_entitlements_updated_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_subscriptions_assigned_by_platform_user_id_platform_users");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionPlanId")
@@ -20216,6 +21718,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscriptionAddon", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_subscription_addons_created_by_platform_user_id_platform_users");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionAddon", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionAddonId")
@@ -20229,10 +21737,48 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_subscription_addons_tenant_subscription_id_tenant_subscriptions");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_subscription_addons_updated_by_platform_user_id_platform_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscriptionHistory", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedByPlatformUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_subscription_history_changed_by_platform_user_id_platform_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", null)
+                        .WithMany()
+                        .HasForeignKey("NewPlanId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_subscription_history_new_plan_id_subscription_plans");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", null)
+                        .WithMany()
+                        .HasForeignKey("OldPlanId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tenant_subscription_history_old_plan_id_subscription_plans");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_subscription_history_subscription_id_tenant_subscriptions");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_subscription_history_tenant_id_tenants");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", null)
                         .WithMany()
                         .HasForeignKey("TenantSubscriptionId")
@@ -20243,6 +21789,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantUsageCounter", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.FeatureLimitDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FeatureLimitDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_usage_counters_feature_limit_definition_id_feature_limit_definitions");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", null)
                         .WithMany()
                         .HasForeignKey("PlatformFeatureId")
@@ -21209,7 +22762,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("CreatedByTenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_tenant_roles_created_by");
 
                     b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.RoleTemplate", null)
@@ -21235,7 +22787,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UpdatedByTenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_tenant_roles_updated_by");
                 });
 

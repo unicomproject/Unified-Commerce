@@ -10,6 +10,9 @@ public class SubscriptionPlanFeature : AuditableEntity
     public Guid PlatformFeatureId { get; protected set; }
     public int SortOrder { get; protected set; }
     public Guid SubscriptionPlanId { get; protected set; }
+    public string? ConfigJson { get; protected set; }
+    public Guid? CreatedByPlatformUserId { get; protected set; }
+    public Guid? UpdatedByPlatformUserId { get; protected set; }
 
     public static SubscriptionPlanFeature CreateIncluded(
         Guid id,
@@ -17,7 +20,9 @@ public class SubscriptionPlanFeature : AuditableEntity
         Guid platformFeatureId,
         int sortOrder,
         DateTimeOffset now,
-        string? description = null)
+        string? description = null,
+        string? configJson = null,
+        Guid? createdByPlatformUserId = null)
     {
         return new SubscriptionPlanFeature
         {
@@ -27,9 +32,10 @@ public class SubscriptionPlanFeature : AuditableEntity
             SortOrder = sortOrder,
             Status = SubscriptionPlanConstants.PlanFeatureStatus.Included,
             Description = description,
+            ConfigJson = configJson,
+            CreatedByPlatformUserId = createdByPlatformUserId,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
 }
-

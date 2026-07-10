@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -52,6 +53,19 @@ public sealed class SubscriptionPlanFeatureConfiguration : IEntityTypeConfigurat
             .HasColumnName("subscription_plan_id")
             .IsRequired();
 
+        builder.Property(x => x.ConfigJson)
+            .HasColumnName("config_json")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id")
+            .IsRequired(false);
+
         builder.HasOne<SubscriptionPlan>()
             .WithMany()
             .HasForeignKey(x => x.SubscriptionPlanId)
@@ -64,11 +78,20 @@ public sealed class SubscriptionPlanFeatureConfiguration : IEntityTypeConfigurat
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_subscription_plan_features_platform_feature_id_platform_features");
 
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_subscription_plan_features_created_by_platform_user_id_platform_users");
+
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_subscription_plan_features_updated_by_platform_user_id_platform_users");
+
         builder.HasIndex(x => new { x.SubscriptionPlanId, x.PlatformFeatureId })
             .IsUnique()
             .HasDatabaseName("uq_subscription_plan_features_subscription_plan_id_platform_feature_id");
     }
 }
-
-
-

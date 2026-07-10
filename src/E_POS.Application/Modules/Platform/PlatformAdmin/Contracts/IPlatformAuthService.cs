@@ -7,7 +7,8 @@ public interface IPlatformAuthService
 {
     Task<ApplicationResult<PlatformAdminLoginResponse>> LoginAsync(
         PlatformAdminLoginRequest request,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        PlatformAuthClientContext? clientContext = null);
 
     Task<ApplicationResult> LogoutAsync(
         Guid platformUserId,
@@ -20,5 +21,6 @@ public interface IPlatformAuthService
 
     Task<ApplicationResult<PlatformAdminLoginResponse>> RefreshAsync(
         string refreshToken,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        PlatformAuthClientContext? clientContext = null);
 }

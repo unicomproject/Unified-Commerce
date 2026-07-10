@@ -423,6 +423,24 @@ public sealed class PlatformSubscriptionPlanServiceTests
         {
             return Task.FromResult(0);
         }
+
+        public Task UpsertLegacyPlanLimitsAsync(
+            Guid planId,
+            int? maxOutlets,
+            int? maxUsers,
+            int? maxTills,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+            Guid planId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyDictionary<string, decimal?>>(new Dictionary<string, decimal?>());
+        }
     }
 }
 

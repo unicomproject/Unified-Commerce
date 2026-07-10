@@ -52,6 +52,11 @@ public sealed class SubscriptionAddonFeatureConfiguration : IEntityTypeConfigura
             .HasColumnName("subscription_addon_id")
             .IsRequired();
 
+        builder.Property(x => x.ConfigJson)
+            .HasColumnName("config_json")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
         builder.HasOne<SubscriptionAddon>()
             .WithMany()
             .HasForeignKey(x => x.SubscriptionAddonId)
@@ -69,6 +74,3 @@ public sealed class SubscriptionAddonFeatureConfiguration : IEntityTypeConfigura
             .HasDatabaseName("uq_subscription_addon_features_subscription_addon_id_platform_feature_id");
     }
 }
-
-
-

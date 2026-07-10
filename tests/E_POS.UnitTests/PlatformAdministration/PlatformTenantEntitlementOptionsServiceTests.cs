@@ -112,7 +112,8 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             new FakePlatformPermissionChecker(permissions),
             new FakePlatformPermissionRepository(permissions),
             new FakeDateTimeProvider(),
-            new FakePasswordHashService());
+            new FakePasswordHashService(),
+            new FakeTenantUsageCounterService());
     }
 
     private static HashSet<string> AllTenantPermissions() =>
@@ -264,6 +265,8 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             Guid tenantId,
             IReadOnlyList<Guid> enabledFeatureIds,
             DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            string? revokedReason,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
@@ -334,6 +337,20 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
             Task.FromResult(0);
+
+        public Task UpsertLegacyPlanLimitsAsync(
+            Guid planId,
+            int? maxOutlets,
+            int? maxUsers,
+            int? maxTills,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+            Guid planId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<string, decimal?>>(new Dictionary<string, decimal?>());
     }
 
     private sealed class FakePlatformPermissionChecker : IPlatformPermissionChecker

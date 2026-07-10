@@ -20,7 +20,8 @@ public static class PlatformRoleMapper
         int permissionCount,
         int userCount,
         DateTimeOffset createdAt,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        bool isSystemRole = false)
     {
         var isProtected = IsProtectedRole(roleCode);
 
@@ -32,7 +33,7 @@ public static class PlatformRoleMapper
             status,
             permissionCount,
             userCount,
-            IsSystem: isProtected,
+            IsSystem: isSystemRole || isProtected,
             IsProtected: isProtected,
             createdAt,
             updatedAt);
@@ -59,7 +60,9 @@ public static class PlatformRoleMapper
         int permissionCount,
         int userCount)
     {
-        return ToListItem(
+        var isProtected = IsProtectedRole(role.RoleCode);
+
+        return new PlatformRoleListItemDto(
             role.Id,
             role.RoleCode,
             role.Name,
@@ -67,6 +70,8 @@ public static class PlatformRoleMapper
             role.Status,
             permissionCount,
             userCount,
+            IsSystem: role.IsSystemRole || isProtected,
+            IsProtected: isProtected,
             role.CreatedAt,
             role.UpdatedAt ?? role.CreatedAt);
     }

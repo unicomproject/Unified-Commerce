@@ -10,6 +10,9 @@ public class PlatformFeature : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public Guid PlatformModuleId { get; protected set; }
     public int SortOrder { get; protected set; }
+    public string FeatureKey { get; protected set; } = string.Empty;
+    public string FeatureName { get; protected set; } = string.Empty;
+    public bool IsCoreFeature { get; protected set; }
 
     public static PlatformFeature Create(
         Guid id,
@@ -18,7 +21,9 @@ public class PlatformFeature : AuditableEntity
         string name,
         string status,
         DateTimeOffset createdAt,
-        int sortOrder = 0)
+        int sortOrder = 0,
+        string? description = null,
+        bool isCoreFeature = false)
     {
         return new PlatformFeature
         {
@@ -26,11 +31,14 @@ public class PlatformFeature : AuditableEntity
             PlatformModuleId = platformModuleId,
             FeatureCode = featureCode,
             Name = name,
+            Description = description,
             Status = status,
             SortOrder = sortOrder,
+            FeatureKey = featureCode,
+            FeatureName = name,
+            IsCoreFeature = isCoreFeature,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
     }
 }
-

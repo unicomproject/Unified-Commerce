@@ -392,7 +392,8 @@ public sealed class PlatformTenantLifecycleServiceTests
             new FakeLifecyclePermissionChecker(permissions),
             new FakeLifecyclePermissionRepository(permissions),
             new FakeLifecycleDateTimeProvider(),
-            new FakeLifecyclePasswordHashService());
+            new FakeLifecyclePasswordHashService(),
+            new FakeTenantUsageCounterService());
     }
 
     private static HashSet<string> AllTenantPermissions() =>
@@ -560,6 +561,8 @@ public sealed class PlatformTenantLifecycleServiceTests
             Guid tenantId,
             IReadOnlyList<Guid> enabledFeatureIds,
             DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            string? revokedReason,
             CancellationToken cancellationToken)
         {
             ReplaceEntitlementsCalled = true;
@@ -649,6 +652,20 @@ public sealed class PlatformTenantLifecycleServiceTests
             throw new NotImplementedException();
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task UpsertLegacyPlanLimitsAsync(
+            Guid planId,
+            int? maxOutlets,
+            int? maxUsers,
+            int? maxTills,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+            Guid planId,
+            CancellationToken cancellationToken) =>
             throw new NotImplementedException();
     }
 }

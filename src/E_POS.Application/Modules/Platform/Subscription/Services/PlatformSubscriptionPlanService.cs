@@ -142,9 +142,18 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
             request.MaxOutlets,
             request.MaxUsers,
             request.MaxTills,
-            now);
+            now,
+            platformUserId);
 
         await _repository.AddPlanAsync(plan, cancellationToken);
+
+        await _repository.UpsertLegacyPlanLimitsAsync(
+            plan.Id,
+            plan.MaxOutlets,
+            plan.MaxUsers,
+            plan.MaxTills,
+            now,
+            cancellationToken);
 
         var created = await _repository.GetPlanByIdAsync(
             plan.Id,
@@ -188,7 +197,8 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
         plan.UpdatePricing(
             SubscriptionPlanMapper.NormalizeCurrency(request.BaseCurrency ?? plan.BaseCurrency),
             request.BasePrice,
-            _dateTimeProvider.UtcNow);
+            _dateTimeProvider.UtcNow,
+            platformUserId);
 
         await _repository.SaveChangesAsync(cancellationToken);
 
@@ -236,8 +246,14 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
                 ValidationFailed with { Message = "At least one limit field is required." });
         }
 
-        plan.UpdateLimits(maxOutlets, maxUsers, maxTills, _dateTimeProvider.UtcNow);
-        await _repository.SaveChangesAsync(cancellationToken);
+        plan.UpdateLimits(maxOutlets, maxUsers, maxTills, _dateTimeProvider.UtcNow, platformUserId);
+        await _repository.UpsertLegacyPlanLimitsAsync(
+            planId,
+            maxOutlets,
+            maxUsers,
+            maxTills,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
 
         return await BuildMutationResultAsync(planId, platformUserId, cancellationToken);
     }
@@ -323,7 +339,7 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
                 ValidationFailed with { Message = "At least one plan limit must be configured before publishing." });
         }
 
-        plan.Publish(_dateTimeProvider.UtcNow);
+        plan.Publish(_dateTimeProvider.UtcNow, platformUserId);
         await _repository.SaveChangesAsync(cancellationToken);
 
         return await BuildMutationResultAsync(planId, platformUserId, cancellationToken);

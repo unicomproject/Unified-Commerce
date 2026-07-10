@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -54,13 +55,31 @@ public sealed class PlatformModuleConfiguration : IEntityTypeConfiguration<Platf
             .IsRequired()
             .HasDefaultValue(0);
 
+        builder.Property(x => x.ModuleKey)
+            .HasColumnName("module_key")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(x => x.ModuleName)
+            .HasColumnName("module_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
+
+        builder.Property(x => x.IsCoreModule)
+            .HasColumnName("is_core_module")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.HasIndex(x => x.ModuleCode)
             .IsUnique()
             .HasDatabaseName("uq_platform_modules_module_code");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_modules_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
+        builder.HasIndex(x => x.ModuleKey)
+            .IsUnique()
+            .HasDatabaseName("uq_platform_modules_module_key");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_platform_modules_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-
-
-

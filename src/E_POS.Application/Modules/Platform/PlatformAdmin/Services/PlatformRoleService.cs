@@ -271,6 +271,7 @@ public sealed class PlatformRoleService : IPlatformRoleService
             roleId,
             resolvedPermissionIds,
             _dateTimeProvider.UtcNow,
+            platformUserId,
             cancellationToken);
 
         var availablePermissions = await BuildAvailablePermissionsAsync(cancellationToken);

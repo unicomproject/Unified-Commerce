@@ -36,6 +36,18 @@ public interface IPlatformSubscriptionPlanRepository
         CancellationToken cancellationToken);
 
     Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken);
+
+    Task UpsertLegacyPlanLimitsAsync(
+        Guid planId,
+        int? maxOutlets,
+        int? maxUsers,
+        int? maxTills,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+        Guid planId,
+        CancellationToken cancellationToken);
 }
 
 public sealed record SubscriptionPlanPermissionFlags(
