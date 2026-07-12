@@ -52,7 +52,7 @@ public class CustomerWishlistConfiguration : IEntityTypeConfiguration<CustomerWi
             .OnDelete(DeleteBehavior.Restrict);
 
         // Customer FK
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>()
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>()
             .WithMany()
             .HasForeignKey(x => x.CustomerId)
             .HasConstraintName("fk_customer_wishlists_customer_id_customers")

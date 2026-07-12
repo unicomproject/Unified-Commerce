@@ -2809,7 +2809,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.Customer", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2877,7 +2877,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("customers", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerAuthAccount", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2919,7 +2919,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerAuthSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2966,7 +2966,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("customer_auth_sessions", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerConsent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerConsent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3011,7 +3011,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("customer_consents", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerPasswordResetToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerPasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3058,7 +3058,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("customer_password_reset_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerRefreshToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3103,7 +3103,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("customer_refresh_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerVerificationOtp", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerVerificationOtp", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -15458,7 +15458,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_unit_of_measures_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.Customer", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
@@ -15468,18 +15468,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customers_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerAuthAccount", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_customer_auth_accounts_customer_id_customers");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerAuthSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthSession", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerAuthAccount", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", null)
                         .WithMany()
                         .HasForeignKey("CustomerAuthAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -15487,34 +15487,34 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customer_auth_sessions_customer_auth_account_id_customer_auth_accounts");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerConsent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerConsent", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_customer_consents_customer_id_customers");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerPasswordResetToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerPasswordResetToken", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerAuthAccount", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", null)
                         .WithMany()
                         .HasForeignKey("CustomerAuthAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_customer_password_reset_tokens_customer_auth_account_id_customer_auth_accounts");
 
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerVerificationOtp", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerVerificationOtp", null)
                         .WithMany()
                         .HasForeignKey("VerifiedOtpId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_customer_password_reset_tokens_verified_otp_id_customer_verification_otps");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerRefreshToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerRefreshToken", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerAuthSession", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthSession", null)
                         .WithMany()
                         .HasForeignKey("CustomerAuthSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -15522,9 +15522,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customer_refresh_tokens_customer_auth_session_id_customer_auth_sessions");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerVerificationOtp", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerVerificationOtp", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -16362,7 +16362,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservation", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -16972,7 +16972,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationInboxItem", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -17007,7 +17007,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationMessage", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -17055,7 +17055,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationPreference", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -17090,7 +17090,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationReadReceipt", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -18486,7 +18486,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_returns_341b4dbd");
 
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)

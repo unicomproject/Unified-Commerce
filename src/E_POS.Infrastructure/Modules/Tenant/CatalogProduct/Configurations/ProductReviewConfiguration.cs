@@ -69,7 +69,7 @@ public class ProductReviewConfiguration : IEntityTypeConfiguration<ProductReview
             .OnDelete(DeleteBehavior.Cascade);
 
         // Customer FK
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>()
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>()
             .WithMany()
             .HasForeignKey(x => x.CustomerId)
             .HasConstraintName("fk_product_reviews_customer_id_customers")

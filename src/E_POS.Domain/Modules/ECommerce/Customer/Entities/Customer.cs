@@ -1,6 +1,6 @@
 using E_POS.Domain.Common.Entities;
 
-namespace E_POS.Domain.Modules.Customer.Entities;
+namespace E_POS.Domain.Modules.ECommerce.Customer.Entities;
 
 public class Customer : AuditableEntity
 {

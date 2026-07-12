@@ -151,7 +151,7 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_sales_returns_8e3771a4");
 
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>()
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>()
             .WithMany()
             .HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Restrict)

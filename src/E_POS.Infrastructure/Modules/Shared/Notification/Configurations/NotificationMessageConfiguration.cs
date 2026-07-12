@@ -193,7 +193,7 @@ public sealed class NotificationMessageConfiguration : IEntityTypeConfiguration<
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_notification_messages_d2afb07b");
 
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>()
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>()
             .WithMany()
             .HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Restrict)

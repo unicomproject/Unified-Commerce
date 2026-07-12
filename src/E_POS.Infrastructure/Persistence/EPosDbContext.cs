@@ -10,11 +10,10 @@ using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Domain.Modules.Tenant.Discount.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
-using E_POS.Domain.Modules.Customer.Entities;
+using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
 using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
-using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;

@@ -1,17 +1,17 @@
-using E_POS.Domain.Modules.Customer.Entities;
+using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace E_POS.Infrastructure.Modules.Customer.Configurations;
+namespace E_POS.Infrastructure.Modules.ECommerce.Customer.Configurations;
 
-public sealed class CustomerAuthSessionConfiguration : IEntityTypeConfiguration<CustomerAuthSession>
+public sealed class CustomerRefreshTokenConfiguration : IEntityTypeConfiguration<CustomerRefreshToken>
 {
-    public void Configure(EntityTypeBuilder<CustomerAuthSession> builder)
+    public void Configure(EntityTypeBuilder<CustomerRefreshToken> builder)
     {
-        builder.ToTable("customer_auth_sessions");
+        builder.ToTable("customer_refresh_tokens");
 
-        builder.HasKey(x => x.Id).HasName("pk_customer_auth_sessions");
+        builder.HasKey(x => x.Id).HasName("pk_customer_refresh_tokens");
 
         builder.Property(x => x.Id)
             .HasColumnName("id");
@@ -33,28 +33,22 @@ public sealed class CustomerAuthSessionConfiguration : IEntityTypeConfiguration<
             .HasColumnName("tenant_id")
             .IsRequired();
 
-        builder.Property(x => x.CustomerAuthAccountId)
-            .HasColumnName("customer_auth_account_id")
+        builder.Property(x => x.CustomerAuthSessionId)
+            .HasColumnName("customer_auth_session_id")
             .IsRequired();
 
-        builder.Property(x => x.SessionTokenHash)
-            .HasColumnName("session_token_hash")
+        builder.Property(x => x.TokenFamilyId)
+            .HasColumnName("token_family_id")
+            .IsRequired();
+
+        builder.Property(x => x.TokenHash)
+            .HasColumnName("token_hash")
             .HasColumnType("varchar(255)")
             .HasMaxLength(255)
             .IsRequired();
 
-        builder.Property(x => x.IpAddress)
-            .HasColumnName("ip_address")
-            .HasColumnType("inet");
-
-        builder.Property(x => x.UserAgent)
-            .HasColumnName("user_agent")
-            .HasColumnType("text");
-
-        builder.Property(x => x.DeviceName)
-            .HasColumnName("device_name")
-            .HasColumnType("varchar(150)")
-            .HasMaxLength(150);
+        builder.Property(x => x.ReplacedByTokenId)
+            .HasColumnName("replaced_by_token_id");
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
@@ -62,14 +56,14 @@ public sealed class CustomerAuthSessionConfiguration : IEntityTypeConfiguration<
             .HasMaxLength(40)
             .IsRequired();
 
-        builder.Property(x => x.LastActivityAt)
-            .HasColumnName("last_activity_at")
-            .HasColumnType("timestamp with time zone");
-
         builder.Property(x => x.ExpiresAt)
             .HasColumnName("expires_at")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
+
+        builder.Property(x => x.UsedAt)
+            .HasColumnName("used_at")
+            .HasColumnType("timestamp with time zone");
 
         builder.Property(x => x.RevokedAt)
             .HasColumnName("revoked_at")
@@ -84,26 +78,33 @@ public sealed class CustomerAuthSessionConfiguration : IEntityTypeConfiguration<
             .WithMany()
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_customer_auth_sessions_tenant_id_tenants");
+            .HasConstraintName("fk_customer_refresh_tokens_tenant_id_tenants");
 
-        builder.HasOne<CustomerAuthAccount>()
+        builder.HasOne<CustomerAuthSession>()
             .WithMany()
-            .HasForeignKey(x => new { x.TenantId, x.CustomerAuthAccountId })
+            .HasForeignKey(x => new { x.TenantId, x.CustomerAuthSessionId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_customer_auth_sessions_customer_auth_account_id_customer_auth_accounts");
+            .HasConstraintName("fk_customer_refresh_tokens_customer_auth_session_id_customer_auth_sessions");
 
-        builder.HasIndex(x => new { x.TenantId, x.SessionTokenHash })
+        builder.HasOne<CustomerRefreshToken>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.ReplacedByTokenId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_customer_refresh_tokens_replaced_by_token_id_customer_refresh_tokens");
+
+        builder.HasIndex(x => new { x.TenantId, x.TokenHash })
             .IsUnique()
-            .HasDatabaseName("uq_customer_auth_sessions_tenant_id_session_token_hash");
+            .HasDatabaseName("uq_customer_refresh_tokens_tenant_id_token_hash");
 
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
-            .HasDatabaseName("uq_customer_auth_sessions_tenant_id_id");
+            .HasDatabaseName("uq_customer_refresh_tokens_tenant_id_id");
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_customer_auth_sessions_status", "status IN ('ACTIVE', 'EXPIRED', 'REVOKED')");
+            t.HasCheckConstraint("ck_customer_refresh_tokens_status", "status IN ('ACTIVE', 'USED', 'EXPIRED', 'REVOKED')");
         });
     }
 }
