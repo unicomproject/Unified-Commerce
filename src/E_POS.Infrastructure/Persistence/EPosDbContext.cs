@@ -1,4 +1,5 @@
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Domain.Modules.Platform.PlatformFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
@@ -12,6 +13,7 @@ using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Customer.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
+
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Tenant.Payment.Entities;
@@ -43,6 +45,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<PlatformUserPermission> PlatformUserPermissions => Set<PlatformUserPermission>();
     public DbSet<PlatformUserRole> PlatformUserRoles => Set<PlatformUserRole>();
     public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
+    public DbSet<PlatformSalesChannel> PlatformSalesChannels => Set<PlatformSalesChannel>();
 
     // Tenant Foundation
     public DbSet<BusinessType> BusinessTypes => Set<BusinessType>();
@@ -152,9 +155,12 @@ public sealed class EPosDbContext : DbContext
     public DbSet<ProductOptionValue> ProductOptionValues => Set<ProductOptionValue>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<ProductVariantOptionValue> ProductVariantOptionValues => Set<ProductVariantOptionValue>();
+
     public DbSet<ReturnPolicy> ReturnPolicies => Set<ReturnPolicy>();
     public DbSet<ReturnPolicyTemplate> ReturnPolicyTemplates => Set<ReturnPolicyTemplate>();
     public DbSet<UnitOfMeasure> UnitOfMeasures => Set<UnitOfMeasure>();
+
+
 
     // Pricing and Tax
     public DbSet<PriceList> PriceLists => Set<PriceList>();
@@ -212,6 +218,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<CustomerPasswordResetToken> CustomerPasswordResetTokens => Set<CustomerPasswordResetToken>();
     public DbSet<CustomerRefreshToken> CustomerRefreshTokens => Set<CustomerRefreshToken>();
     public DbSet<CustomerVerificationOtp> CustomerVerificationOtps => Set<CustomerVerificationOtp>();
+
 
     // Orders and Sales
     public DbSet<DocumentNumberSequence> DocumentNumberSequences => Set<DocumentNumberSequence>();
