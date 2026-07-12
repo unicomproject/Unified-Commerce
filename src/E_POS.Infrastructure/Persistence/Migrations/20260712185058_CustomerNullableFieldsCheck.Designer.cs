@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260712185058_CustomerNullableFieldsCheck")]
+    partial class CustomerNullableFieldsCheck
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1658,12 +1661,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_fulfillment_methods_4ec69d59");
 
-                    b.ToTable("fulfillment_methods", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_fulfillment_methods_method_type", "method_type IN ('IMMEDIATE', 'PICKUP')");
-
-                            t.HasCheckConstraint("ck_fulfillment_methods_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
-                        });
+                    b.ToTable("fulfillment_methods", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethodOutlet", b =>
@@ -1737,14 +1735,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_fulfillment_method_outlets_cf79fc78");
 
-                    b.ToTable("fulfillment_method_outlets", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_fulfillment_method_outlets_pickup_window_minutes", "pickup_window_minutes IS NULL OR pickup_window_minutes > 0");
-
-                            t.HasCheckConstraint("ck_fulfillment_method_outlets_preparation_lead_minutes", "preparation_lead_minutes IS NULL OR preparation_lead_minutes >= 0");
-
-                            t.HasCheckConstraint("ck_fulfillment_method_outlets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
-                        });
+                    b.ToTable("fulfillment_method_outlets", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrder", b =>
@@ -1862,10 +1853,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_fulfillment_orders_e767fb12");
 
-                    b.ToTable("fulfillment_orders", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_fulfillment_orders_status", "fulfillment_status IN ('PENDING', 'ALLOCATED', 'PICKING', 'PICKED', 'PACKED', 'READY', 'FULFILLED', 'CANCELLED')");
-                        });
+                    b.ToTable("fulfillment_orders", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderEvent", b =>
@@ -1929,10 +1917,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("fulfillment_order_events", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_fulfillment_order_events_sequence_number", "sequence_number > 0");
-                        });
+                    b.ToTable("fulfillment_order_events", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderLine", b =>
@@ -2019,20 +2004,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("fulfillment_order_lines", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_fulfillment_order_lines_cancelled_quantity", "cancelled_quantity >= 0");
-
-                            t.HasCheckConstraint("ck_fulfillment_order_lines_fulfilled_quantity", "fulfilled_quantity >= 0");
-
-                            t.HasCheckConstraint("ck_fulfillment_order_lines_packed_quantity", "packed_quantity >= 0");
-
-                            t.HasCheckConstraint("ck_fulfillment_order_lines_picked_quantity", "picked_quantity >= 0");
-
-                            t.HasCheckConstraint("ck_fulfillment_order_lines_requested_quantity", "requested_quantity > 0");
-
-                            t.HasCheckConstraint("ck_fulfillment_order_lines_status", "line_status IN ('PENDING', 'PICKING', 'PICKED', 'PACKED', 'FULFILLED', 'CANCELLED')");
-                        });
+                    b.ToTable("fulfillment_order_lines", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrder", b =>
@@ -2149,12 +2121,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_pickup_orders_917d8d64");
 
-                    b.ToTable("pickup_orders", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pickup_orders_qr_version", "pickup_qr_version IS NULL OR pickup_qr_version > 0");
-
-                            t.HasCheckConstraint("ck_pickup_orders_status", "pickup_status IN ('PENDING', 'READY', 'VERIFIED', 'COLLECTED', 'CANCELLED', 'EXPIRED')");
-                        });
+                    b.ToTable("pickup_orders", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrderEvent", b =>
@@ -2218,10 +2185,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("pickup_order_events", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pickup_order_events_sequence_number", "sequence_number > 0");
-                        });
+                    b.ToTable("pickup_order_events", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlot", b =>
@@ -2291,18 +2255,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_pickup_slots_d08294ab");
 
-                    b.ToTable("pickup_slots", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pickup_slots_capacity", "capacity >= 0");
-
-                            t.HasCheckConstraint("ck_pickup_slots_reserved_count", "reserved_count >= 0 AND reserved_count <= capacity");
-
-                            t.HasCheckConstraint("ck_pickup_slots_row_version", "row_version >= 0");
-
-                            t.HasCheckConstraint("ck_pickup_slots_slot_status", "slot_status IN ('OPEN', 'FULL', 'CLOSED', 'CANCELLED')");
-
-                            t.HasCheckConstraint("ck_pickup_slots_window_end", "window_end > window_start");
-                        });
+                    b.ToTable("pickup_slots", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlotReservation", b =>
@@ -2373,14 +2326,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("pickup_slot_reservations", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pickup_slot_reservations_reserved_capacity", "reserved_capacity > 0");
-
-                            t.HasCheckConstraint("ck_pickup_slot_reservations_session_or_order", "checkout_session_id IS NOT NULL OR sales_order_id IS NOT NULL");
-
-                            t.HasCheckConstraint("ck_pickup_slot_reservations_status", "reservation_status IN ('PENDING', 'CONFIRMED', 'RELEASED', 'EXPIRED', 'CANCELLED')");
-                        });
+                    b.ToTable("pickup_slot_reservations", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Storefront.Entities.StorefrontBanner", b =>
@@ -2391,11 +2337,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("id");
 
                     b.Property<string>("ActionText")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("action_text");
 
                     b.Property<string>("ActionUrl")
+                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("action_url");
@@ -2435,6 +2383,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("status");
 
                     b.Property<string>("Subtitle")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("subtitle");
 

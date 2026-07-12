@@ -6,8 +6,8 @@ public class Customer : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
     public string Name { get; protected set; } = string.Empty; // Maps to display_name
-    public string NormalizedEmail { get; protected set; } = string.Empty;
-    public string NormalizedPhone { get; protected set; } = string.Empty;
+    public string? NormalizedEmail { get; protected set; }
+    public string? NormalizedPhone { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public string CustomerCode { get; protected set; } = string.Empty;
     public string? FirstName { get; protected set; }

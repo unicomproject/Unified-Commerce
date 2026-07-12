@@ -28,30 +28,109 @@ public sealed class CheckoutSessionLineConfiguration : IEntityTypeConfiguration<
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
+
         builder.Property(x => x.CheckoutSessionId)
             .HasColumnName("checkout_session_id")
-            .IsRequired(false);
+            .IsRequired();
 
         builder.Property(x => x.LineNumber)
             .HasColumnName("line_number")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80);
+            .IsRequired();
+
+        builder.Property(x => x.ProductId)
+            .HasColumnName("product_id")
+            .IsRequired();
+
+        builder.Property(x => x.ProductVariantId)
+            .HasColumnName("product_variant_id");
+
+        builder.Property(x => x.SkuSnapshot)
+            .HasColumnName("sku_snapshot")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100);
+
+        builder.Property(x => x.ProductNameSnapshot)
+            .HasColumnName("product_name_snapshot")
+            .HasColumnType("varchar(200)")
+            .HasMaxLength(200)
+            .IsRequired();
 
         builder.Property(x => x.Quantity)
             .HasColumnName("quantity")
-            .HasPrecision(18, 4);
+            .HasColumnType("numeric(18,4)")
+            .IsRequired();
+
+        builder.Property(x => x.UnitPrice)
+            .HasColumnName("unit_price")
+            .HasColumnType("numeric(18,4)")
+            .IsRequired();
+
+        builder.Property(x => x.LineSubtotalAmount)
+            .HasColumnName("line_subtotal_amount")
+            .HasColumnType("numeric(18,4)")
+            .IsRequired();
+
+        builder.Property(x => x.LineDiscountAmount)
+            .HasColumnName("line_discount_amount")
+            .HasColumnType("numeric(18,4)")
+            .IsRequired();
+
+        builder.Property(x => x.LineTaxAmount)
+            .HasColumnName("line_tax_amount")
+            .HasColumnType("numeric(18,4)")
+            .IsRequired();
+
+        builder.Property(x => x.LineTotalAmount)
+            .HasColumnName("line_total_amount")
+            .HasColumnType("numeric(18,4)")
+            .IsRequired();
+
+        builder.Property(x => x.LineStatus)
+            .HasColumnName("line_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired();
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_checkout_session_lines_tenant_id_tenants");
 
         builder.HasOne<CheckoutSession>()
             .WithMany()
             .HasForeignKey(x => x.CheckoutSessionId)
-            .OnDelete(DeleteBehavior.Restrict)
+            .OnDelete(DeleteBehavior.Cascade)
             .HasConstraintName("fk_checkout_session_lines_checkout_session_id_checkout_sessions");
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product>()
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_checkout_session_lines_product_id_products");
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant>()
+            .WithMany()
+            .HasForeignKey(x => x.ProductVariantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_checkout_session_lines_product_variant_id_product_variants");
 
         builder.HasIndex(x => new { x.CheckoutSessionId, x.LineNumber })
             .IsUnique()
             .HasDatabaseName("uq_checkout_session_lines_checkout_session_id_line_number");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_checkout_session_lines_quantity", "quantity > 0")); 
+        builder.ToTable(t => {
+            t.HasCheckConstraint("ck_checkout_session_lines_line_number", "line_number > 0");
+            t.HasCheckConstraint("ck_checkout_session_lines_quantity", "quantity > 0");
+            t.HasCheckConstraint("ck_checkout_session_lines_unit_price", "unit_price >= 0");
+            t.HasCheckConstraint("ck_checkout_session_lines_line_subtotal_amount", "line_subtotal_amount >= 0");
+            t.HasCheckConstraint("ck_checkout_session_lines_line_discount_amount", "line_discount_amount >= 0");
+            t.HasCheckConstraint("ck_checkout_session_lines_line_tax_amount", "line_tax_amount >= 0");
+            t.HasCheckConstraint("ck_checkout_session_lines_line_total_amount", "line_total_amount >= 0");
+        });
     }
 }
 

@@ -9,10 +9,10 @@ public class StorefrontBanner : AuditableEntity
     
     public string BannerType { get; private set; } = string.Empty;
     public string Title { get; private set; } = string.Empty;
-    public string Subtitle { get; private set; } = string.Empty;
+    public string? Subtitle { get; private set; }
     public string ImageUrl { get; private set; } = string.Empty;
-    public string ActionText { get; private set; } = string.Empty;
-    public string ActionUrl { get; private set; } = string.Empty;
+    public string? ActionText { get; private set; }
+    public string? ActionUrl { get; private set; }
     public int SortOrder { get; private set; }
     public string Status { get; private set; } = string.Empty;
 
@@ -23,10 +23,10 @@ public class StorefrontBanner : AuditableEntity
         Guid? salesChannelId,
         string bannerType,
         string title,
-        string subtitle,
+        string? subtitle,
         string imageUrl,
-        string actionText,
-        string actionUrl,
+        string? actionText,
+        string? actionUrl,
         int sortOrder,
         string status)
     {
