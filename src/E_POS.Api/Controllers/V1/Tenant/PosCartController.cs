@@ -9,43 +9,39 @@ namespace E_POS.Api.Controllers;
 
 [ApiController]
 [Authorize(Policy = "TenantOnly")]
-[Route("api/v1/pos")]
-public sealed class PosHomeController : ControllerBase
+[Route("api/v1/pos/cart")]
+public sealed class PosCartController : ControllerBase
 {
-    private readonly IPosHomeDashboardService _posHomeDashboardService;
+    private readonly IPosCheckoutService _posCheckoutService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
-    public PosHomeController(
-        IPosHomeDashboardService posHomeDashboardService,
+    public PosCartController(
+        IPosCheckoutService posCheckoutService,
         ITenantRequestContextFactory tenantRequestContextFactory)
     {
-        _posHomeDashboardService = posHomeDashboardService;
+        _posCheckoutService = posCheckoutService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }
 
-    [HttpGet("home")]
-    [ProducesResponseType(typeof(PosHomeDashboardResponseDto), StatusCodes.Status200OK)]
+    [HttpPost("calculate")]
+    [ProducesResponseType(typeof(PosCheckoutSummaryResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetPosHome(
-        [FromQuery] Guid? outletId,
-        [FromQuery] Guid? tillId,
-        [FromQuery] Guid? deviceId,
-        [FromQuery] string? deviceFingerprint,
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Calculate(
+        [FromBody] PosCheckoutSummaryRequestDto request,
         CancellationToken cancellationToken)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))
         {
             return Unauthorized(CreateError(
-                new ApplicationError("pos_home.invalid_tenant_context", "Invalid tenant context.")));
+                new ApplicationError("pos_cart.invalid_tenant_context", "Invalid tenant context.")));
         }
 
-        var result = await _posHomeDashboardService.GetPosHomeAsync(
+        var result = await _posCheckoutService.CalculateCartAsync(
             context,
-            outletId,
-            tillId,
-            deviceId,
-            deviceFingerprint,
+            request,
             cancellationToken);
 
         if (!result.IsSuccess || result.Value is null)
@@ -56,18 +52,19 @@ public sealed class PosHomeController : ControllerBase
         return Ok(new { data = result.Value });
     }
 
-    private IActionResult ToErrorResult(ApplicationError error)
-    {
-        return error.Code switch
+    private IActionResult ToErrorResult(ApplicationError error) =>
+        error.Code switch
         {
-            "pos_home_dashboard.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+            "pos_cart.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+            "pos_checkout.device_not_found" or
+            "pos_checkout.customer_not_found" or
+            "pos_checkout.variant_not_found" => NotFound(CreateError(error)),
+            "pos_cart.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
         };
-    }
 
-    private object CreateError(ApplicationError error)
-    {
-        return new
+    private object CreateError(ApplicationError error) =>
+        new
         {
             code = error.Code,
             message = error.Message,
@@ -75,5 +72,4 @@ public sealed class PosHomeController : ControllerBase
             traceId = HttpContext.TraceIdentifier,
             timestamp = DateTimeOffset.UtcNow
         };
-    }
 }

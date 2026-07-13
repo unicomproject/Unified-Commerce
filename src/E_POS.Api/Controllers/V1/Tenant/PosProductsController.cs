@@ -85,12 +85,44 @@ public sealed class PosProductsController : ControllerBase
         return Ok(new { data = result.Value ?? Array.Empty<PosCatalogCategoryResponseDto>() });
     }
 
+    [HttpGet("products/{productId:guid}")]
+    [ProducesResponseType(typeof(PosProductDetailResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProductDetail(
+        Guid productId,
+        [FromQuery] Guid? deviceId,
+        CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(
+                new ApplicationError("pos_products.invalid_tenant_context", "Invalid tenant context.")));
+        }
+
+        var result = await _posProductCatalogService.GetProductDetailAsync(
+            context,
+            deviceId,
+            productId,
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return ToErrorResult(result.Error);
+        }
+
+        return Ok(new { data = result.Value });
+    }
+
     private IActionResult ToErrorResult(ApplicationError error)
     {
         return error.Code switch
         {
             "pos_products.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "pos_products.device_not_found" => NotFound(CreateError(error)),
+            "pos_products.product_not_found" => NotFound(CreateError(error)),
             "pos_products.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
         };
