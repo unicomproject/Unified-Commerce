@@ -26,10 +26,12 @@ public sealed class OutletBusinessHourConfiguration : IEntityTypeConfiguration<O
         builder.Ignore(x => x.UpdatedBy);
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_outlet_business_hours_tenant_id_tenants");
         builder.HasOne<Outlet>().WithMany().HasForeignKey(x => x.OutletId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_outlet_business_hours_outlet_id_outlets");
+        builder.HasIndex(x => new { x.OutletId, x.DayOfWeek }).IsUnique().HasDatabaseName("uq_outlet_business_hours_outlet_id_day_of_week");
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_outlet_business_hours_day_of_week", "day_of_week BETWEEN 0 AND 6");
             t.HasCheckConstraint("ck_outlet_business_hours_validity", "valid_until IS NULL OR valid_from IS NULL OR valid_until >= valid_from");
+            t.HasCheckConstraint("ck_outlet_business_hours_open_close", "is_closed = true OR (opening_time IS NOT NULL AND closing_time IS NOT NULL AND opening_time < closing_time)");
         });
     }
 }

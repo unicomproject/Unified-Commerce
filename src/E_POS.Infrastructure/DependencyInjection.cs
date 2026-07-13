@@ -17,7 +17,12 @@ using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
+using E_POS.Application.Modules.Tenant.Inventory.Contracts;
+using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
@@ -77,10 +82,13 @@ public static class DependencyInjection
         services.AddScoped<IBrandRepository, BrandRepository>();
         services.AddScoped<ICollectionRepository, CollectionRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
+        services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
         services.AddScoped<IReturnPolicyTemplateRepository, ReturnPolicyTemplateRepository>();
         services.AddScoped<IReturnPolicyRepository, ReturnPolicyRepository>();
         services.AddScoped<ICodeSequenceRepository, CodeSequenceRepository>();
         services.AddScoped<IOutletRepository, OutletRepository>();
+        services.AddScoped<IOutletAuditLogger, OutletAuditLogger>();
         services.AddScoped<ITenantAdminOutletRepository, TenantAdminOutletRepository>();
         services.AddScoped<ITenantAdminTillRepository, TenantAdminTillRepository>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
@@ -93,6 +101,8 @@ public static class DependencyInjection
         services.AddScoped<IProductTaxAssignmentRepository, ProductTaxAssignmentRepository>();
         services.AddScoped<ITenantLookupRepository, TenantLookupRepository>();
         services.AddScoped<IPosHomeDashboardRepository, PosHomeDashboardRepository>();
+        services.AddScoped<ITenantAdminInventoryRepository, TenantAdminInventoryRepository>();
+        services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
