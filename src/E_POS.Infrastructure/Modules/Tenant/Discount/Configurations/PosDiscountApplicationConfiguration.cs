@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.Customer.Entities;
+using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.Discount.Entities;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
