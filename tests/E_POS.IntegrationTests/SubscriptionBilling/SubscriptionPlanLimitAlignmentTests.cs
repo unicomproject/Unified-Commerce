@@ -107,7 +107,7 @@ public sealed class SubscriptionPlanLimitAlignmentTests
 
         var plan = await repository.GetPlanByIdAsync(
             planId,
-            new SubscriptionPlanPermissionFlags(true, true, true, true, true),
+            new SubscriptionPlanPermissionFlags(true, true, true, true, true, true),
             CancellationToken.None);
 
         Assert.NotNull(plan);

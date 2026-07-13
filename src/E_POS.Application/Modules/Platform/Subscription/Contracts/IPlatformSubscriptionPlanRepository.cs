@@ -21,6 +21,11 @@ public interface IPlatformSubscriptionPlanRepository
         SubscriptionPlanPermissionFlags permissionFlags,
         CancellationToken cancellationToken);
 
+    Task<SubscriptionPlanDetailResponse?> GetPlanDetailByIdAsync(
+        Guid planId,
+        SubscriptionPlanPermissionFlags permissionFlags,
+        CancellationToken cancellationToken);
+
     Task AddPlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);
@@ -48,6 +53,20 @@ public interface IPlatformSubscriptionPlanRepository
     Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
         Guid planId,
         CancellationToken cancellationToken);
+
+    Task<int> CountPlanAssignmentsAsync(Guid planId, CancellationToken cancellationToken);
+
+    Task<string?> GetPlanCodeByIdAsync(Guid planId, CancellationToken cancellationToken);
+
+    Task<bool> PlanCodeExistsAsync(string planCode, Guid excludingPlanId, CancellationToken cancellationToken);
+
+    Task RemovePlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken);
+
+    Task CopyPlanConfigurationAsync(
+        Guid sourcePlanId,
+        Guid targetPlanId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }
 
 public sealed record SubscriptionPlanPermissionFlags(
@@ -55,6 +74,7 @@ public sealed record SubscriptionPlanPermissionFlags(
     bool CanEdit,
     bool CanDuplicate,
     bool CanArchive,
-    bool CanDelete);
+    bool CanDelete,
+    bool CanReactivate);
 
 
