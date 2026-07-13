@@ -40,18 +40,18 @@ public sealed class PlatformAuditLogRepository : IPlatformAuditLogRepository
 
         if (query.From is not null)
         {
-            filteredAudits = filteredAudits.Where(x => x.audit.CreatedAt >= query.From);
+            filteredAudits = filteredAudits.Where(x => x.audit.AttemptedAt >= query.From);
         }
 
         if (query.To is not null)
         {
-            filteredAudits = filteredAudits.Where(x => x.audit.CreatedAt <= query.To);
+            filteredAudits = filteredAudits.Where(x => x.audit.AttemptedAt <= query.To);
         }
 
         var loginResultFilter = PlatformAuditLogMapper.ResolveLoginResultFilter(query.Action);
         if (loginResultFilter is not null)
         {
-            filteredAudits = filteredAudits.Where(x => x.audit.LoginResult == loginResultFilter);
+            filteredAudits = filteredAudits.Where(x => x.audit.LoginStatus == loginResultFilter);
         }
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -62,29 +62,29 @@ public sealed class PlatformAuditLogRepository : IPlatformAuditLogRepository
             if (mappedLoginResult is not null)
             {
                 filteredAudits = filteredAudits.Where(x =>
-                    x.audit.LoginResult == mappedLoginResult ||
+                    x.audit.LoginStatus == mappedLoginResult ||
                     (x.Email != null && x.Email.Contains(term)));
             }
             else
             {
                 filteredAudits = filteredAudits.Where(x =>
                     (x.Email != null && x.Email.Contains(term)) ||
-                    x.audit.LoginResult.Contains(term));
+                    (x.audit.LoginStatus != null && x.audit.LoginStatus.Contains(term)));
             }
         }
 
         var totalCount = await filteredAudits.CountAsync(cancellationToken);
         var pageRows = await filteredAudits
-            .OrderByDescending(x => x.audit.CreatedAt)
+            .OrderByDescending(x => x.audit.AttemptedAt)
             .ThenByDescending(x => x.audit.Id)
             .Skip((query.PageNumber - 1) * query.PageSize)
             .Take(query.PageSize)
             .Select(x => new LoginAuditRow(
                 x.audit.Id,
-                x.audit.CreatedAt,
+                x.audit.AttemptedAt!.Value,
                 x.audit.PlatformUserId,
                 x.Email,
-                x.audit.LoginResult))
+                x.audit.LoginStatus!))
             .ToListAsync(cancellationToken);
 
         var items = pageRows
@@ -93,7 +93,7 @@ public sealed class PlatformAuditLogRepository : IPlatformAuditLogRepository
                 row.OccurredAt,
                 row.PlatformUserId,
                 row.Email,
-                row.LoginResult))
+                row.LoginStatus))
             .ToList();
 
         return new PlatformAuditLogListResponse(
@@ -133,7 +133,5 @@ public sealed class PlatformAuditLogRepository : IPlatformAuditLogRepository
         DateTimeOffset OccurredAt,
         Guid? PlatformUserId,
         string? Email,
-        string LoginResult);
+        string LoginStatus);
 }
-
-

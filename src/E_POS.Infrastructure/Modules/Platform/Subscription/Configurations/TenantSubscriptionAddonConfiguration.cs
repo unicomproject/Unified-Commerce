@@ -1,4 +1,5 @@
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -47,9 +48,44 @@ public sealed class TenantSubscriptionAddonConfiguration : IEntityTypeConfigurat
             .HasColumnName("tenant_subscription_id")
             .IsRequired();
 
+        builder.Property(x => x.AddonId)
+            .HasColumnName("addon_id")
+            .IsRequired();
+
+        builder.Property(x => x.SubscriptionId)
+            .HasColumnName("subscription_id")
+            .IsRequired();
+
         builder.Property(x => x.Quantity)
             .HasColumnName("quantity")
             .HasDefaultValue(1);
+
+        builder.Property(x => x.UnitPrice)
+            .HasColumnName("unit_price")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.CurrencyCode)
+            .HasColumnName("currency_code")
+            .HasColumnType("char(3)")
+            .HasMaxLength(3);
+
+        builder.Property(x => x.AutoRenew)
+            .HasColumnName("auto_renew")
+            .HasDefaultValue(true);
+
+        builder.Property(x => x.StartsAt)
+            .HasColumnName("starts_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.EndsAt)
+            .HasColumnName("ends_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id");
+
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id");
 
         builder.HasOne<TenantSubscription>()
             .WithMany()
@@ -63,9 +99,24 @@ public sealed class TenantSubscriptionAddonConfiguration : IEntityTypeConfigurat
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_tenant_subscription_addons_subscription_addon_id_subscription_addons");
 
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_tenant_subscription_addons_created_by_platform_user_id_platform_users");
+
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_tenant_subscription_addons_updated_by_platform_user_id_platform_users");
+
         builder.HasIndex(x => new { x.TenantSubscriptionId, x.SubscriptionAddonId })
             .IsUnique()
             .HasDatabaseName("uq_tenant_subscription_addons_tenant_subscription_id_subscription_addon_id");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_subscription_addons_quantity", "quantity > 0"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_subscription_addons_unit_price", "unit_price >= 0"));
     }
 }
 

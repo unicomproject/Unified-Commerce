@@ -22,7 +22,7 @@ public sealed class PlatformSubscriptionPlanServiceTests
         var service = CreateService(
             new FakePlatformSubscriptionPlanRepository
             {
-                ListResponse = new SubscriptionPlanListResponse([], 1, 10, 0, 0, true, true, true, true, true)
+                ListResponse = new SubscriptionPlanListResponse([], 1, 10, 0, 0, true, true, true, true, true, true)
             },
             hasView: true);
 
@@ -210,6 +210,131 @@ public sealed class PlatformSubscriptionPlanServiceTests
         Assert.Equal("platform_subscription_plans.validation_failed", result.Error.Code);
     }
 
+    [Fact]
+    public async Task ArchiveAsync_ForActivePlan_ArchivesPlan()
+    {
+        var planId = Guid.NewGuid();
+        var repository = new FakePlatformSubscriptionPlanRepository
+        {
+            PlanEntity = SubscriptionPlan.Create(
+                planId,
+                "PLAN_A",
+                "Plan A",
+                SubscriptionPlanConstants.Status.Active,
+                SubscriptionPlanConstants.BillingInterval.Monthly,
+                10m,
+                Now),
+            MutationResponse = new SubscriptionPlanMutationResponse(
+                planId,
+                "PLAN_A",
+                "Plan A",
+                SubscriptionPlanConstants.Status.Retired,
+                "monthly",
+                "LKR",
+                10m,
+                null,
+                null,
+                null,
+                0,
+                Now)
+        };
+
+        var service = CreateService(repository, hasEdit: true);
+
+        var result = await service.ArchiveAsync(planId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SubscriptionPlanConstants.Status.Retired, result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task ReactivateAsync_ForRetiredPlan_ReactivatesPlan()
+    {
+        var planId = Guid.NewGuid();
+        var repository = new FakePlatformSubscriptionPlanRepository
+        {
+            PlanEntity = SubscriptionPlan.Create(
+                planId,
+                "PLAN_R",
+                "Plan R",
+                SubscriptionPlanConstants.Status.Retired,
+                SubscriptionPlanConstants.BillingInterval.Monthly,
+                10m,
+                Now),
+            MutationResponse = new SubscriptionPlanMutationResponse(
+                planId,
+                "PLAN_R",
+                "Plan R",
+                SubscriptionPlanConstants.Status.Active,
+                "monthly",
+                "LKR",
+                10m,
+                null,
+                null,
+                null,
+                0,
+                Now)
+        };
+
+        var service = CreateService(repository, hasEdit: true);
+        var result = await service.ReactivateAsync(planId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SubscriptionPlanConstants.Status.Active, result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task DeleteDraftAsync_WithAssignments_ReturnsInUse()
+    {
+        var planId = Guid.NewGuid();
+        var repository = new FakePlatformSubscriptionPlanRepository
+        {
+            PlanEntity = SubscriptionPlan.Create(
+                planId,
+                "PLAN_D",
+                "Plan D",
+                SubscriptionPlanConstants.Status.Draft,
+                SubscriptionPlanConstants.BillingInterval.Monthly,
+                10m,
+                Now),
+            PlanAssignments = 2
+        };
+
+        var service = CreateService(repository, hasEdit: true);
+        var result = await service.DeleteDraftAsync(planId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_subscription_plans.in_use", result.Error.Code);
+        Assert.False(repository.RemoveCalled);
+    }
+
+    [Fact]
+    public async Task DuplicateAsync_CopiesFeaturesAndLimitsToNewDraft()
+    {
+        var sourceId = Guid.NewGuid();
+        var repository = new FakePlatformSubscriptionPlanRepository
+        {
+            PlanEntity = SubscriptionPlan.Create(
+                sourceId,
+                "PLAN_SOURCE",
+                "Source Plan",
+                SubscriptionPlanConstants.Status.Active,
+                SubscriptionPlanConstants.BillingInterval.Monthly,
+                10m,
+                Now),
+            MutationResponse = new SubscriptionPlanMutationResponse(
+                Guid.NewGuid(), "PLAN_SOURCE_COPY", "Source Plan Copy",
+                SubscriptionPlanConstants.Status.Draft, "monthly", "LKR", 10m,
+                null, null, null, 1, Now)
+        };
+        var service = CreateService(repository, hasEdit: true);
+
+        var result = await service.DuplicateAsync(sourceId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(repository.CopyConfigurationCalled);
+    }
+
     private static PlatformSubscriptionPlanService CreateService(
         FakePlatformSubscriptionPlanRepository repository,
         bool hasView = false,
@@ -251,6 +376,9 @@ public sealed class PlatformSubscriptionPlanServiceTests
                 _ when permissionCode == PlatformPermissionCodes.SubscriptionPlansView => _hasView,
                 _ when permissionCode == PlatformPermissionCodes.SubscriptionPlansCreate => _hasCreate,
                 _ when permissionCode == PlatformPermissionCodes.SubscriptionPlansEdit => _hasEdit,
+                _ when permissionCode == PlatformPermissionCodes.SubscriptionPlansDuplicate => _hasEdit,
+                _ when permissionCode == PlatformPermissionCodes.SubscriptionPlansArchive => _hasEdit,
+                _ when permissionCode == PlatformPermissionCodes.SubscriptionPlansDelete => _hasEdit,
                 _ => false
             };
 
@@ -300,15 +428,19 @@ public sealed class PlatformSubscriptionPlanServiceTests
 
     private sealed class FakePlatformSubscriptionPlanRepository : IPlatformSubscriptionPlanRepository
     {
-        public SubscriptionPlanListResponse ListResponse { get; init; } = new([], 1, 10, 0, 0, false, false, false, false, false);
+        public SubscriptionPlanListResponse ListResponse { get; init; } = new([], 1, 10, 0, 0, false, false, false, false, false, false);
         public SubscriptionPlanCatalogResponse CatalogResponse { get; init; } = new([]);
         public SubscriptionPlan? PlanEntity { get; init; }
         public SubscriptionPlanMutationResponse? MutationResponse { get; init; }
+        public SubscriptionPlanDetailResponse? DetailResponse { get; init; }
         public bool PlanCodeExists { get; init; }
         public IReadOnlySet<Guid> ActiveFeatureIds { get; init; } = new HashSet<Guid>();
         public bool AddCalled { get; private set; }
         public bool SaveCalled { get; private set; }
         public bool ReplaceFeaturesCalled { get; private set; }
+        public bool RemoveCalled { get; private set; }
+        public bool CopyConfigurationCalled { get; private set; }
+        public int PlanAssignments { get; init; }
         private SubscriptionPlan? _addedPlan;
 
         public Task<SubscriptionPlanListResponse> GetPlansAsync(
@@ -325,6 +457,11 @@ public sealed class PlatformSubscriptionPlanServiceTests
         }
 
         public Task<bool> PlanCodeExistsAsync(string planCode, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PlanCodeExists);
+        }
+
+        public Task<bool> PlanCodeExistsAsync(string planCode, Guid excludingPlanId, CancellationToken cancellationToken)
         {
             return Task.FromResult(PlanCodeExists);
         }
@@ -383,6 +520,14 @@ public sealed class PlatformSubscriptionPlanServiceTests
                     PlanEntity.UpdatedAt ?? Now));
         }
 
+        public Task<SubscriptionPlanDetailResponse?> GetPlanDetailByIdAsync(
+            Guid planId,
+            SubscriptionPlanPermissionFlags permissionFlags,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(DetailResponse);
+        }
+
         public Task AddPlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken)
         {
             AddCalled = true;
@@ -422,6 +567,50 @@ public sealed class PlatformSubscriptionPlanServiceTests
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken)
         {
             return Task.FromResult(0);
+        }
+
+        public Task UpsertLegacyPlanLimitsAsync(
+            Guid planId,
+            int? maxOutlets,
+            int? maxUsers,
+            int? maxTills,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+            Guid planId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyDictionary<string, decimal?>>(new Dictionary<string, decimal?>());
+        }
+
+        public Task<int> CountPlanAssignmentsAsync(Guid planId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PlanAssignments);
+        }
+
+        public Task<string?> GetPlanCodeByIdAsync(Guid planId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<string?>(PlanEntity?.PlanCode ?? _addedPlan?.PlanCode);
+        }
+
+        public Task RemovePlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken)
+        {
+            RemoveCalled = true;
+            return Task.CompletedTask;
+        }
+
+        public Task CopyPlanConfigurationAsync(
+            Guid sourcePlanId,
+            Guid targetPlanId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            CopyConfigurationCalled = true;
+            return Task.CompletedTask;
         }
     }
 }

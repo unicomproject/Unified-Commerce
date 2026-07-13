@@ -29,6 +29,7 @@ public interface IPlatformRoleRepository
         Guid roleId,
         IReadOnlyList<Guid> permissionIds,
         DateTimeOffset now,
+        Guid? actorPlatformUserId,
         CancellationToken cancellationToken);
 }
 

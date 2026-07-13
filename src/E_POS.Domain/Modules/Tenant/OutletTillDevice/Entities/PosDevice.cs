@@ -72,4 +72,28 @@ public class PosDevice : AuditableEntity
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
+
+    public void PairForActivation(
+        string deviceName,
+        string deviceType,
+        string? platform,
+        string? appVersion,
+        string deviceFingerprintHash,
+        Guid pairedByTenantUserId,
+        DateTimeOffset now)
+    {
+        DeviceName = deviceName.Trim();
+        DeviceType = PosDeviceConstants.NormalizeDeviceType(deviceType);
+        Platform = string.IsNullOrWhiteSpace(platform) ? null : platform.Trim();
+        AppVersion = string.IsNullOrWhiteSpace(appVersion) ? null : appVersion.Trim();
+        DeviceFingerprintHash = deviceFingerprintHash;
+        IsTrusted = true;
+        PairedAt = now;
+        PairedByTenantUserId = pairedByTenantUserId;
+        UnpairedAt = null;
+        UnpairedByTenantUserId = null;
+        LastSeenAt = now;
+        UpdatedByTenantUserId = pairedByTenantUserId;
+        UpdatedAt = now;
+    }
 }

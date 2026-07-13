@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using E_POS.Api.Common.Auth;
 using E_POS.Api.Common.Cookies;
 using E_POS.Api.Extensions;
 using E_POS.Application.Common.Models;
@@ -34,7 +35,10 @@ public sealed class PlatformAuthController : ControllerBase
         [FromBody] PlatformAdminLoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _platformAuthService.LoginAsync(request, cancellationToken);
+        var result = await _platformAuthService.LoginAsync(
+            request,
+            cancellationToken,
+            PlatformAuthClientContextFactory.FromHttpContext(HttpContext));
 
         if (result.IsSuccess && result.Value is not null)
         {
@@ -64,7 +68,8 @@ public sealed class PlatformAuthController : ControllerBase
     {
         var result = await _platformAuthService.RefreshAsync(
             Request.Cookies[PlatformAuthCookieHelper.RefreshTokenCookieName] ?? string.Empty,
-            cancellationToken);
+            cancellationToken,
+            PlatformAuthClientContextFactory.FromHttpContext(HttpContext));
 
         if (result.IsSuccess && result.Value is not null)
         {

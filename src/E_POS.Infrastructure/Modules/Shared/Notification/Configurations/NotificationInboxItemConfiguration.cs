@@ -126,7 +126,7 @@ public sealed class NotificationInboxItemConfiguration : IEntityTypeConfiguratio
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_notification_inbox_items_f47d7f24");
 
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>()
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>()
             .WithMany()
             .HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Restrict)

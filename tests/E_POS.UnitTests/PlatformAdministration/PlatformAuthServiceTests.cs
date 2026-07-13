@@ -38,6 +38,7 @@ public sealed class PlatformAuthServiceTests
         Assert.NotNull(repository.SavedSession);
         Assert.NotNull(repository.SavedRefreshToken);
         Assert.NotNull(repository.SavedAudit);
+        Assert.Equal(PlatformAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginStatus);
         Assert.Equal(PlatformAuthConstants.SuccessLoginResult, repository.SavedAudit!.LoginResult);
         Assert.Equal("hash:" + jwtFactory.JwtId, repository.SavedSession!.SessionTokenHash);
         Assert.Equal("hash:refresh-token", repository.SavedRefreshToken!.TokenHash);
@@ -56,6 +57,7 @@ public sealed class PlatformAuthServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("platform_auth.invalid_credentials", result.Error.Code);
         Assert.NotNull(repository.SavedAudit);
+        Assert.Equal(PlatformAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginStatus);
         Assert.Equal(PlatformAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginResult);
         Assert.Null(repository.SavedSession);
         Assert.Null(repository.SavedRefreshToken);
@@ -73,6 +75,7 @@ public sealed class PlatformAuthServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal("platform_auth.platform_access_denied", result.Error.Code);
         Assert.NotNull(repository.SavedAudit);
+        Assert.Equal(PlatformAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginStatus);
         Assert.Equal(PlatformAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginResult);
     }
 
@@ -185,7 +188,9 @@ public sealed class PlatformAuthServiceTests
             Guid platformUserId,
             Guid sessionId,
             DateTimeOffset now,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Guid? revokedByPlatformUserId = null,
+            string? revokeReason = null)
         {
             RevokedPlatformUserId = platformUserId;
             RevokedSessionId = sessionId;

@@ -73,4 +73,3 @@ public class TillSession : AuditableEntity
         UpdatedAt = now;
     }
 }
-

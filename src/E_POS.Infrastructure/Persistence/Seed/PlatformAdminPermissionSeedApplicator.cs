@@ -41,7 +41,8 @@ public static class PlatformAdminPermissionSeedApplicator
                 "Super Administrator",
                 "Full TM-EPOS platform administration access.",
                 PlatformAuthConstants.ActiveStatus,
-                now);
+                now,
+                isSystemRole: true);
 
             dbContext.PlatformRoles.Add(superAdminRole);
         }
@@ -57,7 +58,9 @@ public static class PlatformAdminPermissionSeedApplicator
         {
             var rolePermissionId = Guid.Parse($"67000000-0000-0000-0000-{rolePermissionIndex:D12}");
             var exists = await dbContext.PlatformRolePermissions.AnyAsync(
-                x => x.PlatformRoleId == superAdminRole.Id && x.PlatformPermissionId == permission.Id,
+                x => x.PlatformRoleId == superAdminRole.Id &&
+                     x.PlatformPermissionId == permission.Id &&
+                     x.RevokedAt == null,
                 cancellationToken);
 
             if (!exists)
@@ -79,7 +82,9 @@ public static class PlatformAdminPermissionSeedApplicator
         if (platformUser is not null)
         {
             var userRoleExists = await dbContext.PlatformUserRoles.AnyAsync(
-                x => x.PlatformUserId == platformUser.Id && x.PlatformRoleId == superAdminRole.Id,
+                x => x.PlatformUserId == platformUser.Id &&
+                     x.PlatformRoleId == superAdminRole.Id &&
+                     x.RevokedAt == null,
                 cancellationToken);
 
             if (!userRoleExists)

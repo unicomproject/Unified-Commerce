@@ -28,6 +28,7 @@ public interface IPlatformUserRepository
         Guid userId,
         IReadOnlyList<Guid> roleIds,
         DateTimeOffset now,
+        Guid? actorPlatformUserId,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<ResolvedPlatformRole>> ResolveActiveRolesAsync(

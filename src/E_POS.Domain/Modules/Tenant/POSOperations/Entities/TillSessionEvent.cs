@@ -18,5 +18,32 @@ public class TillSessionEvent : AuditableEntity
     public Guid? PosDeviceId { get; protected set; }
     public IPAddress? IpAddress { get; protected set; }
     public string? Notes { get; protected set; }
+
+    public static TillSessionEvent RecordClosed(
+        Guid id,
+        Guid tenantId,
+        Guid tillSessionId,
+        Guid eventByTenantUserId,
+        Guid posDeviceId,
+        decimal countedCash,
+        string currencyCode,
+        string? notes,
+        DateTimeOffset now)
+    {
+        return new TillSessionEvent
+        {
+            Id = id,
+            TenantId = tenantId,
+            TillSessionId = tillSessionId,
+            EventType = "CLOSED",
+            EventAt = now,
+            EventByTenantUserId = eventByTenantUserId,
+            Amount = countedCash,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            PosDeviceId = posDeviceId,
+            Notes = notes?.Trim(),
+            CreatedAt = now,
+        };
+    }
 }
 

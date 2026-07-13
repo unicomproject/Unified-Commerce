@@ -97,6 +97,12 @@ public sealed class PickupSlotReservationConfiguration : IEntityTypeConfiguratio
             .HasForeignKey(x => x.SalesOrderId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_pickup_slot_reservations_7b279b41");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_pickup_slot_reservations_reserved_capacity", "reserved_capacity > 0");
+            t.HasCheckConstraint("ck_pickup_slot_reservations_session_or_order", "checkout_session_id IS NOT NULL OR sales_order_id IS NOT NULL");
+            t.HasCheckConstraint("ck_pickup_slot_reservations_status", "reservation_status IN ('PENDING', 'CONFIRMED', 'RELEASED', 'EXPIRED', 'CANCELLED')");
+        });
         // </second-brain-constraints>
     }
 }

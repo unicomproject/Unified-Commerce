@@ -52,7 +52,7 @@ public sealed class AuthSessionValidator : IAuthSessionValidator
                 on session.PlatformUserId equals user.Id
             where session.Id == sessionId &&
                   session.PlatformUserId == platformUserId &&
-                  session.Status == PlatformAuthConstants.ActiveTokenStatus &&
+                  session.RevokedAt == null &&
                   user.Status == PlatformAuthConstants.ActiveStatus
             select session.Id)
             .AnyAsync(cancellationToken);

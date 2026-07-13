@@ -69,12 +69,13 @@ public sealed class PlatformTenantLifecycleRepositoryTests
     }
 
     [Fact]
-    public async Task ReplaceTenantEntitlementsAsync_ReplacesEnabledFeatures()
+    public async Task ReplaceTenantEntitlementsAsync_UsesSoftRevokeAndReEnableWithoutDuplicates()
     {
         await using var dbContext = CreateDbContext();
         var planId = Guid.Parse("77777777-7777-4777-8777-777777777798");
         var onlineStoreFeatureId = Guid.Parse("88888888-8888-4888-8888-888888888801");
         var clickCollectFeatureId = Guid.Parse("88888888-8888-4888-8888-888888888802");
+        var actorId = Guid.Parse("88888888-8888-4888-8888-888888888899");
         await SeedPlanWithFeaturesAsync(
             dbContext,
             planId,
@@ -89,7 +90,7 @@ public sealed class PlatformTenantLifecycleRepositoryTests
             TenantSubscriptionStatusConstants.Active,
             Now));
         dbContext.TenantFeatureEntitlements.Add(TenantFeatureEntitlement.Create(
-            Guid.NewGuid(),
+            Guid.Parse("89999999-9999-4999-8999-999999999901"),
             tenantId,
             onlineStoreFeatureId,
             TenantEntitlementStatusConstants.Enabled,
@@ -101,15 +102,58 @@ public sealed class PlatformTenantLifecycleRepositoryTests
             tenantId,
             [clickCollectFeatureId],
             Now,
+            actorId,
+            "Removed during test",
             CancellationToken.None);
 
-        var entitlements = await dbContext.TenantFeatureEntitlements
+        var firstPassEntitlements = await dbContext.TenantFeatureEntitlements
             .Where(item => item.TenantId == tenantId)
-            .Select(item => item.PlatformFeatureId)
+            .OrderBy(item => item.PlatformFeatureId)
             .ToListAsync();
 
-        Assert.Single(entitlements);
-        Assert.Equal(clickCollectFeatureId, entitlements[0]);
+        Assert.Equal(2, firstPassEntitlements.Count);
+
+        var revokedOnlineStore = Assert.Single(firstPassEntitlements, x => x.PlatformFeatureId == onlineStoreFeatureId);
+        Assert.Equal(TenantEntitlementStatusConstants.Disabled, revokedOnlineStore.EntitlementStatus);
+        Assert.False(revokedOnlineStore.IsEnabled);
+        Assert.Equal(Now, revokedOnlineStore.RevokedAt);
+        Assert.Equal(actorId, revokedOnlineStore.RevokedByPlatformUserId);
+        Assert.Equal("Removed during test", revokedOnlineStore.RevokedReason);
+
+        var newClickCollect = Assert.Single(firstPassEntitlements, x => x.PlatformFeatureId == clickCollectFeatureId);
+        Assert.Equal(TenantEntitlementStatusConstants.Enabled, newClickCollect.EntitlementStatus);
+        Assert.True(newClickCollect.IsEnabled);
+        Assert.Equal("MANUAL", newClickCollect.SourceType);
+        Assert.Equal(clickCollectFeatureId, newClickCollect.FeatureId);
+        Assert.Equal(Now, newClickCollect.EffectiveFrom);
+        Assert.Null(newClickCollect.RevokedAt);
+        Assert.Equal(actorId, newClickCollect.CreatedByPlatformUserId);
+        Assert.Equal(actorId, newClickCollect.UpdatedByPlatformUserId);
+
+        await repository.ReplaceTenantEntitlementsAsync(
+            tenantId,
+            [onlineStoreFeatureId, clickCollectFeatureId],
+            Now.AddMinutes(2),
+            actorId,
+            "Re-enable test",
+            CancellationToken.None);
+
+        var secondPassEntitlements = await dbContext.TenantFeatureEntitlements
+            .Where(item => item.TenantId == tenantId)
+            .ToListAsync();
+
+        Assert.Equal(2, secondPassEntitlements.Count);
+        var reenabledOnlineStore = Assert.Single(secondPassEntitlements, x => x.PlatformFeatureId == onlineStoreFeatureId);
+        Assert.Equal(Guid.Parse("89999999-9999-4999-8999-999999999901"), reenabledOnlineStore.Id);
+        Assert.Equal(TenantEntitlementStatusConstants.Enabled, reenabledOnlineStore.EntitlementStatus);
+        Assert.True(reenabledOnlineStore.IsEnabled);
+        Assert.Null(reenabledOnlineStore.RevokedAt);
+        Assert.Null(reenabledOnlineStore.RevokedByPlatformUserId);
+        Assert.Null(reenabledOnlineStore.RevokedReason);
+        Assert.Equal(onlineStoreFeatureId, reenabledOnlineStore.FeatureId);
+
+        Assert.Single(secondPassEntitlements, x => x.PlatformFeatureId == onlineStoreFeatureId);
+        Assert.Single(secondPassEntitlements, x => x.PlatformFeatureId == clickCollectFeatureId);
     }
 
     private static async Task SeedPlanWithFeatureAsync(

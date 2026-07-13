@@ -20,32 +20,57 @@ public sealed class CheckoutEventConfiguration : IEntityTypeConfiguration<Checko
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
-
-        builder.Ignore(x => x.CreatedBy);
+        builder.Ignore(x => x.UpdatedAt);
         builder.Ignore(x => x.UpdatedBy);
+
+        builder.Property(x => x.CreatedBy)
+            .HasColumnName("created_by_tenant_user_id");
+
+        builder.Property(x => x.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(x => x.CheckoutSessionId)
             .HasColumnName("checkout_session_id")
-            .IsRequired(false);
+            .IsRequired();
 
-        builder.Property(x => x.SequenceNumber)
-            .HasColumnName("sequence_number");
+        builder.Property(x => x.EventType)
+            .HasColumnName("event_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.EventStatus)
+            .HasColumnName("event_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30);
+
+        builder.Property(x => x.EventPayloadJson)
+            .HasColumnName("event_payload_json")
+            .HasColumnType("jsonb");
+
+        builder.Property(x => x.EventAt)
+            .HasColumnName("event_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_checkout_events_tenant_id_tenants");
 
         builder.HasOne<CheckoutSession>()
             .WithMany()
             .HasForeignKey(x => x.CheckoutSessionId)
-            .OnDelete(DeleteBehavior.Restrict)
+            .OnDelete(DeleteBehavior.Cascade)
             .HasConstraintName("fk_checkout_events_checkout_session_id_checkout_sessions");
 
-        builder.HasIndex(x => new { x.CheckoutSessionId, x.SequenceNumber })
-            .IsUnique()
-            .HasDatabaseName("uq_checkout_events_checkout_session_id_sequence_number");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_checkout_events_sequence_number", "sequence_number > 0")); 
+        builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_checkout_events_created_by_tenant_user_id_tenant_users");
     }
 }
 

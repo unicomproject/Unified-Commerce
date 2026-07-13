@@ -48,6 +48,8 @@ public interface IPlatformTenantRepository
         Guid tenantId,
         IReadOnlyList<Guid> enabledFeatureIds,
         DateTimeOffset now,
+        Guid? actorPlatformUserId,
+        string? revokedReason,
         CancellationToken cancellationToken);
 
     Task<IReadOnlySet<Guid>> GetIncludedFeatureIdsForPlanAsync(

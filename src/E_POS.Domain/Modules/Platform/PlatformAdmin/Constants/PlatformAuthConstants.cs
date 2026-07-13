@@ -9,6 +9,7 @@ public static class PlatformAuthConstants
     public const string FailedLoginResult = "FAILED";
     public const string LockedLoginResult = "LOCKED";
     public const string ActiveTokenStatus = "ACTIVE";
+    public const string PendingTokenStatus = "PENDING";
     public const string UsedTokenStatus = "USED";
     public const string ExpiredTokenStatus = "EXPIRED";
     public const string RevokedTokenStatus = "REVOKED";
