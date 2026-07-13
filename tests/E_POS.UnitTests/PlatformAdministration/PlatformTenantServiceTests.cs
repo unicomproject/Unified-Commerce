@@ -393,7 +393,16 @@ public sealed class PlatformTenantServiceTests
         public Task<bool> PlanCodeExistsAsync(string planCode, CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
+        public Task<bool> PlanCodeExistsAsync(string planCode, Guid excludingPlanId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
         public Task<SubscriptionPlanMutationResponse?> GetPlanByIdAsync(
+            Guid planId,
+            SubscriptionPlanPermissionFlags permissionFlags,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<SubscriptionPlanDetailResponse?> GetPlanDetailByIdAsync(
             Guid planId,
             SubscriptionPlanPermissionFlags permissionFlags,
             CancellationToken cancellationToken) =>
@@ -432,6 +441,18 @@ public sealed class PlatformTenantServiceTests
         public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
             Guid planId,
             CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<int> CountPlanAssignmentsAsync(Guid planId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<string?> GetPlanCodeByIdAsync(Guid planId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task RemovePlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task CopyPlanConfigurationAsync(Guid sourcePlanId, Guid targetPlanId, DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotImplementedException();
     }
 }

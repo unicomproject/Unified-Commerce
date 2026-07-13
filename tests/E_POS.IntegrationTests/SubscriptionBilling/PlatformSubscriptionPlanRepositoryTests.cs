@@ -59,7 +59,7 @@ public sealed class PlatformSubscriptionPlanRepositoryTests
 
         var draft = await repository.GetPlanByIdAsync(
             planId,
-            new SubscriptionPlanPermissionFlags(true, true, true, true, true),
+            new SubscriptionPlanPermissionFlags(true, true, true, true, true, true),
             CancellationToken.None);
 
         Assert.NotNull(draft);
@@ -72,10 +72,80 @@ public sealed class PlatformSubscriptionPlanRepositoryTests
 
         var published = await repository.GetPlanByIdAsync(
             planId,
-            new SubscriptionPlanPermissionFlags(true, true, true, true, true),
+            new SubscriptionPlanPermissionFlags(true, true, true, true, true, true),
             CancellationToken.None);
 
         Assert.Equal(SubscriptionPlanConstants.Status.Active, published!.Status);
+    }
+
+    [Fact]
+    public async Task GetPlanDetailByIdAsync_ReturnsConfiguredLimitsAndGroupedFeatures()
+    {
+        await using var dbContext = CreateDbContext();
+        await SubscriptionBillingCatalogSeedApplicator.ApplyAsync(dbContext, Now);
+
+        IPlatformSubscriptionPlanRepository repository = new PlatformSubscriptionPlanRepository(dbContext);
+        var planId = Guid.NewGuid();
+        var plan = SubscriptionPlan.CreateDraft(
+            planId,
+            "DETAIL_TEST",
+            "Detail Test Plan",
+            "Detail endpoint contract.",
+            SubscriptionPlanConstants.BillingInterval.Monthly,
+            SubscriptionPlanConstants.DefaultBaseCurrency,
+            49.99m,
+            2,
+            5,
+            3,
+            Now);
+
+        await repository.AddPlanAsync(plan, CancellationToken.None);
+        await repository.ReplacePlanFeaturesAsync(
+            planId,
+            [SubscriptionBillingCatalogSeedConstants.OnlineStoreFeatureId],
+            Now,
+            CancellationToken.None);
+        var limitDefinitionId = Guid.NewGuid();
+        dbContext.FeatureLimitDefinitions.Add(FeatureLimitDefinition.Create(
+            limitDefinitionId,
+            SubscriptionBillingCatalogSeedConstants.OnlineStoreFeatureId,
+            "MAX_ORDERS",
+            "Maximum orders",
+            100m,
+            Now));
+        dbContext.SubscriptionPlanFeatureLimits.Add(SubscriptionPlanFeatureLimit.Create(
+            Guid.NewGuid(),
+            planId,
+            limitDefinitionId,
+            250m,
+            isUnlimited: false,
+            now: Now));
+        await dbContext.SaveChangesAsync();
+
+        var detail = await repository.GetPlanDetailByIdAsync(
+            planId,
+            new SubscriptionPlanPermissionFlags(true, true, true, true, true, true),
+            CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Equal(Now, detail!.CreatedAt);
+        Assert.Equal("fixed", detail.PricingModel);
+        Assert.Single(detail.Limits);
+        Assert.Equal("Maximum orders", detail.Limits[0].Name);
+        Assert.Single(detail.Modules);
+        Assert.Single(detail.Modules[0].Features);
+        Assert.Equal("online_store", detail.Modules[0].Features[0].Code);
+
+        var copyId = Guid.NewGuid();
+        await repository.AddPlanAsync(SubscriptionPlan.CreateDraft(
+            copyId, "DETAIL_COPY", "Detail Copy", null,
+            SubscriptionPlanConstants.BillingInterval.Monthly,
+            SubscriptionPlanConstants.DefaultBaseCurrency,
+            49.99m, 2, 5, 3, Now), CancellationToken.None);
+        await repository.CopyPlanConfigurationAsync(planId, copyId, Now, CancellationToken.None);
+
+        Assert.Single(await dbContext.SubscriptionPlanFeatures.Where(item => item.SubscriptionPlanId == copyId).ToListAsync());
+        Assert.Single(await dbContext.SubscriptionPlanFeatureLimits.Where(item => item.SubscriptionPlanId == copyId).ToListAsync());
     }
 
     [Fact]
@@ -114,7 +184,7 @@ public sealed class PlatformSubscriptionPlanRepositoryTests
             {
                 Status = SubscriptionPlanConstants.Status.Draft
             },
-            new SubscriptionPlanPermissionFlags(true, true, true, true, true),
+            new SubscriptionPlanPermissionFlags(true, true, true, true, true, true),
             CancellationToken.None);
 
         Assert.Equal(1, response.TotalCount);

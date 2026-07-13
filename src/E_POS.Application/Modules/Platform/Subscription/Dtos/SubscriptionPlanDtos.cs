@@ -43,7 +43,8 @@ public sealed record SubscriptionPlanListResponse(
     bool CanEdit,
     bool CanDuplicate,
     bool CanArchive,
-    bool CanDelete);
+    bool CanDelete,
+    bool CanReactivate);
 
 public sealed record SubscriptionPlanCatalogFeatureDto(
     Guid Id,
@@ -105,6 +106,17 @@ public sealed record UpdateSubscriptionPlanFeaturesRequest
     public IReadOnlyList<Guid>? FeatureIds { get; init; }
 }
 
+public sealed record UpdateSubscriptionPlanRequest
+{
+    public string? PlanCode { get; init; }
+
+    public string? Name { get; init; }
+
+    public string? Description { get; init; }
+
+    public string? BillingCycle { get; init; }
+}
+
 public sealed record SubscriptionPlanMutationResponse(
     Guid Id,
     string PlanCode,
@@ -117,5 +129,52 @@ public sealed record SubscriptionPlanMutationResponse(
     int? MaxUsers,
     int? MaxTills,
     int FeatureCount,
+    DateTimeOffset UpdatedAt);
+
+public sealed record SubscriptionPlanDetailLimitDto(
+    Guid Id,
+    string Code,
+    string Name,
+    decimal? Value,
+    bool IsUnlimited,
+    string? UnitCode);
+
+public sealed record SubscriptionPlanDetailFeatureDto(
+    Guid Id,
+    string Code,
+    string Name,
+    string? Description);
+
+public sealed record SubscriptionPlanDetailModuleDto(
+    Guid Id,
+    string Code,
+    string Name,
+    string? Description,
+    IReadOnlyList<SubscriptionPlanDetailFeatureDto> Features);
+
+public sealed record SubscriptionPlanDetailResponse(
+    Guid Id,
+    string PlanCode,
+    string Name,
+    string? Description,
+    string Status,
+    string BillingCycle,
+    string BaseCurrency,
+    decimal BasePrice,
+    string PricingModel,
+    int TrialDays,
+    int? MaxOutlets,
+    int? MaxUsers,
+    int? MaxTills,
+    int FeatureCount,
+    int ActiveTenantCount,
+    bool CanEdit,
+    bool CanDuplicate,
+    bool CanArchive,
+    bool CanDelete,
+    bool CanReactivate,
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<SubscriptionPlanDetailLimitDto> Limits,
+    IReadOnlyList<SubscriptionPlanDetailModuleDto> Modules,
     DateTimeOffset UpdatedAt);
 
