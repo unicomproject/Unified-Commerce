@@ -825,11 +825,12 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
     private async Task<ResolvedPriceList?> ResolvePriceListAsync(
         Guid tenantId, Guid outletId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var posChannelId = await _dbContext.SalesChannels.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.ChannelType == "POS" && x.Status == ActiveStatus)
-            .OrderBy(x => x.SortOrder)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var posChannelId = await (from sc in _dbContext.SalesChannels.AsNoTracking()
+                                  join psc in _dbContext.PlatformSalesChannels.AsNoTracking() on sc.PlatformSalesChannelId equals psc.Id
+                                  where sc.TenantId == tenantId && psc.ChannelType == "POS" && sc.Status == ActiveStatus
+                                  orderby sc.SortOrder
+                                  select (Guid?)sc.Id)
+                                  .FirstOrDefaultAsync(cancellationToken);
 
         var candidates = await _dbContext.PriceLists.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Status == ActiveStatus &&

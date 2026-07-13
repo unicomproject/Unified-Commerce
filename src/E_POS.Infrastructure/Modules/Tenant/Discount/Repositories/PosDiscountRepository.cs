@@ -436,10 +436,11 @@ public sealed class PosDiscountRepository : IPosDiscountRepository
     private IQueryable<PosDiscountPolicySnapshot> QueryAvailablePolicies(
         Guid tenantId, Guid outletId, DateTimeOffset now)
     {
-        var posChannelIds = _dbContext.SalesChannels.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status == Active &&
-                (x.ChannelCode.ToUpper() == "POS" || x.ChannelType.ToUpper() == "POS"))
-            .Select(x => x.Id);
+        var posChannelIds = (from sc in _dbContext.SalesChannels.AsNoTracking()
+                             join psc in _dbContext.PlatformSalesChannels.AsNoTracking() on sc.PlatformSalesChannelId equals psc.Id
+                             where sc.TenantId == tenantId && sc.Status == Active &&
+                                   (psc.ChannelCode.ToUpper() == "POS" || psc.ChannelType.ToUpper() == "POS")
+                             select sc.Id);
 
         return from policy in _dbContext.DiscountPolicies.AsNoTracking()
                join type in _dbContext.DiscountTypes.AsNoTracking() on policy.DiscountTypeId equals type.Id

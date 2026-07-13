@@ -464,12 +464,23 @@ public sealed class PosHoldRepository : IPosHoldRepository
     private async Task<Guid> EnsurePosSalesChannelAsync(
         Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var id = await _dbContext.SalesChannels.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.ChannelType == "POS" && x.Status == "ACTIVE")
-            .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken);
-        if (id.HasValue) return id.Value;
+        var posChannelId = await (from sc in _dbContext.SalesChannels.AsNoTracking()
+                                  join psc in _dbContext.PlatformSalesChannels.AsNoTracking() on sc.PlatformSalesChannelId equals psc.Id
+                                  where sc.TenantId == tenantId && psc.ChannelType == "POS" && sc.Status == "ACTIVE"
+                                  select (Guid?)sc.Id)
+                                  .FirstOrDefaultAsync(cancellationToken);
+        if (posChannelId.HasValue) return posChannelId.Value;
+
+        var platformPosId = await _dbContext.PlatformSalesChannels.AsNoTracking()
+            .Where(x => x.ChannelType == "POS")
+            .Select(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (platformPosId == Guid.Empty)
+            throw new ApplicationException("System POS platform sales channel not found.");
+
         var channel = SalesChannel.Create(
-            Guid.NewGuid(), tenantId, "POS", "POS", "POS", "OFFLINE", "ACTIVE", 0, now);
+            Guid.NewGuid(), tenantId, platformPosId, "POS", "ACTIVE", 0, now);
         _dbContext.SalesChannels.Add(channel);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return channel.Id;

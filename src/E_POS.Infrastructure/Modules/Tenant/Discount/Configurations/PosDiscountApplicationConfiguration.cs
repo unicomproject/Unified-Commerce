@@ -75,7 +75,7 @@ public sealed class PosDiscountApplicationConfiguration : IEntityTypeConfigurati
         builder.HasOne<PosDevice>().WithMany().HasForeignKey(x => new { x.TenantId, x.PosDeviceId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.RequestedByTenantUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.DecidedByTenantUserId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>().WithMany().HasForeignKey(x => new { x.TenantId, x.CustomerId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>().WithMany().HasForeignKey(x => new { x.TenantId, x.CustomerId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<SalesOrder>().WithMany().HasForeignKey(x => new { x.TenantId, x.SalesOrderId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant>().WithMany().HasForeignKey(x => new { x.TenantId, x.TargetProductVariantId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyCode).HasPrincipalKey(x => x.CurrencyCode).OnDelete(DeleteBehavior.Restrict);
