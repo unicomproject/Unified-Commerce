@@ -7,6 +7,8 @@ using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using Xunit;
 
 namespace E_POS.UnitTests.OutletTillDevice;
@@ -33,6 +35,7 @@ public sealed class OutletServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("outlet.duplicate_code", result.Error.Code);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "outletCode");
     }
 
     [Fact]
@@ -52,6 +55,7 @@ public sealed class OutletServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("outlet.validation_failed", result.Error.Code);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field.Contains("dayOfWeek"));
     }
 
     [Fact]
@@ -64,6 +68,125 @@ public sealed class OutletServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("outlet.pickup_method_missing", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithValidRequest_UsesServerTenantAndUserContext()
+    {
+        var repository = new FakeOutletRepository();
+        var service = CreateService(repository);
+
+        var result = await service.CreateAsync(CreateContext(), CreateValidRequest(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.AddedOutlet);
+        Assert.Equal(TenantId, repository.AddedOutlet!.TenantId);
+        Assert.Equal(UserId, repository.AddedOutlet.CreatedByTenantUserId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithMissingOutletName_ReturnsValidationFailure()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with { OutletName = " " };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "outletName");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithInvalidTimezone_ReturnsValidationFailure()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with { Timezone = "Not/A/Timezone" };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "timezone");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithInvalidCountryCode_ReturnsValidationFailure()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with
+        {
+            Address = new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "ZZ", null, null)
+        };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "address.countryCode");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithOpenDayMissingTimes_ReturnsValidationFailure()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with
+        {
+            BusinessHours = [new OutletBusinessHourRequest(1, null, new TimeOnly(17, 0), false, null, null)]
+        };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field.Contains("openingTime"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithClosedDayAndTimes_ReturnsValidationFailure()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with
+        {
+            BusinessHours = [new OutletBusinessHourRequest(0, new TimeOnly(9, 0), new TimeOnly(17, 0), true, null, null)]
+        };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field.Contains("openingTime"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithSuspendedTenant_ReturnsTenantBlocked()
+    {
+        var service = CreateService(new FakeOutletRepository { TenantStatus = TenantStatusConstants.Suspended });
+
+        var result = await service.CreateAsync(CreateContext(), CreateValidRequest(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.tenant_blocked", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithFeatureDisabled_ReturnsFeatureDisabled()
+    {
+        var service = CreateService(new FakeOutletRepository { OutletFeatureEnabled = false });
+
+        var result = await service.CreateAsync(CreateContext(), CreateValidRequest(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetCreateOptionsAsync_ReturnsLookupData()
+    {
+        var service = CreateService(new FakeOutletRepository());
+
+        var result = await service.GetCreateOptionsAsync(CreateContext(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.Value!.OutletTypes);
+        Assert.NotEmpty(result.Value.Countries);
+        Assert.NotEmpty(result.Value.Timezones);
+        Assert.Equal("ACTIVE", result.Value.Defaults.Status);
     }
 
     [Fact]
@@ -109,7 +232,12 @@ public sealed class OutletServiceTests
 
     private static OutletService CreateService(FakeOutletRepository repository)
     {
-        return new OutletService(repository, new FakeCodeSequenceRepository(), new OutletRequestValidator(), new FakeDateTimeProvider());
+        return new OutletService(
+            repository,
+            new FakeCodeSequenceRepository(),
+            new OutletRequestValidator(),
+            new FakeOutletAuditLogger(),
+            new FakeDateTimeProvider());
     }
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string>? permissions = null)
@@ -148,12 +276,24 @@ public sealed class OutletServiceTests
         public DateTimeOffset UtcNow => Now;
     }
 
+    private sealed class FakeOutletAuditLogger : IOutletAuditLogger
+    {
+        public int CreatedCount { get; private set; }
+
+        public void LogOutletCreated(Guid tenantId, Guid actorTenantUserId, Guid outletId, string outletCode, string outletType, string status)
+        {
+            CreatedCount++;
+        }
+    }
+
     private sealed class FakeOutletRepository : IOutletRepository
     {
         public bool DuplicateCode { get; init; }
         public Guid? PickupMethodId { get; init; } = Guid.NewGuid();
         public OutletEditAggregate? EditAggregate { get; init; }
         public bool HasActiveTillOrDevice { get; init; }
+        public string? TenantStatus { get; init; } = TenantAuthConstants.ActiveTenantStatus;
+        public bool OutletFeatureEnabled { get; init; } = true;
 
         public Task<bool> OutletCodeExistsAsync(Guid tenantId, string outletCode, Guid? excludeOutletId, CancellationToken cancellationToken) => Task.FromResult(DuplicateCode);
         public Task<Guid?> GetActivePickupFulfillmentMethodIdAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(PickupMethodId);
@@ -162,6 +302,14 @@ public sealed class OutletServiceTests
         public Task<OutletEditAggregate?> GetEditAggregateAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(EditAggregate);
         public Task<bool> HasActiveTillOrDeviceAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(HasActiveTillOrDevice);
         public Task<bool> AllOutletsBelongToTenantAsync(Guid tenantId, Guid[] outletIds, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(TenantStatus);
+        public Task<bool> IsOutletManagementFeatureEnabledAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(OutletFeatureEnabled);
+        public Task<OutletCreateOptionsResponse> GetCreateOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult(new OutletCreateOptionsResponse(
+                [new OutletLookupOptionResponse("STORE", "Store")],
+                [new OutletCountryOptionResponse("LK", "Sri Lanka")],
+                [new OutletLookupOptionResponse("UTC", "UTC")],
+                new OutletCreateDefaultsResponse("LK", "UTC", "ACTIVE")));
         public Outlet? AddedOutlet { get; private set; }
         public Task<bool> AddAsync(Outlet outlet, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? pickupMapping, CancellationToken cancellationToken)
         {

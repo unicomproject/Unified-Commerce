@@ -21,6 +21,21 @@ public sealed class OutletsController : ControllerBase
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }
 
+    [HttpGet("create-options")]
+    [ProducesResponseType(typeof(OutletCreateOptionsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetCreateOptions(CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError("outlet.invalid_tenant_context", "Invalid tenant context.")));
+        }
+
+        var result = await _outletService.GetCreateOptionsAsync(context, cancellationToken);
+        return result.IsSuccess && result.Value is not null ? Ok(result.Value) : ToErrorResult(result.Error);
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(OutletResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -88,7 +103,7 @@ public sealed class OutletsController : ControllerBase
     {
         return error.Code switch
         {
-            "outlet.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+            "outlet.permission_denied" or "outlet.feature_disabled" or "outlet.tenant_blocked" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "outlet.not_found" => NotFound(CreateError(error)),
             "outlet.duplicate_code" or "outlet.delete_conflict" => Conflict(CreateError(error)),
             "outlet.invalid_tenant_context" => Unauthorized(CreateError(error)),
@@ -98,7 +113,10 @@ public sealed class OutletsController : ControllerBase
 
     private object CreateError(ApplicationError error)
     {
-        return new { code = error.Code, message = error.Message, details = Array.Empty<string>(), traceId = HttpContext.TraceIdentifier, timestamp = DateTimeOffset.UtcNow };
+        var fieldErrors = error.FieldErrors?
+            .Select(item => new { field = item.Field, message = item.Message })
+            .ToArray<object>() ?? Array.Empty<object>();
+
+        return new { code = error.Code, message = error.Message, details = fieldErrors, traceId = HttpContext.TraceIdentifier, timestamp = DateTimeOffset.UtcNow };
     }
 }
-

@@ -12,6 +12,7 @@ public static class OutletConstants
     public const string DefaultTimezone = "UTC";
     public const string ViewPermission = "tenant.outlets.view";
     public const string ManagePermission = "tenant.outlets.manage";
+    public const string ManagementFeatureCode = "tenant_admin.outlets";
 
     public static string NormalizeOutletCode(string outletCode) => outletCode.Trim().ToUpperInvariant();
     public static string NormalizeStatus(string status) => status.Trim().ToUpperInvariant();

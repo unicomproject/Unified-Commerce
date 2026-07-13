@@ -38,14 +38,16 @@ public sealed class GlobalExceptionHandlingMiddleware
         // Return a safe standard error without leaking stack traces or infrastructure details.
         _logger.LogError(exception, "Unhandled exception while processing request. TraceId: {TraceId}", context.TraceIdentifier);
 
+        var mapped = DatabaseExceptionMapper.Map(exception);
+
         context.Response.Clear();
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.StatusCode = mapped.StatusCode;
         context.Response.ContentType = "application/json";
 
         var error = new
         {
-            code = "internal_server_error",
-            message = "An unexpected error occurred.",
+            code = mapped.Code,
+            message = mapped.Message,
             details = Array.Empty<string>(),
             traceId = context.TraceIdentifier,
             timestamp = DateTimeOffset.UtcNow
