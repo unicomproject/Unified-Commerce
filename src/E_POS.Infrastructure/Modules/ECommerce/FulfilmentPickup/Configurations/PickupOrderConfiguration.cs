@@ -152,6 +152,11 @@ public sealed class PickupOrderConfiguration : IEntityTypeConfiguration<PickupOr
             .HasForeignKey(x => x.VerifiedByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_pickup_orders_551f3774");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_pickup_orders_status", "pickup_status IN ('PENDING', 'READY', 'VERIFIED', 'COLLECTED', 'CANCELLED', 'EXPIRED')");
+            t.HasCheckConstraint("ck_pickup_orders_qr_version", "pickup_qr_version IS NULL OR pickup_qr_version > 0");
+        });
         // </second-brain-constraints>
     }
 }

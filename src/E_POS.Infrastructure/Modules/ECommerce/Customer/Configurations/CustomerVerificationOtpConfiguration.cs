@@ -1,10 +1,10 @@
-using E_POS.Domain.Modules.Customer.Entities;
-using CustomerEntity = E_POS.Domain.Modules.Customer.Entities.Customer;
+using E_POS.Domain.Modules.ECommerce.Customer.Entities;
+using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace E_POS.Infrastructure.Modules.Customer.Configurations;
+namespace E_POS.Infrastructure.Modules.ECommerce.Customer.Configurations;
 
 public sealed class CustomerVerificationOtpConfiguration : IEntityTypeConfiguration<CustomerVerificationOtp>
 {

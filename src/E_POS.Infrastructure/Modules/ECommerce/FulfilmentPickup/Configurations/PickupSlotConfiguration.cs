@@ -89,6 +89,14 @@ public sealed class PickupSlotConfiguration : IEntityTypeConfiguration<PickupSlo
             .HasForeignKey(x => x.FulfillmentMethodOutletId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_pickup_slots_5580f869");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_pickup_slots_window_end", "window_end > window_start");
+            t.HasCheckConstraint("ck_pickup_slots_capacity", "capacity >= 0");
+            t.HasCheckConstraint("ck_pickup_slots_reserved_count", "reserved_count >= 0 AND reserved_count <= capacity");
+            t.HasCheckConstraint("ck_pickup_slots_row_version", "row_version >= 0");
+            t.HasCheckConstraint("ck_pickup_slots_slot_status", "slot_status IN ('OPEN', 'FULL', 'CLOSED', 'CANCELLED')");
+        });
         // </second-brain-constraints>
     }
 }

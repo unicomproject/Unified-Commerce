@@ -24,7 +24,774 @@ namespace E_POS.Infrastructure.Persistence.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.Customer", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CheckoutSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("checkout_session_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_tenant_user_id");
+
+                    b.Property<DateTimeOffset>("EventAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("event_at");
+
+                    b.Property<string>("EventPayloadJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("event_payload_json");
+
+                    b.Property<string>("EventStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("event_status");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("event_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_checkout_events");
+
+                    b.HasIndex("CheckoutSessionId");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("checkout_events", (string)null);
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AnonymousSessionId")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("anonymous_session_id");
+
+                    b.Property<Guid>("CartId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cart_id");
+
+                    b.Property<decimal>("ChargeAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("charge_amount");
+
+                    b.Property<string>("CheckoutNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)")
+                        .HasColumnName("checkout_number");
+
+                    b.Property<string>("CheckoutStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("checkout_status");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid?>("ConvertedOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_order_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<DateTimeOffset?>("ExpiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expired_at");
+
+                    b.Property<string>("FulfillmentMethodCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("fulfillment_method_code");
+
+                    b.Property<Guid?>("InventoryReservationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inventory_reservation_id");
+
+                    b.Property<string>("PickupContactEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("pickup_contact_email");
+
+                    b.Property<string>("PickupContactName")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("pickup_contact_name");
+
+                    b.Property<string>("PickupContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("pickup_contact_phone");
+
+                    b.Property<string>("SalesChannel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("sales_channel");
+
+                    b.Property<Guid?>("SalesChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_channel_id");
+
+                    b.Property<Guid?>("SelectedOutletId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("selected_outlet_id");
+
+                    b.Property<Guid?>("SelectedPickupSlotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("selected_pickup_slot_id");
+
+                    b.Property<decimal>("SubtotalAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("subtotal_amount");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("tax_amount");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_checkout_sessions");
+
+                    b.HasIndex("CartId");
+
+                    b.HasIndex("ConvertedOrderId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("SalesChannelId");
+
+                    b.HasIndex("SelectedOutletId");
+
+                    b.HasIndex("TenantId", "CheckoutNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_checkout_sessions_tenant_id_checkout_number");
+
+                    b.ToTable("checkout_sessions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_checkout_sessions_charge_amount", "charge_amount >= 0");
+
+                            t.HasCheckConstraint("ck_checkout_sessions_checkout_status", "checkout_status IN ('STARTED', 'PENDING', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED')");
+
+                            t.HasCheckConstraint("ck_checkout_sessions_discount_amount", "discount_amount >= 0");
+
+                            t.HasCheckConstraint("ck_checkout_sessions_subtotal_amount", "subtotal_amount >= 0");
+
+                            t.HasCheckConstraint("ck_checkout_sessions_tax_amount", "tax_amount >= 0");
+
+                            t.HasCheckConstraint("ck_checkout_sessions_total_amount", "total_amount >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionAddress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AddressLine1")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("address_line1");
+
+                    b.Property<string>("AddressLine2")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("address_line2");
+
+                    b.Property<string>("AddressType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("address_type");
+
+                    b.Property<Guid>("CheckoutSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("checkout_session_id");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("city");
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("contact_name");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("contact_phone");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("char(2)")
+                        .HasColumnName("country_code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnName("postal_code");
+
+                    b.Property<string>("StateOrProvince")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("state_or_province");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_checkout_session_addresses");
+
+                    b.HasIndex("CheckoutSessionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("checkout_session_addresses", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_checkout_session_addresses_address_type", "address_type IN ('BILLING', 'SHIPPING', 'PICKUP')");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CheckoutSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("checkout_session_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("LineDiscountAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_discount_amount");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number");
+
+                    b.Property<string>("LineStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("line_status");
+
+                    b.Property<decimal>("LineSubtotalAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_subtotal_amount");
+
+                    b.Property<decimal>("LineTaxAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_tax_amount");
+
+                    b.Property<decimal>("LineTotalAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_total_amount");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("product_name_snapshot");
+
+                    b.Property<Guid?>("ProductVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_variant_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("SkuSnapshot")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("sku_snapshot");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_checkout_session_lines");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ProductVariantId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("CheckoutSessionId", "LineNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_checkout_session_lines_checkout_session_id_line_number");
+
+                    b.ToTable("checkout_session_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_checkout_session_lines_line_discount_amount", "line_discount_amount >= 0");
+
+                            t.HasCheckConstraint("ck_checkout_session_lines_line_number", "line_number > 0");
+
+                            t.HasCheckConstraint("ck_checkout_session_lines_line_subtotal_amount", "line_subtotal_amount >= 0");
+
+                            t.HasCheckConstraint("ck_checkout_session_lines_line_tax_amount", "line_tax_amount >= 0");
+
+                            t.HasCheckConstraint("ck_checkout_session_lines_line_total_amount", "line_total_amount >= 0");
+
+                            t.HasCheckConstraint("ck_checkout_session_lines_quantity", "quantity > 0");
+
+                            t.HasCheckConstraint("ck_checkout_session_lines_unit_price", "unit_price >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLineOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CheckoutSessionLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("checkout_session_line_id");
+
+                    b.Property<Guid>("ChoiceGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("choice_group_id");
+
+                    b.Property<string>("ChoiceGroupNameSnapshot")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("choice_group_name_snapshot");
+
+                    b.Property<Guid>("ChoiceOptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("choice_option_id");
+
+                    b.Property<string>("ChoiceOptionNameSnapshot")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("choice_option_name_snapshot");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("PriceAdjustment")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("price_adjustment");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<int?>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_checkout_session_line_options");
+
+                    b.HasIndex("CheckoutSessionLineId");
+
+                    b.HasIndex("ChoiceGroupId");
+
+                    b.HasIndex("ChoiceOptionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("checkout_session_line_options", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_checkout_session_line_options_sort_order", "sort_order IS NULL OR sort_order >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AnonymousSessionId")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)")
+                        .HasColumnName("anonymous_session_id");
+
+                    b.Property<string>("CartNumber")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("cart_number");
+
+                    b.Property<string>("CartStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("cart_status");
+
+                    b.Property<decimal>("ChargeAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("charge_amount");
+
+                    b.Property<Guid?>("ConvertedCheckoutSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_checkout_session_id");
+
+                    b.Property<Guid?>("ConvertedOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_order_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("SalesChannel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("sales_channel");
+
+                    b.Property<Guid?>("SalesChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_channel_id");
+
+                    b.Property<decimal>("SubtotalAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("subtotal_amount");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("tax_amount");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shopping_carts");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("SalesChannelId");
+
+                    b.HasIndex("TenantId", "CartNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_shopping_carts_tenant_id_cart_number");
+
+                    b.ToTable("shopping_carts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_shopping_carts_cart_status", "cart_status IN ('ACTIVE', 'ABANDONED', 'CONVERTED', 'EXPIRED', 'CANCELLED')");
+
+                            t.HasCheckConstraint("ck_shopping_carts_charge_amount", "charge_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shopping_carts_discount_amount", "discount_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shopping_carts_subtotal_amount", "subtotal_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shopping_carts_tax_amount", "tax_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shopping_carts_total_amount", "total_amount >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("LineDiscountAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_discount_amount");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number");
+
+                    b.Property<string>("LineStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("line_status");
+
+                    b.Property<decimal>("LineSubtotalAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_subtotal_amount");
+
+                    b.Property<decimal>("LineTaxAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_tax_amount");
+
+                    b.Property<decimal>("LineTotalAmount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("line_total_amount");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("product_name_snapshot");
+
+                    b.Property<string>("ProductStructure")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("product_structure");
+
+                    b.Property<Guid?>("ProductVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_variant_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("ShoppingCartId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shopping_cart_id");
+
+                    b.Property<string>("SkuSnapshot")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("sku_snapshot");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shopping_cart_items");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ProductVariantId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("ShoppingCartId", "LineNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_shopping_cart_items_shopping_cart_id_line_number");
+
+                    b.ToTable("shopping_cart_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_shopping_cart_items_line_discount_amount", "line_discount_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shopping_cart_items_line_number", "line_number > 0");
+
+                            t.HasCheckConstraint("ck_shopping_cart_items_line_status", "line_status IN ('ACTIVE', 'REMOVED', 'UNAVAILABLE', 'PRICE_CHANGED')");
+
+                            t.HasCheckConstraint("ck_shopping_cart_items_line_subtotal_amount", "line_subtotal_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shopping_cart_items_line_tax_amount", "line_tax_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shopping_cart_items_line_total_amount", "line_total_amount >= 0");
+
+                            t.HasCheckConstraint("ck_shopping_cart_items_quantity", "quantity > 0");
+
+                            t.HasCheckConstraint("ck_shopping_cart_items_unit_price", "unit_price >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItemOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ChoiceGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("choice_group_id");
+
+                    b.Property<string>("ChoiceGroupNameSnapshot")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("choice_group_name_snapshot");
+
+                    b.Property<Guid>("ChoiceOptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("choice_option_id");
+
+                    b.Property<string>("ChoiceOptionNameSnapshot")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("choice_option_name_snapshot");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("PriceAdjustment")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("price_adjustment");
+
+                    b.Property<Guid>("ShoppingCartItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shopping_cart_item_id");
+
+                    b.Property<int?>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shopping_cart_item_options");
+
+                    b.HasIndex("ChoiceGroupId");
+
+                    b.HasIndex("ChoiceOptionId");
+
+                    b.HasIndex("ShoppingCartItemId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("shopping_cart_item_options", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_shopping_cart_item_options_sort_order", "sort_order IS NULL OR sort_order >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -67,13 +834,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("display_name");
 
                     b.Property<string>("NormalizedEmail")
-                        .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
                         .HasColumnName("normalized_email");
 
                     b.Property<string>("NormalizedPhone")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)")
                         .HasColumnName("normalized_phone");
@@ -138,7 +903,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerAuthAccount", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -221,7 +986,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerAuthSession", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -305,7 +1070,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerConsent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerConsent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -394,7 +1159,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerPasswordResetToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerPasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -479,7 +1244,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerRefreshToken", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -560,7 +1325,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerVerificationOtp", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerVerificationOtp", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -706,388 +1471,115 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutEvent", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerWishlist", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<Guid?>("CheckoutSessionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("checkout_session_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int>("SequenceNumber")
-                        .HasColumnType("integer")
-                        .HasColumnName("sequence_number");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_checkout_events");
-
-                    b.HasIndex("CheckoutSessionId", "SequenceNumber")
-                        .IsUnique()
-                        .HasDatabaseName("uq_checkout_events_checkout_session_id_sequence_number");
-
-                    b.ToTable("checkout_events", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_checkout_events_sequence_number", "sequence_number > 0");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnName("created_by");
 
-                    b.Property<string>("CheckoutNumber")
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)")
-                        .HasColumnName("checkout_number");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("ShoppingCartId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("shopping_cart_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("total_amount");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_checkout_sessions");
-
-                    b.HasIndex("ShoppingCartId");
-
-                    b.HasIndex("TenantId", "CheckoutNumber")
-                        .IsUnique()
-                        .HasDatabaseName("uq_checkout_sessions_tenant_id_checkout_number");
-
-                    b.ToTable("checkout_sessions", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_checkout_sessions_total_amount", "total_amount >= 0");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionAddress", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AddressLine1")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("address_line1");
-
-                    b.Property<string>("AddressLine2")
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("address_line2");
-
-                    b.Property<string>("AddressType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasColumnName("address_type");
-
-                    b.Property<Guid>("CheckoutSessionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("checkout_session_id");
-
-                    b.Property<string>("City")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("city");
-
-                    b.Property<string>("ContactName")
-                        .HasMaxLength(150)
-                        .HasColumnType("varchar(150)")
-                        .HasColumnName("contact_name");
-
-                    b.Property<string>("ContactPhone")
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("contact_phone");
-
-                    b.Property<string>("CountryCode")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("char(2)")
-                        .HasColumnName("country_code");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("PostalCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("postal_code");
-
-                    b.Property<string>("StateOrProvince")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("state_or_province");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
+                    b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("Id")
-                        .HasName("pk_checkout_session_addresses");
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
 
-                    b.HasIndex("CheckoutSessionId");
+                    b.HasKey("Id");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_customer_wishlists_customer_id");
 
-                    b.ToTable("checkout_session_addresses", (string)null);
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_customer_wishlists_tenant_id");
+
+                    b.ToTable("customer_wishlists", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLine", b =>
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerWishlistItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid?>("CheckoutSessionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("checkout_session_id");
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_at");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("LineNumber")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)")
-                        .HasColumnName("line_number");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("quantity");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_checkout_session_lines");
-
-                    b.HasIndex("CheckoutSessionId", "LineNumber")
-                        .IsUnique()
-                        .HasDatabaseName("uq_checkout_session_lines_checkout_session_id_line_number");
-
-                    b.ToTable("checkout_session_lines", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_checkout_session_lines_quantity", "quantity > 0");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLineOption", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnName("created_by");
 
-                    b.Property<Guid>("CheckoutSessionLineId")
+                    b.Property<Guid>("ProductId")
                         .HasColumnType("uuid")
-                        .HasColumnName("checkout_session_line_id");
+                        .HasColumnName("product_id");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("quantity");
-
-                    b.Property<int>("SortOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("sort_order");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_checkout_session_line_options");
-
-                    b.HasIndex("CheckoutSessionLineId");
-
-                    b.ToTable("checkout_session_line_options", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_checkout_session_line_options_quantity", "quantity > 0");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<Guid?>("ProductVariantId")
                         .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("CartNumber")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)")
-                        .HasColumnName("cart_number");
-
-                    b.Property<string>("CartStatus")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasColumnName("cart_status");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnName("product_variant_id");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
+                    b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("Id")
-                        .HasName("pk_shopping_carts");
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
 
-                    b.HasIndex("TenantId", "CartNumber")
+                    b.Property<Guid>("WishlistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wishlist_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_customer_wishlist_items_product_id");
+
+                    b.HasIndex("ProductVariantId");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_customer_wishlist_items_tenant_id");
+
+                    b.HasIndex("WishlistId")
+                        .HasDatabaseName("ix_customer_wishlist_items_wishlist_id");
+
+                    b.HasIndex("WishlistId", "ProductId", "ProductVariantId")
                         .IsUnique()
-                        .HasDatabaseName("uq_shopping_carts_tenant_id_cart_number");
+                        .HasDatabaseName("ix_customer_wishlist_items_unique_product");
 
-                    b.ToTable("shopping_carts", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_shopping_carts_cart_status", "cart_status IN ('ACTIVE', 'CHECKED_OUT', 'ABANDONED', 'EXPIRED', 'CANCELLED')");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("LineNumber")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)")
-                        .HasColumnName("line_number");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("quantity");
-
-                    b.Property<Guid>("ShoppingCartId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("shopping_cart_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_shopping_cart_items");
-
-                    b.HasIndex("ShoppingCartId", "LineNumber")
-                        .IsUnique()
-                        .HasDatabaseName("uq_shopping_cart_items_shopping_cart_id_line_number");
-
-                    b.ToTable("shopping_cart_items", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_shopping_cart_items_quantity", "quantity > 0");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItemOption", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("quantity");
-
-                    b.Property<Guid>("ShoppingCartItemId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("shopping_cart_item_id");
-
-                    b.Property<int>("SortOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("sort_order");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_shopping_cart_item_options");
-
-                    b.HasIndex("ShoppingCartItemId");
-
-                    b.ToTable("shopping_cart_item_options", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_shopping_cart_item_options_quantity", "quantity > 0");
-                        });
+                    b.ToTable("customer_wishlist_items", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethod", b =>
@@ -1166,7 +1658,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_fulfillment_methods_4ec69d59");
 
-                    b.ToTable("fulfillment_methods", (string)null);
+                    b.ToTable("fulfillment_methods", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fulfillment_methods_method_type", "method_type IN ('IMMEDIATE', 'PICKUP')");
+
+                            t.HasCheckConstraint("ck_fulfillment_methods_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethodOutlet", b =>
@@ -1240,7 +1737,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_fulfillment_method_outlets_cf79fc78");
 
-                    b.ToTable("fulfillment_method_outlets", (string)null);
+                    b.ToTable("fulfillment_method_outlets", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fulfillment_method_outlets_pickup_window_minutes", "pickup_window_minutes IS NULL OR pickup_window_minutes > 0");
+
+                            t.HasCheckConstraint("ck_fulfillment_method_outlets_preparation_lead_minutes", "preparation_lead_minutes IS NULL OR preparation_lead_minutes >= 0");
+
+                            t.HasCheckConstraint("ck_fulfillment_method_outlets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrder", b =>
@@ -1358,7 +1862,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_fulfillment_orders_e767fb12");
 
-                    b.ToTable("fulfillment_orders", (string)null);
+                    b.ToTable("fulfillment_orders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fulfillment_orders_status", "fulfillment_status IN ('PENDING', 'ALLOCATED', 'PICKING', 'PICKED', 'PACKED', 'READY', 'FULFILLED', 'CANCELLED')");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderEvent", b =>
@@ -1422,7 +1929,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("fulfillment_order_events", (string)null);
+                    b.ToTable("fulfillment_order_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fulfillment_order_events_sequence_number", "sequence_number > 0");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderLine", b =>
@@ -1509,7 +2019,20 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("fulfillment_order_lines", (string)null);
+                    b.ToTable("fulfillment_order_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fulfillment_order_lines_cancelled_quantity", "cancelled_quantity >= 0");
+
+                            t.HasCheckConstraint("ck_fulfillment_order_lines_fulfilled_quantity", "fulfilled_quantity >= 0");
+
+                            t.HasCheckConstraint("ck_fulfillment_order_lines_packed_quantity", "packed_quantity >= 0");
+
+                            t.HasCheckConstraint("ck_fulfillment_order_lines_picked_quantity", "picked_quantity >= 0");
+
+                            t.HasCheckConstraint("ck_fulfillment_order_lines_requested_quantity", "requested_quantity > 0");
+
+                            t.HasCheckConstraint("ck_fulfillment_order_lines_status", "line_status IN ('PENDING', 'PICKING', 'PICKED', 'PACKED', 'FULFILLED', 'CANCELLED')");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrder", b =>
@@ -1626,7 +2149,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_pickup_orders_917d8d64");
 
-                    b.ToTable("pickup_orders", (string)null);
+                    b.ToTable("pickup_orders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pickup_orders_qr_version", "pickup_qr_version IS NULL OR pickup_qr_version > 0");
+
+                            t.HasCheckConstraint("ck_pickup_orders_status", "pickup_status IN ('PENDING', 'READY', 'VERIFIED', 'COLLECTED', 'CANCELLED', 'EXPIRED')");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrderEvent", b =>
@@ -1690,7 +2218,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("pickup_order_events", (string)null);
+                    b.ToTable("pickup_order_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pickup_order_events_sequence_number", "sequence_number > 0");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlot", b =>
@@ -1760,7 +2291,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_pickup_slots_d08294ab");
 
-                    b.ToTable("pickup_slots", (string)null);
+                    b.ToTable("pickup_slots", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pickup_slots_capacity", "capacity >= 0");
+
+                            t.HasCheckConstraint("ck_pickup_slots_reserved_count", "reserved_count >= 0 AND reserved_count <= capacity");
+
+                            t.HasCheckConstraint("ck_pickup_slots_row_version", "row_version >= 0");
+
+                            t.HasCheckConstraint("ck_pickup_slots_slot_status", "slot_status IN ('OPEN', 'FULL', 'CLOSED', 'CANCELLED')");
+
+                            t.HasCheckConstraint("ck_pickup_slots_window_end", "window_end > window_start");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupSlotReservation", b =>
@@ -1831,7 +2373,98 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("pickup_slot_reservations", (string)null);
+                    b.ToTable("pickup_slot_reservations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pickup_slot_reservations_reserved_capacity", "reserved_capacity > 0");
+
+                            t.HasCheckConstraint("ck_pickup_slot_reservations_session_or_order", "checkout_session_id IS NOT NULL OR sales_order_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_pickup_slot_reservations_status", "reservation_status IN ('PENDING', 'CONFIRMED', 'RELEASED', 'EXPIRED', 'CANCELLED')");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Storefront.Entities.StorefrontBanner", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActionText")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("action_text");
+
+                    b.Property<string>("ActionUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("action_url");
+
+                    b.Property<string>("BannerType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("banner_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("ImageUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("image_url");
+
+                    b.Property<Guid?>("SalesChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_channel_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subtitle")
+                        .HasColumnType("text")
+                        .HasColumnName("subtitle");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesChannelId")
+                        .HasDatabaseName("ix_storefront_banners_sales_channel_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_storefront_banners_tenant_id");
+
+                    b.ToTable("storefront_banners", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", b =>
@@ -10396,6 +11029,147 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_product_option_values_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
                         });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductRatingSummary", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AverageRating")
+                        .HasColumnType("numeric(3,2)")
+                        .HasColumnName("average_rating");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("FiveStarCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("five_star_count");
+
+                    b.Property<int>("FourStarCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("four_star_count");
+
+                    b.Property<int>("OneStarCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("one_star_count");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("ThreeStarCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("three_star_count");
+
+                    b.Property<int>("TotalReviews")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_reviews");
+
+                    b.Property<int>("TwoStarCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("two_star_count");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_product_rating_summaries_product_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_product_rating_summaries_tenant_id");
+
+                    b.ToTable("product_rating_summaries", (string)null);
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("RatingValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating_value");
+
+                    b.Property<string>("ReviewText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("review_text");
+
+                    b.Property<string>("ReviewTitle")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("review_title");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_product_reviews_customer_id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_product_reviews_product_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_product_reviews_tenant_id");
+
+                    b.ToTable("product_reviews", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", b =>
@@ -20472,6 +21246,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_primary");
 
+                    b.Property<Guid?>("SalesChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_channel_id");
+
                     b.Property<DateTimeOffset?>("SslExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ssl_expires_at");
@@ -20525,6 +21303,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("DomainName")
                         .IsUnique()
                         .HasDatabaseName("uq_tenant_domains_domain_name");
+
+                    b.HasIndex("SalesChannelId")
+                        .HasDatabaseName("ix_tenant_domains_sales_channel_id");
 
                     b.HasIndex("TenantId");
 
@@ -20665,167 +21446,68 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_settings", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.Customer", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
-                        .WithMany()
-                        .HasForeignKey("SourceSalesChannelId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_customers_source_sales_channel_id_sales_channels");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customers_tenant_id_tenants");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerAuthAccount", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_auth_accounts_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "CustomerId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_auth_accounts_customer_id_customers");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerAuthSession", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_auth_sessions_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerAuthAccount", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "CustomerAuthAccountId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_auth_sessions_customer_auth_account_id_customer_auth_accounts");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerConsent", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_consents_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "CustomerId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_consents_customer_id_customers");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "SalesChannelId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_customer_consents_sales_channel_id_sales_channels");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerPasswordResetToken", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_password_reset_tokens_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerAuthAccount", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "CustomerAuthAccountId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_password_reset_tokens_customer_auth_account_id_customer_auth_accounts");
-
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerVerificationOtp", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "VerifiedOtpId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_customer_password_reset_tokens_verified_otp_id_customer_verification_otps");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerRefreshToken", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_refresh_tokens_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerAuthSession", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "CustomerAuthSessionId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_refresh_tokens_customer_auth_session_id_customer_auth_sessions");
-
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.CustomerRefreshToken", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "ReplacedByTokenId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_customer_refresh_tokens_replaced_by_token_id_customer_refresh_tokens");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Customer.Entities.CustomerVerificationOtp", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_verification_otps_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "CustomerId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_customer_verification_otps_customer_id_customers");
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutEvent", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", null)
                         .WithMany()
                         .HasForeignKey("CheckoutSessionId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_checkout_events_checkout_session_id_checkout_sessions");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_checkout_events_created_by_tenant_user_id_tenant_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_checkout_events_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", null)
                         .WithMany()
-                        .HasForeignKey("ShoppingCartId")
+                        .HasForeignKey("CartId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_checkout_sessions_shopping_cart_id_shopping_carts");
+                        .HasConstraintName("fk_checkout_sessions_cart_id_shopping_carts");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ConvertedOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_checkout_sessions_converted_order_id_sales_orders");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_checkout_sessions_customer_id_customers");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformFoundation.Entities.PlatformSalesChannel", null)
+                        .WithMany()
+                        .HasForeignKey("SalesChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_checkout_sessions_sales_channel_id_sales_channels");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
+                        .WithMany()
+                        .HasForeignKey("SelectedOutletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_checkout_sessions_selected_outlet_id_outlets");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_checkout_sessions_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionAddress", b =>
@@ -20833,7 +21515,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", null)
                         .WithMany()
                         .HasForeignKey("CheckoutSessionId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_checkout_session_addresses_checkout_session_id_checkout_sessions");
 
@@ -20850,8 +21532,29 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSession", null)
                         .WithMany()
                         .HasForeignKey("CheckoutSessionId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_checkout_session_lines_checkout_session_id_checkout_sessions");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_checkout_session_lines_product_id_products");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_checkout_session_lines_product_variant_id_product_variants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_checkout_session_lines_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLineOption", b =>
@@ -20859,13 +21562,46 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.CheckoutSessionLine", null)
                         .WithMany()
                         .HasForeignKey("CheckoutSessionLineId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_checkout_session_line_options_checkout_session_line_id_checkout_session_lines");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceGroup", null)
+                        .WithMany()
+                        .HasForeignKey("ChoiceGroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_checkout_session_line_options_choice_group_id_choice_groups");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceOption", null)
+                        .WithMany()
+                        .HasForeignKey("ChoiceOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_checkout_session_line_options_choice_option_id_choice_options");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_checkout_session_line_options_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_shopping_carts_customer_id_customers");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformFoundation.Entities.PlatformSalesChannel", null)
+                        .WithMany()
+                        .HasForeignKey("SalesChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_shopping_carts_sales_channel_id_sales_channels");
+
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -20876,22 +21612,253 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItem", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shopping_cart_items_product_id_products");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_shopping_cart_items_product_variant_id_product_variants");
+
                     b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", null)
                         .WithMany()
                         .HasForeignKey("ShoppingCartId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_shopping_cart_items_shopping_cart_id_shopping_carts");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shopping_cart_items_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItemOption", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceGroup", null)
+                        .WithMany()
+                        .HasForeignKey("ChoiceGroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shopping_cart_item_options_choice_group_id_choice_groups");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceOption", null)
+                        .WithMany()
+                        .HasForeignKey("ChoiceOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shopping_cart_item_options_choice_option_id_choice_options");
+
                     b.HasOne("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCartItem", null)
                         .WithMany()
                         .HasForeignKey("ShoppingCartItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_shopping_cart_item_options_shopping_cart_item_id_shopping_cart_items");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shopping_cart_item_options_tenant_id_tenants");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
+                        .WithMany()
+                        .HasForeignKey("SourceSalesChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customers_source_sales_channel_id_sales_channels");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customers_tenant_id_tenants");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_auth_accounts_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_auth_accounts_customer_id_customers");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthSession", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_auth_sessions_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerAuthAccountId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_auth_sessions_customer_auth_account_id_customer_auth_accounts");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerConsent", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_consents_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_consents_customer_id_customers");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SalesChannelId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customer_consents_sales_channel_id_sales_channels");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerPasswordResetToken", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_password_reset_tokens_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerAuthAccountId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_password_reset_tokens_customer_auth_account_id_customer_auth_accounts");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerVerificationOtp", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "VerifiedOtpId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customer_password_reset_tokens_verified_otp_id_customer_verification_otps");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerRefreshToken", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_refresh_tokens_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthSession", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerAuthSessionId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_refresh_tokens_customer_auth_session_id_customer_auth_sessions");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerRefreshToken", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ReplacedByTokenId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customer_refresh_tokens_replaced_by_token_id_customer_refresh_tokens");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerVerificationOtp", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_verification_otps_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customer_verification_otps_customer_id_customers");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerWishlist", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_wishlists_customer_id_customers");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_wishlists_tenant_id_tenants");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerWishlistItem", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_wishlist_items_product_id_products");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_customer_wishlist_items_product_variant_id_product_variants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_wishlist_items_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerWishlist", null)
+                        .WithMany("Items")
+                        .HasForeignKey("WishlistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentMethod", b =>
@@ -21173,6 +22140,22 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_pickup_slot_reservations_2fb817a0");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Storefront.Entities.StorefrontBanner", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
+                        .WithMany()
+                        .HasForeignKey("SalesChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_storefront_banners_sales_channel_id_sales_channels");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_storefront_banners_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", b =>
@@ -22056,7 +23039,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationInboxItem", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -22091,7 +23074,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationMessage", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -22139,7 +23122,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationPreference", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -22174,7 +23157,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Notification.Entities.NotificationReadReceipt", b =>
                 {
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -22560,7 +23543,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_returns_341b4dbd");
 
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -23496,6 +24479,47 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_option_values_product_option_id_product_options");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductRatingSummary", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_rating_summaries_product_id_products");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_rating_summaries_tenant_id_tenants");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductReview", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_reviews_customer_id_customers");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_reviews_product_id_products");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_reviews_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", b =>
@@ -24488,7 +25512,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_inventory_reservations_updated_by_tenant_user_id_tenant_users");
 
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "CustomerId")
                         .HasPrincipalKey("TenantId", "Id")
@@ -25375,7 +26399,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_orders_updated_by_tenant_user_id_tenant_users");
 
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "CustomerId")
                         .HasPrincipalKey("TenantId", "Id")
@@ -26984,6 +28008,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantDomain", b =>
                 {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
+                        .WithMany()
+                        .HasForeignKey("SalesChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_domains_sales_channel_id_sales_channels");
+
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -27017,6 +28047,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_settings_tenant_id_tenants");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerWishlist", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

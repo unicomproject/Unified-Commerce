@@ -32,7 +32,9 @@ public sealed class CheckoutSessionAddressConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.CountryCode).HasColumnName("country_code").HasColumnType("char(2)").HasMaxLength(2).IsRequired();
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_checkout_session_addresses_tenant_id_tenants");
-        builder.HasOne<CheckoutSession>().WithMany().HasForeignKey(x => x.CheckoutSessionId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_checkout_session_addresses_checkout_session_id_checkout_sessions");
+        builder.HasOne<CheckoutSession>().WithMany().HasForeignKey(x => x.CheckoutSessionId).OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_checkout_session_addresses_checkout_session_id_checkout_sessions");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_checkout_session_addresses_address_type", "address_type IN ('BILLING', 'SHIPPING', 'PICKUP')")); 
     }
 }
 

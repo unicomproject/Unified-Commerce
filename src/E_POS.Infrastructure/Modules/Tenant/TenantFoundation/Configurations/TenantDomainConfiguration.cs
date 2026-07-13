@@ -19,6 +19,7 @@ public sealed class TenantDomainConfiguration : IEntityTypeConfiguration<TenantD
         builder.Ignore(x => x.UpdatedBy);
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(x => x.SalesChannelId).HasColumnName("sales_channel_id");
 
         builder.Property(x => x.DomainType).HasColumnName("domain_type").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
         builder.Property(x => x.DomainName).HasColumnName("domain_name").HasColumnType("varchar(255)").HasMaxLength(255).IsRequired();
@@ -39,9 +40,18 @@ public sealed class TenantDomainConfiguration : IEntityTypeConfiguration<TenantD
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_tenant_domains_tenant_id_tenants");
 
+        builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel>()
+            .WithMany()
+            .HasForeignKey(x => x.SalesChannelId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_tenant_domains_sales_channel_id_sales_channels");
+
         builder.HasIndex(x => x.DomainName)
             .IsUnique()
             .HasDatabaseName("uq_tenant_domains_domain_name");
+
+        builder.HasIndex(x => x.SalesChannelId)
+            .HasDatabaseName("ix_tenant_domains_sales_channel_id");
             
         builder.HasIndex(x => x.VerificationTokenHash)
             .IsUnique()

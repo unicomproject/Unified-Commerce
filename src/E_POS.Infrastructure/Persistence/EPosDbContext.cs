@@ -10,9 +10,10 @@ using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Domain.Modules.Tenant.Discount.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
-using E_POS.Domain.Modules.Customer.Entities;
+using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
+using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
@@ -155,6 +156,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<ProductOptionValue> ProductOptionValues => Set<ProductOptionValue>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<ProductVariantOptionValue> ProductVariantOptionValues => Set<ProductVariantOptionValue>();
+    public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
+    public DbSet<ProductRatingSummary> ProductRatingSummaries => Set<ProductRatingSummary>();
 
     public DbSet<ReturnPolicy> ReturnPolicies => Set<ReturnPolicy>();
     public DbSet<ReturnPolicyTemplate> ReturnPolicyTemplates => Set<ReturnPolicyTemplate>();
@@ -218,6 +221,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<CustomerPasswordResetToken> CustomerPasswordResetTokens => Set<CustomerPasswordResetToken>();
     public DbSet<CustomerRefreshToken> CustomerRefreshTokens => Set<CustomerRefreshToken>();
     public DbSet<CustomerVerificationOtp> CustomerVerificationOtps => Set<CustomerVerificationOtp>();
+    public DbSet<CustomerWishlist> CustomerWishlists => Set<CustomerWishlist>();
+    public DbSet<CustomerWishlistItem> CustomerWishlistItems => Set<CustomerWishlistItem>();
 
 
     // Orders and Sales
@@ -251,6 +256,9 @@ public sealed class EPosDbContext : DbContext
     public DbSet<CheckoutSessionLine> CheckoutSessionLines => Set<CheckoutSessionLine>();    public DbSet<CheckoutSessionLineOption> CheckoutSessionLineOptions => Set<CheckoutSessionLineOption>();
     public DbSet<ShoppingCart> ShoppingCarts => Set<ShoppingCart>();
     public DbSet<ShoppingCartItem> ShoppingCartItems => Set<ShoppingCartItem>();    public DbSet<ShoppingCartItemOption> ShoppingCartItemOptions => Set<ShoppingCartItemOption>();
+
+    // Storefront
+    public DbSet<StorefrontBanner> StorefrontBanners => Set<StorefrontBanner>();
 
     // Fulfilment and Pickup
     public DbSet<FulfillmentMethod> FulfillmentMethods => Set<FulfillmentMethod>();

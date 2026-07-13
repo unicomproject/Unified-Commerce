@@ -86,6 +86,10 @@ public sealed class FulfillmentOrderEventConfiguration : IEntityTypeConfiguratio
             .HasForeignKey(x => x.EventByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_fulfillment_order_events_ad8a6f3d");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_fulfillment_order_events_sequence_number", "sequence_number > 0");
+        });
         // </second-brain-constraints>
     }
 }

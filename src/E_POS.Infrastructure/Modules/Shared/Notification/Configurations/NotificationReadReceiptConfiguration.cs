@@ -97,7 +97,7 @@ public sealed class NotificationReadReceiptConfiguration : IEntityTypeConfigurat
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_notification_read_receipts_77d5c9dd");
 
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>()
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>()
             .WithMany()
             .HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Restrict)

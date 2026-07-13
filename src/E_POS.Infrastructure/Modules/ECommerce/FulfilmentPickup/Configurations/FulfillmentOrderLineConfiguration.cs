@@ -117,6 +117,15 @@ public sealed class FulfillmentOrderLineConfiguration : IEntityTypeConfiguration
             .HasForeignKey(x => x.PackedByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_fulfillment_order_lines_bcaca9ef");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_fulfillment_order_lines_requested_quantity", "requested_quantity > 0");
+            t.HasCheckConstraint("ck_fulfillment_order_lines_picked_quantity", "picked_quantity >= 0");
+            t.HasCheckConstraint("ck_fulfillment_order_lines_packed_quantity", "packed_quantity >= 0");
+            t.HasCheckConstraint("ck_fulfillment_order_lines_fulfilled_quantity", "fulfilled_quantity >= 0");
+            t.HasCheckConstraint("ck_fulfillment_order_lines_cancelled_quantity", "cancelled_quantity >= 0");
+            t.HasCheckConstraint("ck_fulfillment_order_lines_status", "line_status IN ('PENDING', 'PICKING', 'PICKED', 'PACKED', 'FULFILLED', 'CANCELLED')");
+        });
         // </second-brain-constraints>
     }
 }
