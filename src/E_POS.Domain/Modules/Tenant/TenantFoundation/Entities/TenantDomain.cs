@@ -5,6 +5,7 @@ namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 public class TenantDomain : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
+    public Guid? SalesChannelId { get; protected set; }
     public string DomainType { get; protected set; } = string.Empty;
     public string DomainName { get; protected set; } = string.Empty;
     public bool IsPrimary { get; protected set; }
@@ -21,6 +22,7 @@ public class TenantDomain : AuditableEntity
     public static TenantDomain Create(
         Guid id,
         Guid tenantId,
+        Guid? salesChannelId,
         string domainType,
         string domainName,
         bool isPrimary,
@@ -38,6 +40,7 @@ public class TenantDomain : AuditableEntity
         {
             Id = id,
             TenantId = tenantId,
+            SalesChannelId = salesChannelId,
             DomainType = domainType.Trim(),
             DomainName = domainName.Trim(),
             IsPrimary = isPrimary,

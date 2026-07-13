@@ -1,4 +1,5 @@
 using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 
 namespace E_POS.Domain.Modules.Platform.Subscription.Entities;
 
@@ -9,6 +10,9 @@ public class PlatformModule : AuditableEntity
     public string? Description { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public int SortOrder { get; protected set; }
+    public string ModuleKey { get; protected set; } = string.Empty;
+    public string ModuleName { get; protected set; } = string.Empty;
+    public bool IsCoreModule { get; protected set; }
 
     public static PlatformModule Create(
         Guid id,
@@ -17,7 +21,8 @@ public class PlatformModule : AuditableEntity
         string? description,
         string status,
         int sortOrder,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool isCoreModule = false)
     {
         return new PlatformModule
         {
@@ -27,9 +32,11 @@ public class PlatformModule : AuditableEntity
             Description = description,
             Status = status,
             SortOrder = sortOrder,
+            ModuleKey = moduleCode,
+            ModuleName = name,
+            IsCoreModule = isCoreModule,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
 }
-

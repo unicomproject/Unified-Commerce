@@ -28,22 +28,24 @@ public sealed class SubscriptionAddonLimitConfiguration : IEntityTypeConfigurati
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
+        builder.Property(x => x.SubscriptionAddonId)
+            .HasColumnName("subscription_addon_id")
+            .IsRequired();
+
         builder.Property(x => x.FeatureLimitDefinitionId)
             .HasColumnName("feature_limit_definition_id")
             .IsRequired();
 
-        builder.Property(x => x.LimitValue)
-            .HasColumnName("limit_value");
-
-        builder.Property(x => x.SubscriptionAddonFeatureId)
-            .HasColumnName("subscription_addon_feature_id")
+        builder.Property(x => x.IncrementValue)
+            .HasColumnName("increment_value")
+            .HasPrecision(18, 4)
             .IsRequired();
 
-        builder.HasOne<SubscriptionAddonFeature>()
+        builder.HasOne<SubscriptionAddon>()
             .WithMany()
-            .HasForeignKey(x => x.SubscriptionAddonFeatureId)
+            .HasForeignKey(x => x.SubscriptionAddonId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_subscription_addon_limits_subscription_addon_feature_id_subscription_addon_features");
+            .HasConstraintName("fk_subscription_addon_limits_subscription_addon_id_subscription_addons");
 
         builder.HasOne<FeatureLimitDefinition>()
             .WithMany()
@@ -51,13 +53,12 @@ public sealed class SubscriptionAddonLimitConfiguration : IEntityTypeConfigurati
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_subscription_addon_limits_feature_limit_definition_id_feature_limit_definitions");
 
-        builder.HasIndex(x => new { x.SubscriptionAddonFeatureId, x.FeatureLimitDefinitionId })
+        builder.HasIndex(x => new { x.SubscriptionAddonId, x.FeatureLimitDefinitionId })
             .IsUnique()
-            .HasDatabaseName("uq_subscription_addon_limits_subscription_addon_feature_id_feature_limit_definition_id");
+            .HasDatabaseName("uq_subscription_addon_limits_subscription_addon_id_feature_limit_definition_id");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_subscription_addon_limits_limit_value", "limit_value IS NULL OR limit_value >= 0")); 
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_subscription_addon_limits_increment_value",
+            "increment_value > 0"));
     }
 }
-
-
-

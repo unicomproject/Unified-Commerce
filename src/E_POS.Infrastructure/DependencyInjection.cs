@@ -73,7 +73,9 @@ public static class DependencyInjection
         services.AddScoped<IPlatformRoleRepository, PlatformRoleRepository>();
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();
+        services.AddScoped<IPlatformPasswordResetRepository, PlatformPasswordResetRepository>();
         services.AddScoped<IPlatformSubscriptionPlanRepository, PlatformSubscriptionPlanRepository>();
+        services.AddScoped<ITenantUsageCounterRepository, TenantUsageCounterRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();
         services.AddScoped<ITenantAdminContextRepository, TenantAdminContextRepository>();
         services.AddScoped<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
@@ -84,6 +86,7 @@ public static class DependencyInjection
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
         services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
+        services.AddScoped<IPosProductCatalogRepository, PosProductCatalogRepository>();
         services.AddScoped<IReturnPolicyTemplateRepository, ReturnPolicyTemplateRepository>();
         services.AddScoped<IReturnPolicyRepository, ReturnPolicyRepository>();
         services.AddScoped<ICodeSequenceRepository, CodeSequenceRepository>();
@@ -95,6 +98,7 @@ public static class DependencyInjection
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();
         services.AddScoped<ITillDeviceAssignmentRepository, TillDeviceAssignmentRepository>();
+        services.AddScoped<IDeviceContextRepository, DeviceContextRepository>();
         services.AddScoped<IPriceListRepository, PriceListRepository>();
         services.AddScoped<IPriceListItemsRepository, PriceListItemsRepository>();
         services.AddScoped<ITaxSetupRepository, TaxSetupRepository>();
@@ -103,6 +107,9 @@ public static class DependencyInjection
         services.AddScoped<IPosHomeDashboardRepository, PosHomeDashboardRepository>();
         services.AddScoped<ITenantAdminInventoryRepository, TenantAdminInventoryRepository>();
         services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
+        services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
+        services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
+        services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;

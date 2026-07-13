@@ -1,0 +1,178 @@
+using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Domain.Modules.Tenant.Orders.Constants;
+
+namespace E_POS.Application.Modules.Tenant.POSOperations.Services;
+
+public sealed class PosCheckoutService : IPosCheckoutService
+{
+    private static readonly ApplicationError PermissionDenied = new(
+        "pos_checkout.permission_denied",
+        "You do not have permission to checkout POS sales.");
+
+    private static readonly ApplicationError InvalidDeviceId = new(
+        "pos_checkout.invalid_device_id",
+        "Device id is required.");
+
+    private static readonly ApplicationError InvalidLines = new(
+        "pos_checkout.invalid_lines",
+        "Checkout requires at least one cart line.");
+
+    private static readonly ApplicationError DeviceNotFound = new(
+        "pos_checkout.device_not_found",
+        "POS device could not be found.");
+
+    private static readonly ApplicationError TillSessionNotOpen = new(
+        "pos_checkout.till_session_not_open",
+        "An open till session is required before checkout.");
+
+    private static readonly ApplicationError VariantNotFound = new(
+        "pos_checkout.variant_not_found",
+        "One or more product variants could not be found.");
+
+    private static readonly ApplicationError CustomerNotFound = new(
+        "pos_checkout.customer_not_found",
+        "The selected customer could not be found.");
+
+    private readonly IPosCheckoutRepository _repository;
+    private readonly IDateTimeProvider _dateTimeProvider;
+
+    public PosCheckoutService(
+        IPosCheckoutRepository repository,
+        IDateTimeProvider dateTimeProvider)
+    {
+        _repository = repository;
+        _dateTimeProvider = dateTimeProvider;
+    }
+
+    public async Task<ApplicationResult<PosCheckoutSummaryResponseDto>> GetSummaryAsync(
+        TenantRequestContext context,
+        PosCheckoutSummaryRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(SalesPermissions.Sale.Checkout))
+        {
+            return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(PermissionDenied);
+        }
+
+        if (request.DeviceId == Guid.Empty)
+        {
+            return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(InvalidDeviceId);
+        }
+
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(InvalidLines);
+        }
+
+        var result = await _repository.CalculateSummaryAsync(
+            context.TenantId,
+            context.UserId,
+            context.Permissions.ToList(),
+            request,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+
+        if (!result.IsSuccess || result.Summary is null)
+        {
+            return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(
+                result.ErrorCode switch
+                {
+                    "pos_checkout.device_not_found" => DeviceNotFound,
+                    "till_session.not_found" or
+                    "till_session.device_not_trusted" or
+                    "till_session.till_not_assigned" or
+                    "pos_checkout.till_session_not_open" => TillSessionNotOpen,
+                    "pos_checkout.variant_not_found" => VariantNotFound,
+                    "pos_checkout.customer_not_found" => CustomerNotFound,
+                    "pos_checkout.invalid_lines" => InvalidLines,
+                    _ => new ApplicationError(
+                        result.ErrorCode ?? "pos_checkout.summary_failed",
+                        "Checkout summary could not be calculated.")
+                });
+        }
+
+        return ApplicationResult<PosCheckoutSummaryResponseDto>.Success(result.Summary);
+    }
+
+    public async Task<ApplicationResult<PosCheckoutStartPaymentResponseDto>> StartPaymentAsync(
+        TenantRequestContext context,
+        PosCheckoutStartPaymentRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(SalesPermissions.Sale.Checkout))
+        {
+            return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(PermissionDenied);
+        }
+
+        if (request.DeviceId == Guid.Empty)
+        {
+            return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(InvalidDeviceId);
+        }
+
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(InvalidLines);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.PaymentMethod))
+        {
+            return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(
+                new ApplicationError(
+                    "pos_checkout.invalid_payment_method",
+                    "A payment method is required."));
+        }
+
+        var result = await _repository.StartPaymentAsync(
+            context.TenantId,
+            context.UserId,
+            context.Permissions.ToList(),
+            request,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+
+        if (!result.IsSuccess || result.Payment is null)
+        {
+            return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(
+                result.ErrorCode switch
+                {
+                    "pos_checkout.device_not_found" => DeviceNotFound,
+                    "till_session.not_found" or
+                    "till_session.device_not_trusted" or
+                    "till_session.till_not_assigned" or
+                    "pos_checkout.till_session_not_open" => TillSessionNotOpen,
+                    "pos_checkout.variant_not_found" => VariantNotFound,
+                    "pos_checkout.customer_not_found" => CustomerNotFound,
+                    "pos_checkout.invalid_lines" => InvalidLines,
+                    "pos_checkout.invalid_payment_method" => new ApplicationError(
+                        "pos_checkout.invalid_payment_method",
+                        "The selected payment method is not supported."),
+                    "pos_checkout.payment_permission_denied" => new ApplicationError(
+                        "pos_checkout.payment_permission_denied",
+                        "You do not have permission to accept this payment method."),
+                    "pos_checkout.price_not_configured" => new ApplicationError(
+                        "pos_checkout.price_not_configured",
+                        "One or more cart lines do not have a configured price."),
+                    "pos_checkout.insufficient_stock" => new ApplicationError(
+                        "pos_checkout.insufficient_stock",
+                        "One or more cart lines do not have enough stock."),
+                    "pos_checkout.cash_received_required" => new ApplicationError(
+                        "pos_checkout.cash_received_required",
+                        "Cash received is required for cash payments."),
+                    "pos_checkout.insufficient_cash" => new ApplicationError(
+                        "pos_checkout.insufficient_cash",
+                        "Cash received is less than the amount due."),
+                    "pos_checkout.payment_method_not_found" => new ApplicationError(
+                        "pos_checkout.payment_method_not_found",
+                        "The selected payment method could not be found."),
+                    _ => new ApplicationError(
+                        result.ErrorCode ?? "pos_checkout.start_payment_failed",
+                        "Checkout payment could not be started.")
+                });
+        }
+
+        return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Success(result.Payment);
+    }
+}

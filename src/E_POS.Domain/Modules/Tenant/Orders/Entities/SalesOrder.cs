@@ -41,5 +41,59 @@ public class SalesOrder : AuditableEntity
     public string? CancellationReason { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    public static SalesOrder CreateCompletedPosSale(
+        Guid id,
+        Guid tenantId,
+        string orderNumber,
+        Guid salesChannelId,
+        Guid? customerId,
+        string? customerNameSnapshot,
+        Guid tillId,
+        Guid tillSessionId,
+        Guid? priceListId,
+        string currencyCode,
+        decimal subtotalAmount,
+        decimal discountAmount,
+        decimal taxAmount,
+        decimal totalAmount,
+        decimal paidAmount,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        return new SalesOrder
+        {
+            Id = id,
+            TenantId = tenantId,
+            OrderNumber = orderNumber.Trim(),
+            SalesChannelId = salesChannelId,
+            OrderType = "POS_SALE",
+            CustomerId = customerId,
+            CustomerNameSnapshot = customerNameSnapshot?.Trim(),
+            TillId = tillId,
+            TillSessionId = tillSessionId,
+            PriceListId = priceListId,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            SubtotalAmount = subtotalAmount,
+            DiscountAmount = discountAmount,
+            TaxAmount = taxAmount,
+            ChargeAmount = 0,
+            RoundingAmount = 0,
+            TotalAmount = totalAmount,
+            PaidAmount = paidAmount,
+            RefundedAmount = 0,
+            BalanceDue = 0,
+            Status = "COMPLETED",
+            PaymentStatus = "PAID",
+            FulfillmentStatus = "FULFILLED",
+            PlacedAt = now,
+            ConfirmedAt = now,
+            CompletedAt = now,
+            CreatedByTenantUserId = createdByTenantUserId,
+            UpdatedByTenantUserId = createdByTenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }
 

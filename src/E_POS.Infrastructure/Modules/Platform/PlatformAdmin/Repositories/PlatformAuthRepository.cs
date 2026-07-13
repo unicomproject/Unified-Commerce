@@ -63,8 +63,8 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
             .AsNoTracking()
             .CountAsync(
                 x => x.PlatformUserId == audit.PlatformUserId &&
-                     x.LoginResult == PlatformAuthConstants.FailedLoginResult &&
-                     x.CreatedAt >= failedAttemptWindowStart,
+                     x.LoginStatus == PlatformAuthConstants.FailedLoginResult &&
+                     x.AttemptedAt >= failedAttemptWindowStart,
                 cancellationToken);
 
         if (failedAttempts < maxFailedAttempts)
@@ -78,7 +78,7 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(x => x.Status, PlatformAuthConstants.LockedStatus)
-                    .SetProperty(x => x.UpdatedAt, audit.CreatedAt),
+                    .SetProperty(x => x.UpdatedAt, audit.AttemptedAt ?? throw new InvalidOperationException("AttemptedAt is required.")),
                 cancellationToken);
     }
 
@@ -97,7 +97,9 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         Guid platformUserId,
         Guid sessionId,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? revokedByPlatformUserId = null,
+        string? revokeReason = null)
     {
         var session = await _dbContext.PlatformAuthSessions
             .FirstOrDefaultAsync(
@@ -109,15 +111,19 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
             return;
         }
 
-        session.Revoke(now);
+        session.Revoke(now, revokedByPlatformUserId, revokeReason);
 
         var activeRefreshTokens = await _dbContext.PlatformRefreshTokens
-            .Where(x => x.PlatformAuthSessionId == sessionId && x.Status == PlatformAuthConstants.ActiveTokenStatus)
+            .Where(x => x.PlatformAuthSessionId == sessionId &&
+                        x.UsedAt == null &&
+                        x.RevokedAt == null &&
+                        x.ExpiresAt > now &&
+                        x.Status == PlatformAuthConstants.ActiveTokenStatus)
             .ToListAsync(cancellationToken);
 
         foreach (var refreshToken in activeRefreshTokens)
         {
-            refreshToken.Revoke(now);
+            refreshToken.Revoke(now, revokedByPlatformUserId, revokeReason);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -152,7 +158,7 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         var refreshToken = await _dbContext.PlatformRefreshTokens
             .FirstOrDefaultAsync(x => x.Id == refreshTokenId, cancellationToken);
 
-        if (refreshToken is null || refreshToken.Status != PlatformAuthConstants.ActiveTokenStatus)
+        if (refreshToken is null || !IsRefreshTokenEligibleForRotation(refreshToken, now))
         {
             return false;
         }
@@ -160,17 +166,65 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         var session = await _dbContext.PlatformAuthSessions
             .FirstOrDefaultAsync(x => x.Id == refreshToken.PlatformAuthSessionId, cancellationToken);
 
-        if (session is null || session.Status != PlatformAuthConstants.ActiveTokenStatus)
+        if (session is null || !IsSessionActive(session))
         {
             return false;
         }
 
         refreshToken.MarkUsed(now);
         session.RotateSessionToken(replacementSessionTokenHash, now);
-        _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        session.TouchLastSeen(now);
+
+        if (_dbContext.Database.IsRelational())
+        {
+            var ownsTransaction = _dbContext.Database.CurrentTransaction is null;
+            var transaction = ownsTransaction
+                ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+                : _dbContext.Database.CurrentTransaction!;
+
+            // Persist USED state before inserting the replacement ACTIVE token so partial unique
+            // indexes on ACTIVE rows do not reject rotation within PostgreSQL.
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            refreshToken.LinkReplacement(replacementRefreshToken.Id, now);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            if (ownsTransaction)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        else
+        {
+            refreshToken.LinkReplacement(replacementRefreshToken.Id, now);
+            _dbContext.PlatformRefreshTokens.Add(replacementRefreshToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         return true;
+    }
+
+    private static bool IsSessionActive(PlatformAuthSession session)
+    {
+        return session.RevokedAt is null;
+    }
+
+    private static bool IsRefreshTokenEligibleForRotation(PlatformRefreshToken refreshToken, DateTimeOffset now)
+    {
+        if (refreshToken.Status != PlatformAuthConstants.ActiveTokenStatus)
+        {
+            return false;
+        }
+
+        if (refreshToken.UsedAt is not null || refreshToken.RevokedAt is not null || refreshToken.ReplacedByTokenId is not null)
+        {
+            return false;
+        }
+
+        return refreshToken.ExpiresAt > now;
     }
 }
 

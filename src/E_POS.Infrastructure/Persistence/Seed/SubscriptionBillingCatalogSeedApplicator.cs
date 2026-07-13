@@ -20,7 +20,8 @@ public static class SubscriptionBillingCatalogSeedApplicator
                 "Core TM-EPOS commercial capabilities.",
                 "ACTIVE",
                 1,
-                now);
+                now,
+                isCoreModule: true);
 
             dbContext.PlatformModules.Add(module);
         }
@@ -86,7 +87,8 @@ public static class SubscriptionBillingCatalogSeedApplicator
                 name,
                 "ACTIVE",
                 now,
-                sortOrder));
+                sortOrder,
+                description));
         }
     }
 }

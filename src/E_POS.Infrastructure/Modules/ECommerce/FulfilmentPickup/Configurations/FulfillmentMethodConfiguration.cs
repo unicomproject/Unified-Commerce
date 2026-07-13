@@ -99,6 +99,12 @@ public sealed class FulfillmentMethodConfiguration : IEntityTypeConfiguration<Fu
             .HasForeignKey(x => x.UpdatedByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_fulfillment_methods_87b8bdca");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_fulfillment_methods_method_type", "method_type IN ('IMMEDIATE', 'PICKUP')");
+            t.HasCheckConstraint("ck_fulfillment_methods_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+        });
         // </second-brain-constraints>
     }
 }

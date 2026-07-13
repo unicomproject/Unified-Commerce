@@ -29,5 +29,60 @@ public class SalesOrderLine : AuditableEntity
     public decimal LineDiscountAmount { get; protected set; }
     public decimal LineTaxAmount { get; protected set; }
     public string LineStatus { get; protected set; } = string.Empty;
+
+    public static SalesOrderLine CreateForPosSale(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        int lineNumber,
+        Guid productId,
+        Guid productVariantId,
+        Guid uomId,
+        Guid? priceListItemId,
+        string? skuSnapshot,
+        string productNameSnapshot,
+        string? variantNameSnapshot,
+        string uomCodeSnapshot,
+        string uomNameSnapshot,
+        string productTypeSnapshot,
+        string productStructureSnapshot,
+        decimal quantity,
+        decimal unitPrice,
+        decimal lineSubtotalAmount,
+        decimal lineTaxAmount,
+        DateTimeOffset now)
+    {
+        return new SalesOrderLine
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            LineNumber = lineNumber,
+            ProductId = productId,
+            ProductVariantId = productVariantId,
+            UomId = uomId,
+            PriceListItemId = priceListItemId,
+            SkuSnapshot = skuSnapshot?.Trim(),
+            ProductNameSnapshot = productNameSnapshot.Trim(),
+            VariantNameSnapshot = variantNameSnapshot?.Trim(),
+            UomCodeSnapshot = uomCodeSnapshot.Trim(),
+            UomNameSnapshot = uomNameSnapshot.Trim(),
+            ProductTypeSnapshot = productTypeSnapshot.Trim(),
+            ProductStructureSnapshot = productStructureSnapshot.Trim(),
+            Quantity = quantity,
+            FulfilledQuantity = quantity,
+            CancelledQuantity = 0,
+            ReturnedQuantity = 0,
+            OriginalUnitPrice = unitPrice,
+            UnitPrice = unitPrice,
+            LineSubtotalAmount = lineSubtotalAmount,
+            LineDiscountAmount = 0,
+            LineTaxAmount = lineTaxAmount,
+            LineTotalAmount = lineSubtotalAmount + lineTaxAmount,
+            LineStatus = "FULFILLED",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }
 

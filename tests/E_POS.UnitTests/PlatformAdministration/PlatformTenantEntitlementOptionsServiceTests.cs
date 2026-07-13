@@ -112,7 +112,8 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             new FakePlatformPermissionChecker(permissions),
             new FakePlatformPermissionRepository(permissions),
             new FakeDateTimeProvider(),
-            new FakePasswordHashService());
+            new FakePasswordHashService(),
+            new FakeTenantUsageCounterService());
     }
 
     private static HashSet<string> AllTenantPermissions() =>
@@ -264,6 +265,8 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             Guid tenantId,
             IReadOnlyList<Guid> enabledFeatureIds,
             DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            string? revokedReason,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
@@ -308,7 +311,16 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
         public Task<bool> PlanCodeExistsAsync(string planCode, CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
+        public Task<bool> PlanCodeExistsAsync(string planCode, Guid excludingPlanId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
         public Task<SubscriptionPlanMutationResponse?> GetPlanByIdAsync(
+            Guid planId,
+            SubscriptionPlanPermissionFlags permissionFlags,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<SubscriptionPlanDetailResponse?> GetPlanDetailByIdAsync(
             Guid planId,
             SubscriptionPlanPermissionFlags permissionFlags,
             CancellationToken cancellationToken) =>
@@ -334,6 +346,32 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
             Task.FromResult(0);
+
+        public Task UpsertLegacyPlanLimitsAsync(
+            Guid planId,
+            int? maxOutlets,
+            int? maxUsers,
+            int? maxTills,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+            Guid planId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<string, decimal?>>(new Dictionary<string, decimal?>());
+
+        public Task<int> CountPlanAssignmentsAsync(Guid planId, CancellationToken cancellationToken) =>
+            Task.FromResult(0);
+
+        public Task<string?> GetPlanCodeByIdAsync(Guid planId, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>(null);
+
+        public Task RemovePlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task CopyPlanConfigurationAsync(Guid sourcePlanId, Guid targetPlanId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 
     private sealed class FakePlatformPermissionChecker : IPlatformPermissionChecker

@@ -42,6 +42,24 @@ public sealed class PlatformPasswordResetTokenConfiguration : IEntityTypeConfigu
             .HasColumnType("varchar(255)")
             .HasMaxLength(255);
 
+        builder.Property(x => x.RequestedAt)
+            .HasColumnName("requested_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.ExpiresAt)
+            .HasColumnName("expires_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.UsedAt)
+            .HasColumnName("used_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.RevokedAt)
+            .HasColumnName("revoked_at")
+            .HasColumnType("timestamp with time zone");
+
         builder.HasOne<PlatformUser>()
             .WithMany()
             .HasForeignKey(x => x.PlatformUserId)
@@ -52,9 +70,14 @@ public sealed class PlatformPasswordResetTokenConfiguration : IEntityTypeConfigu
             .IsUnique()
             .HasDatabaseName("uq_platform_password_reset_tokens_token_hash");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_password_reset_tokens_status", "status IN ('PENDING', 'USED', 'EXPIRED', 'REVOKED')")); 
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint(
+                "ck_platform_password_reset_tokens_status",
+                "status IN ('PENDING', 'USED', 'EXPIRED', 'REVOKED')");
+            t.HasCheckConstraint(
+                "ck_platform_password_reset_tokens_expires_after_requested",
+                "expires_at > requested_at");
+        });
     }
 }
-
-
-

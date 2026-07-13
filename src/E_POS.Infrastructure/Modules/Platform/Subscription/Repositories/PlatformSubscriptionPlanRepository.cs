@@ -117,7 +117,8 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
             permissionFlags.CanEdit,
             permissionFlags.CanDuplicate,
             permissionFlags.CanArchive,
-            permissionFlags.CanDelete);
+            permissionFlags.CanDelete,
+            permissionFlags.CanReactivate);
     }
 
     public async Task<SubscriptionPlanCatalogResponse> GetCatalogAsync(CancellationToken cancellationToken)
@@ -168,6 +169,17 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
         return _dbContext.SubscriptionPlans
             .AsNoTracking()
             .AnyAsync(plan => plan.PlanCode == planCode, cancellationToken);
+    }
+
+    public Task<bool> PlanCodeExistsAsync(string planCode, Guid excludingPlanId, CancellationToken cancellationToken)
+    {
+        return _dbContext.SubscriptionPlans
+            .AsNoTracking()
+            .AnyAsync(
+                plan =>
+                    plan.PlanCode == planCode &&
+                    plan.Id != excludingPlanId,
+                cancellationToken);
     }
 
     public Task<SubscriptionPlan?> GetPlanEntityByIdAsync(Guid planId, CancellationToken cancellationToken)
@@ -224,6 +236,123 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
             plan.UpdatedAt ?? plan.CreatedAt);
     }
 
+    public async Task<SubscriptionPlanDetailResponse?> GetPlanDetailByIdAsync(
+        Guid planId,
+        SubscriptionPlanPermissionFlags permissionFlags,
+        CancellationToken cancellationToken)
+    {
+        var plan = await _dbContext.SubscriptionPlans
+            .AsNoTracking()
+            .Where(item => item.Id == planId)
+            .Select(item => new
+            {
+                item.Id,
+                item.PlanCode,
+                item.Name,
+                item.Description,
+                item.Status,
+                item.BillingInterval,
+                item.BaseCurrency,
+                item.PriceAmount,
+                item.TrialDays,
+                item.IsCustomPlan,
+                item.MaxOutlets,
+                item.MaxUsers,
+                item.MaxTills,
+                item.UpdatedAt,
+                item.CreatedAt,
+                FeatureCount = _dbContext.SubscriptionPlanFeatures.Count(feature =>
+                    feature.SubscriptionPlanId == item.Id &&
+                    feature.Status == SubscriptionPlanConstants.PlanFeatureStatus.Included),
+                ActiveTenantCount = _dbContext.TenantSubscriptions.Count(subscription =>
+                    subscription.SubscriptionPlanId == item.Id &&
+                    subscription.SubscriptionStatus == "ACTIVE")
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (plan is null)
+        {
+            return null;
+        }
+
+        var limits = await (
+            from planLimit in _dbContext.SubscriptionPlanFeatureLimits.AsNoTracking()
+            join definition in _dbContext.FeatureLimitDefinitions.AsNoTracking()
+                on planLimit.FeatureLimitDefinitionId equals definition.Id
+            where planLimit.SubscriptionPlanId == planId
+            orderby definition.Name, definition.LimitCode
+            select new SubscriptionPlanDetailLimitDto(
+                definition.Id,
+                definition.LimitCode,
+                definition.Name,
+                planLimit.LimitValue,
+                planLimit.IsUnlimited,
+                definition.UnitCode))
+            .ToListAsync(cancellationToken);
+
+        var featureRows = await (
+            from planFeature in _dbContext.SubscriptionPlanFeatures.AsNoTracking()
+            join feature in _dbContext.PlatformFeatures.AsNoTracking()
+                on planFeature.PlatformFeatureId equals feature.Id
+            join module in _dbContext.PlatformModules.AsNoTracking()
+                on feature.PlatformModuleId equals module.Id
+            where planFeature.SubscriptionPlanId == planId &&
+                  planFeature.Status == SubscriptionPlanConstants.PlanFeatureStatus.Included
+            orderby module.SortOrder, module.Name, feature.SortOrder, feature.Name
+            select new
+            {
+                ModuleId = module.Id,
+                ModuleCode = module.ModuleCode,
+                ModuleName = module.Name,
+                ModuleDescription = module.Description,
+                FeatureId = feature.Id,
+                FeatureCode = feature.FeatureCode,
+                FeatureName = feature.Name,
+                FeatureDescription = feature.Description
+            })
+            .ToListAsync(cancellationToken);
+
+        var modules = featureRows
+            .GroupBy(row => new { row.ModuleId, row.ModuleCode, row.ModuleName, row.ModuleDescription })
+            .Select(group => new SubscriptionPlanDetailModuleDto(
+                group.Key.ModuleId,
+                group.Key.ModuleCode,
+                group.Key.ModuleName,
+                group.Key.ModuleDescription,
+                group.Select(row => new SubscriptionPlanDetailFeatureDto(
+                    row.FeatureId,
+                    row.FeatureCode,
+                    row.FeatureName,
+                    row.FeatureDescription)).ToList()))
+            .ToList();
+
+        return new SubscriptionPlanDetailResponse(
+            plan.Id,
+            plan.PlanCode,
+            plan.Name,
+            plan.Description,
+            plan.Status,
+            SubscriptionPlanMapper.ToApiBillingCycle(plan.BillingInterval),
+            plan.BaseCurrency,
+            plan.PriceAmount,
+            plan.IsCustomPlan ? "custom" : "fixed",
+            plan.TrialDays,
+            plan.MaxOutlets,
+            plan.MaxUsers,
+            plan.MaxTills,
+            plan.FeatureCount,
+            plan.ActiveTenantCount,
+            CanEdit: permissionFlags.CanEdit && plan.Status == SubscriptionPlanConstants.Status.Draft,
+            CanDuplicate: permissionFlags.CanDuplicate,
+            CanArchive: permissionFlags.CanArchive && plan.Status == SubscriptionPlanConstants.Status.Active,
+            CanDelete: permissionFlags.CanDelete && plan.Status == SubscriptionPlanConstants.Status.Draft,
+            CanReactivate: permissionFlags.CanReactivate && plan.Status == SubscriptionPlanConstants.Status.Retired,
+            plan.CreatedAt,
+            limits,
+            modules,
+            plan.UpdatedAt ?? plan.CreatedAt);
+    }
+
     public async Task AddPlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken)
     {
         _dbContext.SubscriptionPlans.Add(plan);
@@ -233,6 +362,55 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
     public Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemovePlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken)
+    {
+        _dbContext.SubscriptionPlans.Remove(plan);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task CopyPlanConfigurationAsync(
+        Guid sourcePlanId,
+        Guid targetPlanId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var features = await _dbContext.SubscriptionPlanFeatures
+            .AsNoTracking()
+            .Where(item => item.SubscriptionPlanId == sourcePlanId)
+            .OrderBy(item => item.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        foreach (var feature in features)
+        {
+            _dbContext.SubscriptionPlanFeatures.Add(SubscriptionPlanFeature.CreateIncluded(
+                Guid.NewGuid(),
+                targetPlanId,
+                feature.PlatformFeatureId,
+                feature.SortOrder,
+                now,
+                feature.Description,
+                feature.ConfigJson));
+        }
+
+        var limits = await _dbContext.SubscriptionPlanFeatureLimits
+            .AsNoTracking()
+            .Where(item => item.SubscriptionPlanId == sourcePlanId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var limit in limits)
+        {
+            _dbContext.SubscriptionPlanFeatureLimits.Add(SubscriptionPlanFeatureLimit.Create(
+                Guid.NewGuid(),
+                targetPlanId,
+                limit.FeatureLimitDefinitionId,
+                limit.LimitValue,
+                limit.IsUnlimited,
+                now));
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task ReplacePlanFeaturesAsync(
@@ -295,6 +473,115 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
                     feature.SubscriptionPlanId == planId &&
                     feature.Status == SubscriptionPlanConstants.PlanFeatureStatus.Included,
                 cancellationToken);
+    }
+
+    public async Task UpsertLegacyPlanLimitsAsync(
+        Guid planId,
+        int? maxOutlets,
+        int? maxUsers,
+        int? maxTills,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await UpsertPlanLimitAsync(
+            planId,
+            SubscriptionCatalogLimitSeedConstants.MaxOutletsLimitDefinitionId,
+            maxOutlets,
+            now,
+            cancellationToken);
+
+        await UpsertPlanLimitAsync(
+            planId,
+            SubscriptionCatalogLimitSeedConstants.MaxUsersLimitDefinitionId,
+            maxUsers,
+            now,
+            cancellationToken);
+
+        await UpsertPlanLimitAsync(
+            planId,
+            SubscriptionCatalogLimitSeedConstants.MaxTillsLimitDefinitionId,
+            maxTills,
+            now,
+            cancellationToken);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+        Guid planId,
+        CancellationToken cancellationToken)
+    {
+        var limits = await (
+            from planLimit in _dbContext.SubscriptionPlanFeatureLimits.AsNoTracking()
+            join limitDefinition in _dbContext.FeatureLimitDefinitions.AsNoTracking()
+                on planLimit.FeatureLimitDefinitionId equals limitDefinition.Id
+            where planLimit.SubscriptionPlanId == planId
+            select new
+            {
+                limitDefinition.LimitKey,
+                planLimit.LimitValue
+            })
+            .ToListAsync(cancellationToken);
+
+        return limits.ToDictionary(
+            item => item.LimitKey,
+            item => item.LimitValue,
+            StringComparer.Ordinal);
+    }
+
+    public Task<int> CountPlanAssignmentsAsync(Guid planId, CancellationToken cancellationToken)
+    {
+        return _dbContext.TenantSubscriptions
+            .AsNoTracking()
+            .CountAsync(subscription => subscription.SubscriptionPlanId == planId, cancellationToken);
+    }
+
+    public async Task<string?> GetPlanCodeByIdAsync(Guid planId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.SubscriptionPlans
+            .AsNoTracking()
+            .Where(plan => plan.Id == planId)
+            .Select(plan => plan.PlanCode)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task UpsertPlanLimitAsync(
+        Guid planId,
+        Guid featureLimitDefinitionId,
+        int? legacyLimitValue,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _dbContext.SubscriptionPlanFeatureLimits
+            .FirstOrDefaultAsync(
+                item =>
+                    item.SubscriptionPlanId == planId &&
+                    item.FeatureLimitDefinitionId == featureLimitDefinitionId,
+                cancellationToken);
+
+        if (legacyLimitValue is null)
+        {
+            if (existing is not null)
+            {
+                _dbContext.SubscriptionPlanFeatureLimits.Remove(existing);
+            }
+
+            return;
+        }
+
+        if (existing is null)
+        {
+            _dbContext.SubscriptionPlanFeatureLimits.Add(SubscriptionPlanFeatureLimit.Create(
+                Guid.NewGuid(),
+                planId,
+                featureLimitDefinitionId,
+                legacyLimitValue.Value,
+                isUnlimited: false,
+                now));
+            return;
+        }
+
+        existing.UpdateLimit(legacyLimitValue.Value, isUnlimited: false, now);
     }
 
     private static SubscriptionPlanMutationResponse ToMutationResponse(

@@ -47,6 +47,15 @@ public sealed class SubscriptionPlanAddonConfiguration : IEntityTypeConfiguratio
             .HasColumnName("subscription_plan_id")
             .IsRequired();
 
+        builder.Property(x => x.MinQuantity)
+            .HasColumnName("min_quantity")
+            .IsRequired()
+            .HasDefaultValue(1);
+
+        builder.Property(x => x.MaxQuantity)
+            .HasColumnName("max_quantity")
+            .IsRequired(false);
+
         builder.HasOne<SubscriptionPlan>()
             .WithMany()
             .HasForeignKey(x => x.SubscriptionPlanId)
@@ -62,8 +71,10 @@ public sealed class SubscriptionPlanAddonConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(x => new { x.SubscriptionPlanId, x.SubscriptionAddonId })
             .IsUnique()
             .HasDatabaseName("uq_subscription_plan_addons_subscription_plan_id_subscription_addon_id");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_subscription_plan_addons_min_quantity", "min_quantity >= 1"));
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_subscription_plan_addons_max_quantity",
+            "max_quantity IS NULL OR max_quantity >= min_quantity"));
     }
 }
-
-
-

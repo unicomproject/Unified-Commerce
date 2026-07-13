@@ -103,6 +103,12 @@ public sealed class FulfillmentMethodOutletConfiguration : IEntityTypeConfigurat
             .HasForeignKey(x => x.UpdatedByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_fulfillment_method_outlets_6480bfac");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_fulfillment_method_outlets_preparation_lead_minutes", "preparation_lead_minutes IS NULL OR preparation_lead_minutes >= 0");
+            t.HasCheckConstraint("ck_fulfillment_method_outlets_pickup_window_minutes", "pickup_window_minutes IS NULL OR pickup_window_minutes > 0");
+            t.HasCheckConstraint("ck_fulfillment_method_outlets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+        });
         // </second-brain-constraints>
     }
 }

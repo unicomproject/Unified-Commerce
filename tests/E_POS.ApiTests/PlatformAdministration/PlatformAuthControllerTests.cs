@@ -327,7 +327,8 @@ public sealed class PlatformAuthControllerTests
 
         public Task<ApplicationResult<PlatformAdminLoginResponse>> LoginAsync(
             PlatformAdminLoginRequest request,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            PlatformAuthClientContext? clientContext = null)
         {
             return Task.FromResult(_loginResult);
         }
@@ -352,7 +353,8 @@ public sealed class PlatformAuthControllerTests
 
         public Task<ApplicationResult<PlatformAdminLoginResponse>> RefreshAsync(
             string refreshToken,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            PlatformAuthClientContext? clientContext = null)
         {
             return Task.FromResult(_refreshResult ?? CreateLoginFailure());
         }

@@ -137,6 +137,60 @@ public sealed class PlatformPermissionRepositoryTests
         Assert.Contains(PlatformPermissionCodes.TenantsView, permissionCodes);
     }
 
+    [Fact]
+    public async Task GetActivePermissionCodesAsync_IgnoresRevokedRoleAndDirectPermissions()
+    {
+        await using var dbContext = CreateDbContext();
+        var platformUserId = Guid.NewGuid();
+        var permissionId = Guid.Parse("62000000-0000-0000-0000-000000000098");
+
+        dbContext.PlatformUsers.Add(PlatformUser.Create(
+            platformUserId,
+            "revoked-permission@tmepos.test",
+            "hash",
+            PlatformAuthConstants.ActiveStatus,
+            Now));
+
+        dbContext.PlatformPermissions.Add(PlatformPermission.Create(
+            permissionId,
+            PlatformPermissionCodes.TenantsView,
+            "View Tenants",
+            "Revoked permission test.",
+            PlatformAuthConstants.ActiveStatus,
+            Now));
+
+        var revokedDirectPermission = PlatformUserPermission.Create(
+            Guid.NewGuid(),
+            platformUserId,
+            permissionId,
+            "Revoked direct permission.",
+            Now);
+        revokedDirectPermission.Revoke(null, "Revoked for test.", Now);
+        dbContext.PlatformUserPermissions.Add(revokedDirectPermission);
+
+        await dbContext.SaveChangesAsync();
+        await PlatformAdminPermissionSeedApplicator.ApplyAsync(dbContext, Now);
+
+        var superAdminRole = await dbContext.PlatformRoles
+            .SingleAsync(x => x.RoleCode == PlatformRoleCodes.SuperAdministrator);
+
+        var revokedRoleAssignment = PlatformUserRole.Create(
+            Guid.Parse("66000000-0000-0000-0000-000000000097"),
+            platformUserId,
+            superAdminRole.Id,
+            "Revoked role assignment.",
+            Now);
+        revokedRoleAssignment.Revoke(null, "Revoked for test.", Now);
+        dbContext.PlatformUserRoles.Add(revokedRoleAssignment);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new PlatformPermissionRepository(dbContext);
+
+        var permissionCodes = await repository.GetActivePermissionCodesAsync(platformUserId, CancellationToken.None);
+
+        Assert.Empty(permissionCodes);
+    }
+
     private static EPosDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<EPosDbContext>()

@@ -41,19 +41,68 @@ public sealed class SubscriptionCreditNoteLineConfiguration : IEntityTypeConfigu
             .HasColumnName("subscription_credit_note_id")
             .IsRequired();
 
+        builder.Property(x => x.CreditNoteId)
+            .HasColumnName("credit_note_id");
+
+        builder.Property(x => x.InvoiceLineId)
+            .HasColumnName("invoice_line_id");
+
+        builder.Property(x => x.LineNumberInt)
+            .HasColumnName("line_number_int");
+
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasColumnType("varchar(250)")
+            .HasMaxLength(250);
+
+        builder.Property(x => x.Quantity)
+            .HasColumnName("quantity")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.UnitAmount)
+            .HasColumnName("unit_amount")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.TaxAmount)
+            .HasColumnName("tax_amount")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.LineTotal)
+            .HasColumnName("line_total")
+            .HasPrecision(18, 4);
+
         builder.HasOne<SubscriptionCreditNote>()
             .WithMany()
             .HasForeignKey(x => x.SubscriptionCreditNoteId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_subscription_credit_note_lines_subscription_credit_note_id_subscription_credit_notes");
 
+        builder.HasOne<SubscriptionCreditNote>()
+            .WithMany()
+            .HasForeignKey(x => x.CreditNoteId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_subscription_credit_note_lines_credit_note_id_subscription_credit_notes");
+
+        builder.HasOne<SubscriptionInvoiceLine>()
+            .WithMany()
+            .HasForeignKey(x => x.InvoiceLineId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_subscription_credit_note_lines_invoice_line_id_subscription_invoice_lines");
+
         builder.HasIndex(x => new { x.SubscriptionCreditNoteId, x.LineNumber })
             .IsUnique()
             .HasDatabaseName("uq_subscription_credit_note_lines_subscription_credit_note_id_line_number");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_subscription_credit_note_lines_line_credit_amount", "line_credit_amount >= 0")); 
+        builder.HasIndex(x => x.CreditNoteId)
+            .HasDatabaseName("ix_subscription_credit_note_lines_credit_note_id");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_subscription_credit_note_lines_line_credit_amount", "line_credit_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_credit_note_lines_quantity", "quantity IS NULL OR quantity > 0");
+            t.HasCheckConstraint("ck_subscription_credit_note_lines_unit_amount", "unit_amount IS NULL OR unit_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_credit_note_lines_tax_amount", "tax_amount IS NULL OR tax_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_credit_note_lines_line_total", "line_total IS NULL OR line_total >= 0");
+        });
     }
 }
-
-
-

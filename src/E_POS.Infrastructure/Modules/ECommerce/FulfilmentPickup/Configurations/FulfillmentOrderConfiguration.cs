@@ -167,6 +167,10 @@ public sealed class FulfillmentOrderConfiguration : IEntityTypeConfiguration<Ful
             .HasForeignKey(x => x.UpdatedByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_fulfillment_orders_8d547aff");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_fulfillment_orders_status", "fulfillment_status IN ('PENDING', 'ALLOCATED', 'PICKING', 'PICKED', 'PACKED', 'READY', 'FULFILLED', 'CANCELLED')");
+        });
         // </second-brain-constraints>
     }
 }

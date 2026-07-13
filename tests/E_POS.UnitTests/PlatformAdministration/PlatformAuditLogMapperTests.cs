@@ -10,14 +10,14 @@ public sealed class PlatformAuditLogMapperTests
     [InlineData("SUCCESS", "platform.login.success", "Platform login succeeded.")]
     [InlineData("FAILED", "platform.login.failed", "Platform login failed.")]
     [InlineData("LOCKED", "platform.login.locked", "Platform login blocked because the account is locked.")]
-    public void MapLoginAudit_MapsKnownLoginResults(string loginResult, string action, string summary)
+    public void MapLoginAudit_MapsKnownLoginStatuses(string loginStatus, string action, string summary)
     {
         var item = PlatformAuditLogMapper.MapLoginAudit(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             new DateTimeOffset(2026, 7, 3, 12, 0, 0, TimeSpan.Zero),
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             "admin@nytroz.local",
-            loginResult);
+            loginStatus);
 
         Assert.Equal(action, item.Action);
         Assert.Equal(summary, item.Summary);
@@ -35,6 +35,7 @@ public sealed class PlatformAuditLogMapperTests
         var resolved = PlatformAuditLogMapper.ResolveLoginResultFilter(action);
         Assert.Equal(expected, resolved);
     }
+
 }
 
 

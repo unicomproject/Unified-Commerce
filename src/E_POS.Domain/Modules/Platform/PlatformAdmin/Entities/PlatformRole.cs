@@ -7,7 +7,10 @@ public class PlatformRole : AuditableEntity
     public string RoleCode { get; protected set; } = string.Empty;
     public string Name { get; protected set; } = string.Empty;
     public string? Description { get; protected set; }
+    public bool IsSystemRole { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
+    public Guid? CreatedByPlatformUserId { get; protected set; }
+    public Guid? UpdatedByPlatformUserId { get; protected set; }
 
     public static PlatformRole Create(
         Guid id,
@@ -15,7 +18,9 @@ public class PlatformRole : AuditableEntity
         string name,
         string? description,
         string status,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool isSystemRole = false,
+        Guid? createdByPlatformUserId = null)
     {
         return new PlatformRole
         {
@@ -23,7 +28,9 @@ public class PlatformRole : AuditableEntity
             RoleCode = roleCode,
             Name = name,
             Description = description,
+            IsSystemRole = isSystemRole,
             Status = status,
+            CreatedByPlatformUserId = createdByPlatformUserId,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -42,4 +49,3 @@ public class PlatformRole : AuditableEntity
         UpdatedAt = now;
     }
 }
-

@@ -42,7 +42,9 @@ public static class DependencyInjection
         services.AddScoped<IPlatformRoleService, PlatformRoleService>();
         services.AddScoped<IPlatformUserService, PlatformUserService>();
         services.AddScoped<IPlatformAuditLogService, PlatformAuditLogService>();
+        services.AddScoped<IPlatformPasswordResetService, PlatformPasswordResetService>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
+        services.AddScoped<ITenantUsageCounterService, TenantUsageCounterService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
         services.AddScoped<ITenantAdminContextService, TenantAdminContextService>();
         services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
@@ -59,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
         services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
+        services.AddScoped<IPosProductCatalogService, PosProductCatalogService>();
         services.AddScoped<ICollectionService, CollectionService>();
         services.AddScoped<IReturnPolicyTemplateService, ReturnPolicyTemplateService>();
         services.AddScoped<IReturnPolicyService, ReturnPolicyService>();
@@ -72,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<ITillService, TillService>();
         services.AddScoped<IPosDeviceService, PosDeviceService>();
         services.AddScoped<ITillDeviceAssignmentService, TillDeviceAssignmentService>();
+        services.AddScoped<IDeviceContextService, DeviceContextService>();
         services.AddScoped<IPriceListRequestValidator, PriceListRequestValidator>();
         services.AddScoped<IPriceListService, PriceListService>();
         services.AddScoped<IPriceListItemsRequestValidator, PriceListItemsRequestValidator>();
@@ -83,6 +87,9 @@ public static class DependencyInjection
 
         // POS Home (cashier dashboard)
         services.AddScoped<IPosHomeDashboardService, PosHomeDashboardService>();
+        services.AddScoped<IPosTillSessionService, PosTillSessionService>();
+        services.AddScoped<IPosCheckoutService, PosCheckoutService>();
+        services.AddScoped<IPosReceiptService, PosReceiptService>();
 
         services.AddScoped<ITenantAdminInventoryService, TenantAdminInventoryService>();
         services.AddScoped<ITenantAdminInventoryRequestValidator, TenantAdminInventoryRequestValidator>();
