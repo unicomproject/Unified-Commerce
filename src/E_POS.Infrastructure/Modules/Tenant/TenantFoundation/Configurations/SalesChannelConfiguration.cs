@@ -32,29 +32,15 @@ public sealed class SalesChannelConfiguration : IEntityTypeConfiguration<SalesCh
             .HasColumnName("tenant_id")
             .IsRequired();
 
-        builder.Property(x => x.ChannelCode)
-            .HasColumnName("channel_code")
-            .HasColumnType("varchar(80)")
-            .HasMaxLength(80)
+        builder.Property(x => x.PlatformSalesChannelId)
+            .HasColumnName("platform_sales_channel_id")
             .IsRequired();
 
-        builder.Property(x => x.ChannelName)
-            .HasColumnName("channel_name")
+        builder.Property(x => x.CustomName)
+            .HasColumnName("custom_name")
             .HasColumnType("varchar(150)")
             .HasMaxLength(150)
             .IsRequired();
-
-        builder.Property(x => x.ChannelType)
-            .HasColumnName("channel_type")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40)
-            .IsRequired();
-
-        builder.Property(x => x.ChannelMode)
-            .HasColumnName("channel_mode")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40)
-            .IsRequired(false);
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
@@ -73,17 +59,15 @@ public sealed class SalesChannelConfiguration : IEntityTypeConfiguration<SalesCh
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_sales_channels_tenant_id_tenants");
 
-        builder.HasIndex(x => new { x.TenantId, x.ChannelCode })
+        builder.HasOne<E_POS.Domain.Modules.Platform.PlatformFoundation.Entities.PlatformSalesChannel>()
+            .WithMany()
+            .HasForeignKey(x => x.PlatformSalesChannelId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_channels_platform_sales_channel_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.PlatformSalesChannelId })
             .IsUnique()
-            .HasDatabaseName("ix_sales_channels_tenant_id_channel_code");
-
-        builder.ToTable(t => t.HasCheckConstraint(
-            "ck_sales_channels_channel_type",
-            "channel_type IN ('POS', 'E_COMMERCE')"));
-
-        builder.ToTable(t => t.HasCheckConstraint(
-            "ck_sales_channels_channel_mode",
-            "channel_mode IS NULL OR channel_mode IN ('ONLINE', 'OFFLINE', 'HYBRID')"));
+            .HasDatabaseName("ix_sales_channels_tenant_id_platform_channel_id");
 
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_sales_channels_status",

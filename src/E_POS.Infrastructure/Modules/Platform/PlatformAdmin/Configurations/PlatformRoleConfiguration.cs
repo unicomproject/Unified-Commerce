@@ -44,18 +44,40 @@ public sealed class PlatformRoleConfiguration : IEntityTypeConfiguration<Platfor
             .HasColumnType("text")
             .IsRequired(false);
 
+        builder.Property(x => x.IsSystemRole)
+            .HasColumnName("is_system_role")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(x => x.Status)
             .HasColumnName("status")
             .HasColumnType("varchar(30)")
             .HasMaxLength(30);
 
+        builder.Property(x => x.CreatedByPlatformUserId)
+            .HasColumnName("created_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.UpdatedByPlatformUserId)
+            .HasColumnName("updated_by_platform_user_id")
+            .IsRequired(false);
+
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_platform_roles_created_by_platform_user_id_platform_users");
+
+        builder.HasOne<PlatformUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UpdatedByPlatformUserId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_platform_roles_updated_by_platform_user_id_platform_users");
+
         builder.HasIndex(x => x.RoleCode)
             .IsUnique()
             .HasDatabaseName("uq_platform_roles_role_code");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_roles_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_platform_roles_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-
-
-

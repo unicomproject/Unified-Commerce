@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Dtos;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -89,16 +90,35 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             .ToListAsync(cancellationToken);
 
         // Enabled feature codes from tenant feature entitlements joined to PlatformFeature
-        var enabledFeatures = await (
+        var now = DateTimeOffset.UtcNow;
+        var entitlementRows = await (
             from ent in _dbContext.TenantFeatureEntitlements.AsNoTracking()
             join feat in _dbContext.PlatformFeatures.AsNoTracking()
                 on ent.PlatformFeatureId equals feat.Id
             where ent.TenantId == tenantId
-                  && ent.EntitlementStatus.ToUpper() == "ACTIVE"
-            select feat.FeatureCode)
+            select new
+            {
+                ent.EntitlementStatus,
+                ent.IsEnabled,
+                ent.RevokedAt,
+                ent.EffectiveFrom,
+                ent.EffectiveUntil,
+                feat.FeatureCode
+            })
+            .ToListAsync(cancellationToken);
+
+        var enabledFeatures = entitlementRows
+            .Where(item => TenantEntitlementEffectivePredicate.IsEnabled(
+                item.EntitlementStatus,
+                item.IsEnabled,
+                item.RevokedAt,
+                item.EffectiveFrom,
+                item.EffectiveUntil,
+                now))
+            .Select(item => item.FeatureCode)
             .Distinct()
             .OrderBy(x => x)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         // Subscription status (most recent active one, or first found)
         var subscriptionStatus = await _dbContext.TenantSubscriptions

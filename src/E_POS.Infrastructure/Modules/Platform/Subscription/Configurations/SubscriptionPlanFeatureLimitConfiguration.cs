@@ -28,22 +28,28 @@ public sealed class SubscriptionPlanFeatureLimitConfiguration : IEntityTypeConfi
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
 
+        builder.Property(x => x.SubscriptionPlanId)
+            .HasColumnName("subscription_plan_id")
+            .IsRequired();
+
         builder.Property(x => x.FeatureLimitDefinitionId)
             .HasColumnName("feature_limit_definition_id")
             .IsRequired();
 
         builder.Property(x => x.LimitValue)
-            .HasColumnName("limit_value");
+            .HasColumnName("limit_value")
+            .HasPrecision(18, 4);
 
-        builder.Property(x => x.SubscriptionPlanFeatureId)
-            .HasColumnName("subscription_plan_feature_id")
-            .IsRequired();
+        builder.Property(x => x.IsUnlimited)
+            .HasColumnName("is_unlimited")
+            .IsRequired()
+            .HasDefaultValue(false);
 
-        builder.HasOne<SubscriptionPlanFeature>()
+        builder.HasOne<SubscriptionPlan>()
             .WithMany()
-            .HasForeignKey(x => x.SubscriptionPlanFeatureId)
+            .HasForeignKey(x => x.SubscriptionPlanId)
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_subscription_plan_feature_limits_subscription_plan_feature_id_subscription_plan_features");
+            .HasConstraintName("fk_subscription_plan_feature_limits_subscription_plan_id_subscription_plans");
 
         builder.HasOne<FeatureLimitDefinition>()
             .WithMany()
@@ -51,13 +57,12 @@ public sealed class SubscriptionPlanFeatureLimitConfiguration : IEntityTypeConfi
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_subscription_plan_feature_limits_feature_limit_definition_id_feature_limit_definitions");
 
-        builder.HasIndex(x => new { x.SubscriptionPlanFeatureId, x.FeatureLimitDefinitionId })
+        builder.HasIndex(x => new { x.SubscriptionPlanId, x.FeatureLimitDefinitionId })
             .IsUnique()
-            .HasDatabaseName("uq_subscription_plan_feature_limits_subscription_plan_feature_id_feature_limit_definition_id");
+            .HasDatabaseName("uq_subscription_plan_feature_limits_subscription_plan_id_feature_limit_definition_id");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_subscription_plan_feature_limits_limit_value", "limit_value IS NULL OR limit_value >= 0")); 
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_subscription_plan_feature_limits_limit_value",
+            "limit_value IS NULL OR limit_value >= 0"));
     }
 }
-
-
-

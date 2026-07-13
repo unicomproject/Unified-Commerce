@@ -67,11 +67,11 @@ public sealed class TenantRoleConfiguration : IEntityTypeConfiguration<TenantRol
 
         builder.Property(x => x.CreatedByTenantUserId)
             .HasColumnName("created_by_tenant_user_id")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.UpdatedByTenantUserId)
             .HasColumnName("updated_by_tenant_user_id")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()

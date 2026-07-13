@@ -40,10 +40,46 @@ public sealed class FeatureLimitDefinitionConfiguration : IEntityTypeConfigurati
             .IsRequired();
 
         builder.Property(x => x.DefaultLimitValue)
-            .HasColumnName("default_limit_value");
+            .HasColumnName("default_limit_value")
+            .HasPrecision(18, 4);
 
         builder.Property(x => x.PlatformFeatureId)
             .HasColumnName("platform_feature_id")
+            .IsRequired();
+
+        builder.Property(x => x.LimitKey)
+            .HasColumnName("limit_key")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(x => x.LimitName)
+            .HasColumnName("limit_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
+
+        builder.Property(x => x.ValueType)
+            .HasColumnName("value_type")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired();
+
+        builder.Property(x => x.UnitCode)
+            .HasColumnName("unit_code")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired(false);
+
+        builder.Property(x => x.IsHardLimit)
+            .HasColumnName("is_hard_limit")
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
             .IsRequired();
 
         builder.HasOne<PlatformFeature>()
@@ -56,9 +92,12 @@ public sealed class FeatureLimitDefinitionConfiguration : IEntityTypeConfigurati
             .IsUnique()
             .HasDatabaseName("uq_feature_limit_definitions_platform_feature_id_limit_code");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_feature_limit_definitions_default_limit_value", "default_limit_value IS NULL OR default_limit_value >= 0")); 
+        builder.HasIndex(x => new { x.PlatformFeatureId, x.LimitKey })
+            .IsUnique()
+            .HasDatabaseName("uq_feature_limit_definitions_platform_feature_id_limit_key");
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_feature_limit_definitions_default_limit_value",
+            "default_limit_value IS NULL OR default_limit_value >= 0"));
     }
 }
-
-
-

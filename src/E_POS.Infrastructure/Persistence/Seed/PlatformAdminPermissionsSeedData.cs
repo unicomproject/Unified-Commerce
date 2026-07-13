@@ -58,6 +58,8 @@ public static class PlatformAdminPermissionsSeedData
         new(Guid.Parse("62000000-0000-0000-0000-000000000036"), PlatformPermissionCodes.ReturnPolicyTemplatesManage, "Manage Return Policy Templates", "Manage platform return policy templates.")
     ];
 
+    // Legacy SQL shape for 20260702120000_SeedPlatformAdminPermissions.
+    // Phase 1 columns are backfilled by AlignPlatformAdminFoundationWithSecondBrain.
     public static string UpSql => $"""
         INSERT INTO platform_permissions (id, permission_code, name, description, status, created_at, updated_at)
         VALUES

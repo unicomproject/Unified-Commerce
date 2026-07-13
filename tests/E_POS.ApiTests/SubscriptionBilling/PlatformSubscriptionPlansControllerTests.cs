@@ -21,7 +21,7 @@ public sealed class PlatformSubscriptionPlansControllerTests
         var controller = CreateController(
             new FakePlatformSubscriptionPlanService(
                 ApplicationResult<SubscriptionPlanListResponse>.Success(
-                    new SubscriptionPlanListResponse([], 1, 10, 0, 0, true, true, true, true, true))),
+                    new SubscriptionPlanListResponse([], 1, 10, 0, 0, true, true, true, true, true, true))),
             Guid.NewGuid());
 
         var result = await controller.GetPlans(new SubscriptionPlanListQuery(), CancellationToken.None);
@@ -144,7 +144,7 @@ public sealed class PlatformSubscriptionPlansControllerTests
         public FakePlatformSubscriptionPlanService(ApplicationResult<SubscriptionPlanCatalogResponse> catalogResult)
         {
             _catalogResult = catalogResult;
-            _listResult = ApplicationResult<SubscriptionPlanListResponse>.Success(new SubscriptionPlanListResponse([], 1, 10, 0, 0, false, false, false, false, false));
+            _listResult = ApplicationResult<SubscriptionPlanListResponse>.Success(new SubscriptionPlanListResponse([], 1, 10, 0, 0, false, false, false, false, false, false));
             _mutationResult = ApplicationResult<SubscriptionPlanMutationResponse>.Failure(new ApplicationError("platform_subscription_plans.not_found", "missing"));
             _publishResult = _mutationResult;
         }
@@ -153,7 +153,7 @@ public sealed class PlatformSubscriptionPlansControllerTests
         {
             _mutationResult = mutationResult;
             _publishResult = mutationResult;
-            _listResult = ApplicationResult<SubscriptionPlanListResponse>.Success(new SubscriptionPlanListResponse([], 1, 10, 0, 0, false, false, false, false, false));
+            _listResult = ApplicationResult<SubscriptionPlanListResponse>.Success(new SubscriptionPlanListResponse([], 1, 10, 0, 0, false, false, false, false, false, false));
             _catalogResult = ApplicationResult<SubscriptionPlanCatalogResponse>.Success(new SubscriptionPlanCatalogResponse([]));
         }
 
@@ -180,6 +180,14 @@ public sealed class PlatformSubscriptionPlansControllerTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(_catalogResult!);
+        }
+
+        public Task<ApplicationResult<SubscriptionPlanDetailResponse>> GetPlanDetailAsync(
+            Guid planId,
+            Guid platformUserId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ApplicationResult<SubscriptionPlanDetailResponse>.Failure(new ApplicationError("platform_subscription_plans.not_found", "missing")));
         }
 
         public Task<ApplicationResult<SubscriptionPlanMutationResponse>> CreateDraftAsync(
@@ -217,12 +225,53 @@ public sealed class PlatformSubscriptionPlansControllerTests
             return Task.FromResult(_mutationResult!);
         }
 
+        public Task<ApplicationResult<SubscriptionPlanMutationResponse>> UpdateDraftAsync(
+            Guid planId,
+            UpdateSubscriptionPlanRequest request,
+            Guid platformUserId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_mutationResult!);
+        }
+
         public Task<ApplicationResult<SubscriptionPlanMutationResponse>> PublishAsync(
             Guid planId,
             Guid platformUserId,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(_publishResult ?? _mutationResult!);
+        }
+
+        public Task<ApplicationResult<SubscriptionPlanMutationResponse>> DuplicateAsync(
+            Guid planId,
+            Guid platformUserId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_mutationResult!);
+        }
+
+        public Task<ApplicationResult<SubscriptionPlanMutationResponse>> ArchiveAsync(
+            Guid planId,
+            Guid platformUserId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_mutationResult!);
+        }
+
+        public Task<ApplicationResult<SubscriptionPlanMutationResponse>> ReactivateAsync(
+            Guid planId,
+            Guid platformUserId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_mutationResult!);
+        }
+
+        public Task<ApplicationResult<bool>> DeleteDraftAsync(
+            Guid planId,
+            Guid platformUserId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ApplicationResult<bool>.Success(true));
         }
     }
 }

@@ -534,15 +534,14 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         IReadOnlyCollection<Guid> productIds,
         CancellationToken cancellationToken)
     {
-        var posChannelId = await _dbContext.SalesChannels
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.Status == "ACTIVE" &&
-                (x.ChannelCode.ToUpper() == "POS" || x.ChannelType.ToUpper() == "POS"))
-            .OrderBy(x => x.SortOrder)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var posChannelId = await (from s in _dbContext.SalesChannels.AsNoTracking()
+                                  join p in _dbContext.PlatformSalesChannels.AsNoTracking() on s.PlatformSalesChannelId equals p.Id
+                                  where s.TenantId == tenantId &&
+                                        s.Status == "ACTIVE" &&
+                                        (p.ChannelCode.ToUpper() == "POS" || p.ChannelType.ToUpper() == "PHYSICAL")
+                                  orderby s.SortOrder
+                                  select (Guid?)s.Id)
+                                 .FirstOrDefaultAsync(cancellationToken);
 
         if (!posChannelId.HasValue)
         {

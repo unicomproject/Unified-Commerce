@@ -236,7 +236,7 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_sales_orders_fulfillment_method_outlet_id_fulfillment_method_outlets");
 
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>()
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>()
             .WithMany()
             .HasForeignKey(x => new { x.TenantId, x.CustomerId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id })

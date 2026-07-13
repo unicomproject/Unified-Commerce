@@ -32,6 +32,10 @@ public sealed class PlatformAdminAuditLogsControllerTests
         Assert.True(payload.Success);
         Assert.Equal("platform_login_security", payload.Data.AuditScope);
         Assert.Single(payload.Data.Items);
+        Assert.Null(payload.Data.Items[0].IpAddress);
+        Assert.Null(payload.Data.Items[0].UserAgent);
+        Assert.Equal("platform.login.success", payload.Data.Items[0].Action);
+        Assert.Equal("Platform login succeeded.", payload.Data.Items[0].Summary);
     }
 
     [Fact]
@@ -48,6 +52,41 @@ public sealed class PlatformAdminAuditLogsControllerTests
 
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAuditLogs_ResponseShape_RemainsUnchanged()
+    {
+        var response = CreateResponse();
+        var controller = CreateController(
+            new FakePlatformAuditLogService(ApplicationResult<PlatformAuditLogListResponse>.Success(response)),
+            PlatformUserId);
+
+        var result = await controller.GetAuditLogs(new PlatformAuditLogListQuery(), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var payload = Assert.IsType<LegacyApiResponse<PlatformAuditLogListResponse>>(ok.Value);
+
+        Assert.Equal(response.AuditScope, payload.Data.AuditScope);
+        Assert.Equal(response.AuditScopeDescription, payload.Data.AuditScopeDescription);
+        Assert.Equal(response.PageNumber, payload.Data.PageNumber);
+        Assert.Equal(response.PageSize, payload.Data.PageSize);
+        Assert.Equal(response.TotalCount, payload.Data.TotalCount);
+        Assert.Equal(response.TotalPages, payload.Data.TotalPages);
+
+        var item = payload.Data.Items[0];
+        var expected = response.Items[0];
+        Assert.Equal(expected.Id, item.Id);
+        Assert.Equal(expected.OccurredAt, item.OccurredAt);
+        Assert.Equal(expected.Actor.PlatformUserId, item.Actor.PlatformUserId);
+        Assert.Equal(expected.Actor.Email, item.Actor.Email);
+        Assert.Equal(expected.Action, item.Action);
+        Assert.Equal(expected.Area, item.Area);
+        Assert.Equal(expected.EntityType, item.EntityType);
+        Assert.Equal(expected.EntityId, item.EntityId);
+        Assert.Equal(expected.Summary, item.Summary);
+        Assert.Null(item.IpAddress);
+        Assert.Null(item.UserAgent);
     }
 
     [Fact]
@@ -159,4 +198,3 @@ public sealed class PlatformAdminAuditLogsControllerTests
         }
     }
 }
-

@@ -1,5 +1,4 @@
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
-using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -46,6 +45,47 @@ public sealed class TenantUsageCounterConfiguration : IEntityTypeConfiguration<T
             .HasColumnName("used_quantity")
             .HasPrecision(18, 4);
 
+        builder.Property(x => x.FeatureLimitDefinitionId)
+            .HasColumnName("feature_limit_definition_id")
+            .IsRequired();
+
+        builder.Property(x => x.UsageScope)
+            .HasColumnName("usage_scope")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
+        builder.Property(x => x.ScopeReferenceId)
+            .HasColumnName("scope_reference_id");
+
+        builder.Property(x => x.CurrentValue)
+            .HasColumnName("current_value")
+            .HasPrecision(18, 4)
+            .IsRequired();
+
+        builder.Property(x => x.LimitValue)
+            .HasColumnName("limit_value")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.PeriodStart)
+            .HasColumnName("period_start")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(x => x.PeriodEnd)
+            .HasColumnName("period_end")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.LastCalculatedAt)
+            .HasColumnName("last_calculated_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired();
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -58,14 +98,26 @@ public sealed class TenantUsageCounterConfiguration : IEntityTypeConfiguration<T
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_tenant_usage_counters_platform_feature_id_platform_features");
 
+        builder.HasOne<FeatureLimitDefinition>()
+            .WithMany()
+            .HasForeignKey(x => x.FeatureLimitDefinitionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_tenant_usage_counters_feature_limit_definition_id_feature_limit_definitions");
+
+        builder.HasIndex(x => x.FeatureLimitDefinitionId)
+            .HasDatabaseName("ix_tenant_usage_counters_feature_limit_definition_id");
+
         builder.HasIndex(x => new { x.TenantId, x.PlatformFeatureId, x.UsagePeriodStart })
             .IsUnique()
             .HasDatabaseName("uq_tenant_usage_counters_tenant_id_platform_feature_id_usage_period_start");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_usage_counters_used_quantity", "used_quantity >= 0")); 
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_tenant_usage_counters_used_quantity", "used_quantity >= 0");
+            t.HasCheckConstraint("ck_tenant_usage_counters_current_value", "current_value >= 0");
+            t.HasCheckConstraint(
+                "ck_tenant_usage_counters_limit_value",
+                "limit_value IS NULL OR limit_value >= 0");
+        });
     }
 }
-
-
-
-

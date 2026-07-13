@@ -93,6 +93,50 @@ public sealed class PlatformTenantWizardServiceTests
     }
 
     [Fact]
+    public async Task CreateTenantAsync_WizardRequest_CreatesBootstrapTenantRoleWithoutTenantUserAudit()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-ROLE",
+                Name = "Wizard Tenant",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada.role@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastWriteModel);
+
+        var adminRole = repository.LastWriteModel!.TenantAdminRole;
+        Assert.NotNull(adminRole);
+        // Bootstrap role is system-created during the platform wizard; no tenant user exists yet,
+        // so tenant-user audit FKs (fk_tenant_roles_created_by / _updated_by) must be null, never the platform user id.
+        Assert.Null(adminRole!.CreatedByTenantUserId);
+        Assert.Null(adminRole.UpdatedByTenantUserId);
+
+        Assert.All(
+            repository.LastWriteModel.TenantAdminRolePermissions,
+            permission => Assert.Null(permission.GrantedByTenantUserId));
+    }
+
+    [Fact]
     public async Task CreateTenantAsync_WizardWithPassword_ReturnsValidationFailureBecauseTempPasswordIsDeferred()
     {
         var repository = new FakeWizardTenantRepository();
@@ -276,12 +320,208 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.NotNull(repository.LastWriteModel);
         Assert.NotNull(repository.LastWriteModel!.DraftInvoice);
         Assert.Equal(60m, repository.LastWriteModel.DraftInvoice!.TotalAmount);
+        Assert.Equal(60m, repository.LastWriteModel.DraftInvoice.SubtotalAmount);
+        Assert.Equal(60m, repository.LastWriteModel.DraftInvoice.BalanceDue);
+        Assert.Equal("LKR", repository.LastWriteModel.DraftInvoice.CurrencyCode);
+        Assert.Equal(SubscriptionBillingAlignmentConstants.InvoiceTypeSubscription, repository.LastWriteModel.DraftInvoice.InvoiceType);
+
+        var lines = repository.LastWriteModel.DraftInvoiceLines;
+        Assert.Equal(2, lines.Count);
+
+        var planLine = lines[0];
+        Assert.Equal(SubscriptionBillingAlignmentConstants.InvoiceLineTypePlan, planLine.ItemType);
+        Assert.Equal(1, planLine.LineNumberInt);
+        Assert.Equal("1", planLine.LineNumber);
+        Assert.Equal(50m, planLine.UnitPrice);
+        Assert.Equal(1m, planLine.Quantity);
+        Assert.Equal(50m, planLine.LineTotalAmount);
+        Assert.Equal(50m, planLine.LineTotal);
+        Assert.Equal(repository.LastWriteModel.DraftInvoice.Id, planLine.SubscriptionInvoiceId);
+        Assert.Equal(repository.LastWriteModel.DraftInvoice.Id, planLine.InvoiceId);
+
+        var addonLine = lines[1];
+        Assert.Equal(SubscriptionBillingAlignmentConstants.InvoiceLineTypeAddon, addonLine.ItemType);
+        Assert.Equal(2, addonLine.LineNumberInt);
+        Assert.Equal("2", addonLine.LineNumber);
+        Assert.Equal(5m, addonLine.UnitPrice);
+        Assert.Equal(2m, addonLine.Quantity);
+        Assert.Equal(10m, addonLine.LineTotalAmount);
+        Assert.Equal(10m, addonLine.LineTotal);
+        Assert.Equal(repository.LastWriteModel.DraftInvoice.Id, addonLine.SubscriptionInvoiceId);
+        Assert.Equal(repository.LastWriteModel.DraftInvoice.Id, addonLine.InvoiceId);
+
+        Assert.Equal(
+            repository.LastWriteModel.DraftInvoice.TotalAmount,
+            lines.Sum(line => line.LineTotalAmount));
+        Assert.Equal(
+            repository.LastWriteModel.DraftInvoice.SubtotalAmount,
+            lines.Sum(line => line.LineTotal));
+        Assert.Equal(
+            repository.LastWriteModel.DraftInvoice.BalanceDue,
+            lines.Sum(line => line.LineTotalAmount));
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardWithPaidBilling_SkipsDraftInvoiceAndLines()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-NOINV",
+                Name = "Wizard Tenant",
+                BillingStatus = TenantBillingStatusConstants.Paid,
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "No",
+                    Email = "noinv@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastWriteModel);
+        Assert.Null(repository.LastWriteModel!.DraftInvoice);
+        Assert.Empty(repository.LastWriteModel.DraftInvoiceLines);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardRequest_ValidatesAndSeedsUsageCounters()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var usageCounterService = new FakeTenantUsageCounterService();
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate },
+            tenantUsageCounterService: usageCounterService);
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-COUNTERS",
+                Name = "Wizard Tenant",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada-counters@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(usageCounterService.ValidateCalled);
+        Assert.True(usageCounterService.SeedCalled);
+        Assert.NotNull(usageCounterService.LastSeedRequest);
+        Assert.NotNull(repository.LastWriteModel);
+        Assert.Equal(repository.LastWriteModel!.Tenant.Id, usageCounterService.LastSeedRequest!.TenantId);
+        Assert.Equal(Now, usageCounterService.LastSeedRequest.PeriodStart);
+        Assert.Null(usageCounterService.LastSeedRequest.PeriodEnd);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxOutlets);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxUsers);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxTills);
+        Assert.Equal(CreateDetail(tenantId).Code, result.Value!.Code);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardWithAddons_SeedsCountersWithEffectiveLimits()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var usageCounterService = new FakeTenantUsageCounterService();
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate },
+            tenantUsageCounterService: usageCounterService);
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-ADDON-COUNTERS",
+                Name = "Wizard Tenant",
+                SubscriptionPlanId = PlanId,
+                Addons = [new CreatePlatformTenantAddonSelectionRequest { AddonId = AddonId, Quantity = 2 }],
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Jude",
+                    Email = "jude-counters@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(usageCounterService.LastSeedRequest);
+        Assert.Equal(7, usageCounterService.LastSeedRequest!.MaxOutlets);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxUsers);
+        Assert.Equal(5, usageCounterService.LastSeedRequest.MaxTills);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardWhenCanonicalLimitsMissing_ReturnsValidationFailureBeforeSave()
+    {
+        var repository = new FakeWizardTenantRepository();
+        var usageCounterService = new FakeTenantUsageCounterService
+        {
+            ValidateException = new MissingCanonicalCapacityLimitDefinitionException(
+                SubscriptionCatalogLimitSeedConstants.MaxOutletsLimitKey,
+                SubscriptionCatalogLimitSeedConstants.MaxOutletsLimitDefinitionId)
+        };
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate },
+            tenantUsageCounterService: usageCounterService);
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-MISSING-LIMITS",
+                Name = "Wizard Tenant",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    Email = "ada-missing@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_tenants.validation_failed", result.Error.Code);
+        Assert.Contains("max_outlets", result.Error.Message, StringComparison.Ordinal);
+        Assert.False(repository.CreateWizardCalled);
+        Assert.False(usageCounterService.SeedCalled);
     }
 
     private static PlatformTenantService CreateService(
         FakeWizardTenantRepository repository,
         IReadOnlySet<string> permissions,
-        IPasswordHashService? passwordHashService = null)
+        IPasswordHashService? passwordHashService = null,
+        FakeTenantUsageCounterService? tenantUsageCounterService = null)
     {
         var subscriptionRepository = new FakePlatformSubscriptionPlanRepository
         {
@@ -304,7 +544,8 @@ public sealed class PlatformTenantWizardServiceTests
             new FakePermissionChecker(permissions),
             new FakePermissionRepository(permissions),
             new FakeDateTimeProvider(),
-            passwordHashService ?? new FakePasswordHashService());
+            passwordHashService ?? new FakePasswordHashService(),
+            tenantUsageCounterService ?? new FakeTenantUsageCounterService());
     }
 
     private static PlatformTenantDetailResponse CreateDetail(Guid tenantId) =>
@@ -398,6 +639,8 @@ public sealed class PlatformTenantWizardServiceTests
             Guid tenantId,
             IReadOnlyList<Guid> enabledFeatureIds,
             DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            string? revokedReason,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
@@ -553,7 +796,16 @@ public sealed class PlatformTenantWizardServiceTests
         public Task<bool> PlanCodeExistsAsync(string planCode, CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
+        public Task<bool> PlanCodeExistsAsync(string planCode, Guid excludingPlanId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
         public Task<SubscriptionPlanMutationResponse?> GetPlanByIdAsync(
+            Guid planId,
+            SubscriptionPlanPermissionFlags permissionFlags,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<SubscriptionPlanDetailResponse?> GetPlanDetailByIdAsync(
             Guid planId,
             SubscriptionPlanPermissionFlags permissionFlags,
             CancellationToken cancellationToken) =>
@@ -578,6 +830,32 @@ public sealed class PlatformTenantWizardServiceTests
             throw new NotImplementedException();
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task UpsertLegacyPlanLimitsAsync(
+            Guid planId,
+            int? maxOutlets,
+            int? maxUsers,
+            int? maxTills,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(
+            Guid planId,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<int> CountPlanAssignmentsAsync(Guid planId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task<string?> GetPlanCodeByIdAsync(Guid planId, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task RemovePlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
+        public Task CopyPlanConfigurationAsync(Guid sourcePlanId, Guid targetPlanId, DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotImplementedException();
     }
 }

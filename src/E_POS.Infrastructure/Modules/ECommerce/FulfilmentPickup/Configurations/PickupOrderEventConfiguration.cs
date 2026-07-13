@@ -86,6 +86,10 @@ public sealed class PickupOrderEventConfiguration : IEntityTypeConfiguration<Pic
             .HasForeignKey(x => x.EventByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_pickup_order_events_9194aa75");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_pickup_order_events_sequence_number", "sequence_number > 0");
+        });
         // </second-brain-constraints>
     }
 }

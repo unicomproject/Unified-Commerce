@@ -23,6 +23,7 @@ public sealed class PlatformPermissionRepository : IPlatformPermissionRepository
             join permission in _dbContext.PlatformPermissions.AsNoTracking()
                 on userPermission.PlatformPermissionId equals permission.Id
             where userPermission.PlatformUserId == platformUserId &&
+                  userPermission.RevokedAt == null &&
                   permission.Status == PlatformAuthConstants.ActiveStatus
             select permission.PermissionCode;
 
@@ -35,7 +36,9 @@ public sealed class PlatformPermissionRepository : IPlatformPermissionRepository
             join permission in _dbContext.PlatformPermissions.AsNoTracking()
                 on rolePermission.PlatformPermissionId equals permission.Id
             where userRole.PlatformUserId == platformUserId &&
+                  userRole.RevokedAt == null &&
                   role.Status == PlatformAuthConstants.ActiveStatus &&
+                  rolePermission.RevokedAt == null &&
                   permission.Status == PlatformAuthConstants.ActiveStatus
             select permission.PermissionCode;
 

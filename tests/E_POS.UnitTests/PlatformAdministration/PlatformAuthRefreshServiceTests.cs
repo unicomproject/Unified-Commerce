@@ -83,7 +83,7 @@ public sealed class PlatformAuthRefreshServiceTests
         var result = await service.RefreshAsync("refresh-token", CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("platform_auth.invalid_session", result.Error.Code);
+        Assert.Equal("platform_auth.invalid_refresh_token", result.Error.Code);
     }
 
     [Fact]
@@ -208,7 +208,9 @@ public sealed class PlatformAuthRefreshServiceTests
             Guid platformUserId,
             Guid sessionId,
             DateTimeOffset now,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Guid? revokedByPlatformUserId = null,
+            string? revokeReason = null)
         {
             RevokedSessionId = sessionId;
             return Task.CompletedTask;

@@ -9,6 +9,20 @@ public class TenantSubscription : AuditableEntity
     public string SubscriptionNumber { get; protected set; } = string.Empty;
     public Guid SubscriptionPlanId { get; protected set; }
     public string SubscriptionStatus { get; protected set; } = string.Empty;
+    public Guid PlanId { get; protected set; }
+    public string Status { get; protected set; } = string.Empty;
+    public string CurrencyCode { get; protected set; } = "LKR";
+    public decimal PlanPrice { get; protected set; }
+    public DateTimeOffset StartedAt { get; protected set; }
+    public DateTimeOffset CurrentPeriodStart { get; protected set; }
+    public DateTimeOffset? CurrentPeriodEnd { get; protected set; }
+    public DateTimeOffset? NextBillingDate { get; protected set; }
+    public DateTimeOffset? TrialStartedAt { get; protected set; }
+    public DateTimeOffset? TrialEndsAt { get; protected set; }
+    public DateTimeOffset? CancelledAt { get; protected set; }
+    public DateTimeOffset? EndedAt { get; protected set; }
+    public string? CancellationReason { get; protected set; }
+    public Guid? AssignedByPlatformUserId { get; protected set; }
     public string BillingCycle { get; protected set; } = TenantSubscriptionBillingConstants.BillingCycleMonthly;
     public DateTimeOffset? TrialStartAt { get; protected set; }
     public DateTimeOffset? TrialEndAt { get; protected set; }
@@ -52,6 +66,12 @@ public class TenantSubscription : AuditableEntity
             maxOutletsOverride: null,
             maxTillsOverride: null,
             maxUsersOverride: null,
+            currencyCode: "LKR",
+            planPrice: 0m,
+            startedAt: createdAt,
+            currentPeriodStart: createdAt,
+            currentPeriodEnd: null,
+            assignedByPlatformUserId: null,
             createdAt);
     }
 
@@ -75,8 +95,18 @@ public class TenantSubscription : AuditableEntity
         int? maxOutletsOverride,
         int? maxTillsOverride,
         int? maxUsersOverride,
+        string currencyCode,
+        decimal planPrice,
+        DateTimeOffset? startedAt,
+        DateTimeOffset? currentPeriodStart,
+        DateTimeOffset? currentPeriodEnd,
+        Guid? assignedByPlatformUserId,
         DateTimeOffset createdAt)
     {
+        var normalizedCurrencyCode = NormalizeRequiredText(currencyCode, "LKR");
+        var normalizedStartedAt = startedAt ?? billingStartAt ?? createdAt;
+        var normalizedCurrentPeriodStart = currentPeriodStart ?? normalizedStartedAt;
+
         return new TenantSubscription
         {
             Id = id,
@@ -84,6 +114,17 @@ public class TenantSubscription : AuditableEntity
             SubscriptionNumber = $"SUB-{id.ToString("N")[..8]}",
             SubscriptionPlanId = subscriptionPlanId,
             SubscriptionStatus = subscriptionStatus,
+            PlanId = subscriptionPlanId,
+            Status = subscriptionStatus,
+            CurrencyCode = normalizedCurrencyCode,
+            PlanPrice = planPrice,
+            StartedAt = normalizedStartedAt,
+            CurrentPeriodStart = normalizedCurrentPeriodStart,
+            CurrentPeriodEnd = currentPeriodEnd,
+            NextBillingDate = nextBillingAt,
+            TrialStartedAt = trialStartAt,
+            TrialEndsAt = trialEndAt,
+            AssignedByPlatformUserId = assignedByPlatformUserId,
             BillingCycle = billingCycle,
             TrialStartAt = trialStartAt,
             TrialEndAt = trialEndAt,
@@ -107,12 +148,28 @@ public class TenantSubscription : AuditableEntity
     public void Activate(DateTimeOffset now)
     {
         SubscriptionStatus = TenantSubscriptionStatusConstants.Active;
+        Status = TenantSubscriptionStatusConstants.Active;
         UpdatedAt = now;
     }
 
-    public void ChangePlan(Guid subscriptionPlanId, DateTimeOffset now)
+    public void ChangePlan(
+        Guid subscriptionPlanId,
+        string? currencyCode,
+        decimal? planPrice,
+        DateTimeOffset now)
     {
         SubscriptionPlanId = subscriptionPlanId;
+        PlanId = subscriptionPlanId;
+        if (!string.IsNullOrWhiteSpace(currencyCode))
+        {
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant();
+        }
+
+        if (planPrice.HasValue)
+        {
+            PlanPrice = planPrice.Value;
+        }
+
         UpdatedAt = now;
     }
 
@@ -125,6 +182,14 @@ public class TenantSubscription : AuditableEntity
     {
         var normalized = value?.Trim();
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private static string NormalizeRequiredText(string? value, string fallback)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrWhiteSpace(normalized)
+            ? fallback
+            : normalized.ToUpperInvariant();
     }
 }
 

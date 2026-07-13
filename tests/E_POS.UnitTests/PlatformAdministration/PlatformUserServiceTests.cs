@@ -504,6 +504,7 @@ public sealed class PlatformUserServiceTests
             Guid userId,
             IReadOnlyList<Guid> roleIds,
             DateTimeOffset now,
+            Guid? actorPlatformUserId,
             CancellationToken cancellationToken)
         {
             ReplaceRolesCalled = true;

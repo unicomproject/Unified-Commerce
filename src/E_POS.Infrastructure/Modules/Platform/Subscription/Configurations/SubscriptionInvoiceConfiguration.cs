@@ -61,6 +61,63 @@ public sealed class SubscriptionInvoiceConfiguration : IEntityTypeConfiguration<
             .HasColumnName("due_at")
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(x => x.SubscriptionId)
+            .HasColumnName("subscription_id");
+
+        builder.Property(x => x.InvoiceType)
+            .HasColumnName("invoice_type")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40);
+
+        builder.Property(x => x.CurrencyCode)
+            .HasColumnName("currency_code")
+            .HasColumnType("char(3)")
+            .HasMaxLength(3);
+
+        builder.Property(x => x.SubtotalAmount)
+            .HasColumnName("subtotal_amount")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.DiscountAmount)
+            .HasColumnName("discount_amount")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.TaxAmount)
+            .HasColumnName("tax_amount")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.PaidAmount)
+            .HasColumnName("paid_amount")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.BalanceDue)
+            .HasColumnName("balance_due")
+            .HasPrecision(18, 4);
+
+        builder.Property(x => x.BillingPeriodStart)
+            .HasColumnName("billing_period_start")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.BillingPeriodEnd)
+            .HasColumnName("billing_period_end")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.BillingDetailsJson)
+            .HasColumnName("billing_details_json")
+            .HasColumnType("jsonb");
+
+        builder.Property(x => x.IssuedAt)
+            .HasColumnName("issued_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.PaidAt)
+            .HasColumnName("paid_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.VoidedAt)
+            .HasColumnName("voided_at")
+            .HasColumnType("timestamp with time zone");
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -73,14 +130,27 @@ public sealed class SubscriptionInvoiceConfiguration : IEntityTypeConfiguration<
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_subscription_invoices_tenant_subscription_id_tenant_subscriptions");
 
+        builder.HasOne<TenantSubscription>()
+            .WithMany()
+            .HasForeignKey(x => x.SubscriptionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_subscription_invoices_subscription_id_tenant_subscriptions");
+
         builder.HasIndex(x => new { x.TenantId, x.InvoiceNumber })
             .IsUnique()
             .HasDatabaseName("uq_subscription_invoices_tenant_id_invoice_number");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_subscription_invoices_total_amount", "total_amount >= 0")); 
+        builder.HasIndex(x => x.SubscriptionId)
+            .HasDatabaseName("ix_subscription_invoices_subscription_id");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_subscription_invoices_total_amount", "total_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_invoices_subtotal_amount", "subtotal_amount IS NULL OR subtotal_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_invoices_discount_amount", "discount_amount IS NULL OR discount_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_invoices_tax_amount", "tax_amount IS NULL OR tax_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_invoices_paid_amount", "paid_amount IS NULL OR paid_amount >= 0");
+            t.HasCheckConstraint("ck_subscription_invoices_balance_due", "balance_due IS NULL OR balance_due >= 0");
+        });
     }
 }
-
-
-
-

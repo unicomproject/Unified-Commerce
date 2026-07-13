@@ -210,6 +210,31 @@ public sealed class PlatformTenantRepositoryTests
     }
 
     [Fact]
+    public async Task TenantReads_ExcludeRevokedEntitlementsEvenIfLegacyStatusIsEnabled()
+    {
+        await using var dbContext = CreateDbContext();
+        var planId = Guid.Parse("77777777-7777-4777-8777-777777777712");
+        var tenantId = Guid.Parse("11111111-1111-4111-8111-111111111112");
+        await SeedAsync(dbContext, planId, tenantId, Guid.NewGuid(), Guid.NewGuid());
+
+        var entitlement = await dbContext.TenantFeatureEntitlements
+            .SingleAsync(item => item.TenantId == tenantId);
+        entitlement.Disable(Now.AddMinutes(1), null, "revoked for test", null);
+        dbContext.Entry(entitlement).Property(nameof(TenantFeatureEntitlement.EntitlementStatus)).CurrentValue = TenantEntitlementStatusConstants.Enabled;
+        await dbContext.SaveChangesAsync();
+
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+        var detail = await repository.GetTenantDetailAsync(tenantId, CancellationToken.None);
+        var options = await repository.GetEntitlementOptionsAsync(tenantId, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.NotNull(options);
+        Assert.False(detail!.OnlineStoreEnabled);
+        Assert.Empty(detail.EnabledFeatureIds);
+        Assert.Empty(options!.EnabledFeatureIds);
+    }
+
+    [Fact]
     public async Task GetEntitlementOptionsAsync_WhenTenantMissing_ReturnsNull()
     {
         await using var dbContext = CreateDbContext();
@@ -218,6 +243,90 @@ public sealed class PlatformTenantRepositoryTests
         var options = await repository.GetEntitlementOptionsAsync(Guid.NewGuid(), CancellationToken.None);
 
         Assert.Null(options);
+    }
+
+    [Fact]
+    public async Task GetCreateOptionsAsync_WithAddonMissingLimitRow_DoesNotThrow()
+    {
+        await using var dbContext = CreateDbContext();
+        var planId = Guid.NewGuid();
+        var moduleId = Guid.NewGuid();
+        var featureId = Guid.NewGuid();
+        var limitDefinitionId = Guid.NewGuid();
+        var addonWithLimitId = Guid.NewGuid();
+        var addonWithoutLimitId = Guid.NewGuid();
+
+        dbContext.SubscriptionPlans.Add(SubscriptionPlan.Create(
+            planId,
+            "WIZARD_PLAN",
+            "Wizard Plan",
+            SubscriptionPlanConstants.Status.Active,
+            "MONTHLY",
+            49.99m,
+            Now));
+
+        dbContext.PlatformModules.Add(PlatformModule.Create(
+            moduleId,
+            "wizard_module",
+            "Wizard Module",
+            "Wizard module",
+            "ACTIVE",
+            1,
+            Now));
+
+        dbContext.PlatformFeatures.Add(PlatformFeature.Create(
+            featureId,
+            moduleId,
+            "outlet_management",
+            "Outlet Management",
+            "ACTIVE",
+            Now));
+
+        dbContext.FeatureLimitDefinitions.Add(FeatureLimitDefinition.Create(
+            limitDefinitionId,
+            featureId,
+            "MAX_OUTLETS",
+            "Max Outlets",
+            1m,
+            Now));
+
+        dbContext.SubscriptionAddons.AddRange(
+            SubscriptionAddon.Create(
+                addonWithLimitId,
+                "ADDON_WITH_LIMIT",
+                "Addon With Limit",
+                "ACTIVE",
+                10m,
+                Now),
+            SubscriptionAddon.Create(
+                addonWithoutLimitId,
+                "ADDON_WITHOUT_LIMIT",
+                "Addon Without Limit",
+                "ACTIVE",
+                5m,
+                Now));
+
+        dbContext.SubscriptionAddonLimits.Add(SubscriptionAddonLimit.Create(
+            Guid.NewGuid(),
+            addonWithLimitId,
+            limitDefinitionId,
+            2m,
+            Now));
+
+        await dbContext.SaveChangesAsync();
+
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+
+        var options = await repository.GetCreateOptionsAsync(CancellationToken.None);
+
+        Assert.Single(options.Plans);
+        Assert.Equal(2, options.Addons.Count);
+
+        var addonWithLimit = options.Addons.Single(addon => addon.AddonCode == "ADDON_WITH_LIMIT");
+        Assert.Equal(2, addonWithLimit.LimitIncrementByKey["max_outlets"]);
+
+        var addonWithoutLimit = options.Addons.Single(addon => addon.AddonCode == "ADDON_WITHOUT_LIMIT");
+        Assert.Empty(addonWithoutLimit.LimitIncrementByKey);
     }
 
     private static async Task SeedAsync(

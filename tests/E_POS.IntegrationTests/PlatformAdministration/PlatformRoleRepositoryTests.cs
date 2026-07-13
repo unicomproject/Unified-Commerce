@@ -57,6 +57,7 @@ public sealed class PlatformRoleRepositoryTests
             roleId,
             [permissionMap[PlatformPermissionCodes.DashboardView]],
             Now,
+            null,
             CancellationToken.None);
 
         var role = await repository.GetRoleByIdAsync(roleId, CancellationToken.None);
@@ -68,6 +69,50 @@ public sealed class PlatformRoleRepositoryTests
 
         Assert.NotNull(permissions);
         Assert.Equal([PlatformPermissionCodes.DashboardView], permissions!.AssignedPermissionCodes);
+    }
+
+    [Fact]
+    public async Task ReplaceRolePermissionsAsync_RevokesRemovedPermissionsAndPreservesHistory()
+    {
+        await using var dbContext = CreateDbContext();
+        await PlatformAdminPermissionSeedApplicator.ApplyAsync(dbContext, Now);
+
+        var roleId = Guid.NewGuid();
+        dbContext.PlatformRoles.Add(E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRole.Create(
+            roleId,
+            "soft_revoke_role",
+            "Soft Revoke Role",
+            "Soft revoke role.",
+            PlatformAuthConstants.ActiveStatus,
+            Now));
+        await dbContext.SaveChangesAsync();
+
+        IPlatformRoleRepository repository = new PlatformRoleRepository(dbContext);
+        var permissionMap = await repository.GetActiveBusinessPermissionIdMapAsync(CancellationToken.None);
+        var initialPermissionId = permissionMap[PlatformPermissionCodes.DashboardView];
+        var replacementPermissionId = permissionMap[PlatformPermissionCodes.TenantsView];
+
+        await repository.ReplaceRolePermissionsAsync(
+            roleId,
+            [initialPermissionId],
+            Now,
+            null,
+            CancellationToken.None);
+
+        await repository.ReplaceRolePermissionsAsync(
+            roleId,
+            [replacementPermissionId],
+            Now,
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        var assignments = await dbContext.PlatformRolePermissions
+            .Where(item => item.PlatformRoleId == roleId)
+            .ToListAsync();
+
+        Assert.Equal(2, assignments.Count);
+        Assert.Single(assignments, item => item.PlatformPermissionId == initialPermissionId && item.RevokedAt != null);
+        Assert.Single(assignments, item => item.PlatformPermissionId == replacementPermissionId && item.RevokedAt == null);
     }
 
     [Fact]

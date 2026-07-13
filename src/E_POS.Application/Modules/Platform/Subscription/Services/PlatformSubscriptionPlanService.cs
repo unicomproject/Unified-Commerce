@@ -32,6 +32,10 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
         "platform_subscription_plans.invalid_transition",
         "Subscription plan status transition is not allowed.");
 
+    private static readonly ApplicationError PlanInUse = new(
+        "platform_subscription_plans.in_use",
+        "Subscription plan is currently assigned to tenants.");
+
     private readonly IPlatformSubscriptionPlanRepository _repository;
     private readonly IPlatformPermissionRepository _permissionRepository;
     private readonly IPlatformPermissionChecker _permissionChecker;
@@ -75,6 +79,29 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
 
         var catalog = await _repository.GetCatalogAsync(cancellationToken);
         return ApplicationResult<SubscriptionPlanCatalogResponse>.Success(catalog);
+    }
+
+    public async Task<ApplicationResult<SubscriptionPlanDetailResponse>> GetPlanDetailAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.SubscriptionPlansView, cancellationToken))
+        {
+            return ApplicationResult<SubscriptionPlanDetailResponse>.Failure(AccessDenied);
+        }
+
+        var response = await _repository.GetPlanDetailByIdAsync(
+            planId,
+            await BuildPermissionFlagsAsync(platformUserId, cancellationToken),
+            cancellationToken);
+
+        if (response is null)
+        {
+            return ApplicationResult<SubscriptionPlanDetailResponse>.Failure(NotFound);
+        }
+
+        return ApplicationResult<SubscriptionPlanDetailResponse>.Success(response);
     }
 
     public async Task<ApplicationResult<SubscriptionPlanMutationResponse>> CreateDraftAsync(
@@ -142,9 +169,18 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
             request.MaxOutlets,
             request.MaxUsers,
             request.MaxTills,
-            now);
+            now,
+            platformUserId);
 
         await _repository.AddPlanAsync(plan, cancellationToken);
+
+        await _repository.UpsertLegacyPlanLimitsAsync(
+            plan.Id,
+            plan.MaxOutlets,
+            plan.MaxUsers,
+            plan.MaxTills,
+            now,
+            cancellationToken);
 
         var created = await _repository.GetPlanByIdAsync(
             plan.Id,
@@ -188,7 +224,8 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
         plan.UpdatePricing(
             SubscriptionPlanMapper.NormalizeCurrency(request.BaseCurrency ?? plan.BaseCurrency),
             request.BasePrice,
-            _dateTimeProvider.UtcNow);
+            _dateTimeProvider.UtcNow,
+            platformUserId);
 
         await _repository.SaveChangesAsync(cancellationToken);
 
@@ -236,8 +273,14 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
                 ValidationFailed with { Message = "At least one limit field is required." });
         }
 
-        plan.UpdateLimits(maxOutlets, maxUsers, maxTills, _dateTimeProvider.UtcNow);
-        await _repository.SaveChangesAsync(cancellationToken);
+        plan.UpdateLimits(maxOutlets, maxUsers, maxTills, _dateTimeProvider.UtcNow, platformUserId);
+        await _repository.UpsertLegacyPlanLimitsAsync(
+            planId,
+            maxOutlets,
+            maxUsers,
+            maxTills,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
 
         return await BuildMutationResultAsync(planId, platformUserId, cancellationToken);
     }
@@ -323,10 +366,204 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
                 ValidationFailed with { Message = "At least one plan limit must be configured before publishing." });
         }
 
-        plan.Publish(_dateTimeProvider.UtcNow);
+        plan.Publish(_dateTimeProvider.UtcNow, platformUserId);
         await _repository.SaveChangesAsync(cancellationToken);
 
         return await BuildMutationResultAsync(planId, platformUserId, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<SubscriptionPlanMutationResponse>> UpdateDraftAsync(
+        Guid planId,
+        UpdateSubscriptionPlanRequest request,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.SubscriptionPlansEdit, cancellationToken))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(AccessDenied);
+        }
+
+        var plan = await _repository.GetPlanEntityByIdAsync(planId, cancellationToken);
+        if (plan is null)
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(NotFound);
+        }
+
+        if (!IsDraft(plan))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(
+                InvalidTransition with { Message = "Only draft subscription plans can be edited." });
+        }
+
+        var normalizedCode = SubscriptionPlanMapper.NormalizePlanCode(request.PlanCode);
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(
+                ValidationFailed with { Message = "Plan code is required." });
+        }
+
+        if (!string.Equals(plan.PlanCode, normalizedCode, StringComparison.Ordinal) &&
+            await _repository.PlanCodeExistsAsync(normalizedCode, plan.Id, cancellationToken))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(
+                Conflict with { Message = "A subscription plan with this plan code already exists." });
+        }
+
+        var normalizedName = NormalizeRequiredText(request.Name);
+        if (string.IsNullOrWhiteSpace(normalizedName))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(
+                ValidationFailed with { Message = "Plan name is required." });
+        }
+
+        var billingInterval = SubscriptionPlanMapper.ToDbBillingInterval(request.BillingCycle);
+        if (string.IsNullOrWhiteSpace(billingInterval))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(
+                ValidationFailed with { Message = "Billing cycle must be monthly, yearly, or one_time." });
+        }
+
+        plan.UpdateDraftBasics(
+            normalizedCode,
+            normalizedName,
+            NormalizeOptionalText(request.Description),
+            billingInterval,
+            _dateTimeProvider.UtcNow,
+            platformUserId);
+
+        await _repository.SaveChangesAsync(cancellationToken);
+        return await BuildMutationResultAsync(planId, platformUserId, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<SubscriptionPlanMutationResponse>> DuplicateAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.SubscriptionPlansDuplicate, cancellationToken))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(AccessDenied);
+        }
+
+        var sourcePlan = await _repository.GetPlanEntityByIdAsync(planId, cancellationToken);
+        if (sourcePlan is null)
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(NotFound);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var duplicatedCode = await GenerateDuplicatePlanCodeAsync(sourcePlan.PlanCode, cancellationToken);
+        var duplicatedName = $"{sourcePlan.Name} Copy";
+
+        var duplicated = SubscriptionPlan.CreateDraft(
+            Guid.NewGuid(),
+            duplicatedCode,
+            duplicatedName,
+            sourcePlan.Description,
+            sourcePlan.BillingInterval,
+            sourcePlan.BaseCurrency,
+            sourcePlan.PriceAmount,
+            sourcePlan.MaxOutlets,
+            sourcePlan.MaxUsers,
+            sourcePlan.MaxTills,
+            now,
+            platformUserId);
+
+        await _repository.AddPlanAsync(duplicated, cancellationToken);
+        await _repository.CopyPlanConfigurationAsync(
+            sourcePlan.Id,
+            duplicated.Id,
+            now,
+            cancellationToken);
+        return await BuildMutationResultAsync(duplicated.Id, platformUserId, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<SubscriptionPlanMutationResponse>> ArchiveAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.SubscriptionPlansArchive, cancellationToken))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(AccessDenied);
+        }
+
+        var plan = await _repository.GetPlanEntityByIdAsync(planId, cancellationToken);
+        if (plan is null)
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(NotFound);
+        }
+
+        if (!string.Equals(plan.Status, SubscriptionPlanConstants.Status.Active, StringComparison.Ordinal))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(
+                InvalidTransition with { Message = "Only active subscription plans can be archived." });
+        }
+
+        plan.Archive(_dateTimeProvider.UtcNow, platformUserId);
+        await _repository.SaveChangesAsync(cancellationToken);
+        return await BuildMutationResultAsync(planId, platformUserId, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<SubscriptionPlanMutationResponse>> ReactivateAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.SubscriptionPlansArchive, cancellationToken))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(AccessDenied);
+        }
+
+        var plan = await _repository.GetPlanEntityByIdAsync(planId, cancellationToken);
+        if (plan is null)
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(NotFound);
+        }
+
+        if (!string.Equals(plan.Status, SubscriptionPlanConstants.Status.Retired, StringComparison.Ordinal))
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(
+                InvalidTransition with { Message = "Only archived subscription plans can be reactivated." });
+        }
+
+        plan.Reactivate(_dateTimeProvider.UtcNow, platformUserId);
+        await _repository.SaveChangesAsync(cancellationToken);
+        return await BuildMutationResultAsync(planId, platformUserId, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<bool>> DeleteDraftAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.SubscriptionPlansDelete, cancellationToken))
+        {
+            return ApplicationResult<bool>.Failure(AccessDenied);
+        }
+
+        var plan = await _repository.GetPlanEntityByIdAsync(planId, cancellationToken);
+        if (plan is null)
+        {
+            return ApplicationResult<bool>.Failure(NotFound);
+        }
+
+        if (!IsDraft(plan))
+        {
+            return ApplicationResult<bool>.Failure(
+                InvalidTransition with { Message = "Only draft subscription plans can be deleted." });
+        }
+
+        var assignments = await _repository.CountPlanAssignmentsAsync(planId, cancellationToken);
+        if (assignments > 0)
+        {
+            return ApplicationResult<bool>.Failure(PlanInUse);
+        }
+
+        await _repository.RemovePlanAsync(plan, cancellationToken);
+        return ApplicationResult<bool>.Success(true);
     }
 
     private async Task<ApplicationResult<SubscriptionPlanMutationResponse>> BuildMutationResultAsync(
@@ -355,7 +592,8 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
             CanEdit: permissions.Contains(PlatformPermissionCodes.SubscriptionPlansEdit),
             CanDuplicate: permissions.Contains(PlatformPermissionCodes.SubscriptionPlansDuplicate),
             CanArchive: permissions.Contains(PlatformPermissionCodes.SubscriptionPlansArchive),
-            CanDelete: permissions.Contains(PlatformPermissionCodes.SubscriptionPlansDelete));
+            CanDelete: permissions.Contains(PlatformPermissionCodes.SubscriptionPlansDelete),
+            CanReactivate: permissions.Contains(PlatformPermissionCodes.SubscriptionPlansArchive));
     }
 
     private async Task<bool> HasPermissionAsync(
@@ -398,6 +636,22 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
     {
         var normalized = value?.Trim();
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private async Task<string> GenerateDuplicatePlanCodeAsync(
+        string sourcePlanCode,
+        CancellationToken cancellationToken)
+    {
+        var baseCode = $"{sourcePlanCode}-COPY";
+        var candidate = baseCode;
+        var suffix = 1;
+
+        while (await _repository.PlanCodeExistsAsync(candidate, cancellationToken))
+        {
+            candidate = $"{baseCode}-{suffix++}";
+        }
+
+        return candidate;
     }
 }
 

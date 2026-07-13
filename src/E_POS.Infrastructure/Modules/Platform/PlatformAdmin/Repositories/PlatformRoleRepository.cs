@@ -32,6 +32,7 @@ public sealed class PlatformRoleRepository : IPlatformRoleRepository
                 role.RoleCode,
                 role.Name,
                 role.Description,
+                role.IsSystemRole,
                 role.Status,
                 role.CreatedAt,
                 role.UpdatedAt,
@@ -40,11 +41,13 @@ public sealed class PlatformRoleRepository : IPlatformRoleRepository
                     join permission in _dbContext.PlatformPermissions
                         on rolePermission.PlatformPermissionId equals permission.Id
                     where rolePermission.PlatformRoleId == role.Id &&
+                          rolePermission.RevokedAt == null &&
                           permission.Status == PlatformAuthConstants.ActiveStatus &&
                           BusinessPermissionCodes.Contains(permission.PermissionCode)
                     select rolePermission.Id).Count(),
                 UserCount = _dbContext.PlatformUserRoles.Count(userRole =>
-                    userRole.PlatformRoleId == role.Id)
+                    userRole.PlatformRoleId == role.Id &&
+                    userRole.RevokedAt == null)
             })
             .ToListAsync(cancellationToken);
 
@@ -58,7 +61,8 @@ public sealed class PlatformRoleRepository : IPlatformRoleRepository
                 role.PermissionCount,
                 role.UserCount,
                 role.CreatedAt,
-                role.UpdatedAt ?? role.CreatedAt))
+                role.UpdatedAt ?? role.CreatedAt,
+                role.IsSystemRole))
             .ToList();
 
         return new PlatformRoleListResponse(items);
@@ -77,6 +81,7 @@ public sealed class PlatformRoleRepository : IPlatformRoleRepository
                 item.RoleCode,
                 item.Name,
                 item.Description,
+                item.IsSystemRole,
                 item.Status,
                 item.CreatedAt,
                 item.UpdatedAt,
@@ -85,11 +90,13 @@ public sealed class PlatformRoleRepository : IPlatformRoleRepository
                     join permission in _dbContext.PlatformPermissions
                         on rolePermission.PlatformPermissionId equals permission.Id
                     where rolePermission.PlatformRoleId == item.Id &&
+                          rolePermission.RevokedAt == null &&
                           permission.Status == PlatformAuthConstants.ActiveStatus &&
                           BusinessPermissionCodes.Contains(permission.PermissionCode)
                     select rolePermission.Id).Count(),
                 UserCount = _dbContext.PlatformUserRoles.Count(userRole =>
-                    userRole.PlatformRoleId == item.Id)
+                    userRole.PlatformRoleId == item.Id &&
+                    userRole.RevokedAt == null)
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -108,7 +115,8 @@ public sealed class PlatformRoleRepository : IPlatformRoleRepository
                 role.PermissionCount,
                 role.UserCount,
                 role.CreatedAt,
-                role.UpdatedAt ?? role.CreatedAt));
+                role.UpdatedAt ?? role.CreatedAt,
+                role.IsSystemRole));
     }
 
     public Task<PlatformRole?> GetRoleEntityByIdAsync(Guid roleId, CancellationToken cancellationToken)
@@ -163,6 +171,7 @@ public sealed class PlatformRoleRepository : IPlatformRoleRepository
             join permission in _dbContext.PlatformPermissions.AsNoTracking()
                 on rolePermission.PlatformPermissionId equals permission.Id
             where rolePermission.PlatformRoleId == role.Id &&
+                  rolePermission.RevokedAt == null &&
                   permission.Status == PlatformAuthConstants.ActiveStatus &&
                   BusinessPermissionCodes.Contains(permission.PermissionCode)
             orderby permission.PermissionCode
@@ -201,27 +210,38 @@ public sealed class PlatformRoleRepository : IPlatformRoleRepository
         Guid roleId,
         IReadOnlyList<Guid> permissionIds,
         DateTimeOffset now,
+        Guid? actorPlatformUserId,
         CancellationToken cancellationToken)
     {
-        var existing = await _dbContext.PlatformRolePermissions
-            .Where(rolePermission => rolePermission.PlatformRoleId == roleId)
-            .ToListAsync(cancellationToken);
-
-        _dbContext.PlatformRolePermissions.RemoveRange(existing);
-
-        var requestedPermissionIds = permissionIds
+        var targetPermissionIds = permissionIds
             .Where(permissionId => permissionId != Guid.Empty)
             .Distinct()
-            .ToList();
+            .ToHashSet();
 
-        foreach (var permissionId in requestedPermissionIds)
+        var activeAssignments = await _dbContext.PlatformRolePermissions
+            .Where(rolePermission =>
+                rolePermission.PlatformRoleId == roleId &&
+                rolePermission.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var assignment in activeAssignments.Where(item => !targetPermissionIds.Contains(item.PlatformPermissionId)))
+        {
+            assignment.Revoke(actorPlatformUserId, "Platform role permission reassignment.", now);
+        }
+
+        var activePermissionIds = activeAssignments
+            .Select(item => item.PlatformPermissionId)
+            .ToHashSet();
+
+        foreach (var permissionId in targetPermissionIds.Where(item => !activePermissionIds.Contains(item)))
         {
             _dbContext.PlatformRolePermissions.Add(PlatformRolePermission.Create(
                 Guid.NewGuid(),
                 roleId,
                 permissionId,
                 "Platform role permission assignment.",
-                now));
+                now,
+                actorPlatformUserId));
         }
 
         var role = await _dbContext.PlatformRoles

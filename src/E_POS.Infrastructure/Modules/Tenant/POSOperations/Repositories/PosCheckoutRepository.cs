@@ -725,25 +725,40 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var existingId = await _dbContext.SalesChannels
-            .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.ChannelType == "POS" && x.Status == ActiveStatus)
-            .OrderBy(x => x.SortOrder)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var existingId = await (from s in _dbContext.SalesChannels.AsNoTracking()
+                                join p in _dbContext.PlatformSalesChannels.AsNoTracking() on s.PlatformSalesChannelId equals p.Id
+                                where s.TenantId == tenantId && p.ChannelType == "PHYSICAL" && s.Status == ActiveStatus
+                                orderby s.SortOrder
+                                select (Guid?)s.Id).FirstOrDefaultAsync(cancellationToken);
 
         if (existingId.HasValue)
         {
             return existingId.Value;
         }
 
+        var platformChannelId = await _dbContext.PlatformSalesChannels
+            .AsNoTracking()
+            .Where(x => x.ChannelCode == "POS")
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!platformChannelId.HasValue)
+        {
+            var newPlatformChannel = E_POS.Domain.Modules.Platform.PlatformFoundation.Entities.PlatformSalesChannel.Create(
+                Guid.NewGuid(),
+                "POS",
+                "Point of Sale",
+                "PHYSICAL",
+                now);
+            _dbContext.PlatformSalesChannels.Add(newPlatformChannel);
+            platformChannelId = newPlatformChannel.Id;
+        }
+
         var channel = SalesChannel.Create(
             Guid.NewGuid(),
             tenantId,
+            platformChannelId.Value,
             "POS",
-            "POS",
-            "POS",
-            "OFFLINE",
             ActiveStatus,
             0,
             now);

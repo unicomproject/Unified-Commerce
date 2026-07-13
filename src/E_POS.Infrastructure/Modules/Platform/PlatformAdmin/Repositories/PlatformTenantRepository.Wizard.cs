@@ -1,4 +1,5 @@
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
@@ -85,7 +86,7 @@ public sealed partial class PlatformTenantRepository
                 on addonFeature.PlatformFeatureId equals feature.Id into featureJoin
             from feature in featureJoin.DefaultIfEmpty()
             join addonLimit in _dbContext.SubscriptionAddonLimits.AsNoTracking()
-                on addonFeature.Id equals addonLimit.SubscriptionAddonFeatureId into limitJoin
+                on addon.Id equals addonLimit.SubscriptionAddonId into limitJoin
             from addonLimit in limitJoin.DefaultIfEmpty()
             join limitDefinition in _dbContext.FeatureLimitDefinitions.AsNoTracking()
                 on addonLimit.FeatureLimitDefinitionId equals limitDefinition.Id into definitionJoin
@@ -99,7 +100,7 @@ public sealed partial class PlatformTenantRepository
                 addon.PriceAmount,
                 RelatedFeatureCode = feature != null ? feature.FeatureCode : null,
                 LimitCode = limitDefinition != null ? limitDefinition.LimitCode : null,
-                addonLimit.LimitValue
+                IncrementValue = addonLimit != null ? (decimal?)addonLimit.IncrementValue : null
             })
             .ToListAsync(cancellationToken);
 
@@ -118,12 +119,14 @@ public sealed partial class PlatformTenantRepository
                 foreach (var row in group)
                 {
                     var normalizedKey = NormalizeLimitKey(row.LimitCode);
-                    if (normalizedKey is null || row.LimitValue is null)
+                    if (normalizedKey is null ||
+                        !row.IncrementValue.HasValue ||
+                        row.IncrementValue.Value <= 0m)
                     {
                         continue;
                     }
 
-                    increments[normalizedKey] = row.LimitValue.Value;
+                    increments[normalizedKey] = (int)row.IncrementValue.Value;
                 }
 
                 return new PlatformTenantCreateAddonOptionDto(
@@ -282,6 +285,16 @@ public sealed partial class PlatformTenantRepository
 
             _dbContext.TenantSubscriptions.Add(model.Subscription);
 
+            _dbContext.TenantSubscriptionHistory.Add(TenantSubscriptionHistory.CreateEvent(
+                Guid.NewGuid(),
+                model.Tenant.Id,
+                model.Subscription.Id,
+                sequenceNumber: 1,
+                changeType: TenantSubscriptionHistoryChangeTypeConstants.Created,
+                changedAt: model.Subscription.CreatedAt,
+                newPlanId: model.Subscription.SubscriptionPlanId,
+                newStatus: model.Subscription.SubscriptionStatus));
+
             if (model.Entitlements.Count > 0)
             {
                 _dbContext.TenantFeatureEntitlements.AddRange(model.Entitlements);
@@ -320,6 +333,10 @@ public sealed partial class PlatformTenantRepository
             if (model.DraftInvoice is not null)
             {
                 _dbContext.SubscriptionInvoices.Add(model.DraftInvoice);
+                if (model.DraftInvoiceLines.Count > 0)
+                {
+                    _dbContext.SubscriptionInvoiceLines.AddRange(model.DraftInvoiceLines);
+                }
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);

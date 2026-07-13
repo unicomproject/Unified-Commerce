@@ -14,6 +14,11 @@ public interface IPlatformSubscriptionPlanService
         Guid platformUserId,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<SubscriptionPlanDetailResponse>> GetPlanDetailAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<SubscriptionPlanMutationResponse>> CreateDraftAsync(
         CreateSubscriptionPlanRequest request,
         Guid platformUserId,
@@ -37,7 +42,33 @@ public interface IPlatformSubscriptionPlanService
         Guid platformUserId,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<SubscriptionPlanMutationResponse>> UpdateDraftAsync(
+        Guid planId,
+        UpdateSubscriptionPlanRequest request,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<SubscriptionPlanMutationResponse>> PublishAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<SubscriptionPlanMutationResponse>> DuplicateAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<SubscriptionPlanMutationResponse>> ArchiveAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<SubscriptionPlanMutationResponse>> ReactivateAsync(
+        Guid planId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<bool>> DeleteDraftAsync(
         Guid planId,
         Guid platformUserId,
         CancellationToken cancellationToken);

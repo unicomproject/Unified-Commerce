@@ -58,6 +58,23 @@ public sealed class PlatformFeatureConfiguration : IEntityTypeConfiguration<Plat
             .IsRequired()
             .HasDefaultValue(0);
 
+        builder.Property(x => x.FeatureKey)
+            .HasColumnName("feature_key")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Property(x => x.FeatureName)
+            .HasColumnName("feature_name")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired();
+
+        builder.Property(x => x.IsCoreFeature)
+            .HasColumnName("is_core_feature")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.HasOne<PlatformModule>()
             .WithMany()
             .HasForeignKey(x => x.PlatformModuleId)
@@ -68,9 +85,10 @@ public sealed class PlatformFeatureConfiguration : IEntityTypeConfiguration<Plat
             .IsUnique()
             .HasDatabaseName("uq_platform_features_platform_module_id_feature_code");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_features_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
+        builder.HasIndex(x => x.FeatureKey)
+            .IsUnique()
+            .HasDatabaseName("uq_platform_features_feature_key");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_platform_features_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-
-
-

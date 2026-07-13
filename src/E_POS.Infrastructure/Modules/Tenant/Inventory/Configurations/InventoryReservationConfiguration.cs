@@ -1,5 +1,5 @@
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
-using E_POS.Domain.Modules.Customer.Entities;
+using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
@@ -42,7 +42,7 @@ public sealed class InventoryReservationConfiguration : IEntityTypeConfiguration
         
         builder.HasOne<SalesChannel>().WithMany().HasForeignKey(x => new { x.TenantId, x.SalesChannelId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reservations_sales_channel_id_sales_channels");
         builder.HasOne<Outlet>().WithMany().HasForeignKey(x => new { x.TenantId, x.FulfillmentOutletId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reservations_fulfillment_outlet_id_outlets");
-        builder.HasOne<E_POS.Domain.Modules.Customer.Entities.Customer>().WithMany().HasForeignKey(x => new { x.TenantId, x.CustomerId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reservations_customer_id_customers");
+        builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>().WithMany().HasForeignKey(x => new { x.TenantId, x.CustomerId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reservations_customer_id_customers");
         
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reservations_created_by_tenant_user_id_tenant_users");
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_inventory_reservations_updated_by_tenant_user_id_tenant_users");
