@@ -25,25 +25,37 @@ public sealed class CodeSequenceRepository : ICodeSequenceRepository
         var safePaddingLength = Math.Max(1, paddingLength);
         var normalizedKey = NormalizeSequenceKey(sequenceKey);
 
-        var existingCodes = normalizedKey switch
+        List<string> existingCodes;
+
+        switch (normalizedKey)
         {
-            "OUTLET_CODE" => await _dbContext.Outlets
-                .AsNoTracking()
-                .Where(x => x.TenantId == tenantId && x.OutletCode.StartsWith(normalizedPrefix))
-                .Select(x => x.OutletCode)
-                .ToListAsync(cancellationToken),
-            "POS_DEVICE_CODE" => await _dbContext.PosDevices
-                .AsNoTracking()
-                .Where(x => x.TenantId == tenantId && x.DeviceCode.StartsWith(normalizedPrefix))
-                .Select(x => x.DeviceCode)
-                .ToListAsync(cancellationToken),
-            "STOCK_MOVEMENT_NUMBER" => await _dbContext.StockMovements
-                .AsNoTracking()
-                .Where(x => x.TenantId == tenantId && x.MovementNumber.StartsWith(normalizedPrefix))
-                .Select(x => x.MovementNumber)
-                .ToListAsync(cancellationToken),
-            _ => throw new InvalidOperationException($"Unsupported sequence key '{sequenceKey}'.")
-        };
+            case "OUTLET_CODE":
+                existingCodes = await _dbContext.Outlets
+                    .AsNoTracking()
+                    .Where(x => x.TenantId == tenantId && x.OutletCode.StartsWith(normalizedPrefix))
+                    .Select(x => x.OutletCode)
+                    .ToListAsync(cancellationToken);
+                break;
+
+            case "POS_DEVICE_CODE":
+                existingCodes = await _dbContext.PosDevices
+                    .AsNoTracking()
+                    .Where(x => x.TenantId == tenantId && x.DeviceCode.StartsWith(normalizedPrefix))
+                    .Select(x => x.DeviceCode)
+                    .ToListAsync(cancellationToken);
+                break;
+
+            case "STOCK_MOVEMENT_NUMBER":
+                existingCodes = await _dbContext.StockMovements
+                    .AsNoTracking()
+                    .Where(x => x.TenantId == tenantId && x.MovementNumber.StartsWith(normalizedPrefix))
+                    .Select(x => x.MovementNumber)
+                    .ToListAsync(cancellationToken);
+                break;
+
+            default:
+                throw new InvalidOperationException($"Unsupported sequence key '{sequenceKey}'.");
+        }
 
         var nextValue = GetNextSequenceValue(existingCodes, normalizedPrefix) + 1;
         return FormatCode(normalizedPrefix, nextValue, safePaddingLength);
