@@ -89,6 +89,15 @@ public sealed class PosCheckoutController : ControllerBase
                 => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "pos_checkout.device_not_found" or "pos_checkout.customer_not_found" or "pos_checkout.variant_not_found"
                 => NotFound(CreateError(error)),
+            "pos_checkout.discount_application_not_found" => NotFound(CreateError(error)),
+            "pos_checkout.discount_approval_required" or
+            "pos_checkout.discount_application_invalid" or
+            "pos_checkout.discount_context_mismatch" or
+            "pos_checkout.discount_policy_inactive" or
+            "pos_checkout.discount_cart_changed"
+                => Conflict(CreateError(error)),
+            "pos_checkout.idempotency_conflict" or "pos_checkout.stock_conflict"
+                => Conflict(CreateError(error)),
             "pos_checkout.till_session_not_open" or
             "pos_checkout.invalid_payment_method" or
             "pos_checkout.cash_received_required" or
@@ -96,6 +105,8 @@ public sealed class PosCheckoutController : ControllerBase
             "pos_checkout.insufficient_stock" or
             "pos_checkout.price_not_configured" or
             "pos_checkout.invalid_lines"
+                => BadRequest(CreateError(error)),
+            "pos_checkout.invalid_idempotency_key" or "pos_checkout.payment_provider_required"
                 => BadRequest(CreateError(error)),
             "pos_checkout.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
@@ -109,6 +120,13 @@ public sealed class PosCheckoutController : ControllerBase
             "pos_checkout.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "pos_checkout.device_not_found" or "pos_checkout.customer_not_found" or "pos_checkout.variant_not_found"
                 => NotFound(CreateError(error)),
+            "pos_checkout.discount_application_not_found" => NotFound(CreateError(error)),
+            "pos_checkout.discount_approval_required" or
+            "pos_checkout.discount_application_invalid" or
+            "pos_checkout.discount_context_mismatch" or
+            "pos_checkout.discount_policy_inactive" or
+            "pos_checkout.discount_cart_changed"
+                => Conflict(CreateError(error)),
             "pos_checkout.till_session_not_open" => BadRequest(CreateError(error)),
             "pos_checkout.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))

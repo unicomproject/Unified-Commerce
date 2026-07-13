@@ -31,6 +31,7 @@ public sealed class PosHomeController : ControllerBase
         [FromQuery] Guid? outletId,
         [FromQuery] Guid? tillId,
         [FromQuery] Guid? deviceId,
+        [FromQuery] string? deviceFingerprint,
         CancellationToken cancellationToken)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))

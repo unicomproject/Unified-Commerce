@@ -95,5 +95,45 @@ public class SalesOrder : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public static SalesOrder CreateHeldPosSale(
+        Guid id, Guid tenantId, string orderNumber, string idempotencyReference,
+        Guid salesChannelId, Guid? customerId, string? customerNameSnapshot,
+        Guid tillId, Guid tillSessionId, Guid? priceListId, string currencyCode,
+        decimal subtotalAmount, decimal discountAmount, decimal taxAmount,
+        decimal totalAmount, string? reason, Guid createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        return new SalesOrder
+        {
+            Id = id,
+            TenantId = tenantId,
+            OrderNumber = orderNumber.Trim(),
+            ExternalOrderReference = idempotencyReference,
+            SalesChannelId = salesChannelId,
+            OrderType = "POS_SALE",
+            CustomerId = customerId,
+            CustomerNameSnapshot = customerNameSnapshot?.Trim(),
+            TillId = tillId,
+            TillSessionId = tillSessionId,
+            PriceListId = priceListId,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            SubtotalAmount = subtotalAmount,
+            DiscountAmount = discountAmount,
+            TaxAmount = taxAmount,
+            TotalAmount = totalAmount,
+            PaidAmount = 0,
+            RefundedAmount = 0,
+            BalanceDue = totalAmount,
+            Status = "DRAFT",
+            PaymentStatus = "UNPAID",
+            FulfillmentStatus = "PENDING",
+            InternalNote = reason?.Trim(),
+            CreatedByTenantUserId = createdByTenantUserId,
+            UpdatedByTenantUserId = createdByTenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }
 

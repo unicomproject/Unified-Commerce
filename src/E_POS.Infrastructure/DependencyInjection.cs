@@ -29,6 +29,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.PricingTax.Repositories;
+using E_POS.Application.Modules.Tenant.Discount.Contracts;
+using E_POS.Infrastructure.Modules.Tenant.Discount.Repositories;
 
 
 namespace E_POS.Infrastructure;
@@ -100,6 +102,9 @@ public static class DependencyInjection
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
+        services.AddScoped<IPosHoldRepository, PosHoldRepository>();
+        services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
+        services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;

@@ -124,6 +124,68 @@ public sealed class TenantAuthServiceTests
         Assert.Null(repository.RevokedTenantUserId);
     }
 
+    [Fact]
+    public async Task RefreshAsync_WithValidToken_RotatesTokenAndReloadsPermissions()
+    {
+        var account = CreateAccount(passwordHash: "valid-hash");
+        var sessionId = Guid.NewGuid();
+        var repository = new FakeTenantAuthRepository(account, ["pos.home.view"])
+        {
+            RotationResult = new TenantRefreshRotationResult(
+                TenantRefreshRotationStatus.Succeeded,
+                account,
+                sessionId)
+        };
+        var jwtFactory = new FakeJwtTokenFactory();
+        var service = CreateService(repository, jwtFactory);
+
+        var result = await service.RefreshAsync("current-refresh-token", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("tenant-refresh-token", result.Value!.RefreshToken);
+        Assert.Contains("pos.home.view", result.Value.Permissions);
+        Assert.Equal("hash:current-refresh-token", repository.RotatedCurrentTokenHash);
+        Assert.Equal("hash:tenant-refresh-token", repository.RotatedReplacementTokenHash);
+        Assert.Equal(sessionId.ToString(), jwtFactory.SessionId);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WithRejectedToken_ReturnsGenericRefreshFailure()
+    {
+        var repository = new FakeTenantAuthRepository(null, [])
+        {
+            RotationResult = new TenantRefreshRotationResult(
+                TenantRefreshRotationStatus.Reused,
+                null,
+                null)
+        };
+        var service = CreateService(repository);
+
+        var result = await service.RefreshAsync("reused-refresh-token", CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_auth.invalid_refresh_token", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task LoginAsync_EmitsPosTillOpenPermissionInResponseAndJwtClaims()
+    {
+        var account = CreateAccount(passwordHash: "valid-hash");
+        var repository = new FakeTenantAuthRepository(account, ["pos.till.open"]);
+        var jwtFactory = new FakeJwtTokenFactory();
+        var service = CreateService(repository, jwtFactory: jwtFactory);
+
+        var result = await service.LoginAsync(
+            new TenantLoginRequest("user@tenant.test", "correct-password"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Contains("pos.till.open", result.Value!.Permissions);
+        Assert.Contains("pos.till.open", jwtFactory.PermissionClaims ?? []);
+    }
+
     private static TenantLoginAccount CreateAccount(
         string? passwordHash,
         string userStatus = TenantAuthConstants.ActiveUserStatus,
@@ -176,6 +238,15 @@ public sealed class TenantAuthServiceTests
         public Guid? RevokedSessionId { get; private set; }
 
         public DateTimeOffset? RevokedAt { get; private set; }
+
+        public TenantRefreshRotationResult RotationResult { get; init; } = new(
+            TenantRefreshRotationStatus.Invalid,
+            null,
+            null);
+
+        public string? RotatedCurrentTokenHash { get; private set; }
+
+        public string? RotatedReplacementTokenHash { get; private set; }
 
         public Task<TenantLoginAccount?> FindLoginAccountByNormalizedEmailAsync(
             string normalizedEmail,
@@ -233,6 +304,19 @@ public sealed class TenantAuthServiceTests
             RevokedAt = now;
             return Task.CompletedTask;
         }
+
+        public Task<TenantRefreshRotationResult> RotateRefreshTokenAsync(
+            string currentTokenHash,
+            Guid replacementTokenId,
+            string replacementTokenHash,
+            DateTimeOffset replacementExpiresAt,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            RotatedCurrentTokenHash = currentTokenHash;
+            RotatedReplacementTokenHash = replacementTokenHash;
+            return Task.FromResult(RotationResult);
+        }
     }
 
     private sealed class FakePasswordHashService : IPasswordHashService
@@ -248,10 +332,17 @@ public sealed class TenantAuthServiceTests
     private sealed class FakeJwtTokenFactory : IJwtTokenFactory
     {
         public string? JwtId { get; private set; }
+        public IReadOnlyList<string>? PermissionClaims { get; private set; }
+        public string? SessionId { get; private set; }
 
         public JwtTokenResult CreateAccessToken(JwtTokenDescriptor descriptor)
         {
             JwtId = descriptor.Claims["jti"].ToString();
+            SessionId = descriptor.Claims["session_id"].ToString();
+            PermissionClaims = descriptor.Claims.TryGetValue("permissions", out var value) &&
+                               value is IEnumerable<string> permissions
+                ? permissions.ToList()
+                : null;
             return new JwtTokenResult("tenant-jwt-access-token", Now.AddMinutes(15));
         }
     }

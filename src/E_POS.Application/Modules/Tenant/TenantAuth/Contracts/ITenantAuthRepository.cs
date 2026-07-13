@@ -27,6 +27,14 @@ public interface ITenantAuthRepository
         TenantLoginAudit audit,
         CancellationToken cancellationToken);
 
+    Task<TenantRefreshRotationResult> RotateRefreshTokenAsync(
+        string currentTokenHash,
+        Guid replacementTokenId,
+        string replacementTokenHash,
+        DateTimeOffset replacementExpiresAt,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
     Task RevokeCurrentSessionAsync(
         Guid tenantUserId,
         Guid tenantId,
@@ -34,4 +42,17 @@ public interface ITenantAuthRepository
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
+
+public enum TenantRefreshRotationStatus
+{
+    Succeeded,
+    Invalid,
+    Reused,
+    AccountUnavailable
+}
+
+public sealed record TenantRefreshRotationResult(
+    TenantRefreshRotationStatus Status,
+    TenantLoginAccount? Account,
+    Guid? SessionId);
 

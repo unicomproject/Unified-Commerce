@@ -50,6 +50,29 @@ public sealed class TenantAuthController : ControllerBase
         };
     }
 
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(TenantLoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh(
+        [FromBody] TenantRefreshRequest request,
+        CancellationToken cancellationToken)
+    {
+        var token = string.IsNullOrWhiteSpace(request.RefreshToken)
+            ? Request.Cookies[RefreshTokenCookieName]
+            : request.RefreshToken;
+        var result = await _tenantAuthService.RefreshAsync(token ?? string.Empty, cancellationToken);
+
+        if (result.IsSuccess && result.Value is not null)
+        {
+            AppendRefreshTokenCookie(result.Value);
+            return Ok(result.Value);
+        }
+
+        ClearRefreshTokenCookie();
+        return Unauthorized(CreateError(result.Error));
+    }
+
     [Authorize(Policy = "TenantOnly")]
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

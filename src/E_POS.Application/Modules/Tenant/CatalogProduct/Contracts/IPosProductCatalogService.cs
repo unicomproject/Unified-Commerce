@@ -16,4 +16,10 @@ public interface IPosProductCatalogService
         TenantRequestContext context,
         Guid? deviceId,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PosProductDetailResponseDto>> GetProductDetailAsync(
+        TenantRequestContext context,
+        Guid? deviceId,
+        Guid productId,
+        CancellationToken cancellationToken);
 }
