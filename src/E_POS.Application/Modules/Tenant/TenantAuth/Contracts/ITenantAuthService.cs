@@ -9,6 +9,10 @@ public interface ITenantAuthService
         TenantLoginRequest request,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<TenantLoginResponse>> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult> LogoutAsync(
         Guid tenantUserId,
         Guid tenantId,

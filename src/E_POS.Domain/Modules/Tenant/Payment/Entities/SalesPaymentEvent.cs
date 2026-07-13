@@ -14,5 +14,23 @@ public class SalesPaymentEvent : AuditableEntity
     public string? EventPayloadJson { get; protected set; }
     public DateTimeOffset EventAt { get; protected set; }
     public Guid? EventByTenantUserId { get; protected set; }
+
+    public static SalesPaymentEvent RecordPaid(
+        Guid id, Guid tenantId, Guid salesPaymentId, Guid? eventByTenantUserId,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesPaymentId = salesPaymentId,
+            SequenceNumber = 1,
+            EventType = "PAYMENT_COMPLETED",
+            OldStatus = "PENDING",
+            NewStatus = "PAID",
+            EventNote = "Cash payment completed at POS.",
+            EventAt = now,
+            EventByTenantUserId = eventByTenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

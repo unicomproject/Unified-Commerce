@@ -112,6 +112,71 @@ public sealed class PosProductsControllerTests
     }
 
     [Fact]
+    public async Task GetProductDetail_WithValidClaims_ReturnsOk()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var detail = new PosProductDetailResponseDto(
+            productId,
+            "Pro Team Jersey",
+            "Sized team jersey",
+            null,
+            "Apparel",
+            10000,
+            true,
+            [
+                new PosProductVariantGroupResponseDto("Size", ["Small", "Medium", "Large"]),
+                new PosProductVariantGroupResponseDto("Color", ["Blue", "Red"]),
+            ],
+            [
+                new PosProductVariantDetailResponseDto(
+                    Guid.NewGuid(),
+                    "MER-016-S-BLU",
+                    10000,
+                    20m,
+                    "in_stock",
+                    new Dictionary<string, string>
+                    {
+                        ["Size"] = "Small",
+                        ["Color"] = "Blue",
+                    }),
+            ]);
+
+        var service = new FakePosProductCatalogService
+        {
+            GetProductDetailResult = ApplicationResult<PosProductDetailResponseDto>.Success(detail),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, tenantId, userId, "products.view");
+
+        var result = await controller.GetProductDetail(productId, deviceId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(ok.Value);
+        Assert.Equal(tenantId, service.Context?.TenantId);
+        Assert.Equal(deviceId, service.DeviceId);
+        Assert.Equal(productId, service.ProductId);
+    }
+
+    [Fact]
+    public async Task GetProductDetail_WhenProductNotFound_ReturnsNotFound()
+    {
+        var service = new FakePosProductCatalogService
+        {
+            GetProductDetailResult = ApplicationResult<PosProductDetailResponseDto>.Failure(
+                new ApplicationError("pos_products.product_not_found", "Product could not be found.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "products.view");
+
+        var result = await controller.GetProductDetail(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
     public void Controller_RequiresTenantOnlyPolicy()
     {
         var authorize = Assert.Single(typeof(PosProductsController).GetCustomAttributes<AuthorizeAttribute>());
@@ -146,8 +211,13 @@ public sealed class PosProductsControllerTests
             ApplicationResult<IReadOnlyList<PosCatalogCategoryResponseDto>>.Failure(
                 new ApplicationError("pos_catalog.categories_failed", "POS catalog categories could not be loaded."));
 
+        public ApplicationResult<PosProductDetailResponseDto> GetProductDetailResult { get; init; } =
+            ApplicationResult<PosProductDetailResponseDto>.Failure(
+                new ApplicationError("pos_products.product_not_found", "Product could not be found."));
+
         public TenantRequestContext? Context { get; private set; }
         public Guid? DeviceId { get; private set; }
+        public Guid? ProductId { get; private set; }
         public string? Search { get; private set; }
 
         public Task<ApplicationResult<IReadOnlyList<PosProductSummaryResponseDto>>> ListProductsAsync(
@@ -171,6 +241,18 @@ public sealed class PosProductsControllerTests
             Context = context;
             DeviceId = deviceId;
             return Task.FromResult(ListCategoriesResult);
+        }
+
+        public Task<ApplicationResult<PosProductDetailResponseDto>> GetProductDetailAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            Guid productId,
+            CancellationToken cancellationToken)
+        {
+            Context = context;
+            DeviceId = deviceId;
+            ProductId = productId;
+            return Task.FromResult(GetProductDetailResult);
         }
     }
 }

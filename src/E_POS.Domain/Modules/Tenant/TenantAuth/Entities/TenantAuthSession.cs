@@ -48,4 +48,16 @@ public class TenantAuthSession : AuditableEntity
         RevokeReason = reason;
         UpdatedAt = now;
     }
+
+    public void Extend(DateTimeOffset expiresAt, DateTimeOffset now)
+    {
+        if (RevokedAt.HasValue)
+        {
+            throw new InvalidOperationException("A revoked session cannot be extended.");
+        }
+
+        ExpiresAt = expiresAt;
+        LastSeenAt = now;
+        UpdatedAt = now;
+    }
 }

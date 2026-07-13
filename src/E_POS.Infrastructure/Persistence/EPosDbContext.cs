@@ -177,6 +177,9 @@ public sealed class EPosDbContext : DbContext
     public DbSet<ExpiryDiscountApplication> ExpiryDiscountApplications => Set<ExpiryDiscountApplication>();
     public DbSet<ExpiryDiscountRule> ExpiryDiscountRules => Set<ExpiryDiscountRule>();
     public DbSet<ExpiryDiscountRuleTier> ExpiryDiscountRuleTiers => Set<ExpiryDiscountRuleTier>();
+    public DbSet<PosDiscountAuthorityLimit> PosDiscountAuthorityLimits => Set<PosDiscountAuthorityLimit>();
+    public DbSet<PosDiscountApplication> PosDiscountApplications => Set<PosDiscountApplication>();
+    public DbSet<PosDiscountApplicationEvent> PosDiscountApplicationEvents => Set<PosDiscountApplicationEvent>();
 
     // Inventory
     public DbSet<InventoryBalance> InventoryBalances => Set<InventoryBalance>();

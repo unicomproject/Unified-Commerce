@@ -111,14 +111,60 @@ public sealed class TenantAuthControllerTests
     }
 
     [Fact]
-    public void LogoutEndpoint_RequiresTenantOnlyPolicyWhileLoginAllowsAnonymous()
+    public async Task Refresh_WithValidBodyToken_ReturnsRotatedTokensAndCookie()
+    {
+        var response = new TenantLoginResponse(
+            "new-access-token",
+            DateTimeOffset.UtcNow.AddMinutes(15),
+            "new-refresh-token",
+            DateTimeOffset.UtcNow.AddDays(7),
+            new TenantLoginUserDto(Guid.NewGuid(), Guid.NewGuid(), "USER@TENANT.TEST", "ACTIVE", "active"),
+            ["pos.home.view"]);
+        var service = new FakeTenantAuthService(
+            CreateLoginFailure(),
+            refreshResult: ApplicationResult<TenantLoginResponse>.Success(response));
+        var controller = CreateController(service);
+
+        var result = await controller.Refresh(
+            new TenantRefreshRequest("current-refresh-token"),
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Same(response, ok.Value);
+        Assert.Equal("current-refresh-token", service.RefreshToken);
+        Assert.Contains("tenant_refresh_token=new-refresh-token", controller.Response.Headers.SetCookie.ToString());
+    }
+
+    [Fact]
+    public async Task Refresh_WithRejectedToken_ReturnsUnauthorizedAndClearsCookie()
+    {
+        var service = new FakeTenantAuthService(
+            CreateLoginFailure(),
+            refreshResult: ApplicationResult<TenantLoginResponse>.Failure(new ApplicationError(
+                "tenant_auth.invalid_refresh_token",
+                "The refresh token is invalid or expired.")));
+        var controller = CreateController(service);
+
+        var result = await controller.Refresh(
+            new TenantRefreshRequest("bad-refresh-token"),
+            CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Contains("tenant_refresh_token=", controller.Response.Headers.SetCookie.ToString());
+    }
+
+    [Fact]
+    public void AuthEndpoints_ApplyExpectedAuthorizationPolicies()
     {
         var loginMethod = typeof(TenantAuthController).GetMethod(nameof(TenantAuthController.Login));
+        var refreshMethod = typeof(TenantAuthController).GetMethod(nameof(TenantAuthController.Refresh));
         var logoutMethod = typeof(TenantAuthController).GetMethod(nameof(TenantAuthController.Logout));
 
         Assert.NotNull(loginMethod);
+        Assert.NotNull(refreshMethod);
         Assert.NotNull(logoutMethod);
         Assert.NotNull(loginMethod!.GetCustomAttribute<AllowAnonymousAttribute>());
+        Assert.NotNull(refreshMethod!.GetCustomAttribute<AllowAnonymousAttribute>());
         var authorize = Assert.Single(logoutMethod!.GetCustomAttributes<AuthorizeAttribute>());
         Assert.Equal("TenantOnly", authorize.Policy);
     }
@@ -159,13 +205,16 @@ public sealed class TenantAuthControllerTests
     {
         private readonly ApplicationResult<TenantLoginResponse> _loginResult;
         private readonly ApplicationResult _logoutResult;
+        private readonly ApplicationResult<TenantLoginResponse> _refreshResult;
 
         public FakeTenantAuthService(
             ApplicationResult<TenantLoginResponse> loginResult,
-            ApplicationResult? logoutResult = null)
+            ApplicationResult? logoutResult = null,
+            ApplicationResult<TenantLoginResponse>? refreshResult = null)
         {
             _loginResult = loginResult;
             _logoutResult = logoutResult ?? ApplicationResult.Success();
+            _refreshResult = refreshResult ?? CreateLoginFailure();
         }
 
         public int LogoutCallCount { get; private set; }
@@ -175,6 +224,7 @@ public sealed class TenantAuthControllerTests
         public Guid? LogoutTenantId { get; private set; }
 
         public Guid? LogoutSessionId { get; private set; }
+        public string? RefreshToken { get; private set; }
 
         public Task<ApplicationResult<TenantLoginResponse>> LoginAsync(
             TenantLoginRequest request,
@@ -194,6 +244,14 @@ public sealed class TenantAuthControllerTests
             LogoutTenantId = tenantId;
             LogoutSessionId = sessionId;
             return Task.FromResult(_logoutResult);
+        }
+
+        public Task<ApplicationResult<TenantLoginResponse>> RefreshAsync(
+            string refreshToken,
+            CancellationToken cancellationToken)
+        {
+            RefreshToken = refreshToken;
+            return Task.FromResult(_refreshResult);
         }
     }
 }

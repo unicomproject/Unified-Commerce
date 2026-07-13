@@ -19,5 +19,42 @@ public class SalesOrderDiscount : AuditableEntity
     public string? ManualDiscountReason { get; protected set; }
     public Guid? AppliedByTenantUserId { get; protected set; }
     public DateTimeOffset AppliedAt { get; protected set; }
+
+    public static SalesOrderDiscount CreateForPosSale(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid? salesOrderLineId,
+        Guid discountPolicyId,
+        Guid discountTypeId,
+        string discountTargetScope,
+        string discountCodeSnapshot,
+        string discountNameSnapshot,
+        string calculationMethodSnapshot,
+        decimal discountValue,
+        decimal discountAmount,
+        string? manualDiscountReason,
+        Guid appliedByTenantUserId,
+        DateTimeOffset now) =>
+        new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            SalesOrderLineId = salesOrderLineId,
+            DiscountPolicyId = discountPolicyId,
+            DiscountTypeId = discountTypeId,
+            DiscountTargetScope = discountTargetScope.Trim().ToUpperInvariant(),
+            ApplicationSequence = 1,
+            DiscountCodeSnapshot = discountCodeSnapshot.Trim(),
+            DiscountNameSnapshot = discountNameSnapshot.Trim(),
+            CalculationMethodSnapshot = calculationMethodSnapshot.Trim().ToUpperInvariant(),
+            DiscountValue = discountValue,
+            DiscountAmount = discountAmount,
+            ManualDiscountReason = string.IsNullOrWhiteSpace(manualDiscountReason) ? null : manualDiscountReason.Trim(),
+            AppliedByTenantUserId = appliedByTenantUserId,
+            AppliedAt = now,
+            CreatedAt = now
+        };
 }
 

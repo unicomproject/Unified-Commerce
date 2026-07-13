@@ -270,6 +270,223 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         return new PosProductCatalogCategoriesRepositoryResult(null, categories);
     }
 
+    public async Task<PosProductDetailRepositoryResult> GetProductDetailAsync(
+        Guid tenantId,
+        Guid deviceId,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        var deviceExists = await _dbContext.PosDevices
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId && x.Id == deviceId,
+                cancellationToken);
+
+        if (!deviceExists)
+        {
+            return new PosProductDetailRepositoryResult("pos_products.device_not_found", null);
+        }
+
+        var product = await _dbContext.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x =>
+                    x.TenantId == tenantId &&
+                    x.Id == productId &&
+                    x.Status == ProductConstants.ActiveStatus &&
+                    x.IsSellable,
+                cancellationToken);
+
+        if (product is null)
+        {
+            return new PosProductDetailRepositoryResult("pos_products.product_not_found", null);
+        }
+
+        var hiddenProductIds = await ResolveHiddenProductIdsAsync(
+            tenantId,
+            [productId],
+            cancellationToken);
+
+        if (hiddenProductIds.Contains(productId))
+        {
+            return new PosProductDetailRepositoryResult("pos_products.product_not_found", null);
+        }
+
+        var variants = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.ProductId == productId &&
+                x.Status != ProductConstants.DeletedStatus &&
+                x.IsSellable)
+            .OrderByDescending(x => x.IsDefaultVariant)
+            .ThenBy(x => x.VariantName)
+            .ToListAsync(cancellationToken);
+
+        if (variants.Count == 0)
+        {
+            return new PosProductDetailRepositoryResult("pos_products.product_not_found", null);
+        }
+
+        var hasVariants =
+            !string.Equals(product.ProductStructure, "SIMPLE", StringComparison.OrdinalIgnoreCase) ||
+            variants.Count > 1;
+
+        var defaultPriceListId = await _dbContext.PriceLists
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == "ACTIVE")
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var variantIds = variants.Select(x => x.Id).ToList();
+        var pricesByVariant = new Dictionary<Guid, decimal>();
+        if (defaultPriceListId.HasValue)
+        {
+            var priceRows = await _dbContext.PriceListItems
+                .AsNoTracking()
+                .Where(x =>
+                    x.TenantId == tenantId &&
+                    x.PriceListId == defaultPriceListId.Value &&
+                    x.ProductVariantId.HasValue &&
+                    variantIds.Contains(x.ProductVariantId.Value) &&
+                    x.Status == "ACTIVE")
+                .Select(x => new { VariantId = x.ProductVariantId!.Value, x.SellingPrice })
+                .ToListAsync(cancellationToken);
+
+            pricesByVariant = priceRows.ToDictionary(x => x.VariantId, x => x.SellingPrice);
+        }
+
+        var inventoryByVariant = new Dictionary<Guid, decimal>();
+        var inventoryRows = await _dbContext.InventoryBalances
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.ProductVariantId.HasValue &&
+                variantIds.Contains(x.ProductVariantId.Value))
+            .GroupBy(x => x.ProductVariantId!.Value)
+            .Select(group => new
+            {
+                VariantId = group.Key,
+                AvailableQuantity = group.Sum(x => x.AvailableQuantity),
+            })
+            .ToListAsync(cancellationToken);
+
+        inventoryByVariant = inventoryRows.ToDictionary(x => x.VariantId, x => x.AvailableQuantity);
+
+        var categoryName = await (
+                from link in _dbContext.ProductCategories.AsNoTracking()
+                join category in _dbContext.Categories.AsNoTracking()
+                    on link.CategoryId equals category.Id
+                where link.TenantId == tenantId && link.ProductId == productId
+                orderby link.IsPrimaryCategory descending, link.SortOrder
+                select category.CategoryName)
+            .FirstOrDefaultAsync(cancellationToken) ?? "General";
+
+        var imageStorageKey = await _dbContext.ProductImages
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.ProductId == productId &&
+                x.Status == ActiveImageStatus)
+            .OrderBy(x => x.IsPrimaryImage ? 0 : 1)
+            .ThenBy(x => x.SortOrder)
+            .Select(x => ResolveImageValue(x.ImageUrl, x.ImageStorageKey))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var productOptions = await _dbContext.ProductOptions
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.ProductId == productId &&
+                x.Status == "ACTIVE")
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        var optionIds = productOptions.Select(x => x.Id).ToList();
+        var optionValues = optionIds.Count == 0
+            ? []
+            : await _dbContext.ProductOptionValues
+                .AsNoTracking()
+                .Where(x =>
+                    x.TenantId == tenantId &&
+                    optionIds.Contains(x.ProductOptionId) &&
+                    x.Status == "ACTIVE")
+                .OrderBy(x => x.SortOrder)
+                .ToListAsync(cancellationToken);
+
+        var variantOptionLinks = await _dbContext.ProductVariantOptionValues
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        var optionNameById = productOptions.ToDictionary(x => x.Id, x => x.OptionName);
+        var optionValueNameById = optionValues.ToDictionary(x => x.Id, x => x.ValueName);
+
+        var variantGroups = productOptions
+            .Select(option => new PosProductVariantGroupResponseDto(
+                option.OptionName,
+                optionValues
+                    .Where(value => value.ProductOptionId == option.Id)
+                    .Select(value => value.ValueName)
+                    .ToList()))
+            .Where(group => group.Options.Count > 0)
+            .ToList();
+
+        var pricedVariants = variants
+            .Where(variant => pricesByVariant.ContainsKey(variant.Id))
+            .ToList();
+
+        if (pricedVariants.Count == 0)
+        {
+            return new PosProductDetailRepositoryResult("pos_products.product_not_found", null);
+        }
+
+        decimal? minPrice = null;
+        var variantDetails = new List<PosProductVariantDetailResponseDto>(pricedVariants.Count);
+        foreach (var variant in pricedVariants)
+        {
+            var price = pricesByVariant[variant.Id];
+            minPrice = minPrice.HasValue ? Math.Min(minPrice.Value, price) : price;
+
+            inventoryByVariant.TryGetValue(variant.Id, out var availableQuantity);
+            var stockStatus = ResolveStockStatus(availableQuantity);
+
+            var attributes = variantOptionLinks
+                .Where(link => link.ProductVariantId == variant.Id)
+                .Select(link =>
+                {
+                    optionNameById.TryGetValue(link.ProductOptionId, out var optionName);
+                    optionValueNameById.TryGetValue(link.ProductOptionValueId, out var valueName);
+                    return new KeyValuePair<string, string>(
+                        optionName ?? string.Empty,
+                        valueName ?? string.Empty);
+                })
+                .Where(pair => pair.Key.Length > 0 && pair.Value.Length > 0)
+                .ToDictionary(pair => pair.Key, pair => pair.Value);
+
+            variantDetails.Add(new PosProductVariantDetailResponseDto(
+                variant.Id,
+                variant.Sku ?? string.Empty,
+                (int)Math.Round(price, MidpointRounding.AwayFromZero),
+                availableQuantity,
+                stockStatus,
+                attributes));
+        }
+
+        var detail = new PosProductDetailResponseDto(
+            product.Id,
+            product.ProductName,
+            product.ShortDescription,
+            imageStorageKey,
+            categoryName,
+            (int)Math.Round(minPrice ?? 0m, MidpointRounding.AwayFromZero),
+            hasVariants,
+            variantGroups,
+            variantDetails);
+
+        return new PosProductDetailRepositoryResult(null, detail);
+    }
+
     private async Task<IQueryable<Domain.Modules.Tenant.CatalogProduct.Entities.Product>> ApplySearchFilterAsync(
         IQueryable<Domain.Modules.Tenant.CatalogProduct.Entities.Product> productsQuery,
         Guid tenantId,

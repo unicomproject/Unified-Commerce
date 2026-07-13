@@ -8,7 +8,8 @@ public sealed record PosCheckoutSummaryRequestDto(
     Guid DeviceId,
     string? SaleType,
     Guid? CustomerId,
-    IReadOnlyList<PosCheckoutLineRequestDto> Lines);
+    IReadOnlyList<PosCheckoutLineRequestDto> Lines,
+    Guid? DiscountApplicationId = null);
 
 public sealed record PosCheckoutBillingSummaryDto(
     int ItemCount,
@@ -36,7 +37,9 @@ public sealed record PosCheckoutStartPaymentRequestDto(
     Guid? CustomerId,
     IReadOnlyList<PosCheckoutLineRequestDto> Lines,
     string PaymentMethod,
-    int? CashReceived);
+    int? CashReceived,
+    Guid? DiscountApplicationId = null,
+    string? IdempotencyKey = null);
 
 public sealed record PosCheckoutStartPaymentLineResponseDto(
     string Name,

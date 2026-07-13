@@ -17,5 +17,25 @@ public class SalesPaymentTransaction : AuditableEntity
     public string? IdempotencyKey { get; protected set; }
     public Guid? ProcessedByTenantUserId { get; protected set; }
     public DateTimeOffset ProcessedAt { get; protected set; }
+
+    public static SalesPaymentTransaction CreateCompletedCash(
+        Guid id, Guid tenantId, Guid salesPaymentId, decimal amount,
+        string currencyCode, string idempotencyKey, Guid? processedByTenantUserId,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesPaymentId = salesPaymentId,
+            TransactionType = "CAPTURE",
+            TransactionStatus = "SUCCEEDED",
+            Amount = amount,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            ProviderName = "CASH",
+            IdempotencyKey = idempotencyKey.Trim(),
+            ProcessedByTenantUserId = processedByTenantUserId,
+            ProcessedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

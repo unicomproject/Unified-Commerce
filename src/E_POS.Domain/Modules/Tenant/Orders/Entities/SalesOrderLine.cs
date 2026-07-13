@@ -49,6 +49,7 @@ public class SalesOrderLine : AuditableEntity
         decimal quantity,
         decimal unitPrice,
         decimal lineSubtotalAmount,
+        decimal lineDiscountAmount,
         decimal lineTaxAmount,
         DateTimeOffset now)
     {
@@ -76,13 +77,33 @@ public class SalesOrderLine : AuditableEntity
             OriginalUnitPrice = unitPrice,
             UnitPrice = unitPrice,
             LineSubtotalAmount = lineSubtotalAmount,
-            LineDiscountAmount = 0,
+            LineDiscountAmount = lineDiscountAmount,
             LineTaxAmount = lineTaxAmount,
-            LineTotalAmount = lineSubtotalAmount + lineTaxAmount,
+            LineTotalAmount = lineSubtotalAmount - lineDiscountAmount + lineTaxAmount,
             LineStatus = "FULFILLED",
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public static SalesOrderLine CreateForHeldPosSale(
+        Guid id, Guid tenantId, Guid salesOrderId, int lineNumber,
+        Guid productId, Guid productVariantId, Guid uomId, Guid? priceListItemId,
+        string? skuSnapshot, string productNameSnapshot, string? variantNameSnapshot,
+        string uomCodeSnapshot, string uomNameSnapshot, string productTypeSnapshot,
+        string productStructureSnapshot, decimal quantity, decimal unitPrice,
+        decimal lineSubtotalAmount, decimal lineDiscountAmount, decimal lineTaxAmount,
+        DateTimeOffset now)
+    {
+        var line = CreateForPosSale(
+            id, tenantId, salesOrderId, lineNumber, productId, productVariantId,
+            uomId, priceListItemId, skuSnapshot, productNameSnapshot,
+            variantNameSnapshot, uomCodeSnapshot, uomNameSnapshot,
+            productTypeSnapshot, productStructureSnapshot, quantity, unitPrice,
+            lineSubtotalAmount, lineDiscountAmount, lineTaxAmount, now);
+        line.FulfilledQuantity = 0;
+        line.LineStatus = "PENDING";
+        return line;
     }
 }
 

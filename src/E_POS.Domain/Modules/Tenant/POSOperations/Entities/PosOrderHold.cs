@@ -16,5 +16,26 @@ public class PosOrderHold : AuditableEntity
     public DateTimeOffset? ExpiresAt { get; protected set; }
     public DateTimeOffset? CancelledAt { get; protected set; }
     public string? CancellationReason { get; protected set; }
+
+    public static PosOrderHold Create(
+        Guid id, Guid tenantId, string holdNumber, Guid salesOrderId,
+        string? reason, Guid heldByTenantUserId, DateTimeOffset heldAt,
+        DateTimeOffset? expiresAt)
+    {
+        return new PosOrderHold
+        {
+            Id = id,
+            TenantId = tenantId,
+            HoldNumber = holdNumber.Trim(),
+            SalesOrderId = salesOrderId,
+            HoldStatus = "HELD",
+            HoldReason = reason?.Trim(),
+            HeldByTenantUserId = heldByTenantUserId,
+            HeldAt = heldAt,
+            ExpiresAt = expiresAt,
+            CreatedAt = heldAt,
+            UpdatedAt = heldAt
+        };
+    }
 }
 

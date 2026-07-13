@@ -1,6 +1,7 @@
 using System.Reflection;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
@@ -256,6 +257,461 @@ public sealed class PosProductCatalogRepositoryTests
         Assert.True(result.IsSuccess);
         var summary = Assert.Single(result.Products);
         Assert.Equal("Sports Cap", summary.Name);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_VariableProduct_ReturnsHasVariantsTrueWithoutVariantId()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var smallBlueVariantId = Guid.NewGuid();
+        var mediumBlueVariantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedVariableProductAsync(
+            dbContext,
+            tenantId,
+            productId,
+            smallBlueVariantId,
+            mediumBlueVariantId,
+            outletId);
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.ListProductsAsync(
+            tenantId,
+            deviceId,
+            null,
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var summary = Assert.Single(result.Products);
+        Assert.Equal(productId, summary.Id);
+        Assert.True(summary.HasVariants);
+        Assert.Null(summary.VariantId);
+        Assert.Equal(10000, summary.BasePrice);
+    }
+
+    [Fact]
+    public async Task GetProductDetailAsync_VariableProduct_ReturnsVariantGroupsAndVariants()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var smallBlueVariantId = Guid.NewGuid();
+        var mediumBlueVariantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedVariableProductAsync(
+            dbContext,
+            tenantId,
+            productId,
+            smallBlueVariantId,
+            mediumBlueVariantId,
+            outletId);
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.GetProductDetailAsync(
+            tenantId,
+            deviceId,
+            productId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Product);
+        Assert.Equal(productId, result.Product.Id);
+        Assert.True(result.Product.HasVariants);
+        Assert.Equal(2, result.Product.VariantGroups.Count);
+        Assert.Contains(result.Product.VariantGroups, group => group.Name == "Size");
+        Assert.Contains(result.Product.VariantGroups, group => group.Name == "Color");
+
+        var smallBlue = result.Product.Variants.Single(x => x.VariantId == smallBlueVariantId);
+        Assert.Equal("JER-S-BLU", smallBlue.Sku);
+        Assert.Equal(10000, smallBlue.Price);
+        Assert.Equal("in_stock", smallBlue.StockStatus);
+        Assert.Equal("Small", smallBlue.Attributes["Size"]);
+        Assert.Equal("Blue", smallBlue.Attributes["Color"]);
+
+        var mediumBlue = result.Product.Variants.Single(x => x.VariantId == mediumBlueVariantId);
+        Assert.Equal(12000, mediumBlue.Price);
+    }
+
+    [Fact]
+    public async Task GetProductDetailAsync_WhenProductMissing_ReturnsProductNotFound()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.GetProductDetailAsync(
+            tenantId,
+            deviceId,
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_products.product_not_found", result.ErrorCode);
+        Assert.Null(result.Product);
+    }
+
+    [Fact]
+    public async Task GetProductDetailAsync_WhenDeviceMissing_ReturnsDeviceNotFound()
+    {
+        await using var dbContext = CreateDbContext();
+        var repository = new PosProductCatalogRepository(dbContext);
+
+        var result = await repository.GetProductDetailAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_products.device_not_found", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task GetProductDetailAsync_WhenProductInactive_ReturnsProductNotFound()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 1250m);
+
+        dbContext.Products.Add(Product.Create(
+            productId,
+            tenantId,
+            "JER-001",
+            "Inactive Jersey",
+            "inactive-jersey",
+            "STANDARD",
+            "SIMPLE",
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            true,
+            "INACTIVE",
+            null,
+            Now));
+
+        dbContext.ProductVariants.Add(ProductVariant.Create(
+            variantId,
+            tenantId,
+            productId,
+            "DEFAULT",
+            "Inactive Jersey",
+            "JER-INACTIVE",
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            true,
+            true,
+            false,
+            ProductConstants.ActiveStatus,
+            null,
+            Now));
+
+        await dbContext.SaveChangesAsync();
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.GetProductDetailAsync(
+            tenantId,
+            deviceId,
+            productId,
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_products.product_not_found", result.ErrorCode);
+    }
+
+    private static async Task SeedVariableProductAsync(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        Guid productId,
+        Guid smallBlueVariantId,
+        Guid mediumBlueVariantId,
+        Guid outletId)
+    {
+        var sizeOptionId = Guid.NewGuid();
+        var colorOptionId = Guid.NewGuid();
+        var smallValueId = Guid.NewGuid();
+        var mediumValueId = Guid.NewGuid();
+        var blueValueId = Guid.NewGuid();
+        var uomId = Guid.NewGuid();
+        var inventoryLocationId = Guid.NewGuid();
+        var priceListId = Guid.NewGuid();
+
+        var priceList = new PriceList();
+        Set(priceList, "Id", priceListId);
+        Set(priceList, "TenantId", tenantId);
+        Set(priceList, "IsDefaultPriceList", true);
+        Set(priceList, "Status", "ACTIVE");
+        Set(priceList, "PriceListCode", "DEFAULT");
+        Set(priceList, "PriceListName", "Default Price List");
+        Set(priceList, "PriceListType", "POS");
+        Set(priceList, "CurrencyCode", "LKR");
+        Set(priceList, "CreatedAt", Now);
+        Set(priceList, "UpdatedAt", Now);
+        dbContext.PriceLists.Add(priceList);
+
+        dbContext.PriceListItems.Add(CreatePriceListItem(
+            Guid.NewGuid(),
+            tenantId,
+            priceListId,
+            productId,
+            smallBlueVariantId,
+            10000m));
+        dbContext.PriceListItems.Add(CreatePriceListItem(
+            Guid.NewGuid(),
+            tenantId,
+            priceListId,
+            productId,
+            mediumBlueVariantId,
+            12000m));
+
+        dbContext.InventoryLocations.Add(InventoryLocation.Create(
+            inventoryLocationId,
+            tenantId,
+            outletId,
+            null,
+            "STORE-FLOOR",
+            "Store Floor",
+            "SALES",
+            true,
+            true,
+            true,
+            false,
+            "ACTIVE",
+            null,
+            Now));
+
+        dbContext.Products.Add(Product.Create(
+            productId,
+            tenantId,
+            "JER-VAR",
+            "Pro Team Jersey",
+            "pro-team-jersey",
+            "STANDARD",
+            "VARIABLE",
+            null,
+            null,
+            null,
+            "Sized team jersey",
+            null,
+            true,
+            true,
+            ProductConstants.ActiveStatus,
+            null,
+            Now));
+
+        dbContext.ProductOptions.Add(ProductOption.Create(
+            sizeOptionId,
+            tenantId,
+            productId,
+            null,
+            "SIZE",
+            "Size",
+            "VARIANT",
+            "SELECT",
+            true,
+            0,
+            "ACTIVE",
+            null,
+            Now));
+
+        dbContext.ProductOptions.Add(ProductOption.Create(
+            colorOptionId,
+            tenantId,
+            productId,
+            null,
+            "COLOR",
+            "Color",
+            "VARIANT",
+            "SELECT",
+            true,
+            1,
+            "ACTIVE",
+            null,
+            Now));
+
+        dbContext.ProductOptionValues.Add(ProductOptionValue.Create(
+            smallValueId,
+            tenantId,
+            sizeOptionId,
+            null,
+            "SMALL",
+            "Small",
+            "Small",
+            null,
+            null,
+            0,
+            "ACTIVE",
+            null,
+            Now));
+
+        dbContext.ProductOptionValues.Add(ProductOptionValue.Create(
+            mediumValueId,
+            tenantId,
+            sizeOptionId,
+            null,
+            "MEDIUM",
+            "Medium",
+            "Medium",
+            null,
+            null,
+            1,
+            "ACTIVE",
+            null,
+            Now));
+
+        dbContext.ProductOptionValues.Add(ProductOptionValue.Create(
+            blueValueId,
+            tenantId,
+            colorOptionId,
+            null,
+            "BLUE",
+            "Blue",
+            "Blue",
+            null,
+            null,
+            0,
+            "ACTIVE",
+            null,
+            Now));
+
+        dbContext.ProductVariants.Add(ProductVariant.Create(
+            smallBlueVariantId,
+            tenantId,
+            productId,
+            "S-BLU",
+            "Small / Blue",
+            "JER-S-BLU",
+            uomId,
+            uomId,
+            true,
+            true,
+            false,
+            ProductConstants.ActiveStatus,
+            null,
+            Now));
+
+        dbContext.ProductVariants.Add(ProductVariant.Create(
+            mediumBlueVariantId,
+            tenantId,
+            productId,
+            "M-BLU",
+            "Medium / Blue",
+            "JER-M-BLU",
+            uomId,
+            uomId,
+            false,
+            true,
+            false,
+            ProductConstants.ActiveStatus,
+            null,
+            Now));
+
+        dbContext.ProductVariantOptionValues.Add(ProductVariantOptionValue.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            smallBlueVariantId,
+            sizeOptionId,
+            smallValueId,
+            null,
+            Now));
+
+        dbContext.ProductVariantOptionValues.Add(ProductVariantOptionValue.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            smallBlueVariantId,
+            colorOptionId,
+            blueValueId,
+            null,
+            Now));
+
+        dbContext.ProductVariantOptionValues.Add(ProductVariantOptionValue.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            mediumBlueVariantId,
+            sizeOptionId,
+            mediumValueId,
+            null,
+            Now));
+
+        dbContext.ProductVariantOptionValues.Add(ProductVariantOptionValue.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            mediumBlueVariantId,
+            colorOptionId,
+            blueValueId,
+            null,
+            Now));
+
+        var smallBalance = InventoryBalance.Create(
+            Guid.NewGuid(),
+            tenantId,
+            inventoryLocationId,
+            productId,
+            smallBlueVariantId,
+            null,
+            Now);
+        smallBalance.AdjustQuantities(20m, 0m, 0m, 0m, Now);
+        dbContext.InventoryBalances.Add(smallBalance);
+
+        var mediumBalance = InventoryBalance.Create(
+            Guid.NewGuid(),
+            tenantId,
+            inventoryLocationId,
+            productId,
+            mediumBlueVariantId,
+            null,
+            Now);
+        mediumBalance.AdjustQuantities(15m, 0m, 0m, 0m, Now);
+        dbContext.InventoryBalances.Add(mediumBalance);
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static PriceListItem CreatePriceListItem(
+        Guid id,
+        Guid tenantId,
+        Guid priceListId,
+        Guid productId,
+        Guid variantId,
+        decimal sellingPrice)
+    {
+        var priceItem = new PriceListItem();
+        Set(priceItem, "Id", id);
+        Set(priceItem, "TenantId", tenantId);
+        Set(priceItem, "PriceListId", priceListId);
+        Set(priceItem, "ProductId", productId);
+        Set(priceItem, "ProductVariantId", variantId);
+        Set(priceItem, "SellingPrice", sellingPrice);
+        Set(priceItem, "MinQuantity", 1m);
+        Set(priceItem, "Status", "ACTIVE");
+        Set(priceItem, "CreatedAt", Now);
+        Set(priceItem, "UpdatedAt", Now);
+        return priceItem;
     }
 
     private static async Task SeedDeviceAsync(
