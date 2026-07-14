@@ -69,12 +69,12 @@ public sealed class DepartmentCategoryControllerTests
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var response = new CategoryResponse(Guid.NewGuid(), "FOOD", "Food", CategoryConstants.ActiveStatus, null, null, null, 1, Now, Now);
+        var response = new CategoryResponse(Guid.NewGuid(), "FOOD", "Food", null, CategoryConstants.ActiveStatus, null, null, null, 1, Now, Now);
         var service = new FakeCategoryService { CreateResult = ApplicationResult<CategoryResponse>.Success(response) };
         var controller = CreateCategoryController(service);
         SetTenantClaims(controller, tenantId, userId, CategoryConstants.CreatePermission);
 
-        var result = await controller.Create(new CategoryCreateRequest(Guid.Empty, "FOOD", "Food", "food", null, CategoryConstants.ActiveStatus, null, 1), CancellationToken.None);
+        var result = await controller.Create(new CategoryCreateRequest(Guid.Empty, "FOOD", "Food", "food", null, null, CategoryConstants.ActiveStatus, null, 1), CancellationToken.None);
 
         var created = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Same(response, created.Value);
@@ -93,7 +93,7 @@ public sealed class DepartmentCategoryControllerTests
         var controller = CreateCategoryController(service);
         SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), CategoryConstants.CreatePermission);
 
-        var result = await controller.Create(new CategoryCreateRequest(Guid.Empty, "MILK", "Milk", "milk", null, CategoryConstants.ActiveStatus, Guid.NewGuid(), 1), CancellationToken.None);
+        var result = await controller.Create(new CategoryCreateRequest(Guid.Empty, "MILK", "Milk", "milk", null, null, CategoryConstants.ActiveStatus, Guid.NewGuid(), 1), CancellationToken.None);
 
         Assert.IsType<NotFoundObjectResult>(result);
     }

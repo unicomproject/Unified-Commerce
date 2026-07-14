@@ -54,7 +54,7 @@ public sealed class DepartmentCategoryServiceTests
 
         var result = await service.CreateAsync(
             CreateContext([CategoryConstants.CreatePermission]),
-            new CategoryCreateRequest(Guid.Empty, "FOOD", "Food", "food", null, CategoryConstants.ActiveStatus, null, 1),
+            new CategoryCreateRequest(Guid.Empty, "FOOD", "Food", "food", null, null, CategoryConstants.ActiveStatus, null, 1),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -70,7 +70,7 @@ public sealed class DepartmentCategoryServiceTests
 
         var result = await service.CreateAsync(
             CreateContext([CategoryConstants.CreatePermission]),
-            new CategoryCreateRequest(Guid.Empty, "MILK", "Milk", "milk", null, CategoryConstants.ActiveStatus, Guid.NewGuid(), 1),
+            new CategoryCreateRequest(Guid.Empty, "MILK", "Milk", "milk", null, null, CategoryConstants.ActiveStatus, Guid.NewGuid(), 1),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -83,14 +83,14 @@ public sealed class DepartmentCategoryServiceTests
         var categoryId = Guid.NewGuid();
         var repository = new FakeCategoryRepository
         {
-            EditableCategory = Category.Create(categoryId, TenantId, Guid.Empty, null, "FOOD", "Food", "food", null, 1, CategoryConstants.ActiveStatus, UserId, Now)
+            EditableCategory = Category.Create(categoryId, TenantId, Guid.Empty, null, "FOOD", "Food", "food", null, null, 1, CategoryConstants.ActiveStatus, UserId, Now)
         };
         var service = new CategoryService(repository, new CategoryRequestValidator(), new FakeDateTimeProvider());
 
         var result = await service.UpdateAsync(
             CreateContext([CategoryConstants.UpdatePermission]),
             categoryId,
-            new CategoryUpdateRequest(Guid.Empty, "FOOD", "Food", "food", null, CategoryConstants.ActiveStatus, categoryId, 1),
+            new CategoryUpdateRequest(Guid.Empty, "FOOD", "Food", "food", null, null, CategoryConstants.ActiveStatus, categoryId, 1),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -103,7 +103,7 @@ public sealed class DepartmentCategoryServiceTests
         var categoryId = Guid.NewGuid();
         var repository = new FakeCategoryRepository
         {
-            EditableCategory = Category.Create(categoryId, TenantId, Guid.Empty, null, "FOOD", "Food", "food", null, 1, CategoryConstants.ActiveStatus, UserId, Now),
+            EditableCategory = Category.Create(categoryId, TenantId, Guid.Empty, null, "FOOD", "Food", "food", null, null, 1, CategoryConstants.ActiveStatus, UserId, Now),
             HasChildCategories = true
         };
         var service = new CategoryService(repository, new CategoryRequestValidator(), new FakeDateTimeProvider());
@@ -200,7 +200,7 @@ public sealed class DepartmentCategoryServiceTests
         public Task<CategoryResponse?> GetByIdAsync(Guid tenantId, Guid categoryId, bool includeDeleted, CancellationToken cancellationToken)
         {
             var category = AddedCategory ?? EditableCategory;
-            return Task.FromResult<CategoryResponse?>(new CategoryResponse(categoryId, category!.CategoryCode, category.CategoryName, category.Status, category.ParentCategoryId, null, null, category.SortOrder, category.CreatedAt, category.UpdatedAt));
+            return Task.FromResult<CategoryResponse?>(new CategoryResponse(categoryId, category!.CategoryCode, category.CategoryName, category.ImageUrl, category.Status, category.ParentCategoryId, null, null, category.SortOrder, category.CreatedAt, category.UpdatedAt));
         }
 
         public Task<Category?> GetEditableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken)

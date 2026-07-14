@@ -2,7 +2,8 @@
 # Windows Application Control blocks DLLs when the build is started from Desktop.
 param(
     [switch]$SyncOnly,
-    [switch]$Migrate
+    [switch]$Migrate,
+    [string]$Urls = 'http://0.0.0.0:5150'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,14 +82,15 @@ try {
     }
 
     Write-Host ''
-    Write-Host 'Starting API at http://localhost:5150'
+    Write-Host "Starting API at $Urls"
     Write-Host 'Press Ctrl+C to stop.'
     Write-Host ''
 
     $env:ASPNETCORE_ENVIRONMENT = 'Development'
-    $env:ASPNETCORE_URLS = 'http://localhost:5150'
+    $env:ASPNETCORE_URLS = $Urls
     dotnet exec $apiDll
 }
 finally {
     Pop-Location
 }
+

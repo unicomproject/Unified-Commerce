@@ -20,6 +20,8 @@ using E_POS.Application.Modules.Tenant.PricingTax.Services;
 using E_POS.Application.Modules.Tenant.PricingTax.Validators;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Services;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -85,6 +87,14 @@ public static class DependencyInjection
         services.AddScoped<IPosTillSessionService, PosTillSessionService>();
         services.AddScoped<IPosCheckoutService, PosCheckoutService>();
         services.AddScoped<IPosReceiptService, PosReceiptService>();
+
+        // ECommerce Storefront
+        services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
+        services.AddScoped<IStorefrontCategoryService, StorefrontCategoryService>();
+        services.AddScoped<IStorefrontProductService, StorefrontProductService>();
+        services.AddScoped<IStorefrontFulfillmentService, StorefrontFulfillmentService>();
+        services.AddScoped<IStorefrontTenantService, StorefrontTenantService>();
+        services.AddScoped<IStorefrontService, StorefrontService>();
 
         return services;
     }

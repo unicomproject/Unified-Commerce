@@ -39,9 +39,9 @@ public sealed class DepartmentCategoryRepositoryTests
         var childId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         dbContext.Categories.AddRange(
-            Category.Create(parentId, tenantId, Guid.Empty, null, "FOOD", "Food", "food", null, 1, CategoryConstants.ActiveStatus, null, Now),
-            Category.Create(childId, tenantId, Guid.Empty, parentId, "MILK", "Milk", "milk", null, 2, CategoryConstants.ActiveStatus, null, Now),
-            Category.Create(Guid.NewGuid(), otherTenantId, Guid.Empty, null, "OTHER", "Other", "other", null, 1, CategoryConstants.ActiveStatus, null, Now));
+            Category.Create(parentId, tenantId, Guid.Empty, null, "FOOD", "Food", "food", null, null, 1, CategoryConstants.ActiveStatus, null, Now),
+            Category.Create(childId, tenantId, Guid.Empty, parentId, "MILK", "Milk", "milk", null, null, 2, CategoryConstants.ActiveStatus, null, Now),
+            Category.Create(Guid.NewGuid(), otherTenantId, Guid.Empty, null, "OTHER", "Other", "other", null, null, 1, CategoryConstants.ActiveStatus, null, Now));
         await dbContext.SaveChangesAsync();
         var repository = new CategoryRepository(dbContext);
 
@@ -63,8 +63,8 @@ public sealed class DepartmentCategoryRepositoryTests
         var childId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         dbContext.Categories.AddRange(
-            Category.Create(parentId, tenantId, Guid.Empty, null, "FOOD", "Food", "food", null, 1, CategoryConstants.ActiveStatus, null, Now),
-            Category.Create(childId, tenantId, Guid.Empty, parentId, "MILK", "Milk", "milk", null, 2, CategoryConstants.ActiveStatus, null, Now));
+            Category.Create(parentId, tenantId, Guid.Empty, null, "FOOD", "Food", "food", null, null, 1, CategoryConstants.ActiveStatus, null, Now),
+            Category.Create(childId, tenantId, Guid.Empty, parentId, "MILK", "Milk", "milk", null, null, 2, CategoryConstants.ActiveStatus, null, Now));
         await dbContext.SaveChangesAsync();
         var repository = new CategoryRepository(dbContext);
 
