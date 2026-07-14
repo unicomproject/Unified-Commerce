@@ -36,9 +36,10 @@ public static class DevelopmentCheckoutPrerequisitesSeedData
             ('bbbbbbbb-0007-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'CASH', 'Cash', 'CASH', true, false, false, true, false, true, 0, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
             ('bbbbbbbb-0008-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'CARD', 'Card', 'CARD', true, false, false, true, false, false, 1, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
             ('bbbbbbbb-0009-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'QR', 'QR', 'QR', true, false, false, true, false, false, 2, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('bbbbbbbb-000a-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'SPLIT', 'Split', 'SPLIT', true, false, false, true, false, true, 3, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now())
+            ('bbbbbbbb-000a-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'SPLIT', 'Split', 'OTHER', true, false, false, true, false, true, 3, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now())
         ON CONFLICT (id) DO UPDATE
         SET method_name = EXCLUDED.method_name,
+            method_type = EXCLUDED.method_type,
             is_active_for_pos = true,
             status = 'ACTIVE',
             updated_at = now();

@@ -355,9 +355,15 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
                 where device.TenantId == tenantId &&
                       device.Id == deviceId &&
                       device.Status == PosDeviceConstants.ActiveStatus &&
+                      device.IsTrusted &&
+                      device.DeviceFingerprintHash != null &&
+                      device.DeviceFingerprintHash != string.Empty &&
+                      assignment.TenantId == tenantId &&
+                      assignment.OutletId == till.OutletId &&
                       assignment.ReleasedAt == null &&
                       till.TenantId == tenantId &&
-                      till.Status == TillConstants.ActiveStatus
+                      till.Status == TillConstants.ActiveStatus &&
+                      outlet.TenantId == tenantId
                 orderby assignment.AssignedAt descending
                 select new
                 {
@@ -383,8 +389,6 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
             return null;
         }
 
-        var isTrusted = snapshot.IsTrusted && await HasActiveAssignmentAsync(deviceId, cancellationToken);
-
         return new CurrentDeviceDbSnapshot(
             TenantId: snapshot.TenantId,
             DeviceId: snapshot.DeviceId,
@@ -392,7 +396,7 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
             DeviceName: snapshot.DeviceName,
             DeviceType: snapshot.DeviceType,
             Platform: snapshot.Platform,
-            IsTrusted: isTrusted,
+            IsTrusted: true,
             OutletId: snapshot.OutletId,
             OutletName: snapshot.OutletName,
             TillId: snapshot.TillId,
@@ -413,7 +417,9 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
                 x.TenantId == tenantId &&
                 x.DeviceFingerprintHash == fingerprintHash &&
                 x.Status == PosDeviceConstants.ActiveStatus &&
-                x.IsTrusted)
+                x.IsTrusted &&
+                x.DeviceFingerprintHash != null &&
+                x.DeviceFingerprintHash != string.Empty)
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -428,15 +434,6 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
 
         return null;
     }
-
-    private async Task<bool> HasActiveAssignmentAsync(
-        Guid deviceId,
-        CancellationToken cancellationToken) =>
-        await _dbContext.TillDeviceAssignments
-            .AsNoTracking()
-            .AnyAsync(
-                x => x.PosDeviceId == deviceId && x.ReleasedAt == null,
-                cancellationToken);
 
     private async Task<string?> GetDeviceFingerprintHashAsync(
         Guid deviceId,

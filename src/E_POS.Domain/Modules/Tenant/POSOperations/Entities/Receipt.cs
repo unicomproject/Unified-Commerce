@@ -76,5 +76,49 @@ public class Receipt : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public static Receipt CreateForRefund(
+        Guid id,
+        Guid tenantId,
+        string receiptNumber,
+        Guid salesOrderId,
+        Guid outletId,
+        Guid tillId,
+        Guid tillSessionId,
+        DateOnly businessDate,
+        Guid issuedByTenantUserId,
+        string currencyCode,
+        decimal subtotalAmount,
+        decimal discountAmount,
+        decimal taxAmount,
+        decimal totalAmount,
+        string receiptDataJson,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            ReceiptNumber = receiptNumber.Trim().ToUpperInvariant(),
+            SalesOrderId = salesOrderId,
+            ReceiptType = "REFUND",
+            ReceiptStatus = "ISSUED",
+            OutletId = outletId,
+            TillId = tillId,
+            TillSessionId = tillSessionId,
+            BusinessDate = businessDate,
+            IssuedAt = now,
+            IssuedByTenantUserId = issuedByTenantUserId,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            SubtotalAmount = subtotalAmount,
+            DiscountAmount = discountAmount,
+            TaxAmount = taxAmount,
+            ChargeAmount = 0,
+            RoundingAmount = 0,
+            TotalAmount = totalAmount,
+            PaidAmount = totalAmount,
+            ChangeAmount = 0,
+            ReceiptDataJson = receiptDataJson,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

@@ -1,4 +1,5 @@
 using E_POS.Application.Common.Models;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
@@ -27,6 +28,7 @@ public sealed class PosHomeDashboardRepositoryTests
         var tillId = Guid.NewGuid();
         var deviceId = Guid.NewGuid();
         var now = new DateTimeOffset(2026, 7, 8, 10, 0, 0, TimeSpan.Zero);
+        const string deviceFingerprint = "pos-web-test-installation-01";
 
         await SeedResolvedContextAsync(
             dbContext,
@@ -35,7 +37,8 @@ public sealed class PosHomeDashboardRepositoryTests
             outletId,
             tillId,
             deviceId,
-            now);
+            now,
+            deviceFingerprint);
 
         var repository = CreateRepository(dbContext);
         var context = new TenantRequestContext(tenantId, userId, ["pos.home.view"]);
@@ -45,6 +48,7 @@ public sealed class PosHomeDashboardRepositoryTests
             wrongOutletId,
             tillId,
             deviceId,
+            deviceFingerprint,
             CancellationToken.None);
 
         Assert.True(resolution.IsResolved, resolution.ReasonCode ?? "unknown");
@@ -65,6 +69,7 @@ public sealed class PosHomeDashboardRepositoryTests
         var tillId = Guid.NewGuid();
         var deviceId = Guid.NewGuid();
         var now = new DateTimeOffset(2026, 7, 8, 10, 0, 0, TimeSpan.Zero);
+        const string deviceFingerprint = "pos-web-test-installation-02";
 
         await SeedResolvedContextAsync(
             dbContext,
@@ -74,6 +79,7 @@ public sealed class PosHomeDashboardRepositoryTests
             tillId,
             deviceId,
             now,
+            deviceFingerprint,
             includeOpenSession: false);
 
         var repository = CreateRepository(dbContext);
@@ -84,6 +90,7 @@ public sealed class PosHomeDashboardRepositoryTests
             outletId,
             tillId,
             deviceId,
+            deviceFingerprint,
             CancellationToken.None);
 
         Assert.False(resolution.IsResolved);
@@ -91,7 +98,7 @@ public sealed class PosHomeDashboardRepositoryTests
     }
 
     [Fact]
-    public async Task ResolveContextAsync_WhenDeviceIdProvided_ResolvesTillFromAssignment()
+    public async Task ResolveContextAsync_WhenTillHintDoesNotMatchDeviceAssignment_ReturnsReasonCode()
     {
         await using var dbContext = CreateDbContext();
         var tenantId = Guid.NewGuid();
@@ -101,6 +108,7 @@ public sealed class PosHomeDashboardRepositoryTests
         var deviceId = Guid.NewGuid();
         var wrongTillId = Guid.NewGuid();
         var now = new DateTimeOffset(2026, 7, 8, 10, 0, 0, TimeSpan.Zero);
+        const string deviceFingerprint = "pos-web-test-installation-03";
 
         await SeedResolvedContextAsync(
             dbContext,
@@ -109,7 +117,8 @@ public sealed class PosHomeDashboardRepositoryTests
             outletId,
             tillId,
             deviceId,
-            now);
+            now,
+            deviceFingerprint);
 
         var repository = CreateRepository(dbContext);
         var context = new TenantRequestContext(tenantId, userId, ["pos.home.view"]);
@@ -119,10 +128,85 @@ public sealed class PosHomeDashboardRepositoryTests
             outletId,
             wrongTillId,
             deviceId,
+            deviceFingerprint,
             CancellationToken.None);
 
-        Assert.True(resolution.IsResolved, resolution.ReasonCode ?? "unknown");
-        Assert.Equal(tillId, resolution.Snapshot!.TillId);
+        Assert.False(resolution.IsResolved);
+        Assert.Equal(PosHomeContextReasonCodes.DeviceNotAssignedToTill, resolution.ReasonCode);
+    }
+
+    [Fact]
+    public async Task ResolveContextAsync_WhenDeviceFingerprintMissing_DoesNotUseLatestAssignment()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var now = new DateTimeOffset(2026, 7, 8, 10, 0, 0, TimeSpan.Zero);
+
+        await SeedResolvedContextAsync(
+            dbContext,
+            tenantId,
+            userId,
+            outletId,
+            tillId,
+            deviceId,
+            now,
+            "pos-web-test-installation-04");
+
+        var repository = CreateRepository(dbContext);
+        var context = new TenantRequestContext(tenantId, userId, ["pos.home.view"]);
+
+        var resolution = await repository.ResolveContextAsync(
+            context,
+            outletId,
+            tillId,
+            null,
+            null,
+            CancellationToken.None);
+
+        Assert.False(resolution.IsResolved);
+        Assert.Equal(PosHomeContextReasonCodes.DeviceContextMissing, resolution.ReasonCode);
+    }
+
+    [Fact]
+    public async Task ResolveContextAsync_WhenDeviceIsActiveButNotTrusted_ReturnsDeviceNotTrusted()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var now = new DateTimeOffset(2026, 7, 8, 10, 0, 0, TimeSpan.Zero);
+        const string deviceFingerprint = "pos-web-test-installation-05";
+
+        await SeedResolvedContextAsync(
+            dbContext,
+            tenantId,
+            userId,
+            outletId,
+            tillId,
+            deviceId,
+            now,
+            deviceFingerprint,
+            isTrusted: false);
+
+        var repository = CreateRepository(dbContext);
+        var context = new TenantRequestContext(tenantId, userId, ["pos.home.view"]);
+
+        var resolution = await repository.ResolveContextAsync(
+            context,
+            outletId,
+            tillId,
+            deviceId,
+            deviceFingerprint,
+            CancellationToken.None);
+
+        Assert.False(resolution.IsResolved);
+        Assert.Equal(PosHomeContextReasonCodes.DeviceNotTrusted, resolution.ReasonCode);
     }
 
     private static async Task SeedResolvedContextAsync(
@@ -133,6 +217,8 @@ public sealed class PosHomeDashboardRepositoryTests
         Guid tillId,
         Guid deviceId,
         DateTimeOffset now,
+        string deviceFingerprint,
+        bool isTrusted = true,
         bool includeOpenSession = true)
     {
         dbContext.Currencies.Add(Currency.Create(
@@ -202,7 +288,7 @@ public sealed class PosHomeDashboardRepositoryTests
             null,
             now));
 
-        dbContext.PosDevices.Add(PosDevice.Create(
+        var device = PosDevice.Create(
             deviceId,
             tenantId,
             outletId,
@@ -211,7 +297,19 @@ public sealed class PosHomeDashboardRepositoryTests
             "TABLET",
             "ACTIVE",
             null,
-            now));
+            now);
+
+        device.PairForActivation(
+            "Front POS Device",
+            "TABLET",
+            "web",
+            "dev",
+            DeviceFingerprintHasher.Hash(deviceFingerprint),
+            userId,
+            now);
+
+        dbContext.PosDevices.Add(device);
+        dbContext.Entry(device).Property(nameof(PosDevice.IsTrusted)).CurrentValue = isTrusted;
 
         dbContext.TillDeviceAssignments.Add(
             TillDeviceAssignment.Create(Guid.NewGuid(), tenantId, outletId, tillId, deviceId, null, now));

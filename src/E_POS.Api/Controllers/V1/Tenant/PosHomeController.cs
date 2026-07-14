@@ -45,6 +45,7 @@ public sealed class PosHomeController : ControllerBase
             outletId,
             tillId,
             deviceId,
+            deviceFingerprint,
             cancellationToken);
 
         if (!result.IsSuccess || result.Value is null)

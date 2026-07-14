@@ -38,6 +38,9 @@ using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.PricingTax.Repositories;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Discount.Repositories;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
+using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
 
 
 namespace E_POS.Infrastructure;
@@ -92,6 +95,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
         services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
         services.AddScoped<IPosProductCatalogRepository, PosProductCatalogRepository>();
+        services.AddScoped<IPosCustomerRepository, PosCustomerRepository>();
         services.AddScoped<IReturnPolicyTemplateRepository, ReturnPolicyTemplateRepository>();
         services.AddScoped<IReturnPolicyRepository, ReturnPolicyRepository>();
         services.AddScoped<ICodeSequenceRepository, CodeSequenceRepository>();
@@ -115,6 +119,7 @@ public static class DependencyInjection
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
+        services.AddScoped<IPosReturnRepository, PosReturnRepository>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();

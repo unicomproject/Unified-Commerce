@@ -25,5 +25,43 @@ public class SalesReturn : AuditableEntity
     public string? Notes { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    public static SalesReturn CreateCompleted(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid? customerId,
+        Guid outletId,
+        Guid returnReasonId,
+        string returnNumber,
+        decimal totalQuantity,
+        decimal totalRefundAmount,
+        string? notes,
+        Guid tenantUserId,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            CustomerId = customerId,
+            OutletId = outletId,
+            ReturnReasonId = returnReasonId,
+            ReturnNumber = returnNumber.Trim().ToUpperInvariant(),
+            ReturnChannel = "POS",
+            ReturnStatus = "COMPLETED",
+            RequestedAt = now,
+            ApprovedAt = now,
+            ReceivedAt = now,
+            CompletedAt = now,
+            TotalRequestedQty = totalQuantity,
+            TotalReceivedQty = totalQuantity,
+            TotalRefundAmount = totalRefundAmount,
+            TotalExchangeAmount = 0,
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            CreatedByTenantUserId = tenantUserId,
+            UpdatedByTenantUserId = tenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

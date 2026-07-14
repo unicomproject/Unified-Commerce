@@ -105,5 +105,16 @@ public class SalesOrderLine : AuditableEntity
         line.LineStatus = "PENDING";
         return line;
     }
+
+    public void RecordReturn(decimal quantity, DateTimeOffset now)
+    {
+        if (quantity <= 0 || ReturnedQuantity + quantity > FulfilledQuantity)
+        {
+            throw new InvalidOperationException("Return quantity exceeds the fulfilled quantity.");
+        }
+
+        ReturnedQuantity += quantity;
+        UpdatedAt = now;
+    }
 }
 

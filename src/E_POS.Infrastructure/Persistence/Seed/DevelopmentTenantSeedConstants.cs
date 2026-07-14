@@ -5,8 +5,10 @@ public static class DevelopmentTenantSeedConstants
     public static readonly Guid DevelopmentTenantId = Guid.Parse("55555555-0000-4000-8000-000000000001");
     public static readonly Guid CashierRoleId = Guid.Parse("88888888-0003-4000-8000-000000000001");
     public static readonly Guid CashierUserId = Guid.Parse("99999999-0003-4000-8000-000000000001");
+    public static readonly Guid CashierTwoUserId = Guid.Parse("99999999-0006-4000-8000-000000000001");
     public const string CashierRoleCode = "CASHIER";
     public const string CashierEmail = "CASHIER001@GMAIL.COM";
+    public const string CashierTwoEmail = "CASHIER002@GMAIL.COM";
 }
 
 public static class DevelopmentPosPermissionCatalogSeedConstants
