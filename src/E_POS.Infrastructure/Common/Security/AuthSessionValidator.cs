@@ -74,6 +74,9 @@ public sealed class AuthSessionValidator : IAuthSessionValidator
 
         // Tenant session validation joins user and tenant status so forged tenant_id claims and suspended tenants lose access immediately.
         // Note: IsTenantLoginStatusAllowed() cannot be used in EF LINQ queries; use inline constants instead.
+        var activeTenantStatus = TenantAuthConstants.ActiveTenantStatus;
+        var setupPendingTenantStatus = TenantAuthConstants.SetupPendingTenantStatus;
+
         return (
             from session in _dbContext.TenantAuthSessions.AsNoTracking()
             join user in _dbContext.TenantUsers.AsNoTracking()
@@ -84,8 +87,8 @@ public sealed class AuthSessionValidator : IAuthSessionValidator
                   session.UserId == tenantUserId &&
                   user.TenantId == tenantId &&
                   user.AccountStatus == TenantAuthConstants.ActiveUserStatus &&
-                  (tenant.Status == TenantAuthConstants.ActiveTenantStatus ||
-                   tenant.Status == TenantAuthConstants.SetupPendingTenantStatus) &&
+                  (tenant.Status.ToLower() == activeTenantStatus ||
+                   tenant.Status.ToLower() == setupPendingTenantStatus) &&
                   session.RevokedAt == null
             select session.Id)
             .AnyAsync(cancellationToken);
