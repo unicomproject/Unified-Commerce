@@ -65,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformPermissionCatalogRepository, PlatformPermissionCatalogRepository>();
         services.AddScoped<IPlatformModulesCatalogRepository, PlatformModulesCatalogRepository>();
         services.AddScoped<IPlatformSettingsRepository, PlatformSettingsRepository>();
+        services.AddScoped<IPlatformBillingRepository, PlatformBillingRepository>();
         services.AddScoped<IPlatformRoleRepository, PlatformRoleRepository>();
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();

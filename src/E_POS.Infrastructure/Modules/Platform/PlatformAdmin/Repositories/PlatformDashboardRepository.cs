@@ -43,6 +43,8 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
         var setupPendingTenants = tenants.Count(x =>
             IsStatus(x.Status, "setup_pending") || IsStatus(x.Status, "pending_payment"));
         var pastDueSubscriptions = subscriptions.Count(x => IsStatus(x.SubscriptionStatus, "PAST_DUE"));
+        var pendingBilling = await _dbContext.SubscriptionInvoices.AsNoTracking()
+            .CountAsync(x => x.InvoiceStatus == "PENDING" && x.BalanceDue > 0m, cancellationToken);
 
         var attentionItems = new List<PlatformDashboardAttentionItemDto>
         {
@@ -62,7 +64,7 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
                 "past_due_subscriptions",
                 "Past Due Subscriptions",
                 "Tenant subscriptions with past due billing status.",
-                pastDueSubscriptions,
+                pendingBilling,
                 "critical"),
             Attention(
                 "pending_billing",
@@ -90,7 +92,7 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
             TrialTenants: tenants.Count(x => trialTenantIds.Contains(x.Id)),
             TotalSubscriptions: subscriptions.Count,
             ActiveSubscriptions: subscriptions.Count(x => IsStatus(x.SubscriptionStatus, "ACTIVE")),
-            PendingBillingCount: pastDueSubscriptions,
+            PendingBillingCount: pendingBilling,
             TotalOutlets: await CountNonDeletedAsync(_dbContext.Outlets.Select(x => x.Status), cancellationToken),
             TotalTills: await CountNonDeletedAsync(_dbContext.Tills.Select(x => x.Status), cancellationToken),
             TotalUsers: await CountNonDeletedAsync(_dbContext.TenantUsers.Select(x => x.AccountStatus), cancellationToken),

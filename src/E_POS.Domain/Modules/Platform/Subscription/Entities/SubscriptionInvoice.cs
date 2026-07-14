@@ -27,6 +27,35 @@ public class SubscriptionInvoice : AuditableEntity
     public DateTimeOffset? PaidAt { get; protected set; }
     public DateTimeOffset? VoidedAt { get; protected set; }
 
+    public bool CanIssue => InvoiceStatus == TenantSubscriptionBillingConstants.InvoiceStatusDraft;
+    public bool CanMarkPaid => InvoiceStatus == TenantSubscriptionBillingConstants.InvoiceStatusPending;
+
+    public void Issue(DateTimeOffset now)
+    {
+        if (!CanIssue)
+        {
+            throw new InvalidOperationException("Only draft invoices can be issued.");
+        }
+
+        InvoiceStatus = TenantSubscriptionBillingConstants.InvoiceStatusPending;
+        IssuedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void MarkPaid(DateTimeOffset paidAt, DateTimeOffset now)
+    {
+        if (!CanMarkPaid)
+        {
+            throw new InvalidOperationException("Only pending invoices can be marked paid.");
+        }
+
+        InvoiceStatus = TenantSubscriptionBillingConstants.InvoiceStatusPaid;
+        PaidAmount = TotalAmount;
+        BalanceDue = 0m;
+        PaidAt = paidAt;
+        UpdatedAt = now;
+    }
+
     public static SubscriptionInvoice CreateDraft(
         Guid id,
         Guid tenantId,
