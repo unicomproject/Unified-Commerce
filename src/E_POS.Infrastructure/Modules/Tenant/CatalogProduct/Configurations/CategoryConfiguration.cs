@@ -65,6 +65,12 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasColumnType("text")
             .IsRequired(false);
 
+        builder.Property(x => x.ImageUrl)
+            .HasColumnName("image_url")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(x => x.SortOrder)
             .HasColumnName("sort_order")
             .HasDefaultValue(0)

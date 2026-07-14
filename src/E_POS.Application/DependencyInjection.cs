@@ -23,6 +23,8 @@ using E_POS.Application.Modules.Tenant.Inventory.Services;
 using E_POS.Application.Modules.Tenant.Inventory.Validators;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Services;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Services;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Application.Modules.Tenant.Discount.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -98,6 +100,14 @@ public static class DependencyInjection
 
         services.AddScoped<ITenantAdminInventoryService, TenantAdminInventoryService>();
         services.AddScoped<ITenantAdminInventoryRequestValidator, TenantAdminInventoryRequestValidator>();
+
+        // ECommerce Storefront
+        services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
+        services.AddScoped<IStorefrontCategoryService, StorefrontCategoryService>();
+        services.AddScoped<IStorefrontProductService, StorefrontProductService>();
+        services.AddScoped<IStorefrontFulfillmentService, StorefrontFulfillmentService>();
+        services.AddScoped<IStorefrontTenantService, StorefrontTenantService>();
+        services.AddScoped<IStorefrontService, StorefrontService>();
 
         return services;
     }

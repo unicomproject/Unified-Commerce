@@ -11,6 +11,7 @@ public class Category : AuditableEntity
     public string CategoryName { get; protected set; } = string.Empty;
     public string CategorySlug { get; protected set; } = string.Empty;
     public string? Description { get; protected set; }
+    public string? ImageUrl { get; protected set; }
     public int SortOrder { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
@@ -25,6 +26,7 @@ public class Category : AuditableEntity
         string categoryName, 
         string categorySlug,
         string? description,
+        string? imageUrl,
         int sortOrder,
         string status, 
         Guid? createdByTenantUserId,
@@ -40,6 +42,7 @@ public class Category : AuditableEntity
             CategoryName = categoryName.Trim(),
             CategorySlug = categorySlug.Trim().ToLowerInvariant(),
             Description = description?.Trim(),
+            ImageUrl = imageUrl?.Trim(),
             SortOrder = sortOrder,
             Status = status.Trim().ToUpperInvariant(),
             CreatedByTenantUserId = createdByTenantUserId,
@@ -56,6 +59,7 @@ public class Category : AuditableEntity
         string categoryName, 
         string categorySlug,
         string? description,
+        string? imageUrl,
         int sortOrder,
         string status, 
         Guid? updatedByTenantUserId,
@@ -67,6 +71,7 @@ public class Category : AuditableEntity
         CategoryName = categoryName.Trim();
         CategorySlug = categorySlug.Trim().ToLowerInvariant();
         Description = description?.Trim();
+        ImageUrl = imageUrl?.Trim();
         SortOrder = sortOrder;
         Status = status.Trim().ToUpperInvariant();
         UpdatedByTenantUserId = updatedByTenantUserId;

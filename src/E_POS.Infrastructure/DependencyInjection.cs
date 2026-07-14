@@ -27,6 +27,8 @@ using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -125,6 +127,14 @@ public static class DependencyInjection
             var options = provider.GetRequiredService<IOptions<TenantJwtOptions>>().Value;
             return new TenantJwtSettings(options.Issuer, options.Audience, options.SigningKey, options.AccessTokenMinutes, options.RefreshTokenDays);
         });
+
+        // ECommerce Storefront
+        services.AddScoped<IStorefrontBannerRepository, StorefrontBannerRepository>();
+        services.AddScoped<IStorefrontCategoryRepository, StorefrontCategoryRepository>();
+        services.AddScoped<IStorefrontProductRepository, StorefrontProductRepository>();
+        services.AddScoped<IStorefrontFulfillmentRepository, StorefrontFulfillmentRepository>();
+        services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
+        services.AddScoped<IStorefrontRepository, StorefrontRepository>();
 
         return services;
     }
