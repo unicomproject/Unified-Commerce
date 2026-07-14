@@ -794,6 +794,7 @@ public sealed class PosProductCatalogRepositoryTests
             "Apparel",
             "apparel",
             null,
+            null,
             0,
             "ACTIVE",
             null,

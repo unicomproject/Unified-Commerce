@@ -8752,6 +8752,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("image_url");
+
                     b.Property<Guid?>("ParentCategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("parent_category_id");
@@ -17788,6 +17793,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CreatedByTenantUserId");
 
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_outlets_tenant_id_default_outlet")
+                        .HasFilter("is_default_outlet = true AND status <> 'DELETED'");
+
                     b.HasIndex("UpdatedByTenantUserId");
 
                     b.HasIndex("TenantId", "OutletCode")
@@ -17965,13 +17975,17 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_outlet_business_hours");
 
-                    b.HasIndex("OutletId");
-
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("OutletId", "DayOfWeek")
+                        .IsUnique()
+                        .HasDatabaseName("uq_outlet_business_hours_outlet_id_day_of_week");
 
                     b.ToTable("outlet_business_hours", null, t =>
                         {
                             t.HasCheckConstraint("ck_outlet_business_hours_day_of_week", "day_of_week BETWEEN 0 AND 6");
+
+                            t.HasCheckConstraint("ck_outlet_business_hours_open_close", "is_closed = true OR (opening_time IS NOT NULL AND closing_time IS NOT NULL AND opening_time < closing_time)");
 
                             t.HasCheckConstraint("ck_outlet_business_hours_validity", "valid_until IS NULL OR valid_from IS NULL OR valid_until >= valid_from");
                         });

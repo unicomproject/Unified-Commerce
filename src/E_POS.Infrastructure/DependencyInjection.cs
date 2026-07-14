@@ -17,11 +17,18 @@ using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
+using E_POS.Application.Modules.Tenant.Inventory.Contracts;
+using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -70,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformPermissionCatalogRepository, PlatformPermissionCatalogRepository>();
         services.AddScoped<IPlatformModulesCatalogRepository, PlatformModulesCatalogRepository>();
         services.AddScoped<IPlatformSettingsRepository, PlatformSettingsRepository>();
+        services.AddScoped<IPlatformBillingRepository, PlatformBillingRepository>();
         services.AddScoped<IPlatformRoleRepository, PlatformRoleRepository>();
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();
@@ -84,12 +92,15 @@ public static class DependencyInjection
         services.AddScoped<IBrandRepository, BrandRepository>();
         services.AddScoped<ICollectionRepository, CollectionRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
+        services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
         services.AddScoped<IPosProductCatalogRepository, PosProductCatalogRepository>();
         services.AddScoped<IPosCustomerRepository, PosCustomerRepository>();
         services.AddScoped<IReturnPolicyTemplateRepository, ReturnPolicyTemplateRepository>();
         services.AddScoped<IReturnPolicyRepository, ReturnPolicyRepository>();
         services.AddScoped<ICodeSequenceRepository, CodeSequenceRepository>();
         services.AddScoped<IOutletRepository, OutletRepository>();
+        services.AddScoped<IOutletAuditLogger, OutletAuditLogger>();
         services.AddScoped<ITenantAdminOutletRepository, TenantAdminOutletRepository>();
         services.AddScoped<ITenantAdminTillRepository, TenantAdminTillRepository>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
@@ -103,6 +114,8 @@ public static class DependencyInjection
         services.AddScoped<IProductTaxAssignmentRepository, ProductTaxAssignmentRepository>();
         services.AddScoped<ITenantLookupRepository, TenantLookupRepository>();
         services.AddScoped<IPosHomeDashboardRepository, PosHomeDashboardRepository>();
+        services.AddScoped<ITenantAdminInventoryRepository, TenantAdminInventoryRepository>();
+        services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
@@ -120,6 +133,14 @@ public static class DependencyInjection
             var options = provider.GetRequiredService<IOptions<TenantJwtOptions>>().Value;
             return new TenantJwtSettings(options.Issuer, options.Audience, options.SigningKey, options.AccessTokenMinutes, options.RefreshTokenDays);
         });
+
+        // ECommerce Storefront
+        services.AddScoped<IStorefrontBannerRepository, StorefrontBannerRepository>();
+        services.AddScoped<IStorefrontCategoryRepository, StorefrontCategoryRepository>();
+        services.AddScoped<IStorefrontProductRepository, StorefrontProductRepository>();
+        services.AddScoped<IStorefrontFulfillmentRepository, StorefrontFulfillmentRepository>();
+        services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
+        services.AddScoped<IStorefrontRepository, StorefrontRepository>();
 
         return services;
     }

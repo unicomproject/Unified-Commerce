@@ -6,6 +6,7 @@ public sealed record CategoryCreateRequest(
     string Name, 
     string? CategorySlug,
     string? Description,
+    string? ImageUrl,
     string Status, 
     Guid? ParentCategoryId, 
     int SortOrder);

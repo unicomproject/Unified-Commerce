@@ -99,6 +99,13 @@ public class Product : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void UpdateStatus(string status, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = ProductConstants.NormalizeStatus(status);
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
         Status = ProductConstants.DeletedStatus;

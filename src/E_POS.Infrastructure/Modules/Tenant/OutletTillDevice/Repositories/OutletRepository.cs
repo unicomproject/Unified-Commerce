@@ -1,8 +1,10 @@
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -291,6 +293,90 @@ public sealed class OutletRepository : IOutletRepository
                 cancellationToken);
     }
 
+    public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.Tenants
+            .AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => (string?)x.Status)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsOutletManagementFeatureEnabledAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var featureId = await _dbContext.PlatformFeatures
+            .AsNoTracking()
+            .Where(x => x.FeatureCode == OutletConstants.ManagementFeatureCode && x.Status == OutletConstants.ActiveStatus)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (featureId is null)
+        {
+            return true;
+        }
+
+        return await _dbContext.TenantFeatureEntitlements
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.PlatformFeatureId == featureId.Value &&
+                     x.EntitlementStatus == TenantEntitlementStatusConstants.Enabled,
+                cancellationToken);
+    }
+
+    public async Task<OutletCreateOptionsResponse> GetCreateOptionsAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var tenantDefaults = await _dbContext.Tenants
+            .AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => new { x.DefaultTimezone })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var tenantCountryCode = await (
+            from address in _dbContext.TenantAddresses.AsNoTracking()
+            where address.TenantId == tenantId && address.IsPrimary
+            select address.CountryCode)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var outletTypes = new[]
+        {
+            new OutletLookupOptionResponse(OutletConstants.StoreOutletType, "Store"),
+            new OutletLookupOptionResponse(OutletConstants.WarehouseOutletType, "Warehouse")
+        };
+
+        var countries = TenantCreateWizardReferenceData.CountryCodes
+            .Select(item => new OutletCountryOptionResponse(item.Code, item.Name))
+            .ToList();
+
+        var timezones = TenantCreateWizardReferenceData.Timezones
+            .Select(item => new OutletLookupOptionResponse(item.Value, item.Label))
+            .ToList();
+
+        var defaultTimezone = string.IsNullOrWhiteSpace(tenantDefaults?.DefaultTimezone)
+            ? OutletConstants.DefaultTimezone
+            : tenantDefaults.DefaultTimezone.Trim();
+
+        var defaultCountryCode = string.IsNullOrWhiteSpace(tenantCountryCode)
+            ? countries[0].Code
+            : tenantCountryCode.Trim().ToUpperInvariant();
+
+        if (countries.All(country => !string.Equals(country.Code, defaultCountryCode, StringComparison.OrdinalIgnoreCase)))
+        {
+            defaultCountryCode = countries[0].Code;
+        }
+
+        if (timezones.All(timezone => !string.Equals(timezone.Value, defaultTimezone, StringComparison.OrdinalIgnoreCase)))
+        {
+            defaultTimezone = OutletConstants.DefaultTimezone;
+        }
+
+        return new OutletCreateOptionsResponse(
+            outletTypes,
+            countries,
+            timezones,
+            new OutletCreateDefaultsResponse(defaultCountryCode, defaultTimezone, OutletConstants.ActiveStatus));
+    }
+
     public async Task<bool> AddAsync(
         Outlet outlet,
         OutletAddress address,
@@ -298,6 +384,15 @@ public sealed class OutletRepository : IOutletRepository
         FulfillmentMethodOutlet? pickupMapping,
         CancellationToken cancellationToken)
     {
+        var transaction = _dbContext.Database.IsRelational()
+            ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        if (outlet.IsDefaultOutlet)
+        {
+            await ClearOtherDefaultOutletsAsync(outlet.TenantId, outlet.Id, outlet.CreatedAt, cancellationToken);
+        }
+
         _dbContext.Outlets.Add(outlet);
         _dbContext.OutletAddresses.Add(address);
         _dbContext.OutletBusinessHours.AddRange(businessHours);
@@ -307,7 +402,22 @@ public sealed class OutletRepository : IOutletRepository
             _dbContext.FulfillmentMethodOutlets.Add(pickupMapping);
         }
 
-        return await SaveChangesHandlingUniqueViolationAsync(cancellationToken);
+        var saved = await SaveChangesHandlingUniqueViolationAsync(cancellationToken);
+        if (saved && transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+        else if (!saved && transaction is not null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+        }
+
+        if (transaction is not null)
+        {
+            await transaction.DisposeAsync();
+        }
+
+        return saved;
     }
 
     public async Task<bool> SaveUpdatedAsync(
@@ -354,6 +464,31 @@ public sealed class OutletRepository : IOutletRepository
                                method.MethodType == OutletConstants.PickupMethodType &&
                                method.Status == OutletConstants.ActiveStatus),
                 cancellationToken);
+    }
+
+    private async Task ClearOtherDefaultOutletsAsync(Guid tenantId, Guid outletId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var otherDefaults = await _dbContext.Outlets
+            .Where(x => x.TenantId == tenantId &&
+                        x.Id != outletId &&
+                        x.IsDefaultOutlet &&
+                        x.Status != OutletConstants.DeletedStatus)
+            .ToListAsync(cancellationToken);
+
+        foreach (var otherDefault in otherDefaults)
+        {
+            otherDefault.UpdateProfile(
+                otherDefault.OutletName,
+                otherDefault.OutletCode,
+                otherDefault.Status,
+                otherDefault.OutletType,
+                otherDefault.Timezone,
+                isDefaultOutlet: false,
+                otherDefault.Phone,
+                otherDefault.Email,
+                otherDefault.UpdatedByTenantUserId,
+                now);
+        }
     }
 
     private async Task<bool> SaveChangesHandlingUniqueViolationAsync(CancellationToken cancellationToken)

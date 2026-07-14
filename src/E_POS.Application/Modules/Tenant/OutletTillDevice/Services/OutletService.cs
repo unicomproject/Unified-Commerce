@@ -5,6 +5,7 @@ using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
 
 namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 
@@ -15,27 +16,68 @@ public sealed class OutletService : IOutletService
     private const int GeneratedCodePaddingLength = 3;
     private const int MaxCodeGenerationAttempts = 5;
     private static readonly ApplicationError PermissionDenied = new("outlet.permission_denied", "Permission denied for outlet management.");
+    private static readonly ApplicationError FeatureDisabled = new("outlet.feature_disabled", "Outlet management is not enabled for this tenant.");
+    private static readonly ApplicationError TenantBlocked = new("outlet.tenant_blocked", "Tenant status does not allow outlet management.");
     private static readonly ApplicationError NotFound = new("outlet.not_found", "Outlet was not found.");
     private readonly IOutletRepository _repository;
     private readonly ICodeSequenceRepository _codeSequenceRepository;
     private readonly IOutletRequestValidator _requestValidator;
+    private readonly IOutletAuditLogger _auditLogger;
     private readonly IDateTimeProvider _dateTimeProvider;
 
-    public OutletService(IOutletRepository repository, ICodeSequenceRepository codeSequenceRepository, IOutletRequestValidator requestValidator, IDateTimeProvider dateTimeProvider)
+    public OutletService(
+        IOutletRepository repository,
+        ICodeSequenceRepository codeSequenceRepository,
+        IOutletRequestValidator requestValidator,
+        IOutletAuditLogger auditLogger,
+        IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
         _codeSequenceRepository = codeSequenceRepository;
         _requestValidator = requestValidator;
+        _auditLogger = auditLogger;
         _dateTimeProvider = dateTimeProvider;
+    }
+
+    public async Task<ApplicationResult<OutletCreateOptionsResponse>> GetCreateOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateManageAccess(context);
+        if (accessError is not null)
+        {
+            return ApplicationResult<OutletCreateOptionsResponse>.Failure(accessError);
+        }
+
+        var operationalError = await ValidateOperationalAccessAsync(context, cancellationToken);
+        if (operationalError is not null)
+        {
+            return ApplicationResult<OutletCreateOptionsResponse>.Failure(operationalError);
+        }
+
+        var response = await _repository.GetCreateOptionsAsync(context.TenantId, cancellationToken);
+        return ApplicationResult<OutletCreateOptionsResponse>.Success(response);
     }
 
     public async Task<ApplicationResult<OutletResponse>> CreateAsync(TenantRequestContext context, OutletCreateRequest request, CancellationToken cancellationToken)
     {
         var accessError = ValidateManageAccess(context);
-        if (accessError is not null) return ApplicationResult<OutletResponse>.Failure(accessError);
+        if (accessError is not null)
+        {
+            return ApplicationResult<OutletResponse>.Failure(accessError);
+        }
+
+        var operationalError = await ValidateOperationalAccessAsync(context, cancellationToken);
+        if (operationalError is not null)
+        {
+            return ApplicationResult<OutletResponse>.Failure(operationalError);
+        }
 
         var validationError = _requestValidator.ValidateCreate(request);
-        if (validationError is not null) return ApplicationResult<OutletResponse>.Failure(validationError);
+        if (validationError is not null)
+        {
+            return ApplicationResult<OutletResponse>.Failure(validationError);
+        }
 
         for (var attempt = 0; attempt < MaxCodeGenerationAttempts; attempt++)
         {
@@ -63,12 +105,23 @@ public sealed class OutletService : IOutletService
             var address = CreateAddress(context.TenantId, outletId, request.Address, context.UserId, now);
             var hours = CreateBusinessHours(context.TenantId, outletId, request.BusinessHours, now);
             var pickupMapping = await CreatePickupMappingAsync(context.TenantId, outletId, request.CollectionEnabled, now, cancellationToken);
-            if (pickupMapping.Error is not null) return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
+            if (pickupMapping.Error is not null)
+            {
+                return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
+            }
 
             if (!await _repository.AddAsync(outlet, address, hours, pickupMapping.Value, cancellationToken))
             {
                 continue;
             }
+
+            _auditLogger.LogOutletCreated(
+                context.TenantId,
+                context.UserId,
+                outletId,
+                outlet.OutletCode,
+                outlet.OutletType,
+                outlet.Status);
 
             var response = await _repository.GetByIdAsync(context.TenantId, outletId, false, cancellationToken);
             return ApplicationResult<OutletResponse>.Success(response!);
@@ -101,6 +154,12 @@ public sealed class OutletService : IOutletService
     {
         var accessError = ValidateManageAccess(context);
         if (accessError is not null) return ApplicationResult<OutletResponse>.Failure(accessError);
+
+        var operationalError = await ValidateOperationalAccessAsync(context, cancellationToken);
+        if (operationalError is not null)
+        {
+            return ApplicationResult<OutletResponse>.Failure(operationalError);
+        }
 
         var validationError = _requestValidator.ValidateUpdate(request);
         if (validationError is not null) return ApplicationResult<OutletResponse>.Failure(validationError);
@@ -166,6 +225,24 @@ public sealed class OutletService : IOutletService
         aggregate.PickupMapping?.SetStatus(OutletConstants.InactiveStatus, now);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
+    }
+
+    private async Task<ApplicationError?> ValidateOperationalAccessAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var tenantStatus = await _repository.GetTenantStatusAsync(context.TenantId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(tenantStatus) || !TenantAuthConstants.IsTenantLoginStatusAllowed(tenantStatus))
+        {
+            return TenantBlocked;
+        }
+
+        if (!await _repository.IsOutletManagementFeatureEnabledAsync(context.TenantId, cancellationToken))
+        {
+            return FeatureDisabled;
+        }
+
+        return null;
     }
 
     private static ApplicationError? ValidateReadAccess(TenantRequestContext context)
@@ -285,7 +362,12 @@ public sealed class OutletService : IOutletService
             .ToList();
     }
 
-    private static ApplicationError CreateDuplicateCodeError() => new("outlet.duplicate_code", "Outlet code already exists for this tenant.");
+    private static ApplicationError CreateDuplicateCodeError() =>
+        new(
+            "outlet.duplicate_code",
+            "Outlet code already exists for this tenant.",
+            [new ApplicationFieldError("outletCode", "Outlet code already exists for this tenant.")]);
+
     private static ApplicationError CreateDeleteConflict() => new("outlet.delete_conflict", "Outlet cannot be deleted while active tills or POS devices are assigned.");
     private sealed record PickupMappingResult(FulfillmentMethodOutlet? Value, ApplicationError? Error);
 }

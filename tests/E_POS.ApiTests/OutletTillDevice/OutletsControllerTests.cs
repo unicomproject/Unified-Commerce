@@ -74,6 +74,18 @@ public sealed class OutletsControllerTests
         Assert.Contains("tenant.outlets.view", service.ListContext!.Permissions);
     }
     [Fact]
+    public async Task GetCreateOptions_WithManagePermission_ReturnsOk()
+    {
+        var service = new FakeOutletService(ApplicationResult<OutletResponse>.Success(CreateResponse(Guid.NewGuid())));
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.outlets.manage");
+
+        var result = await controller.GetCreateOptions(CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
     public void Controller_RequiresTenantOnlyPolicy()
     {
         var authorize = Assert.Single(typeof(OutletsController).GetCustomAttributes<AuthorizeAttribute>());
@@ -144,6 +156,12 @@ public sealed class OutletsControllerTests
         public TenantRequestContext? CreateContext { get; private set; }
 
         public TenantRequestContext? ListContext { get; private set; }
+
+        public Task<ApplicationResult<OutletCreateOptionsResponse>> GetCreateOptionsAsync(TenantRequestContext context, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ApplicationResult<OutletCreateOptionsResponse>.Success(
+                new OutletCreateOptionsResponse([], [], [], new OutletCreateDefaultsResponse("LK", "UTC", "ACTIVE"))));
+        }
 
         public Task<ApplicationResult<OutletResponse>> CreateAsync(TenantRequestContext context, OutletCreateRequest request, CancellationToken cancellationToken)
         {

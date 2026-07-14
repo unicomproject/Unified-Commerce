@@ -18,8 +18,13 @@ using E_POS.Application.Modules.Platform.Subscription.Services;
 using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
 using E_POS.Application.Modules.Tenant.PricingTax.Services;
 using E_POS.Application.Modules.Tenant.PricingTax.Validators;
+using E_POS.Application.Modules.Tenant.Inventory.Contracts;
+using E_POS.Application.Modules.Tenant.Inventory.Services;
+using E_POS.Application.Modules.Tenant.Inventory.Validators;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Services;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Services;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Application.Modules.Tenant.Discount.Services;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
@@ -40,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformPermissionCatalogService, PlatformPermissionCatalogService>();
         services.AddScoped<IPlatformModulesCatalogService, PlatformModulesCatalogService>();
         services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
+        services.AddScoped<IPlatformBillingService, PlatformBillingService>();
         services.AddScoped<IPlatformRoleService, PlatformRoleService>();
         services.AddScoped<IPlatformUserService, PlatformUserService>();
         services.AddScoped<IPlatformAuditLogService, PlatformAuditLogService>();
@@ -60,6 +66,8 @@ public static class DependencyInjection
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
+        services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
         services.AddScoped<IPosProductCatalogService, PosProductCatalogService>();
         services.AddScoped<IPosCustomerService, PosCustomerService>();
         services.AddScoped<ICollectionService, CollectionService>();
@@ -94,6 +102,17 @@ public static class DependencyInjection
         services.AddScoped<IPosHoldService, PosHoldService>();
         services.AddScoped<IPosDiscountService, PosDiscountService>();
         services.AddScoped<IDiscountPolicyAdminService, DiscountPolicyAdminService>();
+
+        services.AddScoped<ITenantAdminInventoryService, TenantAdminInventoryService>();
+        services.AddScoped<ITenantAdminInventoryRequestValidator, TenantAdminInventoryRequestValidator>();
+
+        // ECommerce Storefront
+        services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
+        services.AddScoped<IStorefrontCategoryService, StorefrontCategoryService>();
+        services.AddScoped<IStorefrontProductService, StorefrontProductService>();
+        services.AddScoped<IStorefrontFulfillmentService, StorefrontFulfillmentService>();
+        services.AddScoped<IStorefrontTenantService, StorefrontTenantService>();
+        services.AddScoped<IStorefrontService, StorefrontService>();
 
         return services;
     }

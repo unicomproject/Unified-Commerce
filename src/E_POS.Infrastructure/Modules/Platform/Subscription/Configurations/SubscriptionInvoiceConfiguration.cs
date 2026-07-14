@@ -24,7 +24,8 @@ public sealed class SubscriptionInvoiceConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.UpdatedAt)
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired()
+            .IsConcurrencyToken();
 
         builder.Ignore(x => x.CreatedBy);
         builder.Ignore(x => x.UpdatedBy);
