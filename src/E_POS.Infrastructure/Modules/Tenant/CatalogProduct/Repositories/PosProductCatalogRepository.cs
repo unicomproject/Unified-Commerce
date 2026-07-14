@@ -9,7 +9,6 @@ namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
 {
     private const string ActiveImageStatus = "ACTIVE";
-    private const int LowStockThreshold = 5;
 
     private readonly EPosDbContext _dbContext;
 
@@ -176,6 +175,20 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             productIds,
             cancellationToken);
 
+        var reorderRulesByProduct = new Dictionary<Guid, decimal?>();
+        if (productIds.Count > 0)
+        {
+            var rules = await _dbContext.InventoryReorderRules
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId) && x.Status == "ACTIVE")
+                .Select(x => new { x.ProductId, x.MinStockQuantity })
+                .ToListAsync(cancellationToken);
+
+            reorderRulesByProduct = rules
+                .GroupBy(x => x.ProductId)
+                .ToDictionary(g => g.Key, g => g.FirstOrDefault(x => x.MinStockQuantity.HasValue)?.MinStockQuantity);
+        }
+
         var summaries = new List<PosProductSummaryResponseDto>(products.Count);
         foreach (var product in products)
         {
@@ -216,7 +229,8 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                 availableQuantity = quantity;
             }
 
-            var stockStatus = ResolveStockStatus(availableQuantity);
+            reorderRulesByProduct.TryGetValue(product.Id, out var minStockQuantity);
+            var stockStatus = ResolveStockStatus(availableQuantity, minStockQuantity);
 
             summaries.Add(new PosProductSummaryResponseDto(
                 product.Id,
@@ -402,6 +416,12 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             .OrderBy(x => x.SortOrder)
             .ToListAsync(cancellationToken);
 
+        var reorderRule = await _dbContext.InventoryReorderRules
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId && x.Status == "ACTIVE")
+            .Select(x => x.MinStockQuantity)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var optionIds = productOptions.Select(x => x.Id).ToList();
         var optionValues = optionIds.Count == 0
             ? []
@@ -449,7 +469,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             minPrice = minPrice.HasValue ? Math.Min(minPrice.Value, price) : price;
 
             inventoryByVariant.TryGetValue(variant.Id, out var availableQuantity);
-            var stockStatus = ResolveStockStatus(availableQuantity);
+            var stockStatus = ResolveStockStatus(availableQuantity, reorderRule);
 
             var attributes = variantOptionLinks
                 .Where(link => link.ProductVariantId == variant.Id)
@@ -579,7 +599,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         return hiddenProductIds;
     }
 
-    private static string ResolveStockStatus(decimal? availableQuantity)
+    private static string ResolveStockStatus(decimal? availableQuantity, decimal? minStockQuantity)
     {
         if (!availableQuantity.HasValue)
         {
@@ -591,7 +611,9 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             return "out_of_stock";
         }
 
-        if (availableQuantity.Value <= LowStockThreshold)
+        var threshold = minStockQuantity ?? 5m;
+
+        if (availableQuantity.Value <= threshold)
         {
             return "low_stock";
         }
