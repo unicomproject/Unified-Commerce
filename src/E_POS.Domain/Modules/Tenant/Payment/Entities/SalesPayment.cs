@@ -72,5 +72,18 @@ public class SalesPayment : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void RecordRefund(decimal amount, Guid tenantUserId, DateTimeOffset now)
+    {
+        if (amount <= 0 || RefundedAmount + amount > PaidAmount)
+        {
+            throw new InvalidOperationException("Refund amount exceeds the payment balance.");
+        }
+
+        RefundedAmount += amount;
+        PaymentStatus = RefundedAmount >= PaidAmount ? "REFUNDED" : "PARTIALLY_REFUNDED";
+        UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+    }
 }
 

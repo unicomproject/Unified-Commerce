@@ -97,6 +97,25 @@ public sealed class PosTillsControllerTests
     }
 
     [Fact]
+    public async Task OpenTill_WhenPermissionDenied_ReturnsForbidden()
+    {
+        var service = new FakePosTillSessionService
+        {
+            OpenTillResult = ApplicationResult<CurrentTillSessionResponseDto>.Failure(
+                new ApplicationError("till_session.permission_denied", "Permission denied.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "pos.home.view");
+
+        var result = await controller.OpenTill(
+            new OpenTillRequest(Guid.NewGuid(), Guid.NewGuid(), 0m, null),
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
     public async Task GetCurrentSession_WhenPermissionDenied_ReturnsForbidden()
     {
         var service = new FakePosTillSessionService

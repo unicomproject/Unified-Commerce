@@ -29,6 +29,7 @@ public static class DevelopmentPosPaymentReceiptPermissionsSeedData
         new(Guid.Parse("77777777-0330-4000-8000-000000000001"), PosPermissions.Notifications.View, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosNotificationsFeatureId, "view", "View POS notifications."),
         new(Guid.Parse("77777777-0331-4000-8000-000000000001"), PosPermissions.Till.ViewSession, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosTillFeatureId, "view_session", "View till session status on POS home."),
         new(Guid.Parse("77777777-0334-4000-8000-000000000001"), PosPermissions.Till.Open, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosTillFeatureId, "open", "Open a POS till session."),
+        new(Guid.Parse("77777777-0012-4000-8000-000000000001"), PosPermissions.Till.Close, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosTillFeatureId, "close", "Close the currently assigned open POS till session."),
         new(Guid.Parse("77777777-0335-4000-8000-000000000001"), TillConstants.ManagePermission, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.TenantTillOpsFeatureId, "manage", "Manage tenant tills for POS device activation."),
         new(Guid.Parse("77777777-0336-4000-8000-000000000001"), "tenant.till.manage", ModuleId, DevelopmentPosPermissionCatalogSeedConstants.TenantTillOpsFeatureId, "manage_alias", "Frontend-compatible tenant till management permission."),
     ];

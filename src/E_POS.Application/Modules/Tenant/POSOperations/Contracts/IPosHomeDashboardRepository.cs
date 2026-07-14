@@ -9,6 +9,7 @@ public interface IPosHomeDashboardRepository
         Guid? outletId,
         Guid? tillId,
         Guid? deviceId,
+        string? deviceFingerprint,
         CancellationToken cancellationToken);
 }
 

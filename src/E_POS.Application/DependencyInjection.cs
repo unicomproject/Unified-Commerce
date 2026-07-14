@@ -27,6 +27,8 @@ using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Services;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Application.Modules.Tenant.Discount.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts;
+using E_POS.Application.Modules.ECommerce.Customer.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -67,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
         services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
         services.AddScoped<IPosProductCatalogService, PosProductCatalogService>();
+        services.AddScoped<IPosCustomerService, PosCustomerService>();
         services.AddScoped<ICollectionService, CollectionService>();
         services.AddScoped<IReturnPolicyTemplateService, ReturnPolicyTemplateService>();
         services.AddScoped<IReturnPolicyService, ReturnPolicyService>();
@@ -95,6 +98,7 @@ public static class DependencyInjection
         services.AddScoped<IPosTillSessionService, PosTillSessionService>();
         services.AddScoped<IPosCheckoutService, PosCheckoutService>();
         services.AddScoped<IPosReceiptService, PosReceiptService>();
+        services.AddScoped<IPosReturnService, PosReturnService>();
         services.AddScoped<IPosHoldService, PosHoldService>();
         services.AddScoped<IPosDiscountService, PosDiscountService>();
         services.AddScoped<IDiscountPolicyAdminService, DiscountPolicyAdminService>();

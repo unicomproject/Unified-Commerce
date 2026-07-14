@@ -11,4 +11,7 @@ public sealed record PosProductSummaryResponseDto(
     int BasePrice,
     bool HasVariants,
     string StockStatus,
-    decimal? AvailableQuantity);
+    decimal? AvailableQuantity)
+{
+    public string? ImageUrl => ImageStorageKey;
+}

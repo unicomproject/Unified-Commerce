@@ -1,4 +1,5 @@
 using E_POS.Application.Common.Models;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
@@ -26,6 +27,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
         Guid? outletId,
         Guid? tillId,
         Guid? deviceId,
+        string? deviceFingerprint,
         CancellationToken cancellationToken)
     {
         var cashier = await _dbContext.TenantUsers
@@ -51,6 +53,21 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             "POS home context: tenant user resolved {UserId}.",
             context.UserId);
 
+        var requestedFingerprint = deviceFingerprint?.Trim() ?? string.Empty;
+        if (requestedFingerprint.Length == 0)
+        {
+            _logger.LogDebug(
+                "POS home context unresolved: device fingerprint missing for tenant {TenantId}.",
+                context.TenantId);
+
+            return Unresolved(
+                PosHomeContextReasonCodes.DeviceContextMissing,
+                "Current POS device could not be resolved.",
+                "Activate this device or sign in from a registered POS device.");
+        }
+
+        var fingerprintHash = DeviceFingerprintHasher.Hash(requestedFingerprint);
+
         var resolvedDeviceId = deviceId is { } requestedDeviceId && requestedDeviceId != Guid.Empty
             ? requestedDeviceId
             : (Guid?)null;
@@ -62,40 +79,11 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             : null;
         Guid? assignedTillId = null;
 
-        // The client-provided device id is authoritative only when it is registered for this
-        // tenant. A stale/foreign id must not hard-fail while a valid till<->device chain exists.
-        if (resolvedDeviceId is not null)
-        {
-            var clientDeviceExists = await _dbContext.PosDevices
-                .AsNoTracking()
-                .AnyAsync(
-                    x => x.TenantId == context.TenantId && x.Id == resolvedDeviceId.Value,
-                    cancellationToken);
-
-            if (!clientDeviceExists)
-            {
-                _logger.LogDebug(
-                    "POS home context: client device {DeviceId} is not registered for tenant {TenantId}; falling back to till assignment.",
-                    resolvedDeviceId,
-                    context.TenantId);
-                resolvedDeviceId = null;
-            }
-        }
-
-        // Fallback 1: resolve the device from the client-provided till hint.
-        if (resolvedDeviceId is null && clientTillHint is not null)
-        {
-            resolvedDeviceId = await ResolveDeviceIdFromTillAssignmentAsync(
-                context.TenantId,
-                clientTillHint.Value,
-                cancellationToken);
-        }
-
-        // Fallback 2: resolve the tenant's active till<->device assignment.
         if (resolvedDeviceId is null)
         {
-            resolvedDeviceId = await ResolveActiveDeviceForTenantAsync(
+            resolvedDeviceId = await ResolveTrustedDeviceIdByFingerprintAsync(
                 context.TenantId,
+                fingerprintHash,
                 cancellationToken);
         }
 
@@ -114,7 +102,9 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
         var device = await _dbContext.PosDevices
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                x => x.TenantId == context.TenantId && x.Id == resolvedDeviceId.Value,
+                x => x.TenantId == context.TenantId &&
+                     x.Id == resolvedDeviceId.Value &&
+                     x.DeviceFingerprintHash == fingerprintHash,
                 cancellationToken);
 
         if (device is null)
@@ -154,7 +144,11 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
 
         var assignment = await (from row in _dbContext.TillDeviceAssignments.AsNoTracking()
                 join t in _dbContext.Tills.AsNoTracking() on row.TillId equals t.Id
-                where t.TenantId == context.TenantId &&
+                join outlet in _dbContext.Outlets.AsNoTracking() on t.OutletId equals outlet.Id
+                where row.TenantId == context.TenantId &&
+                      row.OutletId == t.OutletId &&
+                      t.TenantId == context.TenantId &&
+                      outlet.TenantId == context.TenantId &&
                       row.PosDeviceId == device.Id &&
                       row.ReleasedAt == null
                 orderby row.AssignedAt descending
@@ -194,6 +188,19 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             "POS home context: till assignment resolved till {TillId} for device {DeviceId}.",
             assignedTillId,
             device.Id);
+
+        if (clientTillHint is not null && clientTillHint.Value != assignedTillId.Value)
+        {
+            _logger.LogDebug(
+                "POS home context unresolved: client till {ClientTillId} does not match device-assigned till {AssignedTillId}.",
+                clientTillHint,
+                assignedTillId);
+
+            return Unresolved(
+                PosHomeContextReasonCodes.DeviceNotAssignedToTill,
+                "This POS device is not assigned to the requested till.",
+                "Refresh the POS device context or activate the correct device.");
+        }
 
         var till = await _dbContext.Tills
             .AsNoTracking()
@@ -246,6 +253,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
         var deviceTrusted = await IsDeviceTrustedAsync(
             context.TenantId,
             device.Id,
+            fingerprintHash,
             cancellationToken);
 
         if (!deviceTrusted)
@@ -366,7 +374,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 DeviceId: device.Id,
                 DeviceCode: deviceCode,
                 DeviceName: deviceName,
-                DeviceTrusted: true,
+                DeviceTrusted: deviceTrusted,
                 DeviceStatus: deviceStatus,
                 TillId: till.Id,
                 TillCode: till.TillCode,
@@ -387,74 +395,68 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 CashDrawerBalance: cashDrawerBalance));
     }
 
-    private async Task<Guid?> ResolveActiveDeviceForTenantAsync(
+    private async Task<Guid?> ResolveTrustedDeviceIdByFingerprintAsync(
         Guid tenantId,
+        string fingerprintHash,
         CancellationToken cancellationToken)
     {
-        return await (from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
-                join t in _dbContext.Tills.AsNoTracking() on assignment.TillId equals t.Id
-                join d in _dbContext.PosDevices.AsNoTracking() on assignment.PosDeviceId equals d.Id
-                where t.TenantId == tenantId &&
-                      d.TenantId == tenantId &&
+        return await (from d in _dbContext.PosDevices.AsNoTracking()
+                where d.TenantId == tenantId &&
+                      d.DeviceFingerprintHash == fingerprintHash &&
                       d.Status == PosDeviceConstants.ActiveStatus &&
-                      assignment.ReleasedAt == null
-                orderby assignment.AssignedAt descending
-                select assignment.PosDeviceId)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
-
-    private async Task<Guid?> ResolveDeviceIdFromTillAssignmentAsync(
-        Guid tenantId,
-        Guid tillId,
-        CancellationToken cancellationToken)
-    {
-        return await (from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
-                join t in _dbContext.Tills.AsNoTracking() on assignment.TillId equals t.Id
-                where t.TenantId == tenantId &&
-                      t.Id == tillId &&
-                      assignment.ReleasedAt == null
-                orderby assignment.AssignedAt descending
-                select assignment.PosDeviceId)
+                      d.IsTrusted &&
+                      d.DeviceFingerprintHash != null &&
+                      d.DeviceFingerprintHash != string.Empty
+                select (Guid?)d.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
     private async Task<bool> IsDeviceTrustedAsync(
         Guid tenantId,
         Guid deviceId,
+        string fingerprintHash,
         CancellationToken cancellationToken)
     {
-        var hasActiveAssignment = await _dbContext.TillDeviceAssignments
-            .AsNoTracking()
-            .AnyAsync(
-                x => x.PosDeviceId == deviceId &&
-                     x.ReleasedAt == null,
-                cancellationToken);
-
-        if (!hasActiveAssignment)
+        if (string.IsNullOrWhiteSpace(fingerprintHash))
         {
             return false;
         }
 
-        var hasActiveOfflineClient = await _dbContext.OfflineClients
+        var hasTrustedDeviceAssignment = await (
+                from device in _dbContext.PosDevices.AsNoTracking()
+                join assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
+                    on device.Id equals assignment.PosDeviceId
+                join till in _dbContext.Tills.AsNoTracking()
+                    on assignment.TillId equals till.Id
+                join outlet in _dbContext.Outlets.AsNoTracking()
+                    on till.OutletId equals outlet.Id
+                where device.TenantId == tenantId &&
+                      device.Id == deviceId &&
+                      device.DeviceFingerprintHash == fingerprintHash &&
+                      device.DeviceFingerprintHash != null &&
+                      device.DeviceFingerprintHash != string.Empty &&
+                      device.Status == PosDeviceConstants.ActiveStatus &&
+                      device.IsTrusted &&
+                      assignment.TenantId == tenantId &&
+                      assignment.OutletId == till.OutletId &&
+                      assignment.ReleasedAt == null &&
+                      till.TenantId == tenantId &&
+                      till.Status == TillConstants.ActiveStatus &&
+                      outlet.TenantId == tenantId
+                select device.Id)
+            .AnyAsync(cancellationToken);
+
+        if (!hasTrustedDeviceAssignment)
+        {
+            return false;
+        }
+
+        return !await _dbContext.OfflineClients
             .AsNoTracking()
             .AnyAsync(
                 x => x.TenantId == tenantId &&
                      x.PosDeviceId == deviceId &&
-                     x.Status == "ACTIVE",
-                cancellationToken);
-
-        if (hasActiveOfflineClient)
-        {
-            return true;
-        }
-
-        // Development and fixed-POS flows may not register offline clients yet.
-        return await _dbContext.PosDevices
-            .AsNoTracking()
-            .AnyAsync(
-                x => x.TenantId == tenantId &&
-                     x.Id == deviceId &&
-                     x.Status == PosDeviceConstants.ActiveStatus,
+                     x.Status != "ACTIVE",
                 cancellationToken);
     }
 

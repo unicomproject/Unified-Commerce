@@ -135,5 +135,18 @@ public class SalesOrder : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void RecordRefund(decimal amount, Guid tenantUserId, DateTimeOffset now)
+    {
+        if (amount <= 0 || RefundedAmount + amount > TotalAmount)
+        {
+            throw new InvalidOperationException("Refund amount exceeds the order total.");
+        }
+
+        RefundedAmount += amount;
+        PaymentStatus = RefundedAmount >= TotalAmount ? "REFUNDED" : "PARTIALLY_REFUNDED";
+        UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+    }
 }
 
