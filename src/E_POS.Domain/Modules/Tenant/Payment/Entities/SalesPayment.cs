@@ -41,6 +41,8 @@ public class SalesPayment : AuditableEntity
         decimal? tenderedAmount,
         decimal paidAmount,
         decimal changeAmount,
+        string idempotencyKey,
+        string requestHash,
         Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
@@ -60,6 +62,8 @@ public class SalesPayment : AuditableEntity
             PaidAmount = paidAmount,
             ChangeAmount = changeAmount,
             RefundedAmount = 0,
+            IdempotencyKey = idempotencyKey.Trim(),
+            PaymentNote = $"POS_REQUEST_HASH:{requestHash}",
             InitiatedAt = now,
             PaidAt = now,
             CreatedByTenantUserId = createdByTenantUserId,

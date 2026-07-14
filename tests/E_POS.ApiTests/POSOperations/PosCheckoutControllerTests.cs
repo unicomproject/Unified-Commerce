@@ -195,6 +195,31 @@ public sealed class PosCheckoutControllerTests
     }
 
     [Fact]
+    public async Task StartPayment_WhenPaymentPermissionDenied_ReturnsForbidden()
+    {
+        var service = new FakePosCheckoutService
+        {
+            StartPaymentResult = ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(
+                new ApplicationError("pos_checkout.payment_permission_denied", "You do not have permission to accept this payment method.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), SalesPermissions.Sale.Checkout);
+
+        var request = new PosCheckoutStartPaymentRequestDto(
+            Guid.NewGuid(),
+            "NewSale",
+            null,
+            [new PosCheckoutLineRequestDto(Guid.NewGuid(), 1)],
+            "card",
+            null);
+
+        var result = await controller.StartPayment(request, CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
     public void Controller_RequiresTenantOnlyPolicy()
     {
         var authorize = Assert.Single(typeof(PosCheckoutController).GetCustomAttributes<AuthorizeAttribute>());
@@ -239,6 +264,16 @@ public sealed class PosCheckoutControllerTests
         public TenantRequestContext? Context { get; private set; }
         public PosCheckoutSummaryRequestDto? Request { get; private set; }
         public PosCheckoutStartPaymentRequestDto? StartPaymentRequest { get; private set; }
+
+        public Task<ApplicationResult<PosCheckoutSummaryResponseDto>> CalculateCartAsync(
+            TenantRequestContext context,
+            PosCheckoutSummaryRequestDto request,
+            CancellationToken cancellationToken)
+        {
+            Context = context;
+            Request = request;
+            return Task.FromResult(GetSummaryResult);
+        }
 
         public Task<ApplicationResult<PosCheckoutSummaryResponseDto>> GetSummaryAsync(
             TenantRequestContext context,

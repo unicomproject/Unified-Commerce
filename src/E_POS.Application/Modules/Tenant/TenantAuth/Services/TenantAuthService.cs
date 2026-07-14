@@ -23,6 +23,10 @@ public sealed class TenantAuthService : ITenantAuthService
         "tenant_auth.invalid_session",
         "Invalid tenant session.");
 
+    private static readonly ApplicationError InvalidRefreshToken = new(
+        "tenant_auth.invalid_refresh_token",
+        "The refresh token is invalid or expired.");
+
     private readonly ITenantAuthRepository _repository;
     private readonly IPasswordHashService _passwordHashService;
     private readonly IJwtTokenFactory _jwtTokenFactory;
@@ -119,7 +123,7 @@ public sealed class TenantAuthService : ITenantAuthService
             account.TenantUserId,
             null, // ipAddress
             null, // userAgent
-            now.AddMinutes(_jwtSettings.AccessTokenMinutes),
+            refreshToken.ExpiresAt,
             now);
 
         var refreshTokenEntity = TenantRefreshToken.Create(
@@ -163,6 +167,58 @@ public sealed class TenantAuthService : ITenantAuthService
             effectivePermissions);
 
         return ApplicationResult<TenantLoginResponse>.Success(response);
+    }
+
+    public async Task<ApplicationResult<TenantLoginResponse>> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return ApplicationResult<TenantLoginResponse>.Failure(InvalidRefreshToken);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var replacement = _refreshTokenGenerator.CreateRefreshToken(_jwtSettings.RefreshTokenDays);
+        var rotation = await _repository.RotateRefreshTokenAsync(
+            _tokenHashService.HashToken(refreshToken, _jwtSettings.SigningKey),
+            Guid.NewGuid(),
+            _tokenHashService.HashToken(replacement.Token, _jwtSettings.SigningKey),
+            replacement.ExpiresAt,
+            now,
+            cancellationToken);
+
+        if (rotation.Status != TenantRefreshRotationStatus.Succeeded ||
+            rotation.Account is null ||
+            rotation.SessionId is null)
+        {
+            return ApplicationResult<TenantLoginResponse>.Failure(InvalidRefreshToken);
+        }
+
+        var account = rotation.Account;
+        var permissions = await _repository.GetActivePermissionCodesAsync(
+            account.TenantUserId,
+            account.TenantId,
+            cancellationToken);
+        var effectivePermissions = TenantPermissionAliases.Expand(permissions);
+        var accessToken = _jwtTokenFactory.CreateAccessToken(CreateTokenDescriptor(
+            account,
+            rotation.SessionId.Value,
+            Guid.NewGuid().ToString("N"),
+            effectivePermissions));
+
+        return ApplicationResult<TenantLoginResponse>.Success(new TenantLoginResponse(
+            accessToken.AccessToken,
+            accessToken.ExpiresAt,
+            replacement.Token,
+            replacement.ExpiresAt,
+            new TenantLoginUserDto(
+                account.TenantUserId,
+                account.TenantId,
+                account.Email,
+                account.UserStatus,
+                account.TenantStatus),
+            effectivePermissions));
     }
 
     public async Task<ApplicationResult> LogoutAsync(

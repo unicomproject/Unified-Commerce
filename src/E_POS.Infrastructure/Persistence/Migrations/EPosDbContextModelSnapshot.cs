@@ -12415,6 +12415,374 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.PosDiscountApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AbsoluteLimitSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("absolute_limit_snapshot");
+
+                    b.Property<string>("ApplicationStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("application_status");
+
+                    b.Property<DateTimeOffset?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("applied_at");
+
+                    b.Property<string>("CalculationMethodSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("calculation_method_snapshot");
+
+                    b.Property<string>("CartHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("char(64)")
+                        .HasColumnName("cart_hash");
+
+                    b.Property<string>("CartSnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("cart_snapshot_json");
+
+                    b.Property<decimal>("CartSubtotalSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("cart_subtotal_snapshot");
+
+                    b.Property<decimal>("CashierLimitSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("cashier_limit_snapshot");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by_tenant_user_id");
+
+                    b.Property<string>("DecisionNote")
+                        .HasColumnType("text")
+                        .HasColumnName("decision_note");
+
+                    b.Property<decimal>("DiscountAmountSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("discount_amount_snapshot");
+
+                    b.Property<Guid>("DiscountPolicyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("discount_policy_id");
+
+                    b.Property<string>("DiscountScope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnName("discount_scope");
+
+                    b.Property<string>("DiscountSource")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnName("discount_source");
+
+                    b.Property<Guid>("DiscountTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("discount_type_id");
+
+                    b.Property<decimal>("EligibleSubtotalSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("eligible_subtotal_snapshot");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid>("OutletId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("outlet_id");
+
+                    b.Property<string>("PolicyCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("policy_code_snapshot");
+
+                    b.Property<string>("PolicyNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("policy_name_snapshot");
+
+                    b.Property<Guid>("PosDeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pos_device_id");
+
+                    b.Property<string>("RequestReason")
+                        .HasColumnType("text")
+                        .HasColumnName("request_reason");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<Guid>("RequestedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_tenant_user_id");
+
+                    b.Property<decimal>("RequestedValue")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("requested_value");
+
+                    b.Property<bool>("RequiresManagerApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_manager_approval");
+
+                    b.Property<Guid?>("SalesOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_order_id");
+
+                    b.Property<Guid?>("TargetProductVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_product_variant_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_id");
+
+                    b.Property<Guid>("TillSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_session_id");
+
+                    b.Property<decimal>("TotalAfterDiscountSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("total_after_discount_snapshot");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pos_discount_applications");
+
+                    b.HasIndex("CurrencyCode");
+
+                    b.HasIndex("DecidedByTenantUserId");
+
+                    b.HasIndex("DiscountTypeId");
+
+                    b.HasIndex("RequestedByTenantUserId");
+
+                    b.HasIndex("TenantId", "CustomerId");
+
+                    b.HasIndex("TenantId", "DiscountPolicyId");
+
+                    b.HasIndex("TenantId", "OutletId");
+
+                    b.HasIndex("TenantId", "PosDeviceId");
+
+                    b.HasIndex("TenantId", "SalesOrderId");
+
+                    b.HasIndex("TenantId", "TargetProductVariantId");
+
+                    b.HasIndex("TenantId", "TillId");
+
+                    b.HasIndex("TenantId", "TillSessionId");
+
+                    b.HasIndex("TenantId", "ApplicationStatus", "ExpiresAt")
+                        .HasDatabaseName("ix_pos_discount_applications_status_expiry");
+
+                    b.HasIndex("TenantId", "RequestedByTenantUserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_pos_discount_applications_idempotency");
+
+                    b.ToTable("pos_discount_applications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pos_discount_applications_amounts", "cart_subtotal_snapshot >= 0 AND eligible_subtotal_snapshot >= 0 AND discount_amount_snapshot >= 0 AND total_after_discount_snapshot >= 0");
+
+                            t.HasCheckConstraint("ck_pos_discount_applications_scope", "discount_scope IN ('ORDER', 'LINE')");
+
+                            t.HasCheckConstraint("ck_pos_discount_applications_source", "discount_source IN ('POLICY', 'MANUAL')");
+
+                            t.HasCheckConstraint("ck_pos_discount_applications_status", "application_status IN ('PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'EXPIRED', 'APPLIED', 'CANCELLED')");
+
+                            t.HasCheckConstraint("ck_pos_discount_applications_values", "requested_value > 0 AND cashier_limit_snapshot >= 0 AND absolute_limit_snapshot > 0");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.PosDiscountApplicationEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActorTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_tenant_user_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("from_status");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("PosDiscountApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pos_discount_application_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("to_status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pos_discount_application_events");
+
+                    b.HasIndex("ActorTenantUserId");
+
+                    b.HasIndex("TenantId", "PosDiscountApplicationId", "OccurredAt")
+                        .HasDatabaseName("ix_pos_discount_application_events_application");
+
+                    b.ToTable("pos_discount_application_events", (string)null);
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.PosDiscountAuthorityLimit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_tenant_user_id");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code");
+
+                    b.Property<decimal>("MaxFixedAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("max_fixed_amount");
+
+                    b.Property<decimal>("MaxPercentage")
+                        .HasPrecision(8, 4)
+                        .HasColumnType("numeric(8,4)")
+                        .HasColumnName("max_percentage");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_user_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_tenant_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pos_discount_authority_limits");
+
+                    b.HasIndex("CreatedByTenantUserId");
+
+                    b.HasIndex("CurrencyCode");
+
+                    b.HasIndex("TenantUserId");
+
+                    b.HasIndex("UpdatedByTenantUserId");
+
+                    b.HasIndex("TenantId", "TenantUserId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_pos_discount_authority_limits_tenant_user");
+
+                    b.ToTable("pos_discount_authority_limits", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pos_discount_authority_limits_fixed", "max_fixed_amount >= 0");
+
+                            t.HasCheckConstraint("ck_pos_discount_authority_limits_percentage", "max_percentage >= 0 AND max_percentage <= 100");
+
+                            t.HasCheckConstraint("ck_pos_discount_authority_limits_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+                        });
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashCountDenomination", b =>
                 {
                     b.Property<Guid>("Id")
@@ -17425,6 +17793,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CreatedByTenantUserId");
 
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_outlets_tenant_id_default_outlet")
+                        .HasFilter("is_default_outlet = true AND status <> 'DELETED'");
+
                     b.HasIndex("UpdatedByTenantUserId");
 
                     b.HasIndex("TenantId", "OutletCode")
@@ -17602,13 +17975,17 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_outlet_business_hours");
 
-                    b.HasIndex("OutletId");
-
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("OutletId", "DayOfWeek")
+                        .IsUnique()
+                        .HasDatabaseName("uq_outlet_business_hours_outlet_id_day_of_week");
 
                     b.ToTable("outlet_business_hours", null, t =>
                         {
                             t.HasCheckConstraint("ck_outlet_business_hours_day_of_week", "day_of_week BETWEEN 0 AND 6");
+
+                            t.HasCheckConstraint("ck_outlet_business_hours_open_close", "is_closed = true OR (opening_time IS NOT NULL AND closing_time IS NOT NULL AND opening_time < closing_time)");
 
                             t.HasCheckConstraint("ck_outlet_business_hours_validity", "valid_until IS NULL OR valid_from IS NULL OR valid_until >= valid_from");
                         });
@@ -24948,6 +25325,146 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_expiry_discount_rule_tiers_expiry_discount_rule_id_expiry_discount_rules");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.PosDiscountApplication", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Currency", null)
+                        .WithMany()
+                        .HasForeignKey("CurrencyCode")
+                        .HasPrincipalKey("CurrencyCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountType", null)
+                        .WithMany()
+                        .HasForeignKey("DiscountTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicy", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DiscountPolicyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OutletId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PosDeviceId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SalesOrderId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TargetProductVariantId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TillId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TillSessionId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.PosDiscountApplicationEvent", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Discount.Entities.PosDiscountApplication", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PosDiscountApplicationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.Discount.Entities.PosDiscountAuthorityLimit", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Currency", null)
+                        .WithMany()
+                        .HasForeignKey("CurrencyCode")
+                        .HasPrincipalKey("CurrencyCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.CashCountDenomination", b =>

@@ -32,6 +32,10 @@ public sealed class OutletConfiguration : IEntityTypeConfiguration<Outlet>
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_outlets_created_by_tenant_user_id_tenant_users");
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_outlets_updated_by_tenant_user_id_tenant_users");
         builder.HasIndex(x => new { x.TenantId, x.OutletCode }).IsUnique().HasDatabaseName("uq_outlets_tenant_id_outlet_code");
+        builder.HasIndex(x => x.TenantId)
+            .HasDatabaseName("uq_outlets_tenant_id_default_outlet")
+            .IsUnique()
+            .HasFilter("is_default_outlet = true AND status <> 'DELETED'");
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_outlets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");

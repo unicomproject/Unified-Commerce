@@ -145,6 +145,38 @@ public class SubscriptionPlan : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void Archive(DateTimeOffset now, Guid? updatedByPlatformUserId = null)
+    {
+        Status = SubscriptionPlanConstants.Status.Retired;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void Reactivate(DateTimeOffset now, Guid? updatedByPlatformUserId = null)
+    {
+        Status = SubscriptionPlanConstants.Status.Active;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateDraftBasics(
+        string planCode,
+        string name,
+        string? description,
+        string billingInterval,
+        DateTimeOffset now,
+        Guid? updatedByPlatformUserId = null)
+    {
+        PlanCode = planCode;
+        Name = name;
+        PlanName = name;
+        Description = description;
+        BillingInterval = billingInterval;
+        BillingCycle = billingInterval;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
     public void TouchUpdatedAt(DateTimeOffset now, Guid? updatedByPlatformUserId = null)
     {
         UpdatedByPlatformUserId = updatedByPlatformUserId;

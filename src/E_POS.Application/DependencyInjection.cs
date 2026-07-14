@@ -18,10 +18,15 @@ using E_POS.Application.Modules.Platform.Subscription.Services;
 using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
 using E_POS.Application.Modules.Tenant.PricingTax.Services;
 using E_POS.Application.Modules.Tenant.PricingTax.Validators;
+using E_POS.Application.Modules.Tenant.Inventory.Contracts;
+using E_POS.Application.Modules.Tenant.Inventory.Services;
+using E_POS.Application.Modules.Tenant.Inventory.Validators;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Services;
+using E_POS.Application.Modules.Tenant.Discount.Contracts;
+using E_POS.Application.Modules.Tenant.Discount.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -58,6 +63,8 @@ public static class DependencyInjection
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
+        services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
         services.AddScoped<IPosProductCatalogService, PosProductCatalogService>();
         services.AddScoped<ICollectionService, CollectionService>();
         services.AddScoped<IReturnPolicyTemplateService, ReturnPolicyTemplateService>();
@@ -87,6 +94,12 @@ public static class DependencyInjection
         services.AddScoped<IPosTillSessionService, PosTillSessionService>();
         services.AddScoped<IPosCheckoutService, PosCheckoutService>();
         services.AddScoped<IPosReceiptService, PosReceiptService>();
+        services.AddScoped<IPosHoldService, PosHoldService>();
+        services.AddScoped<IPosDiscountService, PosDiscountService>();
+        services.AddScoped<IDiscountPolicyAdminService, DiscountPolicyAdminService>();
+
+        services.AddScoped<ITenantAdminInventoryService, TenantAdminInventoryService>();
+        services.AddScoped<ITenantAdminInventoryRequestValidator, TenantAdminInventoryRequestValidator>();
 
         // ECommerce Storefront
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();

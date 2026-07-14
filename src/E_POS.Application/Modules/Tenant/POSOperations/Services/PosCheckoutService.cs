@@ -8,6 +8,10 @@ namespace E_POS.Application.Modules.Tenant.POSOperations.Services;
 
 public sealed class PosCheckoutService : IPosCheckoutService
 {
+    private static readonly ApplicationError CartPermissionDenied = new(
+        "pos_cart.permission_denied",
+        "You do not have permission to update the POS cart.");
+
     private static readonly ApplicationError PermissionDenied = new(
         "pos_checkout.permission_denied",
         "You do not have permission to checkout POS sales.");
@@ -19,6 +23,10 @@ public sealed class PosCheckoutService : IPosCheckoutService
     private static readonly ApplicationError InvalidLines = new(
         "pos_checkout.invalid_lines",
         "Checkout requires at least one cart line.");
+
+    private static readonly ApplicationError InvalidSaleType = new(
+        "pos_checkout.invalid_sale_type",
+        "Sale type must be NewSale.");
 
     private static readonly ApplicationError DeviceNotFound = new(
         "pos_checkout.device_not_found",
@@ -47,6 +55,20 @@ public sealed class PosCheckoutService : IPosCheckoutService
         _dateTimeProvider = dateTimeProvider;
     }
 
+    public Task<ApplicationResult<PosCheckoutSummaryResponseDto>> CalculateCartAsync(
+        TenantRequestContext context,
+        PosCheckoutSummaryRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(SalesPermissions.Cart.UpdateItem))
+        {
+            return Task.FromResult(
+                ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(CartPermissionDenied));
+        }
+
+        return CalculateSummaryAsync(context, request, cancellationToken);
+    }
+
     public async Task<ApplicationResult<PosCheckoutSummaryResponseDto>> GetSummaryAsync(
         TenantRequestContext context,
         PosCheckoutSummaryRequestDto request,
@@ -57,6 +79,15 @@ public sealed class PosCheckoutService : IPosCheckoutService
             return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(PermissionDenied);
         }
 
+        return await CalculateSummaryAsync(context, request, cancellationToken);
+    }
+
+    private async Task<ApplicationResult<PosCheckoutSummaryResponseDto>> CalculateSummaryAsync(
+        TenantRequestContext context,
+        PosCheckoutSummaryRequestDto request,
+        CancellationToken cancellationToken)
+    {
+
         if (request.DeviceId == Guid.Empty)
         {
             return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(InvalidDeviceId);
@@ -65,6 +96,11 @@ public sealed class PosCheckoutService : IPosCheckoutService
         if (request.Lines is null || request.Lines.Count == 0)
         {
             return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(InvalidLines);
+        }
+
+        if (!IsSupportedSaleType(request.SaleType))
+        {
+            return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(InvalidSaleType);
         }
 
         var result = await _repository.CalculateSummaryAsync(
@@ -88,6 +124,7 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.variant_not_found" => VariantNotFound,
                     "pos_checkout.customer_not_found" => CustomerNotFound,
                     "pos_checkout.invalid_lines" => InvalidLines,
+                    "pos_checkout.invalid_sale_type" => InvalidSaleType,
                     _ => new ApplicationError(
                         result.ErrorCode ?? "pos_checkout.summary_failed",
                         "Checkout summary could not be calculated.")
@@ -117,12 +154,25 @@ public sealed class PosCheckoutService : IPosCheckoutService
             return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(InvalidLines);
         }
 
+
+        if (!IsSupportedSaleType(request.SaleType))
+        {
+            return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(InvalidSaleType);
+        }
+
         if (string.IsNullOrWhiteSpace(request.PaymentMethod))
         {
             return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(
                 new ApplicationError(
                     "pos_checkout.invalid_payment_method",
                     "A payment method is required."));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.IdempotencyKey.Trim().Length > 100)
+        {
+            return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(
+                new ApplicationError("pos_checkout.invalid_idempotency_key",
+                    "A valid idempotency key of at most 100 characters is required."));
         }
 
         var result = await _repository.StartPaymentAsync(
@@ -146,6 +196,7 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.variant_not_found" => VariantNotFound,
                     "pos_checkout.customer_not_found" => CustomerNotFound,
                     "pos_checkout.invalid_lines" => InvalidLines,
+                    "pos_checkout.invalid_sale_type" => InvalidSaleType,
                     "pos_checkout.invalid_payment_method" => new ApplicationError(
                         "pos_checkout.invalid_payment_method",
                         "The selected payment method is not supported."),
@@ -167,6 +218,15 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.payment_method_not_found" => new ApplicationError(
                         "pos_checkout.payment_method_not_found",
                         "The selected payment method could not be found."),
+                    "pos_checkout.payment_provider_required" => new ApplicationError(
+                        "pos_checkout.payment_provider_required",
+                        "This payment method requires its provider confirmation flow."),
+                    "pos_checkout.idempotency_conflict" => new ApplicationError(
+                        "pos_checkout.idempotency_conflict",
+                        "The idempotency key was already used for a different checkout request."),
+                    "pos_checkout.stock_conflict" => new ApplicationError(
+                        "pos_checkout.stock_conflict",
+                        "Stock changed while the payment was being completed. Recalculate and retry."),
                     _ => new ApplicationError(
                         result.ErrorCode ?? "pos_checkout.start_payment_failed",
                         "Checkout payment could not be started.")
@@ -175,4 +235,9 @@ public sealed class PosCheckoutService : IPosCheckoutService
 
         return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Success(result.Payment);
     }
+
+    private static bool IsSupportedSaleType(string? saleType) =>
+        string.IsNullOrWhiteSpace(saleType) ||
+        string.Equals(saleType.Trim(), "NewSale", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(saleType.Trim(), "New Sale", StringComparison.OrdinalIgnoreCase);
 }

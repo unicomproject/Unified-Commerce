@@ -22,6 +22,16 @@ public static class SalesPermissions
     public static class Discount
     {
         public const string Apply = "sales.discount.apply";
+        public const string Approve = "sales.discount.approve";
+    }
+
+    public static class DiscountPolicy
+    {
+        public const string View = "discount.policy.view";
+        public const string Create = "discount.policy.create";
+        public const string Update = "discount.policy.update";
+        public const string Activate = "discount.policy.activate";
+        public const string Delete = "discount.policy.delete";
     }
 
     public static class Park

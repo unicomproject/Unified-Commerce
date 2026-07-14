@@ -15,6 +15,12 @@ public interface IPosProductCatalogRepository
         Guid tenantId,
         Guid deviceId,
         CancellationToken cancellationToken);
+
+    Task<PosProductDetailRepositoryResult> GetProductDetailAsync(
+        Guid tenantId,
+        Guid deviceId,
+        Guid productId,
+        CancellationToken cancellationToken);
 }
 
 public sealed record PosProductCatalogRepositoryResult(
@@ -27,6 +33,13 @@ public sealed record PosProductCatalogRepositoryResult(
 public sealed record PosProductCatalogCategoriesRepositoryResult(
     string? ErrorCode,
     IReadOnlyList<PosCatalogCategoryResponseDto> Categories)
+{
+    public bool IsSuccess => ErrorCode is null;
+}
+
+public sealed record PosProductDetailRepositoryResult(
+    string? ErrorCode,
+    PosProductDetailResponseDto? Product)
 {
     public bool IsSuccess => ErrorCode is null;
 }

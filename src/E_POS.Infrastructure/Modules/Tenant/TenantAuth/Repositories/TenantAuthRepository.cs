@@ -127,6 +127,111 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
         _dbContext.TenantLoginAudits.Add(audit);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<TenantRefreshRotationResult> RotateRefreshTokenAsync(
+        string currentTokenHash,
+        Guid replacementTokenId,
+        string replacementTokenHash,
+        DateTimeOffset replacementExpiresAt,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            cancellationToken);
+
+        var current = await _dbContext.TenantRefreshTokens
+            .SingleOrDefaultAsync(x => x.TokenHash == currentTokenHash, cancellationToken);
+
+        if (current is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new(TenantRefreshRotationStatus.Invalid, null, null);
+        }
+
+        var session = await _dbContext.TenantAuthSessions
+            .SingleOrDefaultAsync(
+                x => x.Id == current.TenantAuthSessionId &&
+                     x.TenantId == current.TenantId &&
+                     x.UserId == current.UserId,
+                cancellationToken);
+
+        if (current.UsedAt.HasValue || current.ReplacedByTokenId.HasValue)
+        {
+            if (session is not null)
+            {
+                session.Revoke(now, reason: "refresh_token_reuse");
+            }
+
+            await _dbContext.TenantRefreshTokens
+                .Where(x => x.TokenFamilyId == current.TokenFamilyId && x.RevokedAt == null)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(x => x.RevokedAt, now)
+                        .SetProperty(x => x.RevokeReason, "refresh_token_reuse")
+                        .SetProperty(x => x.UpdatedAt, now),
+                    cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new(TenantRefreshRotationStatus.Reused, null, null);
+        }
+
+        if (current.RevokedAt.HasValue ||
+            current.ExpiresAt <= now ||
+            session is null ||
+            session.RevokedAt.HasValue ||
+            session.ExpiresAt <= now)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new(TenantRefreshRotationStatus.Invalid, null, null);
+        }
+
+        var account = await FindRefreshAccountAsync(current.UserId, current.TenantId, cancellationToken);
+        if (account is null ||
+            !string.Equals(account.UserStatus, TenantAuthConstants.ActiveUserStatus, StringComparison.OrdinalIgnoreCase) ||
+            !TenantAuthConstants.IsTenantLoginStatusAllowed(account.TenantStatus))
+        {
+            session.Revoke(now, reason: "account_unavailable");
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new(TenantRefreshRotationStatus.AccountUnavailable, null, null);
+        }
+
+        current.MarkRotated(replacementTokenId, now);
+        session.Extend(replacementExpiresAt, now);
+        _dbContext.TenantRefreshTokens.Add(TenantRefreshToken.Create(
+            replacementTokenId,
+            current.TenantId,
+            current.TenantAuthSessionId,
+            current.UserId,
+            replacementTokenHash,
+            current.TokenFamilyId,
+            replacementExpiresAt,
+            now));
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new(TenantRefreshRotationStatus.Succeeded, account, current.TenantAuthSessionId);
+    }
+
+    private Task<TenantLoginAccount?> FindRefreshAccountAsync(
+        Guid tenantUserId,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return (
+            from user in _dbContext.TenantUsers.AsNoTracking()
+            join tenant in _dbContext.Tenants.AsNoTracking() on user.TenantId equals tenant.Id
+            where user.Id == tenantUserId && user.TenantId == tenantId
+            select new TenantLoginAccount(
+                user.Id,
+                user.TenantId,
+                user.Email,
+                user.EncryptedPassword,
+                user.AccountStatus,
+                tenant.Status))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
     public async Task RevokeCurrentSessionAsync(
         Guid tenantUserId,
         Guid tenantId,

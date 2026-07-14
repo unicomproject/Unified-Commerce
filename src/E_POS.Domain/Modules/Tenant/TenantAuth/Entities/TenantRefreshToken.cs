@@ -50,4 +50,16 @@ public class TenantRefreshToken : AuditableEntity
         RevokeReason = reason;
         UpdatedAt = now;
     }
+
+    public void MarkRotated(Guid replacementTokenId, DateTimeOffset now)
+    {
+        if (UsedAt.HasValue || RevokedAt.HasValue || ReplacedByTokenId.HasValue)
+        {
+            throw new InvalidOperationException("Refresh token has already been consumed.");
+        }
+
+        UsedAt = now;
+        ReplacedByTokenId = replacementTokenId;
+        UpdatedAt = now;
+    }
 }

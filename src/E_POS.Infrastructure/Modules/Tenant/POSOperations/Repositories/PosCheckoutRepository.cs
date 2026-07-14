@@ -7,9 +7,15 @@ using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Domain.Modules.Tenant.Payment.Constants;
 using E_POS.Domain.Modules.Tenant.Payment.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
+using E_POS.Domain.Modules.Tenant.Discount.Entities;
+using E_POS.Application.Modules.Tenant.Discount.Services;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using System.Data;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
@@ -70,11 +76,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             }
         }
 
-        var normalizedLines = request.Lines
-            .Where(line => line.VariantId != Guid.Empty && line.Qty > 0)
-            .ToList();
-
-        if (normalizedLines.Count == 0)
+        var normalizedLines = NormalizeLines(request.Lines);
+        if (normalizedLines is null)
         {
             return new PosCheckoutCalculationResult("pos_checkout.invalid_lines", null);
         }
@@ -94,6 +97,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 select new CheckoutVariantRow(
                     variant.Id,
                     variant.ProductId,
+                    variant.SalesUomId,
                     product.ProductName,
                     product.IsTaxable))
             .ToListAsync(cancellationToken);
@@ -104,68 +108,51 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         }
 
         var variantsById = variants.ToDictionary(row => row.VariantId);
-        var defaultPriceList = await _dbContext.PriceLists
-            .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == ActiveStatus)
-            .Select(x => new { x.Id, x.CurrencyCode })
-            .FirstOrDefaultAsync(cancellationToken);
+        var priceList = await ResolvePriceListAsync(
+            tenantId, sessionResolution.Snapshot!.OutletId, now, cancellationToken);
+        if (priceList is null)
+            return new PosCheckoutCalculationResult("pos_checkout.price_not_configured", null);
 
-        var priceListId = defaultPriceList?.Id;
-        var pricesByVariant = new Dictionary<Guid, decimal>();
-        if (priceListId.HasValue)
-        {
-            var priceRows = await _dbContext.PriceListItems
-                .AsNoTracking()
-                .Where(x =>
-                    x.TenantId == tenantId &&
-                    x.PriceListId == priceListId.Value &&
-                    x.ProductVariantId.HasValue &&
-                    variantIds.Contains(x.ProductVariantId.Value) &&
-                    x.Status == ActiveStatus)
-                .Select(x => new { VariantId = x.ProductVariantId!.Value, x.SellingPrice })
-                .ToListAsync(cancellationToken);
-
-            pricesByVariant = priceRows.ToDictionary(row => row.VariantId, row => row.SellingPrice);
-        }
+        var pricesByVariant = await ResolvePricesAsync(
+            tenantId, priceList.Id,
+            normalizedLines.Select(line => new PriceLookupInput(
+                line.VariantId, variantsById[line.VariantId].ProductId,
+                variantsById[line.VariantId].SalesUomId, line.Qty)).ToList(),
+            now, cancellationToken);
+        if (pricesByVariant.Count != variantIds.Count)
+            return new PosCheckoutCalculationResult("pos_checkout.price_not_configured", null);
 
         var validationMessages = new List<string>();
         decimal subtotal = 0m;
         decimal taxTotal = 0m;
         var itemCount = 0;
+        var calculatedLines = new List<CalculatedCheckoutLine>(normalizedLines.Count);
+        var availableByVariant = await ResolveAvailableStockAsync(
+            tenantId, sessionResolution.Snapshot!.OutletId, variantIds, cancellationToken);
+        var taxPercentByVariant = await ResolveTaxPercentsAsync(
+            tenantId, variants.Select(x => new TaxLookupInput(x.VariantId, x.ProductId)).ToList(),
+            now, cancellationToken);
 
         foreach (var line in normalizedLines)
         {
             var variant = variantsById[line.VariantId];
-            if (!pricesByVariant.TryGetValue(line.VariantId, out var unitPrice))
-            {
-                validationMessages.Add($"Price is not configured for {variant.ProductName}.");
-                continue;
-            }
+            var unitPrice = pricesByVariant[line.VariantId].SellingPrice;
 
-            var lineSubtotal = unitPrice * line.Qty;
+            var grossLineAmount = unitPrice * line.Qty;
+            var taxPercent = variant.IsTaxable && taxPercentByVariant.TryGetValue(line.VariantId, out var rate)
+                ? rate
+                : 0m;
+            var lineSubtotal = priceList.PriceIncludesTax && taxPercent > 0m
+                ? grossLineAmount * 100m / (100m + taxPercent)
+                : grossLineAmount;
             subtotal += lineSubtotal;
             itemCount += line.Qty;
+            var lineTax = lineSubtotal * taxPercent / 100m;
+            taxTotal += lineTax;
+            calculatedLines.Add(new CalculatedCheckoutLine(line.VariantId, lineSubtotal, lineTax));
 
-            if (variant.IsTaxable)
-            {
-                var taxPercent = await ResolveTaxPercentAsync(
-                    tenantId,
-                    variant.ProductId,
-                    variant.VariantId,
-                    now,
-                    cancellationToken);
-                taxTotal += lineSubtotal * taxPercent / 100m;
-            }
-
-            var availableQuantity = await _dbContext.InventoryBalances
-                .AsNoTracking()
-                .Where(x =>
-                    x.TenantId == tenantId &&
-                    x.ProductVariantId == line.VariantId)
-                .Select(x => (decimal?)x.AvailableQuantity)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (availableQuantity.HasValue && availableQuantity.Value < line.Qty)
+            if (availableByVariant.TryGetValue(line.VariantId, out var availableQuantity) &&
+                availableQuantity < line.Qty)
             {
                 validationMessages.Add($"Insufficient stock for {variant.ProductName}.");
             }
@@ -193,23 +180,35 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             cashierName = "Cashier";
         }
 
-        var discount = 0;
+        var discountResolution = await ResolveDiscountApplicationAsync(
+            tenantId, tenantUserId, request.DeviceId, sessionResolution.Snapshot!.SessionId,
+            request.CustomerId, request.SaleType, normalizedLines, request.DiscountApplicationId,
+            subtotal, priceList.CurrencyCode,
+            now, tracked: false, cancellationToken);
+        if (discountResolution.ErrorCode is not null)
+        {
+            return new PosCheckoutCalculationResult(discountResolution.ErrorCode, null);
+        }
+
+        var discountAmount = discountResolution.Application?.DiscountAmountSnapshot ?? 0m;
+        if (discountAmount > 0m && subtotal > 0m)
+            taxTotal = AllocateDiscountToTax(
+                calculatedLines, discountResolution.Application!, discountAmount);
+        var discount = ToMoney(discountAmount);
         var summary = new PosCheckoutSummaryResponseDto(
             new PosCheckoutBillingSummaryDto(
                 itemCount,
                 ToMoney(subtotal),
                 discount,
                 ToMoney(taxTotal),
-                ToMoney(subtotal + taxTotal),
-                string.IsNullOrWhiteSpace(defaultPriceList?.CurrencyCode)
-                    ? "LKR"
-                    : defaultPriceList!.CurrencyCode),
+                ToMoney(subtotal - discountAmount + taxTotal),
+                priceList.CurrencyCode),
             new PosCheckoutSaleDetailsDto(
                 FormatSaleType(request.SaleType),
                 itemCount,
                 now,
                 cashierName),
-            ResolvePaymentMethods(permissions),
+            await ResolvePaymentMethodsAsync(tenantId, permissions, cancellationToken),
             validationMessages);
 
         return new PosCheckoutCalculationResult(null, summary);
@@ -256,6 +255,11 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             return new PosCheckoutStartPaymentResult("pos_checkout.payment_permission_denied", null);
         }
 
+        if (!string.Equals(paymentMethodCode, "CASH", StringComparison.Ordinal))
+        {
+            return new PosCheckoutStartPaymentResult("pos_checkout.payment_provider_required", null);
+        }
+
         if (request.CustomerId is { } customerId && customerId != Guid.Empty)
         {
             var customerExists = await _dbContext.Customers
@@ -268,13 +272,23 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             }
         }
 
-        var normalizedLines = request.Lines
-            .Where(line => line.VariantId != Guid.Empty && line.Qty > 0)
-            .ToList();
-
-        if (normalizedLines.Count == 0)
+        var normalizedLines = NormalizeLines(request.Lines);
+        if (normalizedLines is null)
         {
             return new PosCheckoutStartPaymentResult("pos_checkout.invalid_lines", null);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.IdempotencyKey.Trim().Length > 100)
+            return new PosCheckoutStartPaymentResult("pos_checkout.invalid_idempotency_key", null);
+        var idempotencyKey = request.IdempotencyKey.Trim();
+        var requestHash = CreatePaymentRequestHash(request, normalizedLines, paymentMethodCode);
+        var replay = await ResolveIdempotentPaymentAsync(
+            tenantId, idempotencyKey, requestHash, cancellationToken);
+        if (replay.Found)
+        {
+            return replay.Payment is null
+                ? new PosCheckoutStartPaymentResult("pos_checkout.idempotency_conflict", null)
+                : new PosCheckoutStartPaymentResult(null, replay.Payment);
         }
 
         var variantIds = normalizedLines.Select(line => line.VariantId).Distinct().ToList();
@@ -311,44 +325,29 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         }
 
         var variantsById = variants.ToDictionary(row => row.VariantId);
-        var defaultPriceList = await _dbContext.PriceLists
-            .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == ActiveStatus)
-            .Select(x => new { x.Id, x.CurrencyCode })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var priceListId = defaultPriceList?.Id;
-        var currencyCode = string.IsNullOrWhiteSpace(defaultPriceList?.CurrencyCode)
-            ? "LKR"
-            : defaultPriceList!.CurrencyCode;
-
-        var priceRowsByVariant = new Dictionary<Guid, (decimal SellingPrice, Guid PriceListItemId)>();
-        if (priceListId.HasValue)
-        {
-            var priceRows = await _dbContext.PriceListItems
-                .AsNoTracking()
-                .Where(x =>
-                    x.TenantId == tenantId &&
-                    x.PriceListId == priceListId.Value &&
-                    x.ProductVariantId.HasValue &&
-                    variantIds.Contains(x.ProductVariantId.Value) &&
-                    x.Status == ActiveStatus)
-                .Select(x => new
-                {
-                    VariantId = x.ProductVariantId!.Value,
-                    x.SellingPrice,
-                    x.Id
-                })
-                .ToListAsync(cancellationToken);
-
-            priceRowsByVariant = priceRows.ToDictionary(
-                row => row.VariantId,
-                row => (row.SellingPrice, row.Id));
-        }
+        var priceList = await ResolvePriceListAsync(
+            tenantId, session.OutletId, now, cancellationToken);
+        if (priceList is null)
+            return new PosCheckoutStartPaymentResult("pos_checkout.price_not_configured", null);
+        var priceListId = priceList.Id;
+        var currencyCode = priceList.CurrencyCode;
+        var priceRowsByVariant = await ResolvePricesAsync(
+            tenantId, priceList.Id,
+            normalizedLines.Select(line => new PriceLookupInput(
+                line.VariantId, variantsById[line.VariantId].ProductId,
+                variantsById[line.VariantId].SalesUomId, line.Qty)).ToList(),
+            now, cancellationToken);
+        if (priceRowsByVariant.Count != variantIds.Count)
+            return new PosCheckoutStartPaymentResult("pos_checkout.price_not_configured", null);
 
         decimal subtotal = 0m;
         decimal taxTotal = 0m;
         var builtLines = new List<BuiltCheckoutLine>(normalizedLines.Count);
+        var availableByVariant = await ResolveAvailableStockAsync(
+            tenantId, session.OutletId, variantIds, cancellationToken);
+        var taxPercentByVariant = await ResolveTaxPercentsAsync(
+            tenantId, variants.Select(x => new TaxLookupInput(x.VariantId, x.ProductId)).ToList(),
+            now, cancellationToken);
 
         foreach (var line in normalizedLines)
         {
@@ -359,30 +358,18 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             }
 
             var quantity = line.Qty;
-            var unitPrice = priceRow.SellingPrice;
+            var listedUnitPrice = priceRow.SellingPrice;
+            var taxPercent = variant.IsTaxable && taxPercentByVariant.TryGetValue(line.VariantId, out var rate)
+                ? rate
+                : 0m;
+            var unitPrice = priceList.PriceIncludesTax && taxPercent > 0m
+                ? listedUnitPrice * 100m / (100m + taxPercent)
+                : listedUnitPrice;
             var lineSubtotal = unitPrice * quantity;
-            var lineTax = 0m;
+            var lineTax = lineSubtotal * taxPercent / 100m;
 
-            if (variant.IsTaxable)
-            {
-                var taxPercent = await ResolveTaxPercentAsync(
-                    tenantId,
-                    variant.ProductId,
-                    variant.VariantId,
-                    now,
-                    cancellationToken);
-                lineTax = lineSubtotal * taxPercent / 100m;
-            }
-
-            var availableQuantity = await _dbContext.InventoryBalances
-                .AsNoTracking()
-                .Where(x =>
-                    x.TenantId == tenantId &&
-                    x.ProductVariantId == line.VariantId)
-                .Select(x => (decimal?)x.AvailableQuantity)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (availableQuantity.HasValue && availableQuantity.Value < quantity)
+            if (availableByVariant.TryGetValue(line.VariantId, out var availableQuantity) &&
+                availableQuantity < quantity)
             {
                 return new PosCheckoutStartPaymentResult("pos_checkout.insufficient_stock", null);
             }
@@ -395,11 +382,56 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 quantity,
                 unitPrice,
                 lineSubtotal,
+                0m,
                 lineTax,
                 priceRow.PriceListItemId));
         }
 
-        var discountTotal = 0m;
+        var discountResolution = await ResolveDiscountApplicationAsync(
+            tenantId, tenantUserId, request.DeviceId, session.SessionId,
+            request.CustomerId, request.SaleType, normalizedLines, request.DiscountApplicationId,
+            subtotal, currencyCode, now, tracked: true, cancellationToken);
+        if (discountResolution.ErrorCode is not null)
+        {
+            return new PosCheckoutStartPaymentResult(discountResolution.ErrorCode, null);
+        }
+
+        var discountApplication = discountResolution.Application;
+        var discountTotal = discountApplication?.DiscountAmountSnapshot ?? 0m;
+        if (discountTotal > 0m && subtotal > 0m)
+        {
+            var remainingDiscount = discountTotal;
+            var eligibleIndexes = builtLines
+                .Select((line, index) => new { line, index })
+                .Where(x => discountApplication!.DiscountScope == "ORDER" ||
+                            x.line.VariantId == discountApplication.TargetProductVariantId)
+                .Select(x => x.index)
+                .ToList();
+            var eligibleSubtotal = eligibleIndexes.Sum(index => builtLines[index].LineSubtotal);
+            if (eligibleSubtotal <= 0m)
+                return new PosCheckoutStartPaymentResult("pos_checkout.discount_application_invalid", null);
+            for (var index = 0; index < builtLines.Count; index++)
+            {
+                var line = builtLines[index];
+                var eligiblePosition = eligibleIndexes.IndexOf(index);
+                var lineDiscount = 0m;
+                if (eligiblePosition >= 0)
+                {
+                    lineDiscount = eligiblePosition == eligibleIndexes.Count - 1
+                            ? remainingDiscount
+                            : Math.Round(discountTotal * line.LineSubtotal / eligibleSubtotal, 4,
+                                MidpointRounding.AwayFromZero);
+                    lineDiscount = Math.Min(Math.Min(lineDiscount, remainingDiscount), line.LineSubtotal);
+                    remainingDiscount -= lineDiscount;
+                }
+
+                var adjustedTax = line.LineSubtotal > 0m
+                    ? line.LineTax * (line.LineSubtotal - lineDiscount) / line.LineSubtotal
+                    : 0m;
+                builtLines[index] = line with { LineDiscount = lineDiscount, LineTax = adjustedTax };
+            }
+            taxTotal = builtLines.Sum(x => x.LineTax);
+        }
         var grandTotal = subtotal + taxTotal - discountTotal;
 
         decimal cashReceived;
@@ -426,17 +458,20 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         }
 
         var salesChannelId = await EnsurePosSalesChannelAsync(tenantId, tenantUserId, now, cancellationToken);
-        var paymentMethod = await EnsurePaymentMethodAsync(
-            tenantId,
-            tenantUserId,
-            paymentMethodCode,
-            now,
+        var paymentMethod = await _dbContext.PaymentMethods.FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.MethodCode == paymentMethodCode &&
+                 x.IsActiveForPos && x.Status == ActiveStatus,
             cancellationToken);
 
         if (paymentMethod is null)
         {
             return new PosCheckoutStartPaymentResult("pos_checkout.payment_method_not_found", null);
         }
+
+
+        await using var transaction = _dbContext.Database.IsRelational()
+            ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
 
         var saleId = Guid.NewGuid();
         var paymentId = Guid.NewGuid();
@@ -492,6 +527,15 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         _dbContext.SalesOrders.Add(salesOrder);
 
         var responseLines = new List<PosCheckoutStartPaymentLineResponseDto>(builtLines.Count);
+        var outletBalances = await (from balance in _dbContext.InventoryBalances
+                                    join location in _dbContext.InventoryLocations
+                                        on new { balance.TenantId, Id = balance.InventoryLocationId }
+                                        equals new { location.TenantId, location.Id }
+                                    where balance.TenantId == tenantId && location.OutletId == session.OutletId &&
+                                          location.Status == ActiveStatus && location.IsSellableLocation &&
+                                          balance.ProductVariantId.HasValue && variantIds.Contains(balance.ProductVariantId.Value)
+                                    orderby balance.ProductBatchId, balance.Id
+                                    select balance).ToListAsync(cancellationToken);
         var lineNumber = 1;
         foreach (var builtLine in builtLines)
         {
@@ -514,6 +558,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 builtLine.Quantity,
                 builtLine.UnitPrice,
                 builtLine.LineSubtotal,
+                builtLine.LineDiscount,
                 builtLine.LineTax,
                 now);
 
@@ -522,18 +567,31 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 builtLine.Variant.ProductName,
                 (int)builtLine.Quantity,
                 ToMoney(builtLine.UnitPrice),
-                ToMoney(builtLine.LineSubtotal + builtLine.LineTax),
+                ToMoney(builtLine.LineSubtotal - builtLine.LineDiscount + builtLine.LineTax),
                 builtLine.Variant.Sku));
 
-            var inventoryBalance = await _dbContext.InventoryBalances
-                .FirstOrDefaultAsync(
-                    x => x.TenantId == tenantId && x.ProductVariantId == builtLine.Variant.VariantId,
-                    cancellationToken);
-
-            if (inventoryBalance is not null)
+            var remainingQuantity = builtLine.Quantity;
+            var movementIndex = 0;
+            var variantBalances = outletBalances.Where(x =>
+                x.ProductVariantId == builtLine.Variant.VariantId).ToList();
+            foreach (var inventoryBalance in variantBalances.Where(x => x.AvailableQuantity > 0))
             {
-                inventoryBalance.AdjustQuantities(-builtLine.Quantity, 0, 0, 0, now);
+                if (remainingQuantity <= 0) break;
+                var quantity = Math.Min(remainingQuantity, inventoryBalance.AvailableQuantity);
+                var quantityBefore = inventoryBalance.OnHandQuantity;
+                inventoryBalance.AdjustQuantities(-quantity, 0, 0, 0, now);
+                var movementId = Guid.NewGuid();
+                _dbContext.StockMovements.Add(StockMovement.Create(
+                    movementId, tenantId, $"SM-{paymentId:N}-{lineNumber - 1:D3}-{++movementIndex:D3}",
+                    inventoryBalance.Id, "SALE", quantityBefore, -quantity, null, null,
+                    $"{idempotencyKey}:{lineNumber - 1}:{movementIndex}",
+                    $"POS sale {orderNumber}", now, tenantUserId, now));
+                _dbContext.StockMovementReferences.Add(StockMovementReference.Create(
+                    Guid.NewGuid(), tenantId, movementId, "SALES_ORDER", saleId, orderLine.Id, now));
+                remainingQuantity -= quantity;
             }
+            if (variantBalances.Count > 0 && remainingQuantity > 0)
+                return new PosCheckoutStartPaymentResult("pos_checkout.stock_conflict", null);
         }
 
         var salesPayment = SalesPayment.CreateCompletedPosPayment(
@@ -549,10 +607,17 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             string.Equals(paymentMethodCode, "CASH", StringComparison.Ordinal) ? cashReceived : null,
             grandTotal,
             changeDue,
+            idempotencyKey,
+            requestHash,
             tenantUserId,
             now);
 
         _dbContext.SalesPayments.Add(salesPayment);
+        _dbContext.SalesPaymentTransactions.Add(SalesPaymentTransaction.CreateCompletedCash(
+            Guid.NewGuid(), tenantId, paymentId, grandTotal, currencyCode,
+            idempotencyKey, tenantUserId, now));
+        _dbContext.SalesPaymentEvents.Add(SalesPaymentEvent.RecordPaid(
+            Guid.NewGuid(), tenantId, paymentId, tenantUserId, now));
 
         var receiptDataJson = JsonSerializer.Serialize(new
         {
@@ -597,7 +662,39 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             now);
 
         _dbContext.Receipts.Add(receipt);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        if (discountApplication is not null)
+        {
+            _dbContext.SalesOrderDiscounts.Add(SalesOrderDiscount.CreateForPosSale(
+                Guid.NewGuid(), tenantId, saleId, null, discountApplication.DiscountPolicyId,
+                discountApplication.DiscountTypeId, discountApplication.DiscountScope,
+                discountApplication.PolicyCodeSnapshot, discountApplication.PolicyNameSnapshot,
+                discountApplication.CalculationMethodSnapshot, discountApplication.RequestedValue,
+                discountApplication.DiscountAmountSnapshot, discountApplication.RequestReason,
+                tenantUserId, now));
+            var previousStatus = discountApplication.ApplicationStatus;
+            discountApplication.MarkApplied(saleId, now);
+            _dbContext.PosDiscountApplicationEvents.Add(PosDiscountApplicationEvent.Record(
+                Guid.NewGuid(), tenantId, discountApplication.Id, "APPLIED", previousStatus,
+                "APPLIED", tenantUserId, $"Applied to sale {orderNumber}.", now));
+        }
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (transaction is not null) await transaction.RollbackAsync(cancellationToken);
+            _dbContext.ChangeTracker.Clear();
+            return new PosCheckoutStartPaymentResult("pos_checkout.stock_conflict", null);
+        }
+        catch (DbUpdateException)
+        {
+            if (transaction is not null) await transaction.RollbackAsync(cancellationToken);
+            _dbContext.ChangeTracker.Clear();
+            return new PosCheckoutStartPaymentResult("pos_checkout.idempotency_conflict", null);
+        }
 
         var response = new PosCheckoutStartPaymentResponseDto(
             saleId,
@@ -671,68 +768,6 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         return channel.Id;
     }
 
-    private async Task<PaymentMethod?> EnsurePaymentMethodAsync(
-        Guid tenantId,
-        Guid tenantUserId,
-        string paymentMethodCode,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        var existing = await _dbContext.PaymentMethods
-            .FirstOrDefaultAsync(
-                x => x.TenantId == tenantId &&
-                     x.MethodCode == paymentMethodCode &&
-                     x.Status == ActiveStatus,
-                cancellationToken);
-
-        if (existing is not null)
-        {
-            return existing;
-        }
-
-        var defaults = new (string Code, string Name, string Type, bool AllowsChange, int SortOrder)[]
-        {
-            ("CASH", "Cash", "CASH", true, 0),
-            ("CARD", "Card", "CARD", false, 1),
-            ("QR", "QR", "QR", false, 2),
-            ("SPLIT", "Split", "SPLIT", true, 3)
-        };
-
-        foreach (var method in defaults)
-        {
-            var alreadyExists = await _dbContext.PaymentMethods
-                .AnyAsync(
-                    x => x.TenantId == tenantId && x.MethodCode == method.Code,
-                    cancellationToken);
-
-            if (alreadyExists)
-            {
-                continue;
-            }
-
-            _dbContext.PaymentMethods.Add(PaymentMethod.Create(
-                Guid.NewGuid(),
-                tenantId,
-                method.Code,
-                method.Name,
-                method.Type,
-                true,
-                method.AllowsChange,
-                method.SortOrder,
-                ActiveStatus,
-                tenantUserId,
-                now));
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return await _dbContext.PaymentMethods
-            .FirstOrDefaultAsync(
-                x => x.TenantId == tenantId &&
-                     x.MethodCode == paymentMethodCode &&
-                     x.Status == ActiveStatus,
-                cancellationToken);
-    }
 
     private static async Task<string> GetNextDocumentNumberAsync(
         Guid tenantId,
@@ -787,71 +822,155 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         };
     }
 
-    private async Task<decimal> ResolveTaxPercentAsync(
-        Guid tenantId,
-        Guid productId,
-        Guid variantId,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
+    private async Task<ResolvedPriceList?> ResolvePriceListAsync(
+        Guid tenantId, Guid outletId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var assignment = await _dbContext.ProductTaxAssignments
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.ProductId == productId &&
-                x.Status == ActiveStatus &&
-                (x.ProductVariantId == null || x.ProductVariantId == variantId) &&
-                (x.AppliesFrom == null || x.AppliesFrom <= now) &&
-                (x.AppliesUntil == null || x.AppliesUntil >= now))
-            .OrderByDescending(x => x.ProductVariantId != null)
-            .FirstOrDefaultAsync(cancellationToken);
+        var posChannelId = await (from sc in _dbContext.SalesChannels.AsNoTracking()
+                                  join psc in _dbContext.PlatformSalesChannels.AsNoTracking() on sc.PlatformSalesChannelId equals psc.Id
+                                  where sc.TenantId == tenantId && psc.ChannelType == "POS" && sc.Status == ActiveStatus
+                                  orderby sc.SortOrder
+                                  select (Guid?)sc.Id)
+                                  .FirstOrDefaultAsync(cancellationToken);
 
-        if (assignment is null)
-        {
-            return 0m;
-        }
-
-        var today = DateOnly.FromDateTime(now.UtcDateTime);
-        var rates = await (
-                from classRate in _dbContext.TaxClassRates.AsNoTracking()
-                join taxRate in _dbContext.TaxRates.AsNoTracking()
-                    on classRate.TaxRateId equals taxRate.Id
-                where classRate.TenantId == tenantId &&
-                      classRate.TaxClassId == assignment.TaxClassId &&
-                      taxRate.TenantId == tenantId &&
-                      taxRate.Status == ActiveStatus &&
-                      (taxRate.ValidFrom == null || taxRate.ValidFrom <= today) &&
-                      (taxRate.ValidUntil == null || taxRate.ValidUntil >= today)
-                select taxRate.RatePercent)
+        var candidates = await _dbContext.PriceLists.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status == ActiveStatus &&
+                        (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
+                        (!x.ValidUntil.HasValue || x.ValidUntil >= now))
+            .Select(x => new ResolvedPriceList(
+                x.Id, x.CurrencyCode, x.PriceIncludesTax, x.IsDefaultPriceList, x.Priority,
+                _dbContext.PriceListOutlets.Any(mapping =>
+                    mapping.TenantId == tenantId && mapping.PriceListId == x.Id &&
+                    mapping.OutletId == outletId && mapping.Status == ActiveStatus),
+                posChannelId.HasValue && _dbContext.PriceListChannels.Any(mapping =>
+                    mapping.TenantId == tenantId && mapping.PriceListId == x.Id &&
+                    mapping.SalesChannelId == posChannelId.Value && mapping.Status == ActiveStatus)))
             .ToListAsync(cancellationToken);
 
-        return rates.Sum();
+        return candidates
+            .Where(x => x.OutletMatched || x.ChannelMatched || x.IsDefault)
+            .OrderByDescending(x => x.OutletMatched && x.ChannelMatched)
+            .ThenByDescending(x => x.OutletMatched)
+            .ThenByDescending(x => x.ChannelMatched)
+            .ThenByDescending(x => x.IsDefault)
+            .ThenByDescending(x => x.Priority)
+            .ThenBy(x => x.Id)
+            .FirstOrDefault();
     }
 
-    private static IReadOnlyList<string> ResolvePaymentMethods(IReadOnlyCollection<string> permissions)
+    private async Task<Dictionary<Guid, ResolvedPrice>> ResolvePricesAsync(
+        Guid tenantId, Guid priceListId, IReadOnlyList<PriceLookupInput> inputs,
+        DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var methods = new List<string>(4);
-        if (permissions.Contains(PaymentPermissions.AcceptCash, StringComparer.Ordinal))
-        {
-            methods.Add("cash");
-        }
+        var productIds = inputs.Select(x => x.ProductId).Distinct().ToList();
+        var variantIds = inputs.Select(x => x.VariantId).ToList();
+        var rows = await _dbContext.PriceListItems.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.PriceListId == priceListId &&
+                        x.Status == ActiveStatus && productIds.Contains(x.ProductId) &&
+                        (!x.ProductVariantId.HasValue || variantIds.Contains(x.ProductVariantId.Value)) &&
+                        (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
+                        (!x.ValidUntil.HasValue || x.ValidUntil >= now))
+            .Select(x => new PriceRow(x.Id, x.ProductId, x.ProductVariantId, x.UomId,
+                x.SellingPrice, x.MinQuantity))
+            .ToListAsync(cancellationToken);
 
-        if (permissions.Contains(PaymentPermissions.AcceptCard, StringComparer.Ordinal))
+        var result = new Dictionary<Guid, ResolvedPrice>();
+        foreach (var input in inputs)
         {
-            methods.Add("card");
+            var row = rows
+                .Where(x => x.ProductId == input.ProductId &&
+                            (!x.ProductVariantId.HasValue || x.ProductVariantId == input.VariantId) &&
+                            (!x.UomId.HasValue || x.UomId == input.UomId) &&
+                            x.MinQuantity <= input.Quantity)
+                .OrderByDescending(x => x.ProductVariantId.HasValue)
+                .ThenByDescending(x => x.UomId.HasValue)
+                .ThenByDescending(x => x.MinQuantity)
+                .ThenBy(x => x.Id)
+                .FirstOrDefault();
+            if (row is not null)
+                result[input.VariantId] = new ResolvedPrice(row.SellingPrice, row.Id);
         }
+        return result;
+    }
 
-        if (permissions.Contains(PaymentPermissions.AcceptQr, StringComparer.Ordinal))
+    private async Task<Dictionary<Guid, decimal>> ResolveAvailableStockAsync(
+        Guid tenantId, Guid outletId, IReadOnlyCollection<Guid> variantIds,
+        CancellationToken cancellationToken) =>
+        await (from balance in _dbContext.InventoryBalances.AsNoTracking()
+               join location in _dbContext.InventoryLocations.AsNoTracking()
+                   on new { balance.TenantId, Id = balance.InventoryLocationId }
+                   equals new { location.TenantId, location.Id }
+               where balance.TenantId == tenantId && location.OutletId == outletId &&
+                     location.Status == ActiveStatus && location.IsSellableLocation &&
+                     balance.ProductVariantId.HasValue && variantIds.Contains(balance.ProductVariantId.Value)
+               group balance by balance.ProductVariantId!.Value into grouped
+               select new { VariantId = grouped.Key, Available = grouped.Sum(x => x.AvailableQuantity) })
+            .ToDictionaryAsync(x => x.VariantId, x => x.Available, cancellationToken);
+
+    private async Task<Dictionary<Guid, decimal>> ResolveTaxPercentsAsync(
+        Guid tenantId, IReadOnlyList<TaxLookupInput> inputs, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var productIds = inputs.Select(x => x.ProductId).Distinct().ToList();
+        var variantIds = inputs.Select(x => x.VariantId).ToList();
+        var assignments = await _dbContext.ProductTaxAssignments.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status == ActiveStatus &&
+                        productIds.Contains(x.ProductId) &&
+                        (!x.ProductVariantId.HasValue || variantIds.Contains(x.ProductVariantId.Value)) &&
+                        (!x.AppliesFrom.HasValue || x.AppliesFrom <= now) &&
+                        (!x.AppliesUntil.HasValue || x.AppliesUntil >= now))
+            .Select(x => new { x.ProductId, x.ProductVariantId, x.TaxClassId, x.AppliesFrom })
+            .ToListAsync(cancellationToken);
+        var classIds = assignments.Select(x => x.TaxClassId).Distinct().ToList();
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var rates = await (from classRate in _dbContext.TaxClassRates.AsNoTracking()
+                           join taxRate in _dbContext.TaxRates.AsNoTracking()
+                               on new { classRate.TenantId, Id = classRate.TaxRateId }
+                               equals new { taxRate.TenantId, taxRate.Id }
+                           where classRate.TenantId == tenantId && classRate.Status == ActiveStatus &&
+                                 classIds.Contains(classRate.TaxClassId) && taxRate.Status == ActiveStatus &&
+                                 (!taxRate.ValidFrom.HasValue || taxRate.ValidFrom <= today) &&
+                                 (!taxRate.ValidUntil.HasValue || taxRate.ValidUntil >= today)
+                           select new TaxRateRow(classRate.TaxClassId, classRate.SortOrder,
+                               taxRate.RatePercent, taxRate.IsCompound))
+            .ToListAsync(cancellationToken);
+
+        var effectiveByClass = rates.GroupBy(x => x.TaxClassId).ToDictionary(
+            group => group.Key,
+            group => group.OrderBy(x => x.SortOrder).Aggregate(0m, (effective, rate) =>
+                effective + (rate.IsCompound
+                    ? (100m + effective) * rate.RatePercent / 100m
+                    : rate.RatePercent)));
+        var result = new Dictionary<Guid, decimal>();
+        foreach (var input in inputs)
         {
-            methods.Add("qr");
+            var assignment = assignments
+                .Where(x => x.ProductId == input.ProductId &&
+                            (!x.ProductVariantId.HasValue || x.ProductVariantId == input.VariantId))
+                .OrderByDescending(x => x.ProductVariantId.HasValue)
+                .ThenByDescending(x => x.AppliesFrom)
+                .FirstOrDefault();
+            if (assignment is not null && effectiveByClass.TryGetValue(assignment.TaxClassId, out var rate))
+                result[input.VariantId] = rate;
         }
+        return result;
+    }
 
-        if (permissions.Contains(PaymentPermissions.AcceptSplit, StringComparer.Ordinal))
-        {
-            methods.Add("split");
-        }
+    private async Task<IReadOnlyList<string>> ResolvePaymentMethodsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var configuredCodes = await _dbContext.PaymentMethods
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IsActiveForPos && x.Status == ActiveStatus)
+            .OrderBy(x => x.SortOrder)
+            .Select(x => x.MethodCode)
+            .ToListAsync(cancellationToken);
 
-        return methods;
+        return configuredCodes
+            .Where(code => HasPaymentPermission(code, permissions))
+            .Select(code => code.ToLowerInvariant())
+            .ToList();
     }
 
     private static string FormatSaleType(string? saleType)
@@ -869,9 +988,44 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
     private static int ToMoney(decimal value) =>
         (int)Math.Round(value, MidpointRounding.AwayFromZero);
 
+    private static decimal AllocateDiscountToTax(
+        IReadOnlyList<CalculatedCheckoutLine> lines,
+        PosDiscountApplication application,
+        decimal discountAmount)
+    {
+        var eligible = lines
+            .Where(line => application.DiscountScope == "ORDER" ||
+                           line.VariantId == application.TargetProductVariantId)
+            .ToList();
+        var eligibleSubtotal = eligible.Sum(x => x.Subtotal);
+        if (eligibleSubtotal <= 0m) return lines.Sum(x => x.Tax);
+
+        var remaining = discountAmount;
+        decimal adjustedTaxTotal = 0m;
+        foreach (var line in lines)
+        {
+            var eligibleIndex = eligible.FindIndex(x => x == line);
+            var lineDiscount = 0m;
+            if (eligibleIndex >= 0)
+            {
+                lineDiscount = eligibleIndex == eligible.Count - 1
+                    ? remaining
+                    : Math.Round(discountAmount * line.Subtotal / eligibleSubtotal, 4,
+                        MidpointRounding.AwayFromZero);
+                lineDiscount = Math.Min(Math.Min(lineDiscount, remaining), line.Subtotal);
+                remaining -= lineDiscount;
+            }
+            adjustedTaxTotal += line.Subtotal > 0m
+                ? line.Tax * (line.Subtotal - lineDiscount) / line.Subtotal
+                : 0m;
+        }
+        return adjustedTaxTotal;
+    }
+
     private sealed record CheckoutVariantRow(
         Guid VariantId,
         Guid ProductId,
+        Guid SalesUomId,
         string ProductName,
         bool IsTaxable);
 
@@ -894,6 +1048,153 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         decimal Quantity,
         decimal UnitPrice,
         decimal LineSubtotal,
+        decimal LineDiscount,
         decimal LineTax,
         Guid PriceListItemId);
+
+    private sealed record ResolvedPriceList(
+        Guid Id, string CurrencyCode, bool PriceIncludesTax, bool IsDefault,
+        int Priority, bool OutletMatched, bool ChannelMatched);
+    private sealed record PriceLookupInput(Guid VariantId, Guid ProductId, Guid UomId, int Quantity);
+    private sealed record PriceRow(Guid Id, Guid ProductId, Guid? ProductVariantId,
+        Guid? UomId, decimal SellingPrice, decimal MinQuantity);
+    private sealed record ResolvedPrice(decimal SellingPrice, Guid PriceListItemId);
+    private sealed record TaxLookupInput(Guid VariantId, Guid ProductId);
+    private sealed record TaxRateRow(Guid TaxClassId, int SortOrder, decimal RatePercent, bool IsCompound);
+    private sealed record CalculatedCheckoutLine(Guid VariantId, decimal Subtotal, decimal Tax);
+    private sealed record IdempotentPaymentResolution(
+        bool Found, PosCheckoutStartPaymentResponseDto? Payment);
+
+    private async Task<DiscountApplicationResolution> ResolveDiscountApplicationAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        Guid deviceId,
+        Guid tillSessionId,
+        Guid? customerId,
+        string? saleType,
+        IReadOnlyList<PosCheckoutLineRequestDto> lines,
+        Guid? applicationId,
+        decimal subtotal,
+        string currencyCode,
+        DateTimeOffset now,
+        bool tracked,
+        CancellationToken cancellationToken)
+    {
+        if (!applicationId.HasValue || applicationId == Guid.Empty)
+        {
+            return new(null, null);
+        }
+
+        IQueryable<PosDiscountApplication> query = _dbContext.PosDiscountApplications;
+        if (!tracked) query = query.AsNoTracking();
+        var application = await query.FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.Id == applicationId.Value,
+            cancellationToken);
+        if (application is null) return new("pos_checkout.discount_application_not_found", null);
+        if (application.RequestedByTenantUserId != tenantUserId || application.PosDeviceId != deviceId ||
+            application.TillSessionId != tillSessionId)
+            return new("pos_checkout.discount_context_mismatch", null);
+        if (!application.CanBeUsed(now))
+            return new(application.ApplicationStatus == "PENDING_APPROVAL"
+                ? "pos_checkout.discount_approval_required"
+                : "pos_checkout.discount_application_invalid", null);
+
+        var policyStillActive = await _dbContext.DiscountPolicies.AsNoTracking().AnyAsync(x =>
+            x.TenantId == tenantId && x.Id == application.DiscountPolicyId && x.Status == ActiveStatus &&
+            (!x.StartsAt.HasValue || x.StartsAt <= now) && (!x.EndsAt.HasValue || x.EndsAt >= now),
+            cancellationToken);
+        if (!policyStillActive) return new("pos_checkout.discount_policy_inactive", null);
+
+        var snapshotJson = PosDiscountCartFingerprint.CreateSnapshotJson(
+            deviceId, saleType, customerId, lines, ToMoney(subtotal), currencyCode);
+        var cartHash = PosDiscountCartFingerprint.Hash(snapshotJson);
+        if (!string.Equals(cartHash, application.CartHash, StringComparison.Ordinal))
+            return new("pos_checkout.discount_cart_changed", null);
+        if (application.DiscountAmountSnapshot > subtotal)
+            return new("pos_checkout.discount_application_invalid", null);
+
+        return new(null, application);
+    }
+
+    private static List<PosCheckoutLineRequestDto>? NormalizeLines(
+        IReadOnlyList<PosCheckoutLineRequestDto>? lines)
+    {
+        if (lines is null || lines.Count == 0 ||
+            lines.Any(line => line.VariantId == Guid.Empty || line.Qty <= 0))
+        {
+            return null;
+        }
+
+        try
+        {
+            return lines
+                .GroupBy(line => line.VariantId)
+                .OrderBy(group => group.Key)
+                .Select(group => new PosCheckoutLineRequestDto(
+                    group.Key,
+                    checked(group.Sum(line => line.Qty))))
+                .ToList();
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    private static string CreatePaymentRequestHash(
+        PosCheckoutStartPaymentRequestDto request,
+        IReadOnlyList<PosCheckoutLineRequestDto> normalizedLines,
+        string paymentMethodCode)
+    {
+        var json = JsonSerializer.Serialize(new
+        {
+            request.DeviceId,
+            saleType = string.IsNullOrWhiteSpace(request.SaleType) ? "NewSale" : request.SaleType.Trim(),
+            request.CustomerId,
+            lines = normalizedLines.Select(x => new { x.VariantId, x.Qty }),
+            paymentMethod = paymentMethodCode,
+            request.CashReceived,
+            request.DiscountApplicationId
+        });
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
+    }
+
+    private async Task<IdempotentPaymentResolution> ResolveIdempotentPaymentAsync(
+        Guid tenantId, string idempotencyKey, string requestHash,
+        CancellationToken cancellationToken)
+    {
+        var payment = await _dbContext.SalesPayments.AsNoTracking().FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.IdempotencyKey == idempotencyKey,
+            cancellationToken);
+        if (payment is null) return new(false, null);
+        if (!string.Equals(payment.PaymentNote, $"POS_REQUEST_HASH:{requestHash}", StringComparison.Ordinal))
+            return new(true, null);
+
+        var order = await _dbContext.SalesOrders.AsNoTracking().FirstAsync(
+            x => x.TenantId == tenantId && x.Id == payment.SalesOrderId, cancellationToken);
+        var receiptNumber = await _dbContext.Receipts.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.SalesOrderId == order.Id)
+            .Select(x => x.ReceiptNumber).FirstAsync(cancellationToken);
+        var methodCode = await _dbContext.PaymentMethods.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Id == payment.PaymentMethodId)
+            .Select(x => x.MethodCode).FirstAsync(cancellationToken);
+        var lines = await _dbContext.SalesOrderLines.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.SalesOrderId == order.Id)
+            .OrderBy(x => x.LineNumber)
+            .Select(x => new PosCheckoutStartPaymentLineResponseDto(
+                x.ProductNameSnapshot, (int)x.Quantity, ToMoney(x.UnitPrice),
+                ToMoney(x.LineTotalAmount), x.SkuSnapshot))
+            .ToListAsync(cancellationToken);
+
+        return new(true, new PosCheckoutStartPaymentResponseDto(
+            order.Id, order.Id, order.OrderNumber, receiptNumber, receiptNumber,
+            ToMoney(order.SubtotalAmount), ToMoney(order.DiscountAmount), ToMoney(order.TaxAmount),
+            ToMoney(order.TotalAmount), ToMoney(payment.TenderedAmount ?? payment.PaidAmount),
+            ToMoney(payment.ChangeAmount), methodCode.ToLowerInvariant(), order.CurrencyCode,
+            "completed", "completed", payment.PaidAt ?? payment.InitiatedAt, payment.Id, lines));
+    }
+
+    private sealed record DiscountApplicationResolution(
+        string? ErrorCode,
+        PosDiscountApplication? Application);
 }
