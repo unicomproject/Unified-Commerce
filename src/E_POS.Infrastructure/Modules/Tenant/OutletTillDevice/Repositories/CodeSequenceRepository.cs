@@ -61,6 +61,14 @@ public sealed class CodeSequenceRepository : ICodeSequenceRepository
                     .ToListAsync(cancellationToken);
                 break;
 
+            case "CUSTOMER_CODE":
+                existingCodes = await _dbContext.Customers
+                    .AsNoTracking()
+                    .Where(x => x.TenantId == tenantId && x.CustomerCode.StartsWith(normalizedPrefix))
+                    .Select(x => x.CustomerCode)
+                    .ToListAsync(cancellationToken);
+                break;
+
             default:
                 throw new InvalidOperationException($"Unsupported sequence key '{sequenceKey}'.");
         }
