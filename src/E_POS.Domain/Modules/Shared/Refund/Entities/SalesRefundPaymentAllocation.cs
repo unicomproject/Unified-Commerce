@@ -12,5 +12,29 @@ public class SalesRefundPaymentAllocation : AuditableEntity
     public decimal AllocatedAmount { get; protected set; }
     public string AllocationStatus { get; protected set; } = string.Empty;
     public string? ExternalReference { get; protected set; }
+
+    public static SalesRefundPaymentAllocation CreateCompleted(
+        Guid id,
+        Guid tenantId,
+        Guid salesRefundId,
+        Guid originalSalesPaymentId,
+        Guid refundPaymentMethodId,
+        decimal amount,
+        string? externalReference,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesRefundId = salesRefundId,
+            OriginalSalesPaymentId = originalSalesPaymentId,
+            RefundPaymentMethodId = refundPaymentMethodId,
+            AllocatedAmount = amount,
+            AllocationStatus = "COMPLETED",
+            ExternalReference = string.IsNullOrWhiteSpace(externalReference)
+                ? null
+                : externalReference.Trim(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

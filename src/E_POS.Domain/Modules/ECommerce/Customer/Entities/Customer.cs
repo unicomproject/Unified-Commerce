@@ -17,4 +17,46 @@ public class Customer : AuditableEntity
     public string SourceType { get; protected set; } = string.Empty;
     public Guid? SourceSalesChannelId { get; protected set; }
     public DateTimeOffset? AnonymizedAt { get; protected set; }
+
+    public static Customer CreatePosCustomer(
+        Guid id,
+        Guid tenantId,
+        string customerCode,
+        string fullName,
+        string phone,
+        string? email,
+        Guid createdBy,
+        DateTimeOffset now)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        var normalizedPhone = NormalizePhone(phone);
+
+        return new Customer
+        {
+            Id = id,
+            TenantId = tenantId,
+            CustomerCode = customerCode.Trim().ToUpperInvariant(),
+            Name = fullName.Trim(),
+            Phone = phone.Trim(),
+            NormalizedPhone = normalizedPhone,
+            Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
+            NormalizedEmail = normalizedEmail,
+            SourceType = "POS",
+            Status = "ACTIVE",
+            CreatedBy = createdBy,
+            UpdatedBy = createdBy,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    public static string NormalizePhone(string phone)
+    {
+        var trimmed = phone.Trim();
+        var prefix = trimmed.StartsWith('+') ? "+" : string.Empty;
+        return prefix + new string(trimmed.Where(char.IsDigit).ToArray());
+    }
+
+    public static string? NormalizeEmail(string? email) =>
+        string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToUpperInvariant();
 }

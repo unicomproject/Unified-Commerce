@@ -212,7 +212,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                 table: "sales_channels",
                 type: "uuid",
                 nullable: false,
-                defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
+                defaultValue: new Guid("d0000000-0000-4000-8000-000000000001"));
             // Removed unneeded statement
             // Removed unneeded statement
             // Removed unneeded statement
@@ -305,6 +305,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     table.PrimaryKey("pk_platform_sales_channels", x => x.id);
                     table.CheckConstraint("ck_platform_sales_channels_channel_type", "channel_type IN ('PHYSICAL', 'ONLINE', 'AGGREGATOR', 'B2B', 'OTHER')");
                 });
+
+            // The tenant channel foreign key is added by this migration, so its
+            // referenced platform rows must exist before that constraint is created.
+            migrationBuilder.Sql("""
+                INSERT INTO platform_sales_channels (
+                    id, channel_code, default_name, channel_type, created_at, updated_at
+                )
+                VALUES
+                    ('d0000000-0000-4000-8000-000000000001', 'PHYSICAL', 'Physical Store', 'PHYSICAL', now(), now()),
+                    ('d0000000-0000-4000-8000-000000000002', 'ONLINE', 'E-Commerce', 'ONLINE', now(), now())
+                ON CONFLICT (id) DO NOTHING;
+                """);
             // Removed unneeded statement
             // Removed unneeded statement
             // Removed unneeded statement

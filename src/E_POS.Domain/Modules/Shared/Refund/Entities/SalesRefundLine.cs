@@ -11,5 +11,27 @@ public class SalesRefundLine : AuditableEntity
     public string DescriptionSnapshot { get; protected set; } = string.Empty;
     public decimal? Quantity { get; protected set; }
     public decimal Amount { get; protected set; }
+
+    public static SalesRefundLine Create(
+        Guid id,
+        Guid tenantId,
+        Guid salesRefundId,
+        Guid salesReturnLineId,
+        string description,
+        decimal quantity,
+        decimal amount,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesRefundId = salesRefundId,
+            SalesReturnLineId = salesReturnLineId,
+            RefundLineType = "PRODUCT",
+            DescriptionSnapshot = description.Trim(),
+            Quantity = quantity,
+            Amount = amount,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

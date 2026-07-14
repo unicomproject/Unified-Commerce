@@ -23,6 +23,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
         Guid? outletId,
         Guid? tillId,
         Guid? deviceId,
+        string? deviceFingerprint,
         CancellationToken cancellationToken)
     {
         var hasHomeView =
@@ -42,6 +43,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
             outletId,
             tillId,
             deviceId,
+            deviceFingerprint,
             cancellationToken);
 
         if (!resolution.IsResolved || resolution.Snapshot is null)
@@ -86,8 +88,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
             context.HasPermission(ReturnsPermissions.ViewRefunds) ||
             context.HasPermission(ReturnsPermissions.CreateRefund);
 
-        var canViewCustomers =
-            context.HasPermission(CustomerPermissions.View) ||
+        var canCreateCustomers =
             context.HasPermission(CustomerPermissions.Create);
 
         var canParkOrViewParkedSales =
@@ -96,8 +97,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
             context.HasPermission(SalesPermissions.Park.Recall);
 
         var canViewCashDrawer =
-            context.HasPermission(CashDrawerPermissions.View) ||
-            context.HasPermission(CashDrawerPermissions.Manage);
+            context.HasPermission(CashDrawerPermissions.View);
 
         var canViewNotifications =
             context.HasPermission(PosPermissions.Notifications.View);
@@ -125,7 +125,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                         canViewReturns,
                         snapshot.ReturnsRefundsCount),
                     Customers: new PosHomeCardDto(
-                        canViewCustomers,
+                        canCreateCustomers,
                         snapshot.CustomersCount),
                     ParkedSales: new PosHomeCardDto(
                         canParkOrViewParkedSales,
@@ -159,7 +159,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                 Metrics: new PosHomeMetricsDto(snapshot.ParkedSalesCount),
                 QuickActions: new PosHomeQuickActionsDto(
                     CanStartSale: startSaleEnabled,
-                    CanAddCustomer: canViewCustomers,
+                    CanAddCustomer: canCreateCustomers,
                     CanViewReturns: canViewReturns,
                     CanViewParkedSales: canParkOrViewParkedSales,
                     CanViewCashDrawer: canViewCashDrawer,

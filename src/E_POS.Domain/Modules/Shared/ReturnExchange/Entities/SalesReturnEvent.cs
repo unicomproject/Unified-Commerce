@@ -11,5 +11,24 @@ public class SalesReturnEvent : AuditableEntity
     public string? NewStatus { get; protected set; }
     public string? EventNotes { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
+
+    public static SalesReturnEvent RecordCompleted(
+        Guid id,
+        Guid tenantId,
+        Guid salesReturnId,
+        Guid tenantUserId,
+        string? notes,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesReturnId = salesReturnId,
+            EventType = "COMPLETED",
+            NewStatus = "COMPLETED",
+            EventNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            CreatedByTenantUserId = tenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

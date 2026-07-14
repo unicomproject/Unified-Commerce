@@ -24,5 +24,40 @@ public class SalesRefund : AuditableEntity
     public Guid? ApprovedByTenantUserId { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    public static SalesRefund CreateCompleted(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid salesReturnId,
+        string refundNumber,
+        string refundMode,
+        string currencyCode,
+        decimal amount,
+        string reason,
+        Guid tenantUserId,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            SalesReturnId = salesReturnId,
+            RefundNumber = refundNumber.Trim().ToUpperInvariant(),
+            RefundMode = refundMode.Trim().ToUpperInvariant(),
+            RefundStatus = "COMPLETED",
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            RequestedAmount = amount,
+            ApprovedAmount = amount,
+            RefundedAmount = amount,
+            RefundReason = reason.Trim(),
+            RequestedAt = now,
+            ApprovedAt = now,
+            CompletedAt = now,
+            ApprovedByTenantUserId = tenantUserId,
+            CreatedByTenantUserId = tenantUserId,
+            UpdatedByTenantUserId = tenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 
