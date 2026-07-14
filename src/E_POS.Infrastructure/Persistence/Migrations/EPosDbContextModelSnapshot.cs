@@ -25359,7 +25359,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("E_POS.Domain.Modules.Customer.Entities.Customer", null)
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "CustomerId")
                         .HasPrincipalKey("TenantId", "Id")
