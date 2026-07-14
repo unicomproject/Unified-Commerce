@@ -29,7 +29,12 @@ public sealed class StorefrontServiceTests
             1,
             "ACTIVE");
         var repository = new FakeStorefrontRepository { Banners = [banner] };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = (await service.GetActiveBannersAsync(TenantId, "HERO", CancellationToken.None)).ToList();
 
@@ -74,7 +79,12 @@ public sealed class StorefrontServiceTests
             null,
             Now);
         var repository = new FakeStorefrontRepository { Categories = [categoryWithImage, categoryWithoutImage] };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = (await service.GetFeaturedCategoriesAsync(TenantId, CancellationToken.None)).ToList();
 
@@ -112,7 +122,12 @@ public sealed class StorefrontServiceTests
             }
         };
         var repository = new FakeStorefrontRepository { RootCategories = rootCategories };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = await service.GetRootCategoriesAsync(TenantId, CancellationToken.None);
 
@@ -138,7 +153,12 @@ public sealed class StorefrontServiceTests
             }
         };
         var repository = new FakeStorefrontRepository { ChildCategories = childCategories };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = await service.GetChildCategoriesAsync(TenantId, parentCategoryId, CancellationToken.None);
 
@@ -159,7 +179,12 @@ public sealed class StorefrontServiceTests
             PageSize = 20
         };
         var repository = new FakeStorefrontRepository { ProductListingPage = productPage };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = await service.GetProductsAsync(TenantId, categoryId, "newest", 1, 20, CancellationToken.None);
 
@@ -183,7 +208,12 @@ public sealed class StorefrontServiceTests
             IsInStock = true
         };
         var repository = new FakeStorefrontRepository { ProductDetail = productDetail };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = await service.GetProductDetailAsync(TenantId, "man-city-home-jersey", CancellationToken.None);
 
@@ -243,7 +273,12 @@ public sealed class StorefrontServiceTests
                 (productWithFallbacks, null, null, null)
             ]
         };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = (await service.GetBestSellersAsync(TenantId, CancellationToken.None)).ToList();
 
@@ -275,7 +310,12 @@ public sealed class StorefrontServiceTests
     {
         var stores = new[] { new StorefrontStoreReadModel { Id = Guid.NewGuid(), Name = "Main Store", Address = "Main Road", IsAvailable = true } };
         var repository = new FakeStorefrontRepository { Stores = stores };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = await service.GetAvailableStoresAsync(TenantId, CancellationToken.None);
 
@@ -288,7 +328,12 @@ public sealed class StorefrontServiceTests
     {
         var resolvedTenantId = Guid.NewGuid();
         var repository = new FakeStorefrontRepository { ResolvedTenantId = resolvedTenantId };
-        var service = new StorefrontService(repository);
+        var service = new StorefrontService(
+            new StorefrontBannerService(repository),
+            new StorefrontCategoryService(repository),
+            new StorefrontProductService(repository),
+            new StorefrontFulfillmentService(repository),
+            new StorefrontTenantService(repository));
 
         var result = await service.ResolveTenantIdAsync("demo-store", CancellationToken.None);
 

@@ -32,7 +32,12 @@ public sealed class StorefrontRepositoryTests
             StorefrontBanner.Create(otherTenantId, null, "HERO", "Other tenant", null, "/other.jpg", null, null, 0, "ACTIVE"),
             StorefrontBanner.Create(tenantId, null, "PROMO", "Wrong type", null, "/promo.jpg", null, null, 0, "ACTIVE"));
         await dbContext.SaveChangesAsync();
-        var repository = new StorefrontRepository(dbContext);
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetActiveBannersAsync(tenantId, " hero ", CancellationToken.None)).ToList();
 
@@ -74,7 +79,12 @@ public sealed class StorefrontRepositoryTests
             ProductCategory.Create(Guid.NewGuid(), tenantId, notSellableProductId, rootOne.Id, true, 0, null, Now),
             ProductCategory.Create(Guid.NewGuid(), tenantId, childProductId, child.Id, true, 0, null, Now));
         await dbContext.SaveChangesAsync();
-        var repository = new StorefrontRepository(dbContext);
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetRootCategoriesAsync(tenantId, CancellationToken.None)).ToList();
 
@@ -136,7 +146,12 @@ public sealed class StorefrontRepositoryTests
             ProductCategory.Create(Guid.NewGuid(), tenantId, notSellableProductId, expectedFirst.Id, true, 0, null, Now),
             ProductCategory.Create(Guid.NewGuid(), tenantId, parentProductId, parent.Id, true, 0, null, Now));
         await dbContext.SaveChangesAsync();
-        var repository = new StorefrontRepository(dbContext);
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetChildCategoriesAsync(tenantId, parent.Id, CancellationToken.None)).ToList();
 
@@ -179,7 +194,12 @@ public sealed class StorefrontRepositoryTests
             CreateCategory(tenantId, "INACTIVE", "Inactive", 0, CategoryConstants.InactiveStatus),
             CreateCategory(otherTenantId, "OTHER", "Other", 0, CategoryConstants.ActiveStatus));
         await dbContext.SaveChangesAsync();
-        var repository = new StorefrontRepository(dbContext);
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetFeaturedCategoriesAsync(tenantId, CancellationToken.None)).ToList();
 
@@ -198,7 +218,12 @@ public sealed class StorefrontRepositoryTests
             TenantEntity.Create(activeTenantId, "DEMO", "demo-store", "Demo Store", TenantStatusConstants.Active, "LKR", "Asia/Colombo", null, null, Now),
             TenantEntity.Create(Guid.NewGuid(), "OLD", "old-store", "Old Store", TenantStatusConstants.Suspended, "LKR", "Asia/Colombo", null, null, Now));
         await dbContext.SaveChangesAsync();
-        var repository = new StorefrontRepository(dbContext);
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
 
         var activeResult = await repository.GetTenantIdBySlugAsync(" demo-store ", CancellationToken.None);
         var inactiveResult = await repository.GetTenantIdBySlugAsync("old-store", CancellationToken.None);
@@ -251,7 +276,12 @@ public sealed class StorefrontRepositoryTests
         dbContext.ProductRatingSummaries.Add(homeRating);
         dbContext.InventoryBalances.AddRange(homeInventory, kidsInventory);
         await dbContext.SaveChangesAsync();
-        var repository = new StorefrontRepository(dbContext);
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
 
         var result = await repository.GetProductsAsync(tenantId, category.Id, "price_desc", 1, 20, CancellationToken.None);
         var secondPage = await repository.GetProductsAsync(tenantId, category.Id, "price_desc", 2, 1, CancellationToken.None);
@@ -396,7 +426,12 @@ public sealed class StorefrontRepositoryTests
             null,
             Now));
         await dbContext.SaveChangesAsync();
-        var repository = new StorefrontRepository(dbContext);
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
 
         var result = await repository.GetProductDetailAsync(tenantId, " HOME ", CancellationToken.None);
         var otherTenantResult = await repository.GetProductDetailAsync(otherTenantId, "home", CancellationToken.None);
@@ -484,7 +519,12 @@ public sealed class StorefrontRepositoryTests
             ProductImage.Create(Guid.NewGuid(), tenantId, productId, null, null, "apple-alt", "/images/apple-alt.jpg", null, "MAIN", "image/jpeg", null, null, null, null, 1, false, "ACTIVE", null, Now));
         dbContext.ProductRatingSummaries.Add(rating);
         await dbContext.SaveChangesAsync();
-        var repository = new StorefrontRepository(dbContext);
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetBestSellersAsync(tenantId, CancellationToken.None)).ToList();
 
