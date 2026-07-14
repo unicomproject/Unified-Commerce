@@ -48,6 +48,18 @@ public sealed class PlatformDashboardRepositoryTests
                 "PAST_DUE",
                 Now));
 
+        var pendingInvoice = SubscriptionInvoice.CreateDraft(
+            Guid.Parse("66666666-6666-4666-8666-666666666601"),
+            tenantOneId,
+            Guid.Parse("22222222-2222-4222-8222-222222222201"),
+            "INV-001",
+            100m,
+            "MONTHLY",
+            Now.AddDays(14),
+            Now);
+        pendingInvoice.Issue(Now);
+        dbContext.SubscriptionInvoices.Add(pendingInvoice);
+
         dbContext.Outlets.Add(Outlet.Create(
             Guid.Parse("33333333-3333-4333-8333-333333333301"),
             tenantOneId,
