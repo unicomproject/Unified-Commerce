@@ -48,7 +48,7 @@ public sealed class StorefrontServiceTests
     }
 
     [Fact]
-    public async Task GetFeaturedCategoriesAsync_MapsImageUrlAndPlaceholder()
+    public async Task GetFeaturedCategoriesAsync_MapsImageUrlAndEmptyFallback()
     {
         var categoryWithImage = Category.Create(
             Guid.NewGuid(),
@@ -100,7 +100,7 @@ public sealed class StorefrontServiceTests
             {
                 Assert.Equal(categoryWithoutImage.Id, second.Id);
                 Assert.Equal("Bakery", second.Name);
-                Assert.Equal("https://via.placeholder.com/150", second.ImageUrl);
+                Assert.Empty(second.ImageUrl);
             });
         Assert.Equal(TenantId, repository.FeaturedCategoriesTenantId);
     }
@@ -298,7 +298,7 @@ public sealed class StorefrontServiceTests
                 Assert.Equal(productWithFallbacks.Id, second.Id);
                 Assert.Equal("Bread", second.Name);
                 Assert.Equal(0m, second.Price);
-                Assert.Equal("https://via.placeholder.com/300", second.ImageUrl);
+                Assert.Empty(second.ImageUrl);
                 Assert.Equal(0m, second.Rating);
                 Assert.Equal(0, second.ReviewCount);
             });
