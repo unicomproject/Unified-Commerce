@@ -15,6 +15,10 @@ public class SalesOrder : AuditableEntity
     public string OrderType { get; protected set; } = string.Empty;
     public Guid? FulfillmentMethodOutletId { get; protected set; }
     public string? FulfillmentMethodCodeSnapshot { get; protected set; }
+    public DateOnly? BusinessDate { get; protected set; }
+    public Guid? ReportingOutletId { get; protected set; }
+    public string? ReportingOutletCodeSnapshot { get; protected set; }
+    public string? ReportingOutletNameSnapshot { get; protected set; }
     public Guid? CustomerId { get; protected set; }
     public string? CustomerNameSnapshot { get; protected set; }
     public string? CustomerEmailSnapshot { get; protected set; }
@@ -59,6 +63,51 @@ public class SalesOrder : AuditableEntity
         decimal totalAmount,
         decimal paidAmount,
         Guid? createdByTenantUserId,
+        DateTimeOffset now) =>
+        CreateCompletedPosSale(
+            id,
+            tenantId,
+            orderNumber,
+            salesChannelId,
+            customerId,
+            customerNameSnapshot,
+            tillId,
+            tillSessionId,
+            priceListId,
+            currencyCode,
+            subtotalAmount,
+            discountAmount,
+            taxAmount,
+            totalAmount,
+            paidAmount,
+            DateOnly.FromDateTime(now.UtcDateTime),
+            null,
+            null,
+            null,
+            createdByTenantUserId,
+            now);
+
+    public static SalesOrder CreateCompletedPosSale(
+        Guid id,
+        Guid tenantId,
+        string orderNumber,
+        Guid salesChannelId,
+        Guid? customerId,
+        string? customerNameSnapshot,
+        Guid tillId,
+        Guid tillSessionId,
+        Guid? priceListId,
+        string currencyCode,
+        decimal subtotalAmount,
+        decimal discountAmount,
+        decimal taxAmount,
+        decimal totalAmount,
+        decimal paidAmount,
+        DateOnly businessDate,
+        Guid? reportingOutletId,
+        string? reportingOutletCodeSnapshot,
+        string? reportingOutletNameSnapshot,
+        Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
         return new SalesOrder
@@ -68,6 +117,10 @@ public class SalesOrder : AuditableEntity
             OrderNumber = orderNumber.Trim(),
             SalesChannelId = salesChannelId,
             OrderType = "POS_SALE",
+            BusinessDate = businessDate,
+            ReportingOutletId = reportingOutletId,
+            ReportingOutletCodeSnapshot = reportingOutletCodeSnapshot?.Trim(),
+            ReportingOutletNameSnapshot = reportingOutletNameSnapshot?.Trim(),
             CustomerId = customerId,
             CustomerNameSnapshot = customerNameSnapshot?.Trim(),
             TillId = tillId,

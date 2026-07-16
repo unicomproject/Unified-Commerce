@@ -70,6 +70,27 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
             .HasColumnType("varchar(40)")
             .HasMaxLength(40);
 
+        builder.Property(x => x.BusinessDate)
+            .HasColumnName("business_date")
+            .HasColumnType("date")
+            .IsRequired(false);
+
+        builder.Property(x => x.ReportingOutletId)
+            .HasColumnName("reporting_outlet_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ReportingOutletCodeSnapshot)
+            .HasColumnName("reporting_outlet_code_snapshot")
+            .HasColumnType("varchar(50)")
+            .HasMaxLength(50)
+            .IsRequired(false);
+
+        builder.Property(x => x.ReportingOutletNameSnapshot)
+            .HasColumnName("reporting_outlet_name_snapshot")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired(false);
+
         builder.Property(x => x.CustomerId)
             .HasColumnName("customer_id");
 
@@ -250,6 +271,13 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_sales_orders_till_id_tills");
 
+        builder.HasOne<Outlet>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.ReportingOutletId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_orders_reporting_outlet_id_outlets");
+
         builder.HasOne<TillSession>()
             .WithMany()
             .HasForeignKey(x => new { x.TenantId, x.TillSessionId })
@@ -283,6 +311,21 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_sales_orders_tenant_id_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.BusinessDate, x.Status })
+            .HasDatabaseName("ix_sales_orders_tenant_business_date_status");
+
+        builder.HasIndex(x => new { x.TenantId, x.ReportingOutletId, x.BusinessDate })
+            .HasDatabaseName("ix_sales_orders_tenant_reporting_outlet_business_date");
+
+        builder.HasIndex(x => new { x.TenantId, x.SalesChannelId, x.BusinessDate })
+            .HasDatabaseName("ix_sales_orders_tenant_sales_channel_business_date");
+
+        builder.HasIndex(x => new { x.TenantId, x.PaymentStatus, x.BusinessDate })
+            .HasDatabaseName("ix_sales_orders_tenant_payment_status_business_date");
+
+        builder.HasIndex(x => new { x.TenantId, x.CreatedByTenantUserId, x.BusinessDate })
+            .HasDatabaseName("ix_sales_orders_tenant_cashier_business_date");
 
         builder.ToTable(t =>
         {

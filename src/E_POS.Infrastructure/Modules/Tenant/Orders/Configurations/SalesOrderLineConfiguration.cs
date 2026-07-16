@@ -62,6 +62,11 @@ public sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sales
             .HasColumnType("varchar(100)")
             .HasMaxLength(100);
 
+        builder.Property(x => x.BarcodeSnapshot)
+            .HasColumnName("barcode_snapshot")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120);
+
         builder.Property(x => x.ProductNameSnapshot)
             .HasColumnName("product_name_snapshot")
             .HasColumnType("varchar(200)")
@@ -72,6 +77,26 @@ public sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sales
             .HasColumnName("variant_name_snapshot")
             .HasColumnType("varchar(200)")
             .HasMaxLength(200);
+
+        builder.Property(x => x.DepartmentNameSnapshot)
+            .HasColumnName("department_name_snapshot")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150);
+
+        builder.Property(x => x.CategoryNameSnapshot)
+            .HasColumnName("category_name_snapshot")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150);
+
+        builder.Property(x => x.SubcategoryNameSnapshot)
+            .HasColumnName("subcategory_name_snapshot")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150);
+
+        builder.Property(x => x.BrandNameSnapshot)
+            .HasColumnName("brand_name_snapshot")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150);
 
         builder.Property(x => x.UomCodeSnapshot)
             .HasColumnName("uom_code_snapshot")

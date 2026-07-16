@@ -29,6 +29,8 @@ using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Application.Modules.Tenant.Discount.Services;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
 using E_POS.Application.Modules.ECommerce.Customer.Services;
+using E_POS.Application.Modules.Tenant.Reports.Contracts;
+using E_POS.Application.Modules.Tenant.Reports.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -105,6 +107,7 @@ public static class DependencyInjection
 
         services.AddScoped<ITenantAdminInventoryService, TenantAdminInventoryService>();
         services.AddScoped<ITenantAdminInventoryRequestValidator, TenantAdminInventoryRequestValidator>();
+        services.AddScoped<ITenantAdminReportsService, TenantAdminReportsService>();
 
         // ECommerce Storefront
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();

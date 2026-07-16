@@ -48,8 +48,32 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
             .HasColumnName("outlet_id")
             .IsRequired(false);
 
+        builder.Property(x => x.ProcessingOutletCodeSnapshot)
+            .HasColumnName("processing_outlet_code_snapshot")
+            .HasColumnType("varchar(50)")
+            .HasMaxLength(50)
+            .IsRequired(false);
+
+        builder.Property(x => x.ProcessingOutletNameSnapshot)
+            .HasColumnName("processing_outlet_name_snapshot")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired(false);
+
         builder.Property(x => x.ReturnReasonId)
             .HasColumnName("return_reason_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ReturnReasonCodeSnapshot)
+            .HasColumnName("return_reason_code_snapshot")
+            .HasColumnType("varchar(60)")
+            .HasMaxLength(60)
+            .IsRequired(false);
+
+        builder.Property(x => x.ReturnReasonNameSnapshot)
+            .HasColumnName("return_reason_name_snapshot")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
             .IsRequired(false);
 
         builder.Property(x => x.ReturnNumber)
@@ -105,6 +129,11 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
             .HasPrecision(18, 4)
             .IsRequired();
 
+        builder.Property(x => x.TotalApprovedQty)
+            .HasColumnName("total_approved_qty")
+            .HasPrecision(18, 4)
+            .IsRequired(false);
+
         builder.Property(x => x.TotalRefundAmount)
             .HasColumnName("total_refund_amount")
             .HasPrecision(18, 4)
@@ -132,6 +161,12 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
         builder.HasIndex(x => new { x.TenantId, x.ReturnNumber })
             .IsUnique()
             .HasDatabaseName("ux_sales_returns_35ae5e87");
+
+        builder.HasIndex(x => new { x.TenantId, x.ReturnStatus, x.CompletedAt })
+            .HasDatabaseName("ix_sales_returns_tenant_status_completed_at");
+
+        builder.HasIndex(x => new { x.TenantId, x.SalesOrderId })
+            .HasDatabaseName("ix_sales_returns_tenant_sales_order_id");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()

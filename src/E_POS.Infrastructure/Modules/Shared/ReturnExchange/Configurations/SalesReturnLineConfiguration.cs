@@ -44,6 +44,18 @@ public sealed class SalesReturnLineConfiguration : IEntityTypeConfiguration<Sale
             .HasColumnName("return_reason_id")
             .IsRequired(false);
 
+        builder.Property(x => x.ReturnReasonCodeSnapshot)
+            .HasColumnName("return_reason_code_snapshot")
+            .HasColumnType("varchar(60)")
+            .HasMaxLength(60)
+            .IsRequired(false);
+
+        builder.Property(x => x.ReturnReasonNameSnapshot)
+            .HasColumnName("return_reason_name_snapshot")
+            .HasColumnType("varchar(150)")
+            .HasMaxLength(150)
+            .IsRequired(false);
+
         builder.Property(x => x.QuantityRequested)
             .HasColumnName("quantity_requested")
             .HasPrecision(18, 4)
@@ -51,6 +63,11 @@ public sealed class SalesReturnLineConfiguration : IEntityTypeConfiguration<Sale
 
         builder.Property(x => x.QuantityReceived)
             .HasColumnName("quantity_received")
+            .HasPrecision(18, 4)
+            .IsRequired(false);
+
+        builder.Property(x => x.QuantityApproved)
+            .HasColumnName("quantity_approved")
             .HasPrecision(18, 4)
             .IsRequired(false);
 

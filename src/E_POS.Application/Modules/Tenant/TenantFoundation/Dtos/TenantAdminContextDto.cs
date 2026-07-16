@@ -8,6 +8,13 @@ public sealed record TenantAdminContextDto(
     IReadOnlyList<string> EnabledFeatures,
     IReadOnlyList<string> EffectivePermissions,
     IReadOnlyList<string> RuntimeFlags,
+    string TenantTimezone,
+    DateOnly CurrentBusinessDate,
+    string CurrencyCode,
+    string Locale,
+    IReadOnlyList<Guid> AccessibleOutletIds,
+    IReadOnlyList<string> EnabledFeatureCodes,
+    IReadOnlyList<string> EffectivePermissionCodes,
     TenantAdminContextSubscriptionDto Subscription);
 
 public sealed record TenantAdminContextTenantDto(Guid Id, string Name);
