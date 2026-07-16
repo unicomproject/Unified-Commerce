@@ -169,6 +169,7 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
         services.AddScoped<IStorefrontCartRepository, StorefrontCartRepository>();
+        services.AddScoped<IStorefrontCheckoutRepository, StorefrontCheckoutRepository>();
         services.AddScoped<ICustomerAuthRepository, CustomerAuthRepository>();
         services.AddScoped<ICustomerWishlistRepository, CustomerWishlistRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();

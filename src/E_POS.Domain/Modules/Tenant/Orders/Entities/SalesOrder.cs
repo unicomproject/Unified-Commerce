@@ -189,6 +189,67 @@ public class SalesOrder : AuditableEntity
         };
     }
 
+    public static SalesOrder CreateClickAndCollect(
+        Guid id,
+        Guid tenantId,
+        string orderNumber,
+        string idempotencyReference,
+        Guid salesChannelId,
+        Guid? fulfillmentMethodOutletId,
+        string fulfillmentMethodCode,
+        Guid outletId,
+        string outletCode,
+        string outletName,
+        Guid customerId,
+        string customerName,
+        string? customerEmail,
+        string? customerPhone,
+        string currencyCode,
+        decimal subtotalAmount,
+        decimal discountAmount,
+        decimal taxAmount,
+        decimal chargeAmount,
+        decimal totalAmount,
+        DateTimeOffset now)
+    {
+        return new SalesOrder
+        {
+            Id = id,
+            TenantId = tenantId,
+            OrderNumber = orderNumber.Trim().ToUpperInvariant(),
+            ExternalOrderReference = idempotencyReference.Trim(),
+            SalesChannelId = salesChannelId,
+            OrderType = "CLICK_AND_COLLECT",
+            FulfillmentMethodOutletId = fulfillmentMethodOutletId,
+            FulfillmentMethodCodeSnapshot = fulfillmentMethodCode.Trim().ToUpperInvariant(),
+            BusinessDate = DateOnly.FromDateTime(now.UtcDateTime),
+            ReportingOutletId = outletId,
+            ReportingOutletCodeSnapshot = outletCode.Trim(),
+            ReportingOutletNameSnapshot = outletName.Trim(),
+            CustomerId = customerId,
+            CustomerNameSnapshot = customerName.Trim(),
+            CustomerEmailSnapshot = string.IsNullOrWhiteSpace(customerEmail) ? null : customerEmail.Trim(),
+            CustomerPhoneSnapshot = string.IsNullOrWhiteSpace(customerPhone) ? null : customerPhone.Trim(),
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            SubtotalAmount = subtotalAmount,
+            DiscountAmount = discountAmount,
+            TaxAmount = taxAmount,
+            ChargeAmount = chargeAmount,
+            RoundingAmount = 0m,
+            TotalAmount = totalAmount,
+            PaidAmount = 0m,
+            RefundedAmount = 0m,
+            BalanceDue = totalAmount,
+            Status = "CONFIRMED",
+            PaymentStatus = "UNPAID",
+            FulfillmentStatus = "PENDING",
+            PlacedAt = now,
+            ConfirmedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
     public void RecordRefund(decimal amount, Guid tenantUserId, DateTimeOffset now)
     {
         if (amount <= 0 || RefundedAmount + amount > TotalAmount)
