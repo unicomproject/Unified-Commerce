@@ -87,6 +87,19 @@ public sealed class SalesOrderDiscountConfiguration : IEntityTypeConfiguration<S
             .HasColumnName("manual_discount_reason")
             .HasColumnType("text");
 
+        builder.Property(x => x.ApprovalRequiredSnapshot)
+            .HasColumnName("approval_required_snapshot")
+            .IsRequired(false);
+
+        builder.Property(x => x.ApprovedByTenantUserId)
+            .HasColumnName("approved_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ApprovedAt)
+            .HasColumnName("approved_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
         builder.Property(x => x.AppliedByTenantUserId)
             .HasColumnName("applied_by_tenant_user_id");
 
@@ -133,6 +146,12 @@ public sealed class SalesOrderDiscountConfiguration : IEntityTypeConfiguration<S
             .HasForeignKey(x => x.AppliedByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_sales_order_discounts_applied_by_tenant_user_id_tenant_users");
+
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.ApprovedByTenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sales_order_discounts_approved_by_tenant_user_id_tenant_users");
 
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()

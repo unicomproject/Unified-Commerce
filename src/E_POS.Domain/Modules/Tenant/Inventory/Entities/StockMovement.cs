@@ -13,6 +13,8 @@ public class StockMovement : AuditableEntity
     public decimal QuantityAfter { get; protected set; }
     public decimal? UnitCost { get; protected set; }
     public decimal? TotalCost { get; protected set; }
+    public string? ReasonCode { get; protected set; }
+    public string? ReferenceNumberSnapshot { get; protected set; }
     public string? IdempotencyKey { get; protected set; }
     public string? MovementNote { get; protected set; }
     public DateTimeOffset OccurredAt { get; protected set; }
@@ -34,6 +36,41 @@ public class StockMovement : AuditableEntity
         string? movementNote,
         DateTimeOffset occurredAt,
         Guid? createdByTenantUserId,
+        DateTimeOffset now) =>
+        Create(
+            id,
+            tenantId,
+            movementNumber,
+            inventoryBalanceId,
+            movementType,
+            quantityBefore,
+            quantityChange,
+            unitCost,
+            totalCost,
+            null,
+            null,
+            idempotencyKey,
+            movementNote,
+            occurredAt,
+            createdByTenantUserId,
+            now);
+
+    public static StockMovement Create(
+        Guid id,
+        Guid tenantId,
+        string movementNumber,
+        Guid inventoryBalanceId,
+        string movementType,
+        decimal quantityBefore,
+        decimal quantityChange,
+        decimal? unitCost,
+        decimal? totalCost,
+        string? reasonCode,
+        string? referenceNumberSnapshot,
+        string? idempotencyKey,
+        string? movementNote,
+        DateTimeOffset occurredAt,
+        Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
         return new StockMovement
@@ -48,6 +85,8 @@ public class StockMovement : AuditableEntity
             QuantityAfter = quantityBefore + quantityChange,
             UnitCost = unitCost,
             TotalCost = totalCost,
+            ReasonCode = string.IsNullOrWhiteSpace(reasonCode) ? null : reasonCode.Trim().ToUpperInvariant(),
+            ReferenceNumberSnapshot = string.IsNullOrWhiteSpace(referenceNumberSnapshot) ? null : referenceNumberSnapshot.Trim(),
             IdempotencyKey = idempotencyKey?.Trim(),
             MovementNote = movementNote?.Trim(),
             OccurredAt = occurredAt,

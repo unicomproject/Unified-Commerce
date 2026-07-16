@@ -50,6 +50,8 @@ using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.ProductReviews.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
+using E_POS.Application.Modules.Tenant.Reports.Contracts;
+using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
 
 
 namespace E_POS.Infrastructure;
@@ -133,6 +135,7 @@ public static class DependencyInjection
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
+        services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;

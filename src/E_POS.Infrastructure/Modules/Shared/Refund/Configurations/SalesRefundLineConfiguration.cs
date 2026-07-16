@@ -57,6 +57,11 @@ public sealed class SalesRefundLineConfiguration : IEntityTypeConfiguration<Sale
             .HasPrecision(18, 4)
             .IsRequired();
 
+        builder.Property(x => x.TaxAmount)
+            .HasColumnName("tax_amount")
+            .HasPrecision(18, 4)
+            .IsRequired(false);
+
         // <second-brain-constraints>
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
