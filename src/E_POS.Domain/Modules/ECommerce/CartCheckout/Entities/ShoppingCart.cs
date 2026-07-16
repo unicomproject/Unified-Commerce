@@ -68,5 +68,14 @@ public class ShoppingCart : AuditableEntity
         CartStatus = "CANCELLED";
         UpdatedAt = now;
     }
+
+    public void MarkConverted(Guid checkoutSessionId, Guid orderId, Guid customerId, DateTimeOffset now)
+    {
+        CustomerId = customerId;
+        ConvertedCheckoutSessionId = checkoutSessionId;
+        ConvertedOrderId = orderId;
+        CartStatus = "CONVERTED";
+        UpdatedAt = now;
+    }
 }
 

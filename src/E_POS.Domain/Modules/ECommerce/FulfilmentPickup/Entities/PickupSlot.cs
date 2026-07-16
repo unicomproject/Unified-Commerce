@@ -14,5 +14,28 @@ public class PickupSlot : AuditableEntity
     public int ReservedCount { get; protected set; }
     public string SlotStatus { get; protected set; } = string.Empty;
     public long RowVersion { get; protected set; }
+
+    public void Reserve(int capacity, DateTimeOffset now)
+    {
+        if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+        if (SlotStatus != "OPEN" || ReservedCount + capacity > Capacity)
+            throw new InvalidOperationException("Pickup slot is not available.");
+
+        ReservedCount += capacity;
+        RowVersion++;
+        if (ReservedCount == Capacity) SlotStatus = "FULL";
+        UpdatedAt = now;
+    }
+
+    public void Release(int capacity, DateTimeOffset now)
+    {
+        if (capacity <= 0 || capacity > ReservedCount)
+            throw new ArgumentOutOfRangeException(nameof(capacity));
+
+        ReservedCount -= capacity;
+        RowVersion++;
+        if (SlotStatus == "FULL" && ReservedCount < Capacity) SlotStatus = "OPEN";
+        UpdatedAt = now;
+    }
 }
 
