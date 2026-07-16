@@ -45,6 +45,32 @@ After applying EF migrations to a local PostgreSQL database, sign in to the Angu
 
 Copy `src/E_POS.Api/appsettings.Development.example.json` to `appsettings.Development.json` and set your local connection string. Do not commit real database passwords or production JWT signing keys.
 
+### Development Platform Admin billing test accounts (optional)
+
+In Development only, the API can seed two login-capable Platform Admin accounts for billing permission browser testing. Credentials must come from user-secrets or environment variables — never from committed appsettings.
+
+Required roles must already exist in the database: `billing_viewer_dev` and `platform_ops_no_billing_dev`.
+
+From `src/E_POS.Api`:
+
+```powershell
+cd src/E_POS.Api
+
+dotnet user-secrets set "DevelopmentSeed:PlatformAdmin:BillingViewer:Email" "billing.viewer.dev@local.test"
+dotnet user-secrets set "DevelopmentSeed:PlatformAdmin:BillingViewer:Password" "<local-secret>"
+dotnet user-secrets set "DevelopmentSeed:PlatformAdmin:NoBilling:Email" "billing.none.dev@local.test"
+dotnet user-secrets set "DevelopmentSeed:PlatformAdmin:NoBilling:Password" "<local-secret>"
+```
+
+Optional display names:
+
+```powershell
+dotnet user-secrets set "DevelopmentSeed:PlatformAdmin:BillingViewer:DisplayName" "Billing Viewer Development"
+dotnet user-secrets set "DevelopmentSeed:PlatformAdmin:NoBilling:DisplayName" "No Billing Development"
+```
+
+Missing secrets skip that profile with a warning and do not fail startup. The seeder never runs outside Development and never modifies `posunique001@gmail.com`.
+
 ### Platform auth routes
 
 | Route | Purpose |

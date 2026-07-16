@@ -115,6 +115,14 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             .FirstOrDefaultAsync(user => user.Id == userId, cancellationToken);
     }
 
+    public Task<PlatformUser?> GetUserEntityByNormalizedEmailAsync(
+        string normalizedEmail,
+        CancellationToken cancellationToken)
+    {
+        return _dbContext.PlatformUsers
+            .FirstOrDefaultAsync(user => user.NormalizedEmail == normalizedEmail, cancellationToken);
+    }
+
     public Task<bool> EmailExistsAsync(
         string normalizedEmail,
         Guid? excludingUserId,

@@ -26,6 +26,7 @@ using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
+using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
@@ -66,6 +67,9 @@ public static class DependencyInjection
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.Configure<TenantJwtOptions>(configuration.GetSection(TenantJwtOptions.SectionName));
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
+        services.Configure<DevelopmentPlatformAdminSeedOptions>(
+            configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
+        services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
         dataSourceBuilder.EnableDynamicJson();

@@ -178,6 +178,8 @@ app.MapGet("/api/v1/health", () =>
 })
 .WithName("HealthCheck");
 
+await DevelopmentPlatformAdminTestAccountSeedHost.RunIfDevelopmentAsync(app);
+
 app.Run();
 
 public partial class Program;
