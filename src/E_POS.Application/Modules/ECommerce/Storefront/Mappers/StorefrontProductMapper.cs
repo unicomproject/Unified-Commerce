@@ -16,7 +16,7 @@ public static class StorefrontProductMapper
             Id = product.Id,
             Name = product.ProductName,
             Price = sellingPrice ?? 0m,
-            ImageUrl = primaryImageUrl ?? "https://via.placeholder.com/300",
+            ImageUrl = primaryImageUrl ?? string.Empty,
             Rating = rating?.AverageRating ?? 0m,
             ReviewCount = rating?.TotalReviews ?? 0
         };
@@ -43,7 +43,7 @@ public static class StorefrontProductMapper
             Slug = product.ProductSlug,
             ShortDescription = product.ShortDescription ?? string.Empty,
             Price = sellingPrice ?? 0m,
-            ImageUrl = primaryImageUrl ?? "https://via.placeholder.com/300",
+            ImageUrl = primaryImageUrl ?? string.Empty,
             Rating = averageRating,
             ReviewCount = reviewCount,
             IsInStock = isInStock,

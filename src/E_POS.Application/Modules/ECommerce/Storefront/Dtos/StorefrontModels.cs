@@ -108,3 +108,34 @@ public class StorefrontStoreReadModel
     public string Address { get; set; } = string.Empty;
     public bool IsAvailable { get; set; }
 }
+
+public sealed class StorefrontSearchRequest
+{
+    public string? SearchText { get; set; }
+    public decimal? MinPrice { get; set; }
+    public decimal? MaxPrice { get; set; }
+    public string? Colour { get; set; }
+    public string? Size { get; set; }
+    public bool? InStock { get; set; }
+    public Guid? CategoryId { get; set; }
+    public string? Sort { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+}
+
+public sealed class StorefrontSearchReadModel
+{
+    public StorefrontPagedReadModel<StorefrontProductListReadModel> Products { get; set; } = new();
+    public IReadOnlyList<StorefrontSearchMatchReadModel> Categories { get; set; } = [];
+    public IReadOnlyList<StorefrontSearchMatchReadModel> Collections { get; set; } = [];
+    public int TotalCount => Products.TotalCount + Categories.Count + Collections.Count;
+}
+
+public sealed class StorefrontSearchMatchReadModel
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? ImageUrl { get; set; }
+}

@@ -11098,14 +11098,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_product_rating_summaries_product_id");
+                    b.HasIndex("ProductId");
 
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_product_rating_summaries_tenant_id");
 
-                    b.ToTable("product_rating_summaries", (string)null);
+                    b.HasIndex("TenantId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_product_rating_summaries_tenant_product");
+
+                    b.ToTable("product_rating_summaries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_rating_summaries_average", "average_rating BETWEEN 0 AND 5");
+
+                            t.HasCheckConstraint("ck_product_rating_summaries_counts", "total_reviews >= 0 AND five_star_count >= 0 AND four_star_count >= 0 AND three_star_count >= 0 AND two_star_count >= 0 AND one_star_count >= 0");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductReview", b =>
@@ -11136,12 +11143,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("rating_value");
 
                     b.Property<string>("ReviewText")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("review_text");
 
                     b.Property<string>("ReviewTitle")
-                        .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("review_title");
@@ -11175,7 +11180,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_product_reviews_tenant_id");
 
-                    b.ToTable("product_reviews", (string)null);
+                    b.HasIndex("TenantId", "ProductId", "CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_product_reviews_tenant_product_customer");
+
+                    b.ToTable("product_reviews", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_reviews_rating_value", "rating_value BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("ck_product_reviews_status", "status IN ('PENDING', 'APPROVED', 'REJECTED', 'DELETED')");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", b =>

@@ -8,7 +8,15 @@ public class ProductReviewConfiguration : IEntityTypeConfiguration<ProductReview
 {
     public void Configure(EntityTypeBuilder<ProductReview> builder)
     {
-        builder.ToTable("product_reviews");
+        builder.ToTable("product_reviews", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_product_reviews_rating_value",
+                "rating_value BETWEEN 1 AND 5");
+            table.HasCheckConstraint(
+                "ck_product_reviews_status",
+                "status IN ('PENDING', 'APPROVED', 'REJECTED', 'DELETED')");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -33,10 +41,13 @@ public class ProductReviewConfiguration : IEntityTypeConfiguration<ProductReview
 
         builder.Property(x => x.ReviewTitle)
             .HasColumnName("review_title")
-            .HasMaxLength(150);
+            .HasMaxLength(150)
+            .IsRequired(false);
 
         builder.Property(x => x.ReviewText)
-            .HasColumnName("review_text");
+            .HasColumnName("review_text")
+            .HasColumnType("text")
+            .IsRequired(false);
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
@@ -53,7 +64,10 @@ public class ProductReviewConfiguration : IEntityTypeConfiguration<ProductReview
         builder.HasIndex(x => x.TenantId).HasDatabaseName("ix_product_reviews_tenant_id");
         builder.HasIndex(x => x.ProductId).HasDatabaseName("ix_product_reviews_product_id");
         builder.HasIndex(x => x.CustomerId).HasDatabaseName("ix_product_reviews_customer_id");
-        
+        builder.HasIndex(x => new { x.TenantId, x.ProductId, x.CustomerId })
+            .IsUnique()
+            .HasDatabaseName("ux_product_reviews_tenant_product_customer");
+
         // Tenant FK
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()

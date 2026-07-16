@@ -28,4 +28,7 @@ public sealed class StorefrontProductService : IStorefrontProductService
         var products = await _repository.GetBestSellersAsync(tenantId, cancellationToken);
         return products.ToBestSellerReadModels();
     }
+
+    public Task<StorefrontSearchReadModel> SearchAsync(Guid tenantId, StorefrontSearchRequest request, CancellationToken cancellationToken = default)
+        => _repository.SearchAsync(tenantId, request, cancellationToken);
 }

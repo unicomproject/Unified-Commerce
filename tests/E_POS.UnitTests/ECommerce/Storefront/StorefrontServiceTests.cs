@@ -401,6 +401,11 @@ public sealed class StorefrontServiceTests
             return Task.FromResult(ChildCategories);
         }
 
+        public Task<StorefrontCategoryListReadModel?> GetCategoryBySlugAsync(Guid tenantId, string slug, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<StorefrontCategoryListReadModel?>(null);
+        }
+
         public Task<StorefrontPagedReadModel<StorefrontProductListReadModel>> GetProductsAsync(Guid tenantId, Guid categoryId, string? sort, int page, int pageSize, CancellationToken cancellationToken = default)
         {
             ProductsTenantId = tenantId;
@@ -421,6 +426,11 @@ public sealed class StorefrontServiceTests
         {
             BestSellersTenantId = tenantId;
             return Task.FromResult(BestSellers);
+        }
+
+        public Task<StorefrontSearchReadModel> SearchAsync(Guid tenantId, StorefrontSearchRequest request, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new StorefrontSearchReadModel());
         }
 
         public Task<IEnumerable<StorefrontStoreReadModel>> GetAvailableStoresAsync(Guid tenantId, CancellationToken cancellationToken = default)

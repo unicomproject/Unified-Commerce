@@ -38,6 +38,36 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
         return await GetCategoriesByParentAsync(tenantId, parentCategoryId, cancellationToken);
     }
 
+    public async Task<StorefrontCategoryListReadModel?> GetCategoryBySlugAsync(Guid tenantId, string slug, CancellationToken cancellationToken = default)
+    {
+        var category = await _dbContext.Set<Category>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.CategorySlug == slug && c.Status == CategoryConstants.ActiveStatus, cancellationToken);
+
+        if (category == null) return null;
+
+        var itemCount = await GetItemCountForCategoryAsync(tenantId, category.Id, cancellationToken);
+        return category.ToListReadModel(itemCount);
+    }
+
+    private async Task<int> GetItemCountForCategoryAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken)
+    {
+        var productCount = await (
+                from productCategory in _dbContext.Set<ProductCategory>().AsNoTracking()
+                join product in _dbContext.Set<Product>().AsNoTracking()
+                    on new { productCategory.TenantId, productCategory.ProductId }
+                    equals new { product.TenantId, ProductId = product.Id }
+                where productCategory.TenantId == tenantId &&
+                      productCategory.CategoryId == categoryId &&
+                      product.Status == ActiveStatus &&
+                      product.IsSellable
+                select product.Id)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        return productCount;
+    }
+
     private async Task<IEnumerable<StorefrontCategoryListReadModel>> GetCategoriesByParentAsync(Guid tenantId, Guid? parentCategoryId, CancellationToken cancellationToken)
     {
         var query = _dbContext.Set<Category>()
