@@ -7,12 +7,14 @@ using E_POS.Application.Common.Security;
 using E_POS.Infrastructure;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 const string PlatformIdentityType = "platform_user";
 const string TenantIdentityType = "tenant_user";
+const string CustomerIdentityType = "customer";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,11 +39,15 @@ var platformJwtOptions = builder.Configuration
 var tenantJwtOptions = builder.Configuration
     .GetSection(TenantJwtOptions.SectionName)
     .Get<TenantJwtOptions>() ?? new TenantJwtOptions();
+var customerJwtOptions = builder.Configuration
+    .GetSection(CustomerJwtOptions.SectionName)
+    .Get<CustomerJwtOptions>() ?? new CustomerJwtOptions();
 
 var signingKeys = new[]
     {
         platformJwtOptions.SigningKey,
-        tenantJwtOptions.SigningKey
+        tenantJwtOptions.SigningKey,
+        customerJwtOptions.SigningKey
     }
     .Where(key => !string.IsNullOrWhiteSpace(key))
     .Distinct(StringComparer.Ordinal)
@@ -58,10 +64,10 @@ builder.Services
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuers = new[] { platformJwtOptions.Issuer, tenantJwtOptions.Issuer }
+            ValidIssuers = new[] { platformJwtOptions.Issuer, tenantJwtOptions.Issuer, customerJwtOptions.Issuer }
                 .Where(issuer => !string.IsNullOrWhiteSpace(issuer)),
             ValidateAudience = true,
-            ValidAudiences = new[] { platformJwtOptions.Audience, tenantJwtOptions.Audience }
+            ValidAudiences = new[] { platformJwtOptions.Audience, tenantJwtOptions.Audience, customerJwtOptions.Audience }
                 .Where(audience => !string.IsNullOrWhiteSpace(audience)),
             ValidateIssuerSigningKey = true,
             IssuerSigningKeys = signingKeys,
@@ -100,6 +106,11 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .RequireClaim("identity_type", TenantIdentityType)
         .RequireClaim("aud", tenantJwtOptions.Audience));
+
+    options.AddPolicy("CustomerOnly", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireClaim("identity_type", CustomerIdentityType)
+        .RequireClaim("aud", customerJwtOptions.Audience));
 });
 
 builder.Services.AddSwaggerGen(options =>

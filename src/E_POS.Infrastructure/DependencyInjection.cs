@@ -40,6 +40,15 @@ using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Discount.Repositories;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Options;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Repositories;
+using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
+using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.ProductReviews.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
@@ -56,6 +65,7 @@ public static class DependencyInjection
 
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.Configure<TenantJwtOptions>(configuration.GetSection(TenantJwtOptions.SectionName));
+        services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
         dataSourceBuilder.EnableDynamicJson();
@@ -136,6 +146,16 @@ public static class DependencyInjection
             var options = provider.GetRequiredService<IOptions<TenantJwtOptions>>().Value;
             return new TenantJwtSettings(options.Issuer, options.Audience, options.SigningKey, options.AccessTokenMinutes, options.RefreshTokenDays);
         });
+        services.AddScoped(static provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<CustomerJwtOptions>>().Value;
+            return new CustomerJwtSettings(
+                options.Issuer,
+                options.Audience,
+                options.SigningKey,
+                options.AccessTokenMinutes,
+                options.RefreshTokenDays);
+        });
 
         // ECommerce Storefront
         services.AddScoped<IStorefrontBannerRepository, StorefrontBannerRepository>();
@@ -144,6 +164,10 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontFulfillmentRepository, StorefrontFulfillmentRepository>();
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
+        services.AddScoped<IStorefrontCartRepository, StorefrontCartRepository>();
+        services.AddScoped<ICustomerAuthRepository, CustomerAuthRepository>();
+        services.AddScoped<ICustomerWishlistRepository, CustomerWishlistRepository>();
+        services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
 
         return services;
     }

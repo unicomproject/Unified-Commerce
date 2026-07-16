@@ -13,33 +13,63 @@ public class CustomerWishlist : AuditableEntity
 
     protected CustomerWishlist() { } // EF Core
 
-    public static CustomerWishlist Create(Guid tenantId, Guid customerId, string name)
+    public static CustomerWishlist Create(
+        Guid tenantId,
+        Guid customerId,
+        string name,
+        DateTimeOffset now)
     {
         return new CustomerWishlist
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             CustomerId = customerId,
-            Name = name
+            Name = name.Trim(),
+            CreatedAt = now,
+            UpdatedAt = now
         };
     }
 
-    public void AddItem(Guid productId, Guid? productVariantId = null)
+    public CustomerWishlistItem AddItem(
+        Guid productId,
+        Guid? productVariantId,
+        DateTimeOffset now)
     {
-        if (_items.Any(i => i.ProductId == productId && i.ProductVariantId == productVariantId))
+        var existingItem = _items.FirstOrDefault(
+            i => i.ProductId == productId && i.ProductVariantId == productVariantId);
+        if (existingItem is not null)
         {
-            return; // Already exists
+            return existingItem;
         }
 
-        _items.Add(CustomerWishlistItem.Create(TenantId, Id, productId, productVariantId));
+        var item = CustomerWishlistItem.Create(
+            TenantId,
+            Id,
+            productId,
+            productVariantId,
+            now);
+        _items.Add(item);
+        UpdatedAt = now;
+        return item;
     }
 
-    public void RemoveItem(Guid itemId)
+    public bool RemoveItem(Guid itemId, DateTimeOffset now)
     {
         var item = _items.FirstOrDefault(i => i.Id == itemId);
-        if (item != null)
-        {
-            _items.Remove(item);
-        }
+        if (item is null)
+            return false;
+
+        _items.Remove(item);
+        UpdatedAt = now;
+        return true;
+    }
+
+    public void Clear(DateTimeOffset now)
+    {
+        if (_items.Count == 0)
+            return;
+
+        _items.Clear();
+        UpdatedAt = now;
     }
 }

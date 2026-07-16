@@ -1,4 +1,5 @@
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
 namespace E_POS.Api.Controllers.V1.ECommerce.Storefront;
@@ -39,6 +40,18 @@ public class StorefrontProductsController : ControllerBase
 
         var products = await _storefrontProductService.GetBestSellersAsync(tenantId, cancellationToken);
         return Ok(products);
+    }
+
+    [HttpGet("/api/v1/ecommerce/storefront/catalog/search")]
+    public async Task<IActionResult> Search([FromHeader(Name = "X-Tenant-Id")] Guid tenantId, [FromQuery] StorefrontSearchRequest request, CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty) return BadRequest(new { Error = "X-Tenant-Id header is required" });
+        if (request.MinPrice < 0 || request.MaxPrice < 0) return BadRequest(new { Error = "Price range cannot be negative" });
+        if (request.MinPrice.HasValue && request.MaxPrice.HasValue && request.MinPrice > request.MaxPrice)
+            return BadRequest(new { Error = "minPrice cannot be greater than maxPrice" });
+        request.Page = request.Page < 1 ? 1 : request.Page;
+        request.PageSize = request.PageSize < 1 ? 20 : Math.Min(request.PageSize, 50);
+        return Ok(await _storefrontProductService.SearchAsync(tenantId, request, cancellationToken));
     }
 
     [HttpGet("{slug}")]

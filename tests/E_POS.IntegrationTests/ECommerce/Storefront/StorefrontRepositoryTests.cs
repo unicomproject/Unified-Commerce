@@ -308,7 +308,7 @@ public sealed class StorefrontRepositoryTests
             {
                 Assert.Equal(kidsProductId, second.Id);
                 Assert.Equal(54.99m, second.Price);
-                Assert.Equal("https://via.placeholder.com/300", second.ImageUrl);
+                Assert.Empty(second.ImageUrl);
                 Assert.False(second.IsInStock);
                 Assert.Null(second.Badge);
             });

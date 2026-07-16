@@ -45,6 +45,11 @@ public sealed class StorefrontService : IStorefrontService
         return _categoryService.GetChildCategoriesAsync(tenantId, parentCategoryId, cancellationToken);
     }
 
+    public Task<StorefrontCategoryListReadModel?> GetCategoryBySlugAsync(Guid tenantId, string slug, CancellationToken cancellationToken = default)
+    {
+        return _categoryService.GetCategoryBySlugAsync(tenantId, slug, cancellationToken);
+    }
+
     public Task<StorefrontPagedReadModel<StorefrontProductListReadModel>> GetProductsAsync(Guid tenantId, Guid categoryId, string? sort, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         return _productService.GetProductsAsync(tenantId, categoryId, sort, page, pageSize, cancellationToken);
@@ -58,6 +63,11 @@ public sealed class StorefrontService : IStorefrontService
     public Task<IEnumerable<StorefrontProductReadModel>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return _productService.GetBestSellersAsync(tenantId, cancellationToken);
+    }
+
+    public Task<StorefrontSearchReadModel> SearchAsync(Guid tenantId, StorefrontSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        return _productService.SearchAsync(tenantId, request, cancellationToken);
     }
 
     public Task<IEnumerable<StorefrontStoreReadModel>> GetAvailableStoresAsync(Guid tenantId, CancellationToken cancellationToken = default)
