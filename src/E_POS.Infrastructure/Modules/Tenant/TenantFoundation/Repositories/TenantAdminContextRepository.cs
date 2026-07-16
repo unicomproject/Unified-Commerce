@@ -33,7 +33,9 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                 FirstName = user.FullName,
                 LastName = string.Empty,
                 TenantId = tenant.Id,
-                TenantName = tenant.DisplayName
+                TenantName = tenant.DisplayName,
+                TenantTimezone = tenant.DefaultTimezone,
+                CurrencyCode = tenant.BaseCurrencyCode
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -53,12 +55,37 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             select new TenantAdminContextRoleDto(role.Id, role.RoleName))
             .ToListAsync(cancellationToken);
 
-        // Outlets accessible to this tenant
-        var outlets = await _dbContext.Outlets
+        var assignedOutletIds = await _dbContext.OutletUserRoles
             .AsNoTracking()
-            .Where(o => o.TenantId == tenantId && o.Status.ToUpper() != "DELETED")
+            .Where(x => x.TenantId == tenantId &&
+                        x.TenantUserId == tenantUserId &&
+                        x.RevokedAt == null)
+            .Select(x => x.OutletId)
+            .Union(_dbContext.OutletUserPermissions
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId &&
+                            x.TenantUserId == tenantUserId &&
+                            x.RevokedAt == null)
+                .Select(x => x.OutletId))
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var outletQuery = _dbContext.Outlets
+            .AsNoTracking()
+            .Where(o => o.TenantId == tenantId &&
+                        o.Status.ToUpper() != "DELETED" &&
+                        o.Status.ToUpper() != "INACTIVE");
+
+        if (assignedOutletIds.Count > 0)
+        {
+            outletQuery = outletQuery.Where(o => assignedOutletIds.Contains(o.Id));
+        }
+
+        var outlets = await outletQuery
             .Select(o => new TenantAdminContextOutletDto(o.Id, o.OutletName))
             .ToListAsync(cancellationToken);
+
+        var accessibleOutletIds = outlets.Select(x => x.Id).OrderBy(x => x).ToList();
 
         // Effective permissions: direct + role-based
         var directPermissions =
@@ -131,11 +158,15 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
         return new TenantAdminContextData(
             TenantId: userInfo.TenantId,
             TenantName: userInfo.TenantName,
+            TenantTimezone: string.IsNullOrWhiteSpace(userInfo.TenantTimezone) ? "UTC" : userInfo.TenantTimezone,
+            CurrencyCode: string.IsNullOrWhiteSpace(userInfo.CurrencyCode) ? "LKR" : userInfo.CurrencyCode,
+            Locale: "en-LK",
             UserId: userInfo.UserId,
             FirstName: userInfo.FirstName,
             LastName: userInfo.LastName,
             Roles: roles,
             Outlets: outlets,
+            AccessibleOutletIds: accessibleOutletIds,
             EnabledFeatures: enabledFeatures,
             EffectivePermissions: permissions,
             SubscriptionStatus: subscriptionStatus);

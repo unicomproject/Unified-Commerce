@@ -13,11 +13,15 @@ public interface ITenantAdminContextRepository
 public sealed record TenantAdminContextData(
     Guid TenantId,
     string TenantName,
+    string TenantTimezone,
+    string CurrencyCode,
+    string Locale,
     Guid UserId,
     string? FirstName,
     string? LastName,
     IReadOnlyList<TenantAdminContextRoleDto> Roles,
     IReadOnlyList<TenantAdminContextOutletDto> Outlets,
+    IReadOnlyList<Guid> AccessibleOutletIds,
     IReadOnlyList<string> EnabledFeatures,
     IReadOnlyList<string> EffectivePermissions,
     string SubscriptionStatus);

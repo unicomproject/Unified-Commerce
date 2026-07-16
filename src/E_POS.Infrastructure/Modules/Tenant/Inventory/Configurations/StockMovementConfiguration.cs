@@ -31,6 +31,8 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
         builder.Property(x => x.QuantityAfter).HasColumnName("quantity_after").HasPrecision(18, 4).IsRequired();
         builder.Property(x => x.UnitCost).HasColumnName("unit_cost").HasPrecision(18, 4).IsRequired(false);
         builder.Property(x => x.TotalCost).HasColumnName("total_cost").HasPrecision(18, 4).IsRequired(false);
+        builder.Property(x => x.ReasonCode).HasColumnName("reason_code").HasColumnType("varchar(60)").HasMaxLength(60).IsRequired(false);
+        builder.Property(x => x.ReferenceNumberSnapshot).HasColumnName("reference_number_snapshot").HasColumnType("varchar(100)").HasMaxLength(100).IsRequired(false);
         builder.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasColumnType("varchar(150)").HasMaxLength(150).IsRequired(false);
         builder.Property(x => x.MovementNote).HasColumnName("movement_note").HasColumnType("text").IsRequired(false);
         builder.Property(x => x.OccurredAt).HasColumnName("occurred_at").HasColumnType("timestamp with time zone").IsRequired();
@@ -43,6 +45,8 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
         builder.HasIndex(x => new { x.TenantId, x.MovementNumber }).IsUnique().HasDatabaseName("uq_stock_movements_tenant_id_movement_number");
         builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique().HasDatabaseName("uq_stock_movements_tenant_id_idempotency_key").HasFilter("idempotency_key IS NOT NULL");
         builder.HasIndex(x => new { x.TenantId, x.Id }).IsUnique().HasDatabaseName("uq_stock_movements_tenant_id_id");
+        builder.HasIndex(x => new { x.TenantId, x.OccurredAt, x.MovementType }).HasDatabaseName("ix_stock_movements_tenant_occurred_at_type");
+        builder.HasIndex(x => new { x.TenantId, x.InventoryBalanceId, x.OccurredAt }).HasDatabaseName("ix_stock_movements_tenant_balance_occurred_at");
 
         builder.ToTable(t =>
         {

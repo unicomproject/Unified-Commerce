@@ -1,4 +1,5 @@
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.Reports.Services;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Dtos;
 
@@ -44,6 +45,13 @@ public sealed class TenantAdminContextService : ITenantAdminContextService
             EnabledFeatures: data.EnabledFeatures,
             EffectivePermissions: data.EffectivePermissions,
             RuntimeFlags: [],
+            TenantTimezone: data.TenantTimezone,
+            CurrentBusinessDate: ReportBusinessDateCalculator.FromInstant(DateTimeOffset.UtcNow, data.TenantTimezone),
+            CurrencyCode: data.CurrencyCode,
+            Locale: data.Locale,
+            AccessibleOutletIds: data.AccessibleOutletIds,
+            EnabledFeatureCodes: data.EnabledFeatures,
+            EffectivePermissionCodes: data.EffectivePermissions,
             Subscription: new TenantAdminContextSubscriptionDto(data.SubscriptionStatus));
 
         return ApplicationResult<TenantAdminContextDto>.Success(dto);
