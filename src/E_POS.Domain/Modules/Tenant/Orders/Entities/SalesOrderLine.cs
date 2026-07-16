@@ -188,6 +188,60 @@ public class SalesOrderLine : AuditableEntity
         return line;
     }
 
+    public static SalesOrderLine CreateForClickAndCollect(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        int lineNumber,
+        Guid productId,
+        Guid? productVariantId,
+        Guid uomId,
+        string? skuSnapshot,
+        string productNameSnapshot,
+        string? variantNameSnapshot,
+        string uomCodeSnapshot,
+        string uomNameSnapshot,
+        string productTypeSnapshot,
+        string productStructureSnapshot,
+        decimal quantity,
+        decimal unitPrice,
+        decimal lineSubtotalAmount,
+        decimal lineDiscountAmount,
+        decimal lineTaxAmount,
+        DateTimeOffset now)
+    {
+        return new SalesOrderLine
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            LineNumber = lineNumber,
+            ProductId = productId,
+            ProductVariantId = productVariantId,
+            UomId = uomId,
+            SkuSnapshot = string.IsNullOrWhiteSpace(skuSnapshot) ? null : skuSnapshot.Trim(),
+            ProductNameSnapshot = productNameSnapshot.Trim(),
+            VariantNameSnapshot = string.IsNullOrWhiteSpace(variantNameSnapshot) ? null : variantNameSnapshot.Trim(),
+            UomCodeSnapshot = uomCodeSnapshot.Trim().ToUpperInvariant(),
+            UomNameSnapshot = uomNameSnapshot.Trim(),
+            ProductTypeSnapshot = productTypeSnapshot.Trim().ToUpperInvariant(),
+            ProductStructureSnapshot = productStructureSnapshot.Trim().ToUpperInvariant(),
+            Quantity = quantity,
+            FulfilledQuantity = 0m,
+            CancelledQuantity = 0m,
+            ReturnedQuantity = 0m,
+            OriginalUnitPrice = unitPrice,
+            UnitPrice = unitPrice,
+            LineSubtotalAmount = lineSubtotalAmount,
+            LineDiscountAmount = lineDiscountAmount,
+            LineTaxAmount = lineTaxAmount,
+            LineTotalAmount = lineSubtotalAmount - lineDiscountAmount + lineTaxAmount,
+            LineStatus = "ACTIVE",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
     public void RecordReturn(decimal quantity, DateTimeOffset now)
     {
         if (quantity <= 0 || ReturnedQuantity + quantity > FulfilledQuantity)

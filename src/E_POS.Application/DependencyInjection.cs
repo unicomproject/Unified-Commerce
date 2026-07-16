@@ -125,6 +125,7 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontTenantService, StorefrontTenantService>();
         services.AddScoped<IStorefrontService, StorefrontService>();
         services.AddScoped<IStorefrontCartService, StorefrontCartService>();
+        services.AddScoped<IStorefrontCheckoutService, StorefrontCheckoutService>();
         services.AddScoped<ICustomerAuthService, CustomerAuthService>();
         services.AddScoped<ICustomerWishlistService, CustomerWishlistService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
