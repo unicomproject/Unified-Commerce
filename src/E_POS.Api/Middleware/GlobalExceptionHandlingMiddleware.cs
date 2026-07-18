@@ -19,6 +19,7 @@ public sealed class GlobalExceptionHandlingMiddleware
     {
         try
         {
+
             await _next(context);
         }
         catch (Exception exception)

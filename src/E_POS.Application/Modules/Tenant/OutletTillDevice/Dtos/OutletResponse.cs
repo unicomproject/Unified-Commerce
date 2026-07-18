@@ -14,4 +14,6 @@ public sealed record OutletResponse(
     IReadOnlyList<OutletBusinessHourResponse> BusinessHours,
     bool CollectionEnabled,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    Guid? CreatedByTenantUserId,
+    DateTimeOffset? UpdatedAt,
+    Guid? UpdatedByTenantUserId);
