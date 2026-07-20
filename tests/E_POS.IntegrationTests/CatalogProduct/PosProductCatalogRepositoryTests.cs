@@ -314,7 +314,7 @@ public sealed class PosProductCatalogRepositoryTests
 
         foreach (var balance in dbContext.InventoryBalances)
         {
-            balance.AdjustQuantities(0m, 0m, 0m, 0m, Now);
+            balance.AdjustQuantities(-balance.AvailableQuantity, 0m, 0m, 0m, Now);
         }
         await dbContext.SaveChangesAsync();
 
@@ -359,11 +359,11 @@ public sealed class PosProductCatalogRepositoryTests
             tenantId, deviceId, productId, CancellationToken.None);
 
         var summary = Assert.Single(listResult.Products);
-        Assert.Equal("out_of_stock", summary.StockStatus);
-        Assert.Equal(0m, summary.AvailableQuantity);
+        Assert.Equal("in_stock", summary.StockStatus);
+        Assert.Null(summary.AvailableQuantity);
         Assert.NotNull(detailResult.Product);
-        Assert.Equal("out_of_stock", detailResult.Product.StockStatus);
-        Assert.All(detailResult.Product.Variants, variant => Assert.Equal(0m, variant.StockQty));
+        Assert.Equal("in_stock", detailResult.Product.StockStatus);
+        Assert.All(detailResult.Product.Variants, variant => Assert.Null(variant.StockQty));
     }
 
     [Fact]

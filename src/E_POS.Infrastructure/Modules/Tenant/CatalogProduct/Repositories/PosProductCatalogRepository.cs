@@ -238,7 +238,8 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             imageByProduct.TryGetValue(product.Id, out var imageStorageKey);
 
             var availableQuantities = productVariants
-                .Select(variant => inventoryByVariant.GetValueOrDefault(variant.Id))
+                .Where(variant => inventoryByVariant.ContainsKey(variant.Id))
+                .Select(variant => inventoryByVariant[variant.Id])
                 .ToList();
             decimal? availableQuantity = availableQuantities.Count == 0
                 ? null
@@ -496,7 +497,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             var price = pricesByVariant[variant.Id];
             minPrice = minPrice.HasValue ? Math.Min(minPrice.Value, price) : price;
 
-            decimal? availableQuantity = inventoryByVariant.GetValueOrDefault(variant.Id);
+            decimal? availableQuantity = inventoryByVariant.TryGetValue(variant.Id, out var qty) ? qty : null;
             var stockStatus = ResolveStockStatus(availableQuantity, reorderRule);
 
             var attributes = variantOptionLinks
@@ -522,7 +523,8 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         }
 
         var productAvailableQuantities = variantDetails
-            .Select(x => x.StockQty ?? 0m)
+            .Where(x => x.StockQty.HasValue)
+            .Select(x => x.StockQty!.Value)
             .ToList();
         var productAvailableQuantity = productAvailableQuantities.Count > 0
             ? productAvailableQuantities.Sum(quantity => Math.Max(0m, quantity))
@@ -642,7 +644,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
     {
         if (!availableQuantity.HasValue)
         {
-            return "unknown";
+            return "in_stock";
         }
 
         if (availableQuantity.Value <= 0m)
@@ -667,7 +669,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
     {
         if (variantAvailableQuantities.Count == 0)
         {
-            return "unknown";
+            return ResolveStockStatus(totalAvailableQuantity, minStockQuantity);
         }
 
         if (!variantAvailableQuantities.Any(quantity => quantity > 0m))

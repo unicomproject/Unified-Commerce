@@ -151,7 +151,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             taxTotal += lineTax;
             calculatedLines.Add(new CalculatedCheckoutLine(line.VariantId, lineSubtotal, lineTax));
 
-            if (!availableByVariant.TryGetValue(line.VariantId, out var availableQuantity) ||
+            if (availableByVariant.TryGetValue(line.VariantId, out var availableQuantity) &&
                 availableQuantity < line.Qty)
             {
                 validationMessages.Add($"Insufficient stock for {variant.ProductName}.");
@@ -368,7 +368,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             var lineSubtotal = unitPrice * quantity;
             var lineTax = lineSubtotal * taxPercent / 100m;
 
-            if (!availableByVariant.TryGetValue(line.VariantId, out var availableQuantity) ||
+            if (availableByVariant.TryGetValue(line.VariantId, out var availableQuantity) &&
                 availableQuantity < quantity)
             {
                 return new PosCheckoutStartPaymentResult("pos_checkout.insufficient_stock", null);
