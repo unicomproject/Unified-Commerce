@@ -1,3 +1,4 @@
+using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 
@@ -73,6 +74,15 @@ public sealed class StorefrontService : IStorefrontService
     public Task<IEnumerable<StorefrontStoreReadModel>> GetAvailableStoresAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return _fulfillmentService.GetAvailableStoresAsync(tenantId, cancellationToken);
+    }
+
+    public Task<ApplicationResult<StorefrontCollectionOptionsReadModel>> GetCollectionOptionsAsync(
+        Guid tenantId,
+        Guid outletId,
+        int days,
+        CancellationToken cancellationToken = default)
+    {
+        return _fulfillmentService.GetCollectionOptionsAsync(tenantId, outletId, days, cancellationToken);
     }
 
     public Task<Guid?> ResolveTenantIdAsync(string slug, CancellationToken cancellationToken = default)

@@ -1,4 +1,5 @@
 using E_POS.Api.Controllers.V1.ECommerce.Storefront;
+using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -362,6 +363,47 @@ public sealed class StorefrontControllerTests
         Assert.Equal(tenantId, service.StoresTenantId);
     }
 
+    [Fact]
+    public async Task GetCollectionOptions_WithMissingTenantHeader_ReturnsBadRequest()
+    {
+        var service = new FakeStorefrontService();
+        var controller = new StorefrontFulfillmentController(service);
+
+        var result = await controller.GetCollectionOptions(
+            Guid.Empty,
+            Guid.NewGuid(),
+            5,
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Null(service.CollectionOptionsTenantId);
+    }
+
+    [Fact]
+    public async Task GetCollectionOptions_WithValidRequest_ReturnsOptionsAndPassesParameters()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var options = new StorefrontCollectionOptionsReadModel { OutletId = outletId, Timezone = "UTC" };
+        var service = new FakeStorefrontService
+        {
+            CollectionOptionsResult = ApplicationResult<StorefrontCollectionOptionsReadModel>.Success(options)
+        };
+        var controller = new StorefrontFulfillmentController(service);
+
+        var result = await controller.GetCollectionOptions(
+            tenantId,
+            outletId,
+            7,
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Same(options, ok.Value);
+        Assert.Equal(tenantId, service.CollectionOptionsTenantId);
+        Assert.Equal(outletId, service.CollectionOptionsOutletId);
+        Assert.Equal(7, service.CollectionOptionsDays);
+    }
+
     private sealed class FakeStorefrontService : IStorefrontService
     {
         public Guid? ResolvedTenantId { get; init; }
@@ -381,6 +423,9 @@ public sealed class StorefrontControllerTests
         public string? ProductDetailSlug { get; private set; }
         public Guid? BestSellersTenantId { get; private set; }
         public Guid? StoresTenantId { get; private set; }
+        public Guid? CollectionOptionsTenantId { get; private set; }
+        public Guid? CollectionOptionsOutletId { get; private set; }
+        public int? CollectionOptionsDays { get; private set; }
         public IEnumerable<StorefrontBannerReadModel> Banners { get; init; } = [];
         public IEnumerable<StorefrontCategoryListReadModel> RootCategories { get; init; } = [];
         public IEnumerable<StorefrontCategoryListReadModel> ChildCategories { get; init; } = [];
@@ -389,6 +434,9 @@ public sealed class StorefrontControllerTests
         public StorefrontProductDetailReadModel? ProductDetail { get; init; }
         public IEnumerable<StorefrontProductReadModel> Products { get; init; } = [];
         public IEnumerable<StorefrontStoreReadModel> Stores { get; init; } = [];
+        public ApplicationResult<StorefrontCollectionOptionsReadModel> CollectionOptionsResult { get; init; } =
+            ApplicationResult<StorefrontCollectionOptionsReadModel>.Failure(
+                new ApplicationError("storefront_fulfillment.collection_unavailable", "Collection unavailable."));
 
         public Task<IEnumerable<StorefrontBannerReadModel>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
         {
@@ -454,6 +502,18 @@ public sealed class StorefrontControllerTests
         {
             StoresTenantId = tenantId;
             return Task.FromResult(Stores);
+        }
+
+        public Task<ApplicationResult<StorefrontCollectionOptionsReadModel>> GetCollectionOptionsAsync(
+            Guid tenantId,
+            Guid outletId,
+            int days,
+            CancellationToken cancellationToken = default)
+        {
+            CollectionOptionsTenantId = tenantId;
+            CollectionOptionsOutletId = outletId;
+            CollectionOptionsDays = days;
+            return Task.FromResult(CollectionOptionsResult);
         }
 
         public Task<Guid?> ResolveTenantIdAsync(string slug, CancellationToken cancellationToken = default)

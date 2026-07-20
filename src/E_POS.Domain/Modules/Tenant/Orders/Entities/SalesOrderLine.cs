@@ -56,6 +56,7 @@ public class SalesOrderLine : AuditableEntity
         decimal lineSubtotalAmount,
         decimal lineDiscountAmount,
         decimal lineTaxAmount,
+        bool isTaxInclusive,
         DateTimeOffset now) =>
         CreateForPosSale(
             id,
@@ -83,6 +84,7 @@ public class SalesOrderLine : AuditableEntity
             lineSubtotalAmount,
             lineDiscountAmount,
             lineTaxAmount,
+            isTaxInclusive,
             now);
 
     public static SalesOrderLine CreateForPosSale(
@@ -111,8 +113,15 @@ public class SalesOrderLine : AuditableEntity
         decimal lineSubtotalAmount,
         decimal lineDiscountAmount,
         decimal lineTaxAmount,
+        bool isTaxInclusive,
         DateTimeOffset now)
     {
+        // When tax is inclusive, the total price already contains the tax,
+        // so we do NOT add lineTaxAmount on top. When exclusive, we do.
+        var lineTotalAmount = isTaxInclusive
+            ? lineSubtotalAmount - lineDiscountAmount
+            : lineSubtotalAmount - lineDiscountAmount + lineTaxAmount;
+
         return new SalesOrderLine
         {
             Id = id,
@@ -144,7 +153,7 @@ public class SalesOrderLine : AuditableEntity
             LineSubtotalAmount = lineSubtotalAmount,
             LineDiscountAmount = lineDiscountAmount,
             LineTaxAmount = lineTaxAmount,
-            LineTotalAmount = lineSubtotalAmount - lineDiscountAmount + lineTaxAmount,
+            LineTotalAmount = lineTotalAmount,
             LineStatus = "FULFILLED",
             CreatedAt = now,
             UpdatedAt = now
@@ -158,13 +167,14 @@ public class SalesOrderLine : AuditableEntity
         string uomCodeSnapshot, string uomNameSnapshot, string productTypeSnapshot,
         string productStructureSnapshot, decimal quantity, decimal unitPrice,
         decimal lineSubtotalAmount, decimal lineDiscountAmount, decimal lineTaxAmount,
+        bool isTaxInclusive,
         DateTimeOffset now) =>
         CreateForHeldPosSale(
             id, tenantId, salesOrderId, lineNumber, productId, productVariantId, uomId,
             priceListItemId, skuSnapshot, null, productNameSnapshot, variantNameSnapshot,
             null, null, null, null, uomCodeSnapshot, uomNameSnapshot, productTypeSnapshot,
             productStructureSnapshot, quantity, unitPrice, lineSubtotalAmount, lineDiscountAmount,
-            lineTaxAmount, now);
+            lineTaxAmount, isTaxInclusive, now);
 
     public static SalesOrderLine CreateForHeldPosSale(
         Guid id, Guid tenantId, Guid salesOrderId, int lineNumber,
@@ -174,6 +184,7 @@ public class SalesOrderLine : AuditableEntity
         string? brandNameSnapshot, string uomCodeSnapshot, string uomNameSnapshot, string productTypeSnapshot,
         string productStructureSnapshot, decimal quantity, decimal unitPrice,
         decimal lineSubtotalAmount, decimal lineDiscountAmount, decimal lineTaxAmount,
+        bool isTaxInclusive,
         DateTimeOffset now)
     {
         var line = CreateForPosSale(
@@ -182,7 +193,7 @@ public class SalesOrderLine : AuditableEntity
             variantNameSnapshot, departmentNameSnapshot, categoryNameSnapshot, subcategoryNameSnapshot,
             brandNameSnapshot, uomCodeSnapshot, uomNameSnapshot,
             productTypeSnapshot, productStructureSnapshot, quantity, unitPrice,
-            lineSubtotalAmount, lineDiscountAmount, lineTaxAmount, now);
+            lineSubtotalAmount, lineDiscountAmount, lineTaxAmount, isTaxInclusive, now);
         line.FulfilledQuantity = 0;
         line.LineStatus = "PENDING";
         return line;
@@ -208,8 +219,13 @@ public class SalesOrderLine : AuditableEntity
         decimal lineSubtotalAmount,
         decimal lineDiscountAmount,
         decimal lineTaxAmount,
+        bool isTaxInclusive,
         DateTimeOffset now)
     {
+        var lineTotalAmount = isTaxInclusive
+            ? lineSubtotalAmount - lineDiscountAmount
+            : lineSubtotalAmount - lineDiscountAmount + lineTaxAmount;
+
         return new SalesOrderLine
         {
             Id = id,
@@ -235,7 +251,7 @@ public class SalesOrderLine : AuditableEntity
             LineSubtotalAmount = lineSubtotalAmount,
             LineDiscountAmount = lineDiscountAmount,
             LineTaxAmount = lineTaxAmount,
-            LineTotalAmount = lineSubtotalAmount - lineDiscountAmount + lineTaxAmount,
+            LineTotalAmount = lineTotalAmount,
             LineStatus = "ACTIVE",
             CreatedAt = now,
             UpdatedAt = now
@@ -253,4 +269,3 @@ public class SalesOrderLine : AuditableEntity
         UpdatedAt = now;
     }
 }
-

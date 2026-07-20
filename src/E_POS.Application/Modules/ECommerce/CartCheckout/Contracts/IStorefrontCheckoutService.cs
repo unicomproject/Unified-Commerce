@@ -18,6 +18,13 @@ public interface IStorefrontCheckoutService
         Guid checkoutSessionId,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<StorefrontCheckoutReadModel>> UpdateCollectionAsync(
+        Guid tenantId,
+        Guid customerId,
+        Guid checkoutSessionId,
+        UpdateStorefrontCheckoutCollectionRequest request,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<StorefrontCheckoutReadModel>> ConfirmAsync(
         Guid tenantId,
         Guid customerId,

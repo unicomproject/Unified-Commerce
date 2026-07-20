@@ -4,8 +4,11 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace E_POS.Api.Controllers.V1.ECommerce.CustomerAuth;
 
@@ -132,7 +135,7 @@ public sealed class CustomerAuthController : ControllerBase
             new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
+                Secure = ShouldUseSecureRefreshCookie(),
                 SameSite = SameSiteMode.Strict,
                 Expires = result.RefreshTokenExpiresAt,
                 Path = RefreshTokenCookiePath
@@ -146,9 +149,22 @@ public sealed class CustomerAuthController : ControllerBase
             new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
+                Secure = ShouldUseSecureRefreshCookie(),
                 SameSite = SameSiteMode.Strict,
                 Path = RefreshTokenCookiePath
             });
+    }
+
+    private bool ShouldUseSecureRefreshCookie()
+    {
+        if (Request.IsHttps)
+            return true;
+
+        var services = HttpContext.RequestServices;
+        if (services is null)
+            return true;
+
+        var environment = services.GetService<IWebHostEnvironment>();
+        return environment is null || !environment.IsDevelopment();
     }
 }

@@ -388,17 +388,14 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
                 x.TenantId == tenantId &&
                 productIds.Contains(x.ProductId) &&
                 x.Status == ActiveStatus &&
-                x.ProductVariantId == null &&
                 x.MinQuantity <= 1m &&
                 (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
                 (!x.ValidUntil.HasValue || x.ValidUntil >= now))
-            .OrderByDescending(x => x.ValidFrom ?? DateTimeOffset.MinValue)
-            .ThenBy(x => x.MinQuantity)
             .ToListAsync(cancellationToken);
 
         return priceRows
             .GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => (decimal?)x.First().SellingPrice);
+            .ToDictionary(x => x.Key, x => (decimal?)x.Min(p => p.SellingPrice));
     }
 
     private async Task<Dictionary<Guid, decimal?>> GetVariantPricesByVariantAsync(Guid tenantId, Guid productId, IReadOnlyCollection<Guid> variantIds, DateTimeOffset now, CancellationToken cancellationToken)

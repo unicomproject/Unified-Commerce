@@ -110,6 +110,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(30)")
                         .HasColumnName("checkout_status");
 
+                    b.Property<string>("CollectionTimezoneSnapshot")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("collection_timezone_snapshot");
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
@@ -149,6 +154,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("inventory_reservation_id");
 
+                    b.Property<bool>("IsTaxInclusive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_tax_included");
+
                     b.Property<string>("PickupContactEmail")
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
@@ -164,6 +175,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(50)")
                         .HasColumnName("pickup_contact_phone");
 
+                    b.Property<DateTimeOffset?>("RequestedCollectionAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_collection_at");
+
+                    b.Property<DateTimeOffset?>("RequestedCollectionEndAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_collection_end_at");
+
                     b.Property<string>("SalesChannel")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -177,10 +196,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("SelectedOutletId")
                         .HasColumnType("uuid")
                         .HasColumnName("selected_outlet_id");
-
-                    b.Property<Guid?>("SelectedPickupSlotId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("selected_pickup_slot_id");
 
                     b.Property<decimal>("SubtotalAmount")
                         .HasColumnType("numeric(18,4)")
@@ -553,6 +568,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
+
+                    b.Property<bool>("IsTaxInclusive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_tax_included");
 
                     b.Property<string>("SalesChannel")
                         .IsRequired()
@@ -16628,6 +16649,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0m)
                         .HasColumnName("charge_amount");
 
+                    b.Property<string>("CollectionTimezoneSnapshot")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("collection_timezone_snapshot");
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
@@ -16708,6 +16734,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("internal_note");
 
+                    b.Property<bool>("IsTaxInclusive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_tax_included");
+
                     b.Property<string>("OrderNumber")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -16761,6 +16793,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
                         .HasColumnName("reporting_outlet_name_snapshot");
+
+                    b.Property<DateTimeOffset?>("RequestedCollectionAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_collection_at");
+
+                    b.Property<DateTimeOffset?>("RequestedCollectionEndAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_collection_end_at");
 
                     b.Property<decimal>("RoundingAmount")
                         .ValueGeneratedOnAdd()

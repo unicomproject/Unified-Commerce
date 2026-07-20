@@ -17,6 +17,7 @@ public sealed class OutletService : IOutletService
     private const int MaxCodeGenerationAttempts = 5;
     private static readonly ApplicationError PermissionDenied = new("outlet.permission_denied", "Permission denied for outlet management.");
     private static readonly ApplicationError FeatureDisabled = new("outlet.feature_disabled", "Outlet management is not enabled for this tenant.");
+    private static readonly ApplicationError ClickCollectFeatureDisabled = new("outlet.click_collect_feature_disabled", "Click & collect is not enabled for this tenant.");
     private static readonly ApplicationError TenantBlocked = new("outlet.tenant_blocked", "Tenant status does not allow outlet management.");
     private static readonly ApplicationError NotFound = new("outlet.not_found", "Outlet was not found.");
     private readonly IOutletRepository _repository;
@@ -79,6 +80,15 @@ public sealed class OutletService : IOutletService
             return ApplicationResult<OutletResponse>.Failure(validationError);
         }
 
+        if (request.CollectionEnabled &&
+            !await _repository.IsClickCollectFeatureEnabledAsync(
+                context.TenantId,
+                _dateTimeProvider.UtcNow,
+                cancellationToken))
+        {
+            return ApplicationResult<OutletResponse>.Failure(ClickCollectFeatureDisabled);
+        }
+
         for (var attempt = 0; attempt < MaxCodeGenerationAttempts; attempt++)
         {
             var now = _dateTimeProvider.UtcNow;
@@ -104,7 +114,15 @@ public sealed class OutletService : IOutletService
                 now);
             var address = CreateAddress(context.TenantId, outletId, request.Address, context.UserId, now);
             var hours = CreateBusinessHours(context.TenantId, outletId, request.BusinessHours, now);
-            var pickupMapping = await CreatePickupMappingAsync(context.TenantId, outletId, request.CollectionEnabled, now, cancellationToken);
+            var pickupMapping = await CreatePickupMappingAsync(
+                context.TenantId,
+                outletId,
+                request.CollectionEnabled,
+                request.PreparationLeadMinutes,
+                request.PickupWindowMinutes,
+                request.CollectionCutoffTime,
+                now,
+                cancellationToken);
             if (pickupMapping.Error is not null)
             {
                 return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
@@ -164,6 +182,15 @@ public sealed class OutletService : IOutletService
         var validationError = _requestValidator.ValidateUpdate(request);
         if (validationError is not null) return ApplicationResult<OutletResponse>.Failure(validationError);
 
+        if (request.CollectionEnabled &&
+            !await _repository.IsClickCollectFeatureEnabledAsync(
+                context.TenantId,
+                _dateTimeProvider.UtcNow,
+                cancellationToken))
+        {
+            return ApplicationResult<OutletResponse>.Failure(ClickCollectFeatureDisabled);
+        }
+
         var aggregate = await _repository.GetEditAggregateAsync(context.TenantId, outletId, cancellationToken);
         if (aggregate is null) return ApplicationResult<OutletResponse>.Failure(NotFound);
 
@@ -194,7 +221,16 @@ public sealed class OutletService : IOutletService
         var address = UpdateOrCreateAddress(context.TenantId, aggregate.PhysicalAddress, outletId, request.Address, context.UserId, now);
         var hours = CreateBusinessHours(context.TenantId, outletId, request.BusinessHours, now);
         var enableCollection = aggregate.Outlet.Status != OutletConstants.DeletedStatus && request.CollectionEnabled;
-        var pickupMapping = await UpdatePickupMappingAsync(context.TenantId, outletId, aggregate.PickupMapping, enableCollection, now, cancellationToken);
+        var pickupMapping = await UpdatePickupMappingAsync(
+            context.TenantId,
+            outletId,
+            aggregate.PickupMapping,
+            enableCollection,
+            request.PreparationLeadMinutes,
+            request.PickupWindowMinutes,
+            request.CollectionCutoffTime,
+            now,
+            cancellationToken);
         if (pickupMapping.Error is not null) return ApplicationResult<OutletResponse>.Failure(pickupMapping.Error);
 
         if (!await _repository.SaveUpdatedAsync(aggregate, address, hours, pickupMapping.Value, cancellationToken))
@@ -276,7 +312,15 @@ public sealed class OutletService : IOutletService
             : null;
     }
 
-    private async Task<PickupMappingResult> CreatePickupMappingAsync(Guid tenantId, Guid outletId, bool collectionEnabled, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<PickupMappingResult> CreatePickupMappingAsync(
+        Guid tenantId,
+        Guid outletId,
+        bool collectionEnabled,
+        int? preparationLeadMinutes,
+        int? pickupWindowMinutes,
+        TimeOnly? collectionCutoffTime,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         if (!collectionEnabled) return new PickupMappingResult(null, null);
 
@@ -286,24 +330,62 @@ public sealed class OutletService : IOutletService
             return new PickupMappingResult(null, new ApplicationError("outlet.pickup_method_missing", "Active pickup fulfillment method is required before enabling collection point."));
         }
 
-        return new PickupMappingResult(FulfillmentMethodOutlet.Create(Guid.NewGuid(), tenantId, pickupMethodId.Value, outletId, OutletConstants.ActiveStatus, now), null);
+        return new PickupMappingResult(
+            FulfillmentMethodOutlet.Create(
+                Guid.NewGuid(),
+                tenantId,
+                pickupMethodId.Value,
+                outletId,
+                preparationLeadMinutes,
+                pickupWindowMinutes,
+                collectionCutoffTime,
+                OutletConstants.ActiveStatus,
+                now),
+            null);
     }
 
-    private async Task<PickupMappingResult> UpdatePickupMappingAsync(Guid tenantId, Guid outletId, FulfillmentMethodOutlet? existingMapping, bool collectionEnabled, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<PickupMappingResult> UpdatePickupMappingAsync(
+        Guid tenantId,
+        Guid outletId,
+        FulfillmentMethodOutlet? existingMapping,
+        bool collectionEnabled,
+        int? preparationLeadMinutes,
+        int? pickupWindowMinutes,
+        TimeOnly? collectionCutoffTime,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         if (!collectionEnabled)
         {
-            existingMapping?.SetStatus(OutletConstants.InactiveStatus, now);
+            existingMapping?.ConfigureCollection(
+                preparationLeadMinutes,
+                pickupWindowMinutes,
+                collectionCutoffTime,
+                OutletConstants.InactiveStatus,
+                now);
             return new PickupMappingResult(null, null);
         }
 
         if (existingMapping is not null)
         {
-            existingMapping.SetStatus(OutletConstants.ActiveStatus, now);
+            existingMapping.ConfigureCollection(
+                preparationLeadMinutes,
+                pickupWindowMinutes,
+                collectionCutoffTime,
+                OutletConstants.ActiveStatus,
+                now);
             return new PickupMappingResult(null, null);
         }
 
-        return await CreatePickupMappingAsync(tenantId, outletId, collectionEnabled, now, cancellationToken);
+        return await CreatePickupMappingAsync(
+            tenantId,
+            outletId,
+            collectionEnabled,
+            preparationLeadMinutes,
+            pickupWindowMinutes,
+            collectionCutoffTime,
+            now,
+            cancellationToken);
     }
 
     private Task<string> GenerateOutletCodeAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)

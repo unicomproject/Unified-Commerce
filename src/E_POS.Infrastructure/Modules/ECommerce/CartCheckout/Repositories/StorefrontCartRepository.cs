@@ -67,12 +67,12 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
             item = ShoppingCartItem.Create(
                 tenantId, cart.Id, nextLine + 1, selection.Product!.Id, selection.Variant?.Id,
                 selection.Variant?.Sku, selection.Product.ProductName, selection.Product.ProductStructure,
-                request.Quantity, selection.UnitPrice, selection.TaxPercent, now);
+                request.Quantity, selection.UnitPrice, selection.TaxPercent, cart.IsTaxInclusive, now);
             _dbContext.Set<ShoppingCartItem>().Add(item);
         }
         else
         {
-            item.UpdateQuantityAndPrice(newQuantity, selection.UnitPrice, selection.TaxPercent, now);
+            item.UpdateQuantityAndPrice(newQuantity, selection.UnitPrice, selection.TaxPercent, cart.IsTaxInclusive, now);
         }
 
         await RecalculateCartAsync(cart, now, cancellationToken);
@@ -105,7 +105,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         if (selection.HasInventory && selection.AvailableQuantity < quantity)
             return StorefrontCartRepositoryResult.Failure("storefront_cart.insufficient_stock");
 
-        item.UpdateQuantityAndPrice(quantity, selection.UnitPrice, selection.TaxPercent, now);
+        item.UpdateQuantityAndPrice(quantity, selection.UnitPrice, selection.TaxPercent, cart.IsTaxInclusive, now);
         await RecalculateCartAsync(cart, now, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return StorefrontCartRepositoryResult.Success(await BuildReadModelAsync(cart, cancellationToken));
@@ -171,6 +171,12 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
     private async Task<ShoppingCart> CreateCartAsync(
         Guid tenantId, string sessionId, DateTimeOffset now, CancellationToken cancellationToken)
     {
+        var isTaxInclusive = await _dbContext.Set<PriceList>()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == Active)
+            .Select(x => x.PriceIncludesTax)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var currency = await ResolveCurrencyAsync(tenantId, cancellationToken);
         var cart = ShoppingCart.Create(
             tenantId,
@@ -179,6 +185,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
             sessionId,
             $"CART-{Guid.NewGuid():N}",
             currency,
+            isTaxInclusive,
             now.AddDays(30),
             now);
         _dbContext.Set<ShoppingCart>().Add(cart);

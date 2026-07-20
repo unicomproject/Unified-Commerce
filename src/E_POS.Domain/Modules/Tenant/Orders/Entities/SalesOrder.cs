@@ -15,6 +15,9 @@ public class SalesOrder : AuditableEntity
     public string OrderType { get; protected set; } = string.Empty;
     public Guid? FulfillmentMethodOutletId { get; protected set; }
     public string? FulfillmentMethodCodeSnapshot { get; protected set; }
+    public DateTimeOffset? RequestedCollectionAt { get; protected set; }
+    public DateTimeOffset? RequestedCollectionEndAt { get; protected set; }
+    public string? CollectionTimezoneSnapshot { get; protected set; }
     public DateOnly? BusinessDate { get; protected set; }
     public Guid? ReportingOutletId { get; protected set; }
     public string? ReportingOutletCodeSnapshot { get; protected set; }
@@ -27,6 +30,7 @@ public class SalesOrder : AuditableEntity
     public Guid? TillSessionId { get; protected set; }
     public Guid? PriceListId { get; protected set; }
     public string CurrencyCode { get; protected set; } = string.Empty;
+    public bool IsTaxInclusive { get; protected set; }
     public decimal SubtotalAmount { get; protected set; }
     public decimal DiscountAmount { get; protected set; }
     public decimal TaxAmount { get; protected set; }
@@ -57,6 +61,7 @@ public class SalesOrder : AuditableEntity
         Guid tillSessionId,
         Guid? priceListId,
         string currencyCode,
+        bool isTaxInclusive,
         decimal subtotalAmount,
         decimal discountAmount,
         decimal taxAmount,
@@ -75,6 +80,7 @@ public class SalesOrder : AuditableEntity
             tillSessionId,
             priceListId,
             currencyCode,
+            isTaxInclusive,
             subtotalAmount,
             discountAmount,
             taxAmount,
@@ -98,6 +104,7 @@ public class SalesOrder : AuditableEntity
         Guid tillSessionId,
         Guid? priceListId,
         string currencyCode,
+        bool isTaxInclusive,
         decimal subtotalAmount,
         decimal discountAmount,
         decimal taxAmount,
@@ -127,6 +134,7 @@ public class SalesOrder : AuditableEntity
             TillSessionId = tillSessionId,
             PriceListId = priceListId,
             CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            IsTaxInclusive = isTaxInclusive,
             SubtotalAmount = subtotalAmount,
             DiscountAmount = discountAmount,
             TaxAmount = taxAmount,
@@ -153,6 +161,7 @@ public class SalesOrder : AuditableEntity
         Guid id, Guid tenantId, string orderNumber, string idempotencyReference,
         Guid salesChannelId, Guid? customerId, string? customerNameSnapshot,
         Guid tillId, Guid tillSessionId, Guid? priceListId, string currencyCode,
+        bool isTaxInclusive,
         decimal subtotalAmount, decimal discountAmount, decimal taxAmount,
         decimal totalAmount, string? reason, Guid createdByTenantUserId,
         DateTimeOffset now)
@@ -171,6 +180,7 @@ public class SalesOrder : AuditableEntity
             TillSessionId = tillSessionId,
             PriceListId = priceListId,
             CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            IsTaxInclusive = isTaxInclusive,
             SubtotalAmount = subtotalAmount,
             DiscountAmount = discountAmount,
             TaxAmount = taxAmount,
@@ -205,11 +215,15 @@ public class SalesOrder : AuditableEntity
         string? customerEmail,
         string? customerPhone,
         string currencyCode,
+        bool isTaxInclusive,
         decimal subtotalAmount,
         decimal discountAmount,
         decimal taxAmount,
         decimal chargeAmount,
         decimal totalAmount,
+        DateTimeOffset requestedCollectionAt,
+        DateTimeOffset requestedCollectionEndAt,
+        string collectionTimezone,
         DateTimeOffset now)
     {
         return new SalesOrder
@@ -222,6 +236,9 @@ public class SalesOrder : AuditableEntity
             OrderType = "CLICK_AND_COLLECT",
             FulfillmentMethodOutletId = fulfillmentMethodOutletId,
             FulfillmentMethodCodeSnapshot = fulfillmentMethodCode.Trim().ToUpperInvariant(),
+            RequestedCollectionAt = requestedCollectionAt,
+            RequestedCollectionEndAt = requestedCollectionEndAt,
+            CollectionTimezoneSnapshot = collectionTimezone.Trim(),
             BusinessDate = DateOnly.FromDateTime(now.UtcDateTime),
             ReportingOutletId = outletId,
             ReportingOutletCodeSnapshot = outletCode.Trim(),
@@ -231,6 +248,7 @@ public class SalesOrder : AuditableEntity
             CustomerEmailSnapshot = string.IsNullOrWhiteSpace(customerEmail) ? null : customerEmail.Trim(),
             CustomerPhoneSnapshot = string.IsNullOrWhiteSpace(customerPhone) ? null : customerPhone.Trim(),
             CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            IsTaxInclusive = isTaxInclusive,
             SubtotalAmount = subtotalAmount,
             DiscountAmount = discountAmount,
             TaxAmount = taxAmount,
@@ -250,6 +268,106 @@ public class SalesOrder : AuditableEntity
         };
     }
 
+    public void UpdateClickAndCollectStatus(
+        string targetStatus,
+        Guid updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        if (!string.Equals(OrderType, "CLICK_AND_COLLECT", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Only click and collect orders can use this status workflow.");
+
+        var normalizedTarget = targetStatus.Trim().Replace('-', '_').ToUpperInvariant();
+        var currentStatus = GetClickAndCollectCustomerStatus();
+        if (!IsAllowedClickAndCollectTransition(currentStatus, normalizedTarget))
+        {
+            throw new InvalidOperationException(
+                $"Cannot change click and collect order status from {currentStatus} to {normalizedTarget}.");
+        }
+
+        switch (normalizedTarget)
+        {
+            case "ACCEPTED":
+                Status = "ACCEPTED";
+                FulfillmentStatus = "ACCEPTED";
+                ConfirmedAt ??= now;
+                break;
+            case "PREPARING":
+                Status = "ACCEPTED";
+                FulfillmentStatus = "PREPARING";
+                break;
+            case "READY_FOR_COLLECTION":
+                Status = "ACCEPTED";
+                FulfillmentStatus = "READY_FOR_COLLECTION";
+                break;
+            case "COMPLETED":
+                Status = "COMPLETED";
+                FulfillmentStatus = "COLLECTED";
+                CompletedAt = now;
+                break;
+            default:
+                throw new InvalidOperationException("Unsupported click and collect target status.");
+        }
+
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void CancelClickAndCollectByCustomer(
+        string? reason,
+        DateTimeOffset now)
+    {
+        if (!string.Equals(OrderType, "CLICK_AND_COLLECT", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Only click and collect orders can be cancelled by a customer.");
+
+        var currentStatus = GetClickAndCollectCustomerStatus();
+        if (currentStatus is not "PENDING_CONFIRMATION" and not "ACCEPTED")
+        {
+            throw new InvalidOperationException(
+                $"Cannot cancel click and collect order from {currentStatus} status.");
+        }
+
+        Status = "CANCELLED";
+        FulfillmentStatus = "CANCELLED";
+        CancelledAt = now;
+        CancellationReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        UpdatedAt = now;
+    }
+
+    public string GetClickAndCollectCustomerStatus()
+    {
+        if (string.Equals(Status, "CANCELLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "CANCELLED", StringComparison.OrdinalIgnoreCase))
+            return "CANCELLED";
+
+        if (string.Equals(Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "FULFILLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "COLLECTED", StringComparison.OrdinalIgnoreCase))
+            return "COMPLETED";
+
+        if (string.Equals(FulfillmentStatus, "READY", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "READY_FOR_COLLECTION", StringComparison.OrdinalIgnoreCase))
+            return "READY_FOR_COLLECTION";
+
+        if (string.Equals(FulfillmentStatus, "PREPARING", StringComparison.OrdinalIgnoreCase))
+            return "PREPARING";
+
+        if (string.Equals(Status, "ACCEPTED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "ACCEPTED", StringComparison.OrdinalIgnoreCase))
+            return "ACCEPTED";
+
+        return "PENDING_CONFIRMATION";
+    }
+
+    private static bool IsAllowedClickAndCollectTransition(string currentStatus, string targetStatus) =>
+        (currentStatus, targetStatus) switch
+        {
+            ("PENDING_CONFIRMATION", "ACCEPTED") => true,
+            ("ACCEPTED", "PREPARING") => true,
+            ("PREPARING", "READY_FOR_COLLECTION") => true,
+            ("READY_FOR_COLLECTION", "COMPLETED") => true,
+            _ => false
+        };
+
     public void RecordRefund(decimal amount, Guid tenantUserId, DateTimeOffset now)
     {
         if (amount <= 0 || RefundedAmount + amount > TotalAmount)
@@ -263,4 +381,3 @@ public class SalesOrder : AuditableEntity
         UpdatedAt = now;
     }
 }
-

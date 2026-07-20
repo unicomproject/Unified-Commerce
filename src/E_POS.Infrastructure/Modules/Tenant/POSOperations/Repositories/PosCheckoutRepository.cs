@@ -568,6 +568,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             session.SessionId,
             priceListId,
             currencyCode,
+            priceList.PriceIncludesTax,
             subtotal,
             discountTotal,
             taxTotal,
@@ -621,6 +622,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 builtLine.LineSubtotal,
                 builtLine.LineDiscount,
                 builtLine.LineTax,
+                priceList.PriceIncludesTax,
                 now);
 
             _dbContext.SalesOrderLines.Add(orderLine);

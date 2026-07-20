@@ -45,6 +45,7 @@ public sealed class PosReturnRepositoryTests
         dbContext.SalesOrders.Add(SalesOrder.CreateCompletedPosSale(
             saleId, tenantId, "SO-000004", Guid.NewGuid(), null,
             "Walk-in Customer", tillId, tillSessionId, null, "LKR",
+            false,
             1200m, 200m, 100m, 1100m, 1100m, userId, Now));
         dbContext.Receipts.Add(Receipt.CreateForSale(
             Guid.NewGuid(), tenantId, "RCP-000004", saleId, outletId,
@@ -53,7 +54,7 @@ public sealed class PosReturnRepositoryTests
         dbContext.SalesOrderLines.Add(SalesOrderLine.CreateForPosSale(
             saleLineId, tenantId, saleId, 1, productId, Guid.NewGuid(),
             Guid.NewGuid(), null, "SKU-004", "Return Product", null, "EA",
-            "Each", "STANDARD", "SIMPLE", 2m, 600m, 1200m, 200m, 100m, Now));
+            "Each", "STANDARD", "SIMPLE", 2m, 600m, 1200m, 200m, 100m, false, Now));
         dbContext.PaymentMethods.Add(PaymentMethod.Create(
             paymentMethodId, tenantId, "CASH", "Cash", "CASH",
             true, true, 1, "ACTIVE", userId, Now));
@@ -169,6 +170,7 @@ public sealed class PosReturnRepositoryTests
         dbContext.SalesOrders.Add(SalesOrder.CreateCompletedPosSale(
             saleId, tenantId, "SO-000003", Guid.NewGuid(), null,
             "Walk-in Customer", tillId, tillSessionId, null, "LKR",
+            false,
             1200m, 200m, 100m, 1100m, 1100m, userId, Now));
         dbContext.Receipts.Add(Receipt.CreateForSale(
             Guid.NewGuid(), tenantId, "RCP-000003", saleId, Guid.NewGuid(),
@@ -177,7 +179,7 @@ public sealed class PosReturnRepositoryTests
         dbContext.SalesOrderLines.Add(SalesOrderLine.CreateForPosSale(
             saleLineId, tenantId, saleId, 1, productId, Guid.NewGuid(),
             Guid.NewGuid(), null, "SKU-003", "Preview Product", "Large", "EA",
-            "Each", "STANDARD", "VARIABLE", 2m, 600m, 1200m, 200m, 100m, Now));
+            "Each", "STANDARD", "VARIABLE", 2m, 600m, 1200m, 200m, 100m, false, Now));
 
         var reason = new ReturnReason();
         dbContext.ReturnReasons.Add(reason);
@@ -233,6 +235,7 @@ public sealed class PosReturnRepositoryTests
         dbContext.SalesOrders.Add(SalesOrder.CreateCompletedPosSale(
             saleId, tenantId, "SO-000002", Guid.NewGuid(), null,
             "Walk-in Customer", tillId, tillSessionId, null, "LKR",
+            false,
             1200m, 0m, 0m, 1200m, 1200m, userId, Now));
         dbContext.Receipts.Add(Receipt.CreateForSale(
             Guid.NewGuid(), tenantId, "RCP-000002", saleId, Guid.NewGuid(),
@@ -241,7 +244,7 @@ public sealed class PosReturnRepositoryTests
         dbContext.SalesOrderLines.Add(SalesOrderLine.CreateForPosSale(
             Guid.NewGuid(), tenantId, saleId, 1, productId, variantId,
             Guid.NewGuid(), null, "SKU-002", "Test Product", "Large", "EA",
-            "Each", "STANDARD", "VARIABLE", 2m, 600m, 1200m, 0m, 0m, Now));
+            "Each", "STANDARD", "VARIABLE", 2m, 600m, 1200m, 0m, 0m, false, Now));
         await dbContext.SaveChangesAsync();
 
         var repository = new PosReturnRepository(dbContext);
@@ -276,6 +279,7 @@ public sealed class PosReturnRepositoryTests
         dbContext.SalesOrders.Add(SalesOrder.CreateCompletedPosSale(
             saleId, tenantId, "SO-000001", Guid.NewGuid(), null,
             "Walk-in Customer", tillId, tillSessionId, null, "LKR",
+            false,
             1000m, 0m, 0m, 1000m, 1000m, userId, Now));
         dbContext.Receipts.Add(Receipt.CreateForSale(
             Guid.NewGuid(), tenantId, "RCP-000001", saleId, Guid.NewGuid(),
@@ -291,7 +295,7 @@ public sealed class PosReturnRepositoryTests
         dbContext.SalesOrderLines.Add(SalesOrderLine.CreateForPosSale(
             Guid.NewGuid(), tenantId, saleId, 1, Guid.NewGuid(), Guid.NewGuid(),
             Guid.NewGuid(), null, "SKU-001", "Test Product", null, "EA",
-            "Each", "STANDARD", "SIMPLE", 1m, 1000m, 1000m, 0m, 0m, Now));
+            "Each", "STANDARD", "SIMPLE", 1m, 1000m, 1000m, 0m, 0m, false, Now));
         await dbContext.SaveChangesAsync();
 
         var repository = new PosReturnRepository(dbContext);
@@ -317,3 +321,4 @@ public sealed class PosReturnRepositoryTests
         return new EPosDbContext(options);
     }
 }
+

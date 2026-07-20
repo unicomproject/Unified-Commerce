@@ -5,6 +5,7 @@ using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -57,7 +58,9 @@ public sealed class OutletRepository : IOutletRepository
             .Where(x => x.TenantId == tenantId &&
                         x.MethodType == OutletConstants.PickupMethodType &&
                         x.Status == OutletConstants.ActiveStatus)
-            .OrderBy(x => x.MethodCode)
+            .OrderByDescending(x => x.IsDefault)
+            .ThenBy(x => x.MethodCode)
+            .ThenBy(x => x.Id)
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -91,25 +94,53 @@ public sealed class OutletRepository : IOutletRepository
             }
         }
 
-        var activePickupOutletIds = (
+        var activePickupMappings = (
             from mapping in _dbContext.FulfillmentMethodOutlets.AsNoTracking()
             join method in _dbContext.FulfillmentMethods.AsNoTracking()
                 on mapping.FulfillmentMethodId equals method.Id
-            where method.TenantId == tenantId &&
+            where mapping.TenantId == tenantId &&
+                  method.TenantId == tenantId &&
                   method.MethodType == OutletConstants.PickupMethodType &&
                   method.Status == OutletConstants.ActiveStatus &&
                   mapping.Status == OutletConstants.ActiveStatus
-            select mapping.OutletId)
-            .Distinct();
+            select new
+            {
+                Mapping = mapping,
+                mapping.OutletId,
+                method.IsDefault,
+                method.MethodCode,
+                MethodId = method.Id
+            });
 
         var query =
             from outlet in outlets
-            join activePickupOutletId in activePickupOutletIds
-                on outlet.Id equals activePickupOutletId into pickupJoin
+            join activePickupMapping in activePickupMappings
+                on outlet.Id equals activePickupMapping.OutletId into pickupJoin
             select new
             {
                 Outlet = outlet,
-                CollectionEnabled = pickupJoin.Any()
+                CollectionEnabled = pickupJoin.Any(),
+                PreparationLeadMinutes = pickupJoin
+                    .OrderByDescending(x => x.IsDefault)
+                    .ThenBy(x => x.MethodCode)
+                    .ThenBy(x => x.MethodId)
+                    .ThenBy(x => x.Mapping.Id)
+                    .Select(x => x.Mapping.PreparationLeadMinutes)
+                    .FirstOrDefault(),
+                PickupWindowMinutes = pickupJoin
+                    .OrderByDescending(x => x.IsDefault)
+                    .ThenBy(x => x.MethodCode)
+                    .ThenBy(x => x.MethodId)
+                    .ThenBy(x => x.Mapping.Id)
+                    .Select(x => x.Mapping.PickupWindowMinutes)
+                    .FirstOrDefault(),
+                CollectionCutoffTime = pickupJoin
+                    .OrderByDescending(x => x.IsDefault)
+                    .ThenBy(x => x.MethodCode)
+                    .ThenBy(x => x.MethodId)
+                    .ThenBy(x => x.Mapping.Id)
+                    .Select(x => x.Mapping.CutoffTime)
+                    .FirstOrDefault()
             };
 
         var rows = await query
@@ -128,6 +159,9 @@ public sealed class OutletRepository : IOutletRepository
                 x.Outlet.Phone,
                 x.Outlet.Email,
                 x.CollectionEnabled,
+                x.PreparationLeadMinutes,
+                x.PickupWindowMinutes,
+                x.CollectionCutoffTime,
                 TotalCount = query.Count()
             })
             .ToListAsync(cancellationToken);
@@ -144,7 +178,10 @@ public sealed class OutletRepository : IOutletRepository
                 x.IsDefaultOutlet,
                 x.Phone,
                 x.Email,
-                x.CollectionEnabled))
+                x.CollectionEnabled,
+                x.PreparationLeadMinutes,
+                x.PickupWindowMinutes,
+                x.CollectionCutoffTime))
             .ToList();
 
         return new OutletListResponse(items, pageNumber, pageSize, totalCount);
@@ -171,7 +208,8 @@ public sealed class OutletRepository : IOutletRepository
 
         var address = await _dbContext.OutletAddresses
             .AsNoTracking()
-            .Where(x => x.OutletId == outletId &&
+            .Where(x => x.TenantId == tenantId &&
+                        x.OutletId == outletId &&
                         x.AddressType == OutletConstants.PhysicalAddressType)
             .Select(x => new OutletAddressResponse(
                 x.Id,
@@ -195,7 +233,7 @@ public sealed class OutletRepository : IOutletRepository
 
         var businessHours = await _dbContext.OutletBusinessHours
             .AsNoTracking()
-            .Where(x => x.OutletId == outletId)
+            .Where(x => x.TenantId == tenantId && x.OutletId == outletId)
             .OrderBy(x => x.DayOfWeek)
             .Select(x => new OutletBusinessHourResponse(
                 x.Id,
@@ -206,6 +244,30 @@ public sealed class OutletRepository : IOutletRepository
                 x.ValidFrom,
                 x.ValidUntil))
             .ToListAsync(cancellationToken);
+
+        var pickupMapping = await (
+            from mapping in _dbContext.FulfillmentMethodOutlets.AsNoTracking()
+            join method in _dbContext.FulfillmentMethods.AsNoTracking()
+                on mapping.FulfillmentMethodId equals method.Id
+            where mapping.TenantId == tenantId &&
+                  mapping.OutletId == outletId &&
+                  method.TenantId == tenantId &&
+                  method.MethodType == OutletConstants.PickupMethodType &&
+                  method.Status == OutletConstants.ActiveStatus
+            orderby mapping.Status == OutletConstants.ActiveStatus descending,
+                method.IsDefault descending,
+                method.MethodCode,
+                method.Id,
+                mapping.Id
+            select new
+            {
+                MappingStatus = mapping.Status,
+                MethodStatus = method.Status,
+                mapping.PreparationLeadMinutes,
+                mapping.PickupWindowMinutes,
+                CollectionCutoffTime = mapping.CutoffTime
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         return new OutletResponse(
             outlet.Id,
@@ -219,7 +281,12 @@ public sealed class OutletRepository : IOutletRepository
             outlet.Email,
             address,
             businessHours,
-            await IsCollectionEnabledAsync(tenantId, outletId, cancellationToken),
+            pickupMapping is not null &&
+            pickupMapping.MappingStatus == OutletConstants.ActiveStatus &&
+            pickupMapping.MethodStatus == OutletConstants.ActiveStatus,
+            pickupMapping?.PreparationLeadMinutes,
+            pickupMapping?.PickupWindowMinutes,
+            pickupMapping?.CollectionCutoffTime,
             outlet.CreatedAt,
             outlet.UpdatedAt);
     }
@@ -243,25 +310,30 @@ public sealed class OutletRepository : IOutletRepository
 
         var address = await _dbContext.OutletAddresses
             .FirstOrDefaultAsync(
-                x => x.OutletId == outletId &&
+                x => x.TenantId == tenantId &&
+                     x.OutletId == outletId &&
                      x.AddressType == OutletConstants.PhysicalAddressType,
                 cancellationToken);
 
         var hours = await _dbContext.OutletBusinessHours
-            .Where(x => x.OutletId == outletId)
+            .Where(x => x.TenantId == tenantId && x.OutletId == outletId)
             .ToListAsync(cancellationToken);
 
-        var pickupMethodIds = _dbContext.FulfillmentMethods
-            .AsNoTracking()
-            .Where(x => x.TenantId == tenantId &&
-                        x.MethodType == OutletConstants.PickupMethodType)
-            .Select(x => x.Id);
-
-        var pickupMapping = await _dbContext.FulfillmentMethodOutlets
-            .FirstOrDefaultAsync(
-                x => x.OutletId == outletId &&
-                     pickupMethodIds.Contains(x.FulfillmentMethodId),
-                cancellationToken);
+        var pickupMapping = await (
+                from mapping in _dbContext.FulfillmentMethodOutlets
+                join method in _dbContext.FulfillmentMethods
+                    on new { mapping.TenantId, Id = mapping.FulfillmentMethodId }
+                    equals new { method.TenantId, method.Id }
+                where mapping.TenantId == tenantId &&
+                      mapping.OutletId == outletId &&
+                      method.MethodType == OutletConstants.PickupMethodType &&
+                      method.Status == OutletConstants.ActiveStatus
+                orderby method.IsDefault descending,
+                    method.MethodCode,
+                    method.Id,
+                    mapping.Id
+                select mapping)
+            .FirstOrDefaultAsync(cancellationToken);
 
         return new OutletEditAggregate(outlet, address, hours, pickupMapping);
     }
@@ -322,6 +394,37 @@ public sealed class OutletRepository : IOutletRepository
                      x.PlatformFeatureId == featureId.Value &&
                      x.EntitlementStatus == TenantEntitlementStatusConstants.Enabled,
                 cancellationToken);
+    }
+
+    public async Task<bool> IsClickCollectFeatureEnabledAsync(
+        Guid tenantId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var entitlements = await (
+                from entitlement in _dbContext.TenantFeatureEntitlements.AsNoTracking()
+                join feature in _dbContext.PlatformFeatures.AsNoTracking()
+                    on entitlement.PlatformFeatureId equals feature.Id
+                where entitlement.TenantId == tenantId &&
+                      feature.FeatureCode == PlatformTenantFeatureCodes.ClickCollect &&
+                      feature.Status == SubscriptionCatalogConstants.RecordStatus.Active
+                select new
+                {
+                    entitlement.EntitlementStatus,
+                    entitlement.IsEnabled,
+                    entitlement.RevokedAt,
+                    entitlement.EffectiveFrom,
+                    entitlement.EffectiveUntil
+                })
+            .ToListAsync(cancellationToken);
+
+        return entitlements.Any(x => TenantEntitlementEffectivePredicate.IsEnabled(
+            x.EntitlementStatus,
+            x.IsEnabled,
+            x.RevokedAt,
+            x.EffectiveFrom,
+            x.EffectiveUntil,
+            now));
     }
 
     public async Task<OutletCreateOptionsResponse> GetCreateOptionsAsync(Guid tenantId, CancellationToken cancellationToken)

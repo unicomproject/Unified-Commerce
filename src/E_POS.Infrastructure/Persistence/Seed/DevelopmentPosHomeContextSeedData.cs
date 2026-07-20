@@ -14,7 +14,7 @@ public static class DevelopmentPosHomeContextSeedData
             'DEV-STORE-01',
             'ACTIVE',
             'STORE',
-            'UTC',
+            'Asia/Colombo',
             true,
             now(),
             now()

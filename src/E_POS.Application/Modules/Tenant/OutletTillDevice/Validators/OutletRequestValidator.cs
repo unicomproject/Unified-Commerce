@@ -8,6 +8,8 @@ namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
 
 public sealed class OutletRequestValidator : IOutletRequestValidator
 {
+    private const int MaximumPreparationLeadMinutes = 10_080;
+    private const int MaximumPickupWindowMinutes = 1_440;
     private static readonly HashSet<string> SupportedCountryCodes = TenantCreateWizardReferenceData.CountryCodes
         .Select(item => item.Code)
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -23,6 +25,9 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
             request.Email,
             request.Address,
             request.BusinessHours,
+            request.CollectionEnabled,
+            request.PreparationLeadMinutes,
+            request.PickupWindowMinutes,
             allowDeletedStatus: false);
     }
 
@@ -37,6 +42,9 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
             request.Email,
             request.Address,
             request.BusinessHours,
+            request.CollectionEnabled,
+            request.PreparationLeadMinutes,
+            request.PickupWindowMinutes,
             allowDeletedStatus: true);
     }
 
@@ -49,6 +57,9 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
         string? email,
         OutletAddressRequest? address,
         IReadOnlyList<OutletBusinessHourRequest>? businessHours,
+        bool collectionEnabled,
+        int? preparationLeadMinutes,
+        int? pickupWindowMinutes,
         bool allowDeletedStatus)
     {
         var fieldErrors = new List<ApplicationFieldError>();
@@ -116,6 +127,13 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
 
         ValidateAddress(address, fieldErrors);
         ValidateBusinessHours(businessHours, fieldErrors);
+        ValidateCollectionConfiguration(
+            collectionEnabled,
+            timezone,
+            businessHours,
+            preparationLeadMinutes,
+            pickupWindowMinutes,
+            fieldErrors);
 
         return fieldErrors.Count == 0
             ? null
@@ -185,6 +203,82 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
         {
             fieldErrors.Add(new ApplicationFieldError("address.contactPhone", "Contact phone must be 40 characters or less."));
         }
+    }
+
+    private static void ValidateCollectionConfiguration(
+        bool collectionEnabled,
+        string timezone,
+        IReadOnlyList<OutletBusinessHourRequest>? businessHours,
+        int? preparationLeadMinutes,
+        int? pickupWindowMinutes,
+        ICollection<ApplicationFieldError> fieldErrors)
+    {
+        if (collectionEnabled && !HasCurrentlyValidOpenBusinessHours(timezone, businessHours))
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "businessHours",
+                "At least one currently valid open business-hours entry is required when collection is enabled."));
+        }
+
+        if (collectionEnabled && !preparationLeadMinutes.HasValue)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "preparationLeadMinutes",
+                "Preparation lead minutes are required when collection is enabled."));
+        }
+        else if (preparationLeadMinutes is < 0 or > MaximumPreparationLeadMinutes)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "preparationLeadMinutes",
+                "Preparation lead minutes must be between 0 and 10080."));
+        }
+
+        if (collectionEnabled && !pickupWindowMinutes.HasValue)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "pickupWindowMinutes",
+                "Pickup window minutes are required when collection is enabled."));
+        }
+        else if (pickupWindowMinutes is < 1 or > MaximumPickupWindowMinutes)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "pickupWindowMinutes",
+                "Pickup window minutes must be between 1 and 1440."));
+        }
+    }
+
+    private static bool HasCurrentlyValidOpenBusinessHours(
+        string timezone,
+        IReadOnlyList<OutletBusinessHourRequest>? businessHours)
+    {
+        if (businessHours is null || businessHours.Count == 0)
+        {
+            return false;
+        }
+
+        DateOnly localToday;
+        try
+        {
+            var timezoneInfo = TimeZoneInfo.FindSystemTimeZoneById(timezone.Trim());
+            var localNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, timezoneInfo);
+            localToday = DateOnly.FromDateTime(localNow.DateTime);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return true;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return true;
+        }
+
+        return businessHours.Any(hour =>
+            !hour.IsClosed &&
+            hour.OpeningTime.HasValue &&
+            hour.ClosingTime.HasValue &&
+            hour.OpeningTime.Value < hour.ClosingTime.Value &&
+            (!hour.ValidFrom.HasValue || hour.ValidFrom.Value <= localToday) &&
+            (!hour.ValidUntil.HasValue || hour.ValidUntil.Value >= localToday));
     }
 
     private static void ValidateBusinessHours(IReadOnlyList<OutletBusinessHourRequest>? businessHours, ICollection<ApplicationFieldError> fieldErrors)

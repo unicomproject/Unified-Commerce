@@ -57,6 +57,24 @@ public class Customer : AuditableEntity
         return prefix + new string(trimmed.Where(char.IsDigit).ToArray());
     }
 
+    public void UpdateProfile(string firstName, string lastName, string email, string phone, DateTimeOffset now)
+    {
+        FirstName = firstName?.Trim();
+        LastName = lastName?.Trim();
+        Name = $"{FirstName} {LastName}".Trim();
+        
+        var trimmedPhone = phone?.Trim() ?? string.Empty;
+        var trimmedEmail = email?.Trim();
+        
+        Phone = trimmedPhone;
+        NormalizedPhone = NormalizePhone(trimmedPhone);
+        
+        Email = string.IsNullOrWhiteSpace(trimmedEmail) ? null : trimmedEmail;
+        NormalizedEmail = NormalizeEmail(trimmedEmail);
+        
+        UpdatedAt = now;
+    }
+
     public static string? NormalizeEmail(string? email) =>
         string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToUpperInvariant();
 }

@@ -1,4 +1,5 @@
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
+using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 
 namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
 
@@ -32,6 +33,15 @@ public interface ICustomerAuthRepository
         Guid customerId,
         Guid sessionId,
         DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<CustomerEntity?> GetCustomerByIdAsync(
+        Guid tenantId,
+        Guid customerId,
+        CancellationToken cancellationToken);
+
+    Task UpdateCustomerAsync(
+        CustomerEntity customer,
         CancellationToken cancellationToken);
 }
 

@@ -316,6 +316,21 @@ public sealed class CustomerAuthServiceTests
             RevokedAt = now;
             return Task.FromResult(RevokeResult);
         }
+
+        public Task<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer?> GetCustomerByIdAsync(
+            Guid tenantId,
+            Guid customerId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer?>(null);
+        }
+
+        public Task UpdateCustomerAsync(
+            E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer customer,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakePasswordHashService : IPasswordHashService

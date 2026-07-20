@@ -61,13 +61,119 @@ public sealed class OutletServiceTests
     [Fact]
     public async Task CreateAsync_WithCollectionEnabledAndNoPickupMethod_ReturnsPickupMethodMissing()
     {
-        var request = CreateValidRequest() with { CollectionEnabled = true };
+        var request = CreateValidRequest() with
+        {
+            CollectionEnabled = true,
+            PreparationLeadMinutes = 30,
+            PickupWindowMinutes = 30
+        };
         var service = CreateService(new FakeOutletRepository { PickupMethodId = null });
 
         var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("outlet.pickup_method_missing", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithCollectionEnabledAndClickCollectDisabled_ReturnsFeatureDisabled()
+    {
+        var request = CreateValidRequest() with
+        {
+            CollectionEnabled = true,
+            PreparationLeadMinutes = 30,
+            PickupWindowMinutes = 30
+        };
+        var service = CreateService(new FakeOutletRepository { ClickCollectFeatureEnabled = false });
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.click_collect_feature_disabled", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithCollectionEnabledAndMissingConfiguration_ReturnsValidationFailure()
+    {
+        var request = CreateValidRequest() with { CollectionEnabled = true };
+        var service = CreateService(new FakeOutletRepository());
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.validation_failed", result.Error.Code);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "preparationLeadMinutes");
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "pickupWindowMinutes");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithCollectionConfigurationOutsideAllowedRange_ReturnsValidationFailure()
+    {
+        var request = CreateValidRequest() with
+        {
+            CollectionEnabled = true,
+            PreparationLeadMinutes = 10_081,
+            PickupWindowMinutes = 1_441
+        };
+        var service = CreateService(new FakeOutletRepository());
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "preparationLeadMinutes");
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "pickupWindowMinutes");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithCollectionEnabledAndNoCurrentlyValidOpenHours_ReturnsValidationFailure()
+    {
+        var request = CreateValidRequest() with
+        {
+            CollectionEnabled = true,
+            PreparationLeadMinutes = 30,
+            PickupWindowMinutes = 30,
+            BusinessHours =
+            [
+                new OutletBusinessHourRequest(
+                    1,
+                    new TimeOnly(9, 0),
+                    new TimeOnly(17, 0),
+                    false,
+                    null,
+                    new DateOnly(2000, 1, 1))
+            ]
+        };
+        var service = CreateService(new FakeOutletRepository());
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.validation_failed", result.Error.Code);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "businessHours");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithCollectionConfiguration_PassesConfigurationToPickupMapping()
+    {
+        var repository = new FakeOutletRepository();
+        var request = CreateValidRequest() with
+        {
+            CollectionEnabled = true,
+            PreparationLeadMinutes = 45,
+            PickupWindowMinutes = 30,
+            CollectionCutoffTime = new TimeOnly(16, 30)
+        };
+        var service = CreateService(repository);
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.AddedPickupMapping);
+        Assert.Equal(45, repository.AddedPickupMapping!.PreparationLeadMinutes);
+        Assert.Equal(30, repository.AddedPickupMapping.PickupWindowMinutes);
+        Assert.Equal(new TimeOnly(16, 30), repository.AddedPickupMapping.CutoffTime);
+        Assert.Equal(OutletConstants.ActiveStatus, repository.AddedPickupMapping.Status);
+        Assert.Equal(TenantId, repository.AddedPickupMapping.TenantId);
     }
 
     [Fact]
@@ -294,6 +400,7 @@ public sealed class OutletServiceTests
         public bool HasActiveTillOrDevice { get; init; }
         public string? TenantStatus { get; init; } = TenantAuthConstants.ActiveTenantStatus;
         public bool OutletFeatureEnabled { get; init; } = true;
+        public bool ClickCollectFeatureEnabled { get; init; } = true;
 
         public Task<bool> OutletCodeExistsAsync(Guid tenantId, string outletCode, Guid? excludeOutletId, CancellationToken cancellationToken) => Task.FromResult(DuplicateCode);
         public Task<Guid?> GetActivePickupFulfillmentMethodIdAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(PickupMethodId);
@@ -304,6 +411,7 @@ public sealed class OutletServiceTests
         public Task<bool> AllOutletsBelongToTenantAsync(Guid tenantId, Guid[] outletIds, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(TenantStatus);
         public Task<bool> IsOutletManagementFeatureEnabledAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(OutletFeatureEnabled);
+        public Task<bool> IsClickCollectFeatureEnabledAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(ClickCollectFeatureEnabled);
         public Task<OutletCreateOptionsResponse> GetCreateOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult(new OutletCreateOptionsResponse(
                 [new OutletLookupOptionResponse("STORE", "Store")],
@@ -311,9 +419,11 @@ public sealed class OutletServiceTests
                 [new OutletLookupOptionResponse("UTC", "UTC")],
                 new OutletCreateDefaultsResponse("LK", "UTC", "ACTIVE")));
         public Outlet? AddedOutlet { get; private set; }
+        public FulfillmentMethodOutlet? AddedPickupMapping { get; private set; }
         public Task<bool> AddAsync(Outlet outlet, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? pickupMapping, CancellationToken cancellationToken)
         {
             AddedOutlet = outlet;
+            AddedPickupMapping = pickupMapping;
             return Task.FromResult(true);
         }
         public Task<bool> SaveUpdatedAsync(OutletEditAggregate aggregate, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? newPickupMapping, CancellationToken cancellationToken) => Task.FromResult(true);
@@ -334,6 +444,9 @@ public sealed class OutletServiceTests
                 new OutletAddressResponse(Guid.NewGuid(), "PHYSICAL", "1 Main Street", null, "Colombo", null, null, "LK", null, null, true, "ACTIVE"),
                 [],
                 false,
+                null,
+                null,
+                null,
                 Now,
                 Now);
         }

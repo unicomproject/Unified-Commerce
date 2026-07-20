@@ -64,6 +64,28 @@ public sealed class StorefrontCheckoutControllerTests
         Assert.Equal("confirm-key", service.IdempotencyKey);
     }
 
+    [Fact]
+    public async Task UpdateCollection_ReadsCustomerClaimsAndForwardsRequest()
+    {
+        var tenantId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var service = new FakeService();
+        var controller = CreateController(service, tenantId, customerId, "cart-session");
+        var request = new UpdateStorefrontCheckoutCollectionRequest
+        {
+            SelectedOutletId = Guid.NewGuid(),
+            RequestedCollectionAt = DateTimeOffset.UtcNow.AddHours(2)
+        };
+
+        var result = await controller.UpdateCollection(
+            Guid.NewGuid(), request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(tenantId, service.TenantId);
+        Assert.Equal(customerId, service.CustomerId);
+        Assert.Same(request, service.CollectionRequest);
+    }
+
     private static StorefrontCheckoutController CreateController(
         FakeService service,
         Guid tenantId,
@@ -97,6 +119,7 @@ public sealed class StorefrontCheckoutControllerTests
         public Guid? CustomerId { get; private set; }
         public string? CartSessionId { get; private set; }
         public CreateStorefrontCheckoutFromCartRequest? CreateRequest { get; private set; }
+        public UpdateStorefrontCheckoutCollectionRequest? CollectionRequest { get; private set; }
         public string? IdempotencyKey { get; private set; }
 
         public Task<ApplicationResult<StorefrontCheckoutReadModel>> CreateFromCartAsync(
@@ -119,6 +142,18 @@ public sealed class StorefrontCheckoutControllerTests
             CancellationToken cancellationToken)
         {
             Capture(tenantId, customerId);
+            return Task.FromResult(Result);
+        }
+
+        public Task<ApplicationResult<StorefrontCheckoutReadModel>> UpdateCollectionAsync(
+            Guid tenantId,
+            Guid customerId,
+            Guid checkoutSessionId,
+            UpdateStorefrontCheckoutCollectionRequest request,
+            CancellationToken cancellationToken)
+        {
+            Capture(tenantId, customerId);
+            CollectionRequest = request;
             return Task.FromResult(Result);
         }
 

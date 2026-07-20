@@ -47,6 +47,8 @@ using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Options;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Repositories;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerOrders.Repositories;
 using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.ProductReviews.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
@@ -168,6 +170,8 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontCheckoutRepository, StorefrontCheckoutRepository>();
         services.AddScoped<ICustomerAuthRepository, CustomerAuthRepository>();
         services.AddScoped<ICustomerWishlistRepository, CustomerWishlistRepository>();
+        services.AddScoped<ICustomerOrderRepository, CustomerOrderRepository>();
+        services.AddScoped<IClickCollectOrderStatusRepository, ClickCollectOrderStatusRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
 
         return services;

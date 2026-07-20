@@ -3,10 +3,15 @@ namespace E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 public sealed class CreateStorefrontCheckoutFromCartRequest
 {
     public Guid SelectedOutletId { get; set; }
-    public Guid? SelectedPickupSlotId { get; set; }
     public string? PickupContactName { get; set; }
     public string? PickupContactPhone { get; set; }
     public string? PickupContactEmail { get; set; }
+}
+
+public sealed class UpdateStorefrontCheckoutCollectionRequest
+{
+    public Guid SelectedOutletId { get; set; }
+    public DateTimeOffset RequestedCollectionAt { get; set; }
 }
 
 public sealed class StorefrontCheckoutReadModel
@@ -18,8 +23,9 @@ public sealed class StorefrontCheckoutReadModel
     public string FulfillmentMethodCode { get; set; } = string.Empty;
     public Guid SelectedOutletId { get; set; }
     public string SelectedOutletName { get; set; } = string.Empty;
-    public Guid? SelectedPickupSlotId { get; set; }
-    public StorefrontCheckoutPickupSlotReadModel? PickupSlot { get; set; }
+    public DateTimeOffset? RequestedCollectionAt { get; set; }
+    public DateTimeOffset? RequestedCollectionEndAt { get; set; }
+    public string? CollectionTimezone { get; set; }
     public string? PickupContactName { get; set; }
     public string? PickupContactPhone { get; set; }
     public string? PickupContactEmail { get; set; }
@@ -51,14 +57,6 @@ public sealed class StorefrontCheckoutLineReadModel
     public decimal LineTotal { get; set; }
 }
 
-public sealed class StorefrontCheckoutPickupSlotReadModel
-{
-    public string SlotCode { get; set; } = string.Empty;
-    public DateOnly SlotDate { get; set; }
-    public TimeOnly WindowStart { get; set; }
-    public TimeOnly WindowEnd { get; set; }
-}
-
 public sealed class StorefrontCheckoutOrderReadModel
 {
     public Guid Id { get; set; }
@@ -66,4 +64,7 @@ public sealed class StorefrontCheckoutOrderReadModel
     public string Status { get; set; } = string.Empty;
     public string PaymentStatus { get; set; } = string.Empty;
     public string FulfillmentStatus { get; set; } = string.Empty;
+    public DateTimeOffset? RequestedCollectionAt { get; set; }
+    public DateTimeOffset? RequestedCollectionEndAt { get; set; }
+    public string? CollectionTimezone { get; set; }
 }

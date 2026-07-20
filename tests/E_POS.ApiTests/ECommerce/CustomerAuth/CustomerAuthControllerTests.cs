@@ -249,5 +249,22 @@ public sealed class CustomerAuthControllerTests
             LogoutSessionId = sessionId;
             return Task.FromResult(LogoutResult);
         }
+
+        public Task<ApplicationResult<E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos.CustomerProfileResponse>> GetProfileAsync(
+            Guid tenantId,
+            Guid customerId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ApplicationResult<E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos.CustomerProfileResponse>.Failure(new ApplicationError("not_implemented", "not implemented")));
+        }
+
+        public Task<ApplicationResult> UpdateProfileAsync(
+            Guid tenantId,
+            Guid customerId,
+            E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos.CustomerProfileUpdateRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ApplicationResult.Failure(new ApplicationError("not_implemented", "not implemented")));
+        }
     }
 }
