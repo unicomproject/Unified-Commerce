@@ -1232,8 +1232,13 @@ public sealed class PosReturnRepository : IPosReturnRepository
                 variant.SalesUomId,
                 priceItem.Id,
                 variant.Sku,
+                null,
                 product.ProductName,
                 variant.VariantName,
+                null,
+                null,
+                null,
+                null,
                 uom.UomCode,
                 uom.UomName,
                 product.ProductType,
@@ -1243,6 +1248,7 @@ public sealed class PosReturnRepository : IPosReturnRepository
                 priced.LineSubtotal,
                 priced.LineDiscount,
                 priced.LineTax,
+                false,
                 now));
 
             var remaining = item.Quantity;

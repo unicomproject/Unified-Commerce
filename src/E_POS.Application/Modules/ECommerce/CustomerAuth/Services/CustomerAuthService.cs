@@ -181,6 +181,52 @@ public sealed class CustomerAuthService : ICustomerAuthService
         return revoked ? ApplicationResult.Success() : ApplicationResult.Failure(InvalidSession);
     }
 
+    public async Task<ApplicationResult<CustomerProfileResponse>> GetProfileAsync(
+        Guid tenantId,
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        var customer = await _repository.GetCustomerByIdAsync(tenantId, customerId, cancellationToken);
+
+        if (customer is null)
+            return ApplicationResult<CustomerProfileResponse>.Failure(new ApplicationError("customer.not_found", "Customer not found."));
+
+        return ApplicationResult<CustomerProfileResponse>.Success(new CustomerProfileResponse
+        {
+            FirstName = customer.FirstName ?? string.Empty,
+            LastName = customer.LastName ?? string.Empty,
+            Email = customer.Email ?? string.Empty,
+            Phone = customer.Phone ?? string.Empty
+        });
+    }
+
+    public async Task<ApplicationResult> UpdateProfileAsync(
+        Guid tenantId,
+        Guid customerId,
+        CustomerProfileUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var customer = await _repository.GetCustomerByIdAsync(tenantId, customerId, cancellationToken);
+
+        if (customer is null)
+            return ApplicationResult.Failure(new ApplicationError("customer.not_found", "Customer not found."));
+
+        // Basic validation
+        if (string.IsNullOrWhiteSpace(request.FirstName))
+            return ApplicationResult.Failure(new ApplicationError("customer.invalid_first_name", "First name is required."));
+
+        customer.UpdateProfile(
+            request.FirstName,
+            request.LastName,
+            request.Email,
+            request.Phone,
+            _dateTimeProvider.UtcNow);
+
+        await _repository.UpdateCustomerAsync(customer, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
     private JwtTokenResult CreateAccessToken(
         CustomerLoginAccount account,
         Guid sessionId)

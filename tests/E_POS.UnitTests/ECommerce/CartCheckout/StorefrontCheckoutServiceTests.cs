@@ -94,6 +94,25 @@ public sealed class StorefrontCheckoutServiceTests
         Assert.Equal("The checkout session has expired.", result.Error.Message);
     }
 
+    [Fact]
+    public async Task UpdateCollectionAsync_ValidRequest_ForwardsCustomerAndUtcNow()
+    {
+        var repository = new FakeRepository();
+        var service = new StorefrontCheckoutService(repository, new FakeClock());
+        var request = new UpdateStorefrontCheckoutCollectionRequest
+        {
+            SelectedOutletId = Guid.NewGuid(),
+            RequestedCollectionAt = Now.AddHours(2)
+        };
+
+        var result = await service.UpdateCollectionAsync(
+            TenantId, CustomerId, Guid.NewGuid(), request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(request, repository.CollectionRequest);
+        Assert.Equal(Now, repository.Now);
+    }
+
     private sealed class FakeClock : IDateTimeProvider
     {
         public DateTimeOffset UtcNow => Now;
@@ -106,6 +125,7 @@ public sealed class StorefrontCheckoutServiceTests
         public Guid? CustomerId { get; private set; }
         public string? CartSessionId { get; private set; }
         public CreateStorefrontCheckoutFromCartRequest? CreateRequest { get; private set; }
+        public UpdateStorefrontCheckoutCollectionRequest? CollectionRequest { get; private set; }
         public string? IdempotencyKey { get; private set; }
         public DateTimeOffset? Now { get; private set; }
 
@@ -129,10 +149,26 @@ public sealed class StorefrontCheckoutServiceTests
             Guid tenantId,
             Guid customerId,
             Guid checkoutSessionId,
+            DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             TenantId = tenantId;
             CustomerId = customerId;
+            return Result();
+        }
+
+        public Task<StorefrontCheckoutRepositoryResult> UpdateCollectionAsync(
+            Guid tenantId,
+            Guid customerId,
+            Guid checkoutSessionId,
+            UpdateStorefrontCheckoutCollectionRequest request,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            TenantId = tenantId;
+            CustomerId = customerId;
+            CollectionRequest = request;
+            Now = now;
             return Result();
         }
 

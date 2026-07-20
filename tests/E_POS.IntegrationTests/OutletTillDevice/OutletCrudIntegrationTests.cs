@@ -1,3 +1,4 @@
+using System.Reflection;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Common.Models;
@@ -5,11 +6,14 @@ using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Persistence;
+using E_POS.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -33,6 +37,11 @@ public sealed class OutletCrudIntegrationTests
         Assert.True(result.IsSuccess);
         Assert.Equal("OUT001", result.Value!.OutletCode);
         Assert.True(result.Value.CollectionEnabled);
+
+        Assert.Equal(30, result.Value.PreparationLeadMinutes);
+        Assert.Equal(30, result.Value.PickupWindowMinutes);
+        Assert.Equal(new TimeOnly(16, 0), result.Value.CollectionCutoffTime);
+
         Assert.Equal("Main Outlet", result.Value.OutletName);
         Assert.Equal("STORE", result.Value.OutletType);
         Assert.Equal("+94770000000", result.Value.Phone);
@@ -42,10 +51,65 @@ public sealed class OutletCrudIntegrationTests
         Assert.Equal(now, result.Value.CreatedAt);
         Assert.NotNull(result.Value.CreatedByTenantUserId);
         Assert.Equal(result.Value.CreatedByTenantUserId, result.Value.UpdatedByTenantUserId);
+
         Assert.Equal(1, await dbContext.Outlets.CountAsync());
         Assert.Equal(1, await dbContext.OutletAddresses.CountAsync());
         Assert.Equal(2, await dbContext.OutletBusinessHours.CountAsync());
         Assert.Equal(1, await dbContext.FulfillmentMethodOutlets.CountAsync());
+        var mapping = await dbContext.FulfillmentMethodOutlets.SingleAsync();
+        Assert.Equal(tenantId, mapping.TenantId);
+        Assert.Equal(30, mapping.PreparationLeadMinutes);
+        Assert.Equal(30, mapping.PickupWindowMinutes);
+        Assert.Equal(new TimeOnly(16, 0), mapping.CutoffTime);
+
+        var list = await service.ListAsync(CreateContext(tenantId), 1, 20, null, CancellationToken.None);
+        var summary = Assert.Single(list.Value!.Items);
+        Assert.True(summary.CollectionEnabled);
+        Assert.Equal(30, summary.PreparationLeadMinutes);
+        Assert.Equal(30, summary.PickupWindowMinutes);
+        Assert.Equal(new TimeOnly(16, 0), summary.CollectionCutoffTime);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_UpdatesCollectionConfigurationOnTenantPickupMapping()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        await SeedTenantAsync(dbContext, tenantId);
+        var now = new DateTimeOffset(2026, 7, 2, 10, 0, 0, TimeSpan.Zero);
+        dbContext.FulfillmentMethods.Add(FulfillmentMethod.Create(Guid.NewGuid(), tenantId, "PICKUP", "Pickup", null, "ACTIVE", "PICKUP", now));
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(dbContext, now);
+        var create = await service.CreateAsync(CreateContext(tenantId), CreateRequest(collectionEnabled: true), CancellationToken.None);
+        var outletId = create.Value!.Id;
+        dbContext.ChangeTracker.Clear();
+        service = CreateService(dbContext, now);
+        var source = CreateRequest(collectionEnabled: true);
+        var updateRequest = new OutletUpdateRequest(
+            source.OutletName,
+            source.Status,
+            source.OutletType,
+            source.Timezone,
+            source.IsDefaultOutlet,
+            source.Phone,
+            source.Email,
+            source.Address,
+            source.BusinessHours,
+            true,
+            90,
+            60,
+            new TimeOnly(15, 30));
+
+        var result = await service.UpdateAsync(CreateContext(tenantId), outletId, updateRequest, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(90, result.Value!.PreparationLeadMinutes);
+        Assert.Equal(60, result.Value.PickupWindowMinutes);
+        Assert.Equal(new TimeOnly(15, 30), result.Value.CollectionCutoffTime);
+        var mapping = await dbContext.FulfillmentMethodOutlets.SingleAsync(x => x.TenantId == tenantId);
+        Assert.Equal(90, mapping.PreparationLeadMinutes);
+        Assert.Equal(60, mapping.PickupWindowMinutes);
+        Assert.Equal(new TimeOnly(15, 30), mapping.CutoffTime);
     }
 
     [Fact]
@@ -256,9 +320,46 @@ public sealed class OutletCrudIntegrationTests
         Assert.Contains(result.Value.Timezones, item => item.Value == "UTC");
     }
 
+    [Fact]
+    public async Task GetActivePickupFulfillmentMethodIdAsync_PrefersDefaultThenStableOrdering()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        await SeedTenantAsync(dbContext, tenantId);
+        var now = new DateTimeOffset(2026, 7, 2, 10, 0, 0, TimeSpan.Zero);
+        var alphabeticalMethod = FulfillmentMethod.Create(
+            Guid.NewGuid(),
+            tenantId,
+            "AAA_PICKUP",
+            "Alphabetical Pickup",
+            null,
+            "ACTIVE",
+            "PICKUP",
+            now);
+        var defaultMethod = FulfillmentMethod.Create(
+            Guid.NewGuid(),
+            tenantId,
+            "ZZZ_PICKUP",
+            "Default Pickup",
+            null,
+            "ACTIVE",
+            "PICKUP",
+            now);
+        Set(defaultMethod, "IsDefault", true);
+        dbContext.FulfillmentMethods.AddRange(alphabeticalMethod, defaultMethod);
+        await dbContext.SaveChangesAsync();
+        var repository = new OutletRepository(dbContext);
+
+        var selectedMethodId = await repository.GetActivePickupFulfillmentMethodIdAsync(
+            tenantId,
+            CancellationToken.None);
+
+        Assert.Equal(defaultMethod.Id, selectedMethodId);
+    }
+
     private static async Task SeedTenantAsync(EPosDbContext dbContext, Guid tenantId)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
         dbContext.Tenants.Add(Tenant.Create(
             tenantId,
             $"TEN-{tenantId.ToString()[..8]}",
@@ -270,7 +371,32 @@ public sealed class OutletCrudIntegrationTests
             null,
             null,
             now));
+        if (!await dbContext.PlatformFeatures.AnyAsync(
+                x => x.Id == SubscriptionBillingCatalogSeedConstants.ClickCollectFeatureId))
+        {
+            dbContext.PlatformFeatures.Add(PlatformFeature.Create(
+                SubscriptionBillingCatalogSeedConstants.ClickCollectFeatureId,
+                SubscriptionBillingCatalogSeedConstants.CoreCommerceModuleId,
+                PlatformTenantFeatureCodes.ClickCollect,
+                "Click & Collect",
+                SubscriptionCatalogConstants.RecordStatus.Active,
+                now));
+        }
+        dbContext.TenantFeatureEntitlements.Add(TenantFeatureEntitlement.Create(
+            Guid.NewGuid(),
+            tenantId,
+            SubscriptionBillingCatalogSeedConstants.ClickCollectFeatureId,
+            TenantEntitlementStatusConstants.Enabled,
+            now));
         await dbContext.SaveChangesAsync();
+    }
+
+    private static void Set<T>(object entity, string propertyName, T value)
+    {
+        var property = entity.GetType().GetProperty(
+            propertyName,
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        property?.SetValue(entity, value);
     }
 
     private static EPosDbContext CreateDbContext()
@@ -311,7 +437,10 @@ public sealed class OutletCrudIntegrationTests
                 new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null),
                 new OutletBusinessHourRequest(2, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null)
             ],
-            collectionEnabled);
+            collectionEnabled,
+            collectionEnabled ? 30 : null,
+            collectionEnabled ? 30 : null,
+            collectionEnabled ? new TimeOnly(16, 0) : null);
     }
 
     private static OutletUpdateRequest CreateUpdateRequest()

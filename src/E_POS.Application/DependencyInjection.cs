@@ -35,6 +35,8 @@ using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Services;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Services;
 using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
 using E_POS.Application.Modules.ECommerce.ProductReviews.Services;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
@@ -128,6 +130,8 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontCheckoutService, StorefrontCheckoutService>();
         services.AddScoped<ICustomerAuthService, CustomerAuthService>();
         services.AddScoped<ICustomerWishlistService, CustomerWishlistService>();
+        services.AddScoped<ICustomerOrderService, CustomerOrderService>();
+        services.AddScoped<IClickCollectOrderStatusService, ClickCollectOrderStatusService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;

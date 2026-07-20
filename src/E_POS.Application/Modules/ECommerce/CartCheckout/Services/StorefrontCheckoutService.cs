@@ -36,9 +36,6 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
             return Failure(Error("storefront_checkout.invalid_cart_session", "A valid X-Cart-Session-Id header is required."));
         if (request.SelectedOutletId == Guid.Empty)
             return Failure(Error("storefront_checkout.invalid_outlet_id", "A valid pickup outlet is required."));
-        if (request.SelectedPickupSlotId == Guid.Empty)
-            return Failure(Error("storefront_checkout.invalid_pickup_slot_id", "The pickup slot id is invalid."));
-
         var contactError = ValidateContact(request);
         if (contactError is not null) return Failure(contactError);
 
@@ -66,6 +63,32 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
             tenantId,
             customerId,
             checkoutSessionId,
+            _dateTimeProvider.UtcNow,
+            cancellationToken));
+    }
+
+    public async Task<ApplicationResult<StorefrontCheckoutReadModel>> UpdateCollectionAsync(
+        Guid tenantId,
+        Guid customerId,
+        Guid checkoutSessionId,
+        UpdateStorefrontCheckoutCollectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var contextError = ValidateCustomerContext(tenantId, customerId);
+        if (contextError is not null) return Failure(contextError);
+        if (checkoutSessionId == Guid.Empty)
+            return Failure(Error("storefront_checkout.invalid_session_id", "A valid checkout session id is required."));
+        if (request.SelectedOutletId == Guid.Empty)
+            return Failure(Error("storefront_checkout.invalid_outlet_id", "A valid pickup outlet is required."));
+        if (request.RequestedCollectionAt == default)
+            return Failure(Error("storefront_checkout.invalid_collection_time", "A valid collection time is required."));
+
+        return Map(await _repository.UpdateCollectionAsync(
+            tenantId,
+            customerId,
+            checkoutSessionId,
+            request,
+            _dateTimeProvider.UtcNow,
             cancellationToken));
     }
 
@@ -121,6 +144,8 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
 
     private static ApplicationError MapError(string code) => code switch
     {
+        "storefront_checkout.tenant_unavailable" => Error(code, "The storefront tenant is unavailable."),
+        "storefront_checkout.feature_disabled" => Error(code, "Click & Collect is not enabled for this tenant."),
         "storefront_checkout.customer_not_found" => Error(code, "Customer not found or unavailable."),
         "storefront_checkout.outlet_not_found" => Error(code, "Pickup outlet not found or unavailable."),
         "storefront_checkout.cart_not_found" => Error(code, "Active cart not found or access denied."),
@@ -129,7 +154,10 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
         "storefront_checkout.variant_unavailable" => Error(code, "A cart product variant is no longer available."),
         "storefront_checkout.price_not_configured" => Error(code, "A current selling price is not configured for a cart item."),
         "storefront_checkout.insufficient_stock" => Error(code, "One or more cart items are not available at the selected outlet."),
-        "storefront_checkout.pickup_slot_unavailable" => Error(code, "The selected pickup slot is no longer available."),
+        "storefront_checkout.collection_configuration_missing" => Error(code, "Collection is not configured for the selected outlet."),
+        "storefront_checkout.collection_time_unavailable" => Error(code, "The requested collection time is unavailable."),
+        "storefront_checkout.invalid_outlet_timezone" => Error(code, "The selected outlet timezone is invalid."),
+        "storefront_checkout.collection_required" => Error(code, "Select a valid collection date and time before confirming."),
         "storefront_checkout.session_not_found" => Error(code, "Checkout session not found or access denied."),
         "storefront_checkout.session_expired" => Error(code, "The checkout session has expired."),
         "storefront_checkout.invalid_state" => Error(code, "The checkout session cannot be confirmed in its current state."),

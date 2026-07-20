@@ -10,4 +10,7 @@ public sealed record OutletUpdateRequest(
     string? Email,
     OutletAddressRequest Address,
     IReadOnlyList<OutletBusinessHourRequest>? BusinessHours,
-    bool CollectionEnabled);
+    bool CollectionEnabled,
+    int? PreparationLeadMinutes = null,
+    int? PickupWindowMinutes = null,
+    TimeOnly? CollectionCutoffTime = null);

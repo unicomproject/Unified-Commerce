@@ -15,6 +15,7 @@ public static class StorefrontProductMapper
         {
             Id = product.Id,
             Name = product.ProductName,
+            Slug = product.ProductSlug,
             Price = sellingPrice ?? 0m,
             ImageUrl = primaryImageUrl ?? string.Empty,
             Rating = rating?.AverageRating ?? 0m,

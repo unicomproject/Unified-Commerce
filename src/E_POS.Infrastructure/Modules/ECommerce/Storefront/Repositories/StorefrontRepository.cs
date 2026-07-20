@@ -78,6 +78,19 @@ public sealed class StorefrontRepository : IStorefrontRepository
         return _fulfillmentRepository.GetAvailableStoresAsync(tenantId, cancellationToken);
     }
 
+    public Task<StorefrontCollectionConfigurationReadModel?> GetCollectionConfigurationAsync(
+        Guid tenantId,
+        Guid outletId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        return _fulfillmentRepository.GetCollectionConfigurationAsync(
+            tenantId,
+            outletId,
+            now,
+            cancellationToken);
+    }
+
     public Task<Guid?> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
     {
         return _tenantRepository.GetTenantIdBySlugAsync(slug, cancellationToken);
