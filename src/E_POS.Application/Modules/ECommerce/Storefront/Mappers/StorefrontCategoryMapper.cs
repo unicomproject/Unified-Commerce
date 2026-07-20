@@ -11,7 +11,7 @@ public static class StorefrontCategoryMapper
         {
             Id = category.Id,
             Name = category.CategoryName,
-            ImageUrl = category.ImageUrl ?? "https://via.placeholder.com/150"
+            ImageUrl = category.ImageUrl ?? string.Empty
         };
     }
 
@@ -28,7 +28,7 @@ public static class StorefrontCategoryMapper
             Name = category.CategoryName,
             Slug = category.CategorySlug,
             Description = category.Description ?? string.Empty,
-            ImageUrl = category.ImageUrl ?? "https://via.placeholder.com/150",
+            ImageUrl = category.ImageUrl ?? string.Empty,
             ItemCount = itemCount,
             SortOrder = category.SortOrder
         };

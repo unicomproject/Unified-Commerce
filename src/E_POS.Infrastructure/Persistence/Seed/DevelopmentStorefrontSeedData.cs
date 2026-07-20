@@ -3,6 +3,9 @@ namespace E_POS.Infrastructure.Persistence.Seed;
 public static class DevelopmentStorefrontSeedData
 {
     public const string UpSql = """
+        -- 0. Update Dev Tenant Slug
+        UPDATE tenants SET tenant_slug = 'arenasports' WHERE id = '55555555-0000-4000-8000-000000000001';
+
         -- 1. Storefront Banners
         INSERT INTO storefront_banners (
             id, tenant_id, banner_type, title, subtitle, image_url, action_text, action_url, sort_order, status, created_at, updated_at

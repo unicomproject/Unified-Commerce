@@ -12,7 +12,12 @@ public class CustomerWishlistItem : AuditableEntity
 
     protected CustomerWishlistItem() { } // EF Core
 
-    internal static CustomerWishlistItem Create(Guid tenantId, Guid wishlistId, Guid productId, Guid? productVariantId)
+    internal static CustomerWishlistItem Create(
+        Guid tenantId,
+        Guid wishlistId,
+        Guid productId,
+        Guid? productVariantId,
+        DateTimeOffset now)
     {
         return new CustomerWishlistItem
         {
@@ -21,7 +26,9 @@ public class CustomerWishlistItem : AuditableEntity
             WishlistId = wishlistId,
             ProductId = productId,
             ProductVariantId = productVariantId,
-            AddedAt = DateTimeOffset.UtcNow
+            AddedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
         };
     }
 }

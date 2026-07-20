@@ -308,7 +308,7 @@ public sealed class StorefrontRepositoryTests
             {
                 Assert.Equal(kidsProductId, second.Id);
                 Assert.Equal(54.99m, second.Price);
-                Assert.Equal("https://via.placeholder.com/300", second.ImageUrl);
+                Assert.Empty(second.ImageUrl);
                 Assert.False(second.IsInStock);
                 Assert.Null(second.Badge);
             });
@@ -501,7 +501,7 @@ public sealed class StorefrontRepositoryTests
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         var productId = Guid.NewGuid();
-        var olderPrice = PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null, 10m, null, 1m, null, null, "ACTIVE", null, Now);
+        var olderPrice = PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null, 15m, null, 1m, null, null, "ACTIVE", null, Now);
         var latestPrice = PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null, 12.50m, null, 1m, DateTimeOffset.UtcNow.AddDays(-1), null, "ACTIVE", null, Now);
         var rating = ProductRatingSummary.Create(tenantId, productId);
         Set(rating, "AverageRating", 4.25m);

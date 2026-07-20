@@ -24,13 +24,16 @@ using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
+using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -40,7 +43,21 @@ using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Discount.Repositories;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Options;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Repositories;
+using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerOrders.Repositories;
+using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
+using E_POS.Infrastructure.Modules.ECommerce.ProductReviews.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
+using E_POS.Application.Modules.Tenant.Reports.Contracts;
+using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
+using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Services;
 
 
 namespace E_POS.Infrastructure;
@@ -54,6 +71,10 @@ public static class DependencyInjection
 
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.Configure<TenantJwtOptions>(configuration.GetSection(TenantJwtOptions.SectionName));
+        services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
+        services.Configure<DevelopmentPlatformAdminSeedOptions>(
+            configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
+        services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
         dataSourceBuilder.EnableDynamicJson();
@@ -62,6 +83,10 @@ public static class DependencyInjection
         services.AddDbContext<EPosDbContext>(options =>
         {
             options.UseNpgsql(dataSource);
+            // Hand-written SQL migrations (inspection drafts/media) intentionally skip
+            // regenerating the EF model snapshot, matching prior POS return migrations.
+            options.ConfigureWarnings(warnings =>
+                warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
@@ -118,11 +143,15 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
+        services.AddScoped<IPosSaleLinePricingCalculator, PosSaleLinePricingCalculator>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
         services.AddScoped<IPosReturnRepository, PosReturnRepository>();
+        services.AddScoped<IReturnInspectionMediaStorage, LocalReturnInspectionMediaStorage>();
+        services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
+        services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
@@ -133,6 +162,16 @@ public static class DependencyInjection
             var options = provider.GetRequiredService<IOptions<TenantJwtOptions>>().Value;
             return new TenantJwtSettings(options.Issuer, options.Audience, options.SigningKey, options.AccessTokenMinutes, options.RefreshTokenDays);
         });
+        services.AddScoped(static provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<CustomerJwtOptions>>().Value;
+            return new CustomerJwtSettings(
+                options.Issuer,
+                options.Audience,
+                options.SigningKey,
+                options.AccessTokenMinutes,
+                options.RefreshTokenDays);
+        });
 
         // ECommerce Storefront
         services.AddScoped<IStorefrontBannerRepository, StorefrontBannerRepository>();
@@ -141,6 +180,13 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontFulfillmentRepository, StorefrontFulfillmentRepository>();
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
+        services.AddScoped<IStorefrontCartRepository, StorefrontCartRepository>();
+        services.AddScoped<IStorefrontCheckoutRepository, StorefrontCheckoutRepository>();
+        services.AddScoped<ICustomerAuthRepository, CustomerAuthRepository>();
+        services.AddScoped<ICustomerWishlistRepository, CustomerWishlistRepository>();
+        services.AddScoped<ICustomerOrderRepository, CustomerOrderRepository>();
+        services.AddScoped<IClickCollectOrderStatusRepository, ClickCollectOrderStatusRepository>();
+        services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
 
         return services;
     }

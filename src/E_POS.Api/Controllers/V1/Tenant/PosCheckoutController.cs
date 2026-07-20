@@ -89,6 +89,9 @@ public sealed class PosCheckoutController : ControllerBase
                 => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "pos_checkout.device_not_found" or "pos_checkout.customer_not_found" or "pos_checkout.variant_not_found"
                 => NotFound(CreateError(error)),
+            "pos_checkout.customer_inactive" or "pos_checkout.customer_blocked" or
+            "pos_checkout.customer_deleted" or "pos_checkout.customer_not_eligible"
+                => UnprocessableEntity(CreateError(error)),
             "pos_checkout.discount_application_not_found" => NotFound(CreateError(error)),
             "pos_checkout.discount_approval_required" or
             "pos_checkout.discount_application_invalid" or
@@ -120,6 +123,9 @@ public sealed class PosCheckoutController : ControllerBase
             "pos_checkout.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "pos_checkout.device_not_found" or "pos_checkout.customer_not_found" or "pos_checkout.variant_not_found"
                 => NotFound(CreateError(error)),
+            "pos_checkout.customer_inactive" or "pos_checkout.customer_blocked" or
+            "pos_checkout.customer_deleted" or "pos_checkout.customer_not_eligible"
+                => UnprocessableEntity(CreateError(error)),
             "pos_checkout.discount_application_not_found" => NotFound(CreateError(error)),
             "pos_checkout.discount_approval_required" or
             "pos_checkout.discount_application_invalid" or

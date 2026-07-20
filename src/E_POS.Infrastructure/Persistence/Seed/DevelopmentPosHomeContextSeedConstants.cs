@@ -16,4 +16,11 @@ public static class DevelopmentPosHomeContextSeedConstants
     public static readonly Guid DevelopmentTillSessionTwoId = Guid.Parse("bbbbbbbb-0010-4000-8000-000000000001");
     public static readonly Guid DevelopmentTillActivationCodeTwoId = Guid.Parse("bbbbbbbb-0011-4000-8000-000000000001");
     public const string DevelopmentActivationCodeTwo = "TILL-2K45-POS";
+
+    public static readonly Guid DevelopmentTillThreeId = Guid.Parse("bbbbbbbb-0012-4000-8000-000000000001");
+    public static readonly Guid DevelopmentPosDeviceThreeId = Guid.Parse("bbbbbbbb-0013-4000-8000-000000000001");
+    public static readonly Guid DevelopmentTillDeviceAssignmentThreeId = Guid.Parse("bbbbbbbb-0014-4000-8000-000000000001");
+    public static readonly Guid DevelopmentTillSessionThreeId = Guid.Parse("bbbbbbbb-0015-4000-8000-000000000001");
+    public static readonly Guid DevelopmentTillActivationCodeThreeId = Guid.Parse("bbbbbbbb-0016-4000-8000-000000000001");
+    public const string DevelopmentActivationCodeThree = "TILL-3M77-POS";
 }

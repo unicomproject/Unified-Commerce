@@ -9,7 +9,11 @@ public class SalesReturn : AuditableEntity
     public Guid SalesOrderId { get; protected set; }
     public Guid? CustomerId { get; protected set; }
     public Guid? OutletId { get; protected set; }
+    public string? ProcessingOutletCodeSnapshot { get; protected set; }
+    public string? ProcessingOutletNameSnapshot { get; protected set; }
     public Guid? ReturnReasonId { get; protected set; }
+    public string? ReturnReasonCodeSnapshot { get; protected set; }
+    public string? ReturnReasonNameSnapshot { get; protected set; }
     public string ReturnNumber { get; protected set; } = string.Empty;
     public string ReturnChannel { get; protected set; } = string.Empty;
     public string ReturnStatus { get; protected set; } = string.Empty;
@@ -20,9 +24,11 @@ public class SalesReturn : AuditableEntity
     public DateTimeOffset? CancelledAt { get; protected set; }
     public decimal TotalRequestedQty { get; protected set; }
     public decimal TotalReceivedQty { get; protected set; }
+    public decimal? TotalApprovedQty { get; protected set; }
     public decimal TotalRefundAmount { get; protected set; }
     public decimal TotalExchangeAmount { get; protected set; }
     public string? Notes { get; protected set; }
+    public string? IdempotencyKey { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
@@ -36,6 +42,88 @@ public class SalesReturn : AuditableEntity
         string returnNumber,
         decimal totalQuantity,
         decimal totalRefundAmount,
+        string? notes,
+        string idempotencyKey,
+        Guid tenantUserId,
+        DateTimeOffset now) =>
+        CreateCompleted(
+            id,
+            tenantId,
+            salesOrderId,
+            customerId,
+            outletId,
+            null,
+            null,
+            returnReasonId,
+            null,
+            null,
+            returnNumber,
+            totalQuantity,
+            totalRefundAmount,
+            notes,
+            idempotencyKey,
+            tenantUserId,
+            now);
+
+    public static SalesReturn CreateCompleted(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid? customerId,
+        Guid outletId,
+        string? processingOutletCodeSnapshot,
+        string? processingOutletNameSnapshot,
+        Guid returnReasonId,
+        string? returnReasonCodeSnapshot,
+        string? returnReasonNameSnapshot,
+        string returnNumber,
+        decimal totalQuantity,
+        decimal totalRefundAmount,
+        string? notes,
+        string idempotencyKey,
+        Guid tenantUserId,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            CustomerId = customerId,
+            OutletId = outletId,
+            ProcessingOutletCodeSnapshot = processingOutletCodeSnapshot?.Trim(),
+            ProcessingOutletNameSnapshot = processingOutletNameSnapshot?.Trim(),
+            ReturnReasonId = returnReasonId,
+            ReturnReasonCodeSnapshot = returnReasonCodeSnapshot?.Trim(),
+            ReturnReasonNameSnapshot = returnReasonNameSnapshot?.Trim(),
+            ReturnNumber = returnNumber.Trim().ToUpperInvariant(),
+            ReturnChannel = "POS",
+            ReturnStatus = "COMPLETED",
+            RequestedAt = now,
+            ApprovedAt = now,
+            ReceivedAt = now,
+            CompletedAt = now,
+            TotalRequestedQty = totalQuantity,
+            TotalReceivedQty = totalQuantity,
+            TotalApprovedQty = totalQuantity,
+            TotalRefundAmount = totalRefundAmount,
+            TotalExchangeAmount = 0,
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            IdempotencyKey = idempotencyKey.Trim(),
+            CreatedByTenantUserId = tenantUserId,
+            UpdatedByTenantUserId = tenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+    public static SalesReturn CreateCompletedExchange(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid? customerId,
+        Guid outletId,
+        Guid returnReasonId,
+        string returnNumber,
+        decimal totalQuantity,
+        decimal totalExchangeAmount,
         string? notes,
         Guid tenantUserId,
         DateTimeOffset now) => new()
@@ -55,8 +143,8 @@ public class SalesReturn : AuditableEntity
             CompletedAt = now,
             TotalRequestedQty = totalQuantity,
             TotalReceivedQty = totalQuantity,
-            TotalRefundAmount = totalRefundAmount,
-            TotalExchangeAmount = 0,
+            TotalRefundAmount = 0,
+            TotalExchangeAmount = totalExchangeAmount,
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
             CreatedByTenantUserId = tenantUserId,
             UpdatedByTenantUserId = tenantUserId,

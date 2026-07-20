@@ -397,6 +397,128 @@ public sealed class PlatformTenantWizardServiceTests
     }
 
     [Fact]
+    public async Task CreateTenantAsync_TopLevelCountryWithoutAddress_CreatesPrimaryAddress()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-COUNTRY-ONLY",
+                Name = "Country Only Tenant",
+                CountryCode = "GB",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada.country-only@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastWriteModel?.Address);
+        Assert.Equal("GB", repository.LastWriteModel!.Address!.CountryCode);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_ConflictingCountryCodes_ReturnsValidationFailureBeforeSave()
+    {
+        var repository = new FakeWizardTenantRepository();
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-COUNTRY-CONFLICT",
+                Name = "Conflict Tenant",
+                CountryCode = "GB",
+                Address = new CreatePlatformTenantAddressRequest
+                {
+                    Line1 = "1 Conflict Road",
+                    City = "Colombo",
+                    CountryCode = "LK"
+                },
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    Email = "ada.conflict@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_tenants.validation_failed", result.Error.Code);
+        Assert.False(repository.CreateWizardCalled);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardRequest_PersistsLocaleOperatingModeBusinessTypeAndCountry()
+    {
+        var tenantId = Guid.NewGuid();
+        var businessTypeId = Guid.Parse("85555555-5555-4555-8555-555555555555");
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        repository.BusinessTypeIdsByCode["retail"] = businessTypeId;
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-LOCALE",
+                Name = "Wizard Tenant",
+                DefaultLocale = "en-GB",
+                OperatingMode = TenantOperatingModeConstants.PosOnly,
+                BusinessType = "retail",
+                CountryCode = "GB",
+                Address = new CreatePlatformTenantAddressRequest
+                {
+                    Line1 = "10 Downing Street",
+                    City = "London",
+                    CountryCode = "GB"
+                },
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada.locale@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastWriteModel);
+        Assert.Equal("en-GB", repository.LastWriteModel!.Tenant.DefaultLocale);
+        Assert.Equal(TenantOperatingModeConstants.PosOnly, repository.LastWriteModel.Tenant.OperatingMode);
+        Assert.NotNull(repository.LastWriteModel.Profile);
+        Assert.Equal(businessTypeId, repository.LastWriteModel.Profile!.BusinessTypeId);
+        Assert.NotNull(repository.LastWriteModel.Address);
+        Assert.Equal("GB", repository.LastWriteModel.Address!.CountryCode);
+    }
+
+    [Fact]
     public async Task CreateTenantAsync_WizardRequest_ValidatesAndSeedsUsageCounters()
     {
         var tenantId = Guid.NewGuid();
@@ -586,6 +708,29 @@ public sealed class PlatformTenantWizardServiceTests
         public bool CreateWizardCalled { get; private set; }
         public PlatformTenantCreateWriteModel? LastWriteModel { get; private set; }
         public PlatformTenantDetailResponse? DetailResponse { get; init; }
+        public Dictionary<string, Guid> BusinessTypeIdsByCode { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public TenantProfile? ProfileEntity { get; set; }
+        public TenantProfile? UpsertedProfile { get; private set; }
+
+        public Task<Guid?> GetActiveBusinessTypeIdByCodeAsync(string businessCode, CancellationToken cancellationToken)
+        {
+            if (BusinessTypeIdsByCode.TryGetValue(businessCode.Trim(), out var id))
+            {
+                return Task.FromResult<Guid?>(id);
+            }
+
+            return Task.FromResult<Guid?>(null);
+        }
+
+        public Task<TenantProfile?> GetTenantProfileEntityByTenantIdAsync(Guid tenantId, CancellationToken cancellationToken)
+            => Task.FromResult(ProfileEntity);
+
+        public Task UpsertTenantProfileAsync(TenantProfile profile, CancellationToken cancellationToken)
+        {
+            UpsertedProfile = profile;
+            ProfileEntity = profile;
+            return Task.CompletedTask;
+        }
 
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using E_POS.Api.Common;
 using E_POS.Api.Extensions;
@@ -7,12 +8,14 @@ using E_POS.Application.Common.Security;
 using E_POS.Infrastructure;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 const string PlatformIdentityType = "platform_user";
 const string TenantIdentityType = "tenant_user";
+const string CustomerIdentityType = "customer";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,9 +24,22 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        var configuredOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? Array.Empty<string>();
+
+        if (configuredOrigins.Length > 0)
+        {
+            policy.WithOrigins(configuredOrigins);
+        }
+        else if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(IsDevelopmentOrigin);
+        }
+
+        policy.AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 builder.Services.AddEndpointsApiExplorer();
@@ -37,11 +53,15 @@ var platformJwtOptions = builder.Configuration
 var tenantJwtOptions = builder.Configuration
     .GetSection(TenantJwtOptions.SectionName)
     .Get<TenantJwtOptions>() ?? new TenantJwtOptions();
+var customerJwtOptions = builder.Configuration
+    .GetSection(CustomerJwtOptions.SectionName)
+    .Get<CustomerJwtOptions>() ?? new CustomerJwtOptions();
 
 var signingKeys = new[]
     {
         platformJwtOptions.SigningKey,
-        tenantJwtOptions.SigningKey
+        tenantJwtOptions.SigningKey,
+        customerJwtOptions.SigningKey
     }
     .Where(key => !string.IsNullOrWhiteSpace(key))
     .Distinct(StringComparer.Ordinal)
@@ -58,10 +78,10 @@ builder.Services
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuers = new[] { platformJwtOptions.Issuer, tenantJwtOptions.Issuer }
+            ValidIssuers = new[] { platformJwtOptions.Issuer, tenantJwtOptions.Issuer, customerJwtOptions.Issuer }
                 .Where(issuer => !string.IsNullOrWhiteSpace(issuer)),
             ValidateAudience = true,
-            ValidAudiences = new[] { platformJwtOptions.Audience, tenantJwtOptions.Audience }
+            ValidAudiences = new[] { platformJwtOptions.Audience, tenantJwtOptions.Audience, customerJwtOptions.Audience }
                 .Where(audience => !string.IsNullOrWhiteSpace(audience)),
             ValidateIssuerSigningKey = true,
             IssuerSigningKeys = signingKeys,
@@ -100,6 +120,11 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .RequireClaim("identity_type", TenantIdentityType)
         .RequireClaim("aud", tenantJwtOptions.Audience));
+
+    options.AddPolicy("CustomerOnly", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireClaim("identity_type", CustomerIdentityType)
+        .RequireClaim("aud", customerJwtOptions.Audience));
 });
 
 builder.Services.AddSwaggerGen(options =>
@@ -167,6 +192,33 @@ app.MapGet("/api/v1/health", () =>
 })
 .WithName("HealthCheck");
 
+await DevelopmentPlatformAdminTestAccountSeedHost.RunIfDevelopmentAsync(app);
+
 app.Run();
+
+static bool IsDevelopmentOrigin(string origin)
+{
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+        return false;
+
+    var host = uri.Host;
+    if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    if (!IPAddress.TryParse(host, out var address))
+        return false;
+
+    if (IPAddress.IsLoopback(address))
+        return true;
+
+    var bytes = address.GetAddressBytes();
+    return bytes.Length == 4 &&
+           (bytes[0] == 10 ||
+            (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+            (bytes[0] == 192 && bytes[1] == 168));
+}
 
 public partial class Program;

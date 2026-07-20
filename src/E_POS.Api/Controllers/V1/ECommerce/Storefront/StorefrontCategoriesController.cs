@@ -44,4 +44,18 @@ public class StorefrontCategoriesController : ControllerBase
         var categories = await _storefrontCategoryService.GetFeaturedCategoriesAsync(tenantId, cancellationToken);
         return Ok(categories);
     }
-}
+
+    [HttpGet("by-slug/{slug}")]
+    public async Task<IActionResult> GetCategoryBySlug([FromHeader(Name = "X-Tenant-Id")] Guid tenantId, [FromRoute] string slug, CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty) return BadRequest(new { Error = "X-Tenant-Id header is required" });
+        if (string.IsNullOrWhiteSpace(slug)) return BadRequest(new { Error = "slug is required" });
+
+        var category = await _storefrontCategoryService.GetCategoryBySlugAsync(tenantId, slug, cancellationToken);
+        
+        if (category == null)
+            return NotFound(new { Error = "Category not found" });
+
+        return Ok(category);
+    }
+}

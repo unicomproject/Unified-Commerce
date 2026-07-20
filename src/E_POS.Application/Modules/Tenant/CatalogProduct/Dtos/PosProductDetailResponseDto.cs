@@ -21,7 +21,9 @@ public sealed record PosProductDetailResponseDto(
     int BasePrice,
     bool HasVariants,
     IReadOnlyList<PosProductVariantGroupResponseDto> VariantGroups,
-    IReadOnlyList<PosProductVariantDetailResponseDto> Variants)
+    IReadOnlyList<PosProductVariantDetailResponseDto> Variants,
+    string StockStatus = "unknown",
+    decimal? AvailableQuantity = null)
 {
     public string? ImageUrl => ImageStorageKey;
 }

@@ -73,8 +73,18 @@ public sealed class CheckoutSessionConfiguration : IEntityTypeConfiguration<Chec
         builder.Property(x => x.SelectedOutletId)
             .HasColumnName("selected_outlet_id");
 
-        builder.Property(x => x.SelectedPickupSlotId)
-            .HasColumnName("selected_pickup_slot_id");
+        builder.Property(x => x.RequestedCollectionAt)
+            .HasColumnName("requested_collection_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.RequestedCollectionEndAt)
+            .HasColumnName("requested_collection_end_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.CollectionTimezoneSnapshot)
+            .HasColumnName("collection_timezone_snapshot")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80);
 
         builder.Property(x => x.PickupContactName)
             .HasColumnName("pickup_contact_name")
@@ -96,6 +106,11 @@ public sealed class CheckoutSessionConfiguration : IEntityTypeConfiguration<Chec
             .HasColumnType("char(3)")
             .HasMaxLength(3)
             .IsRequired();
+
+        builder.Property(x => x.IsTaxInclusive)
+            .HasColumnName("is_tax_included")
+            .IsRequired()
+            .HasDefaultValue(false);
 
         builder.Property(x => x.SubtotalAmount)
             .HasColumnName("subtotal_amount")
@@ -186,6 +201,3 @@ public sealed class CheckoutSessionConfiguration : IEntityTypeConfiguration<Chec
         });
     }
 }
-
-
-

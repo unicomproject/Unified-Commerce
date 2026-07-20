@@ -189,6 +189,12 @@ public sealed partial class PlatformTenantService
         var maxTills = requestedMaxTills ?? computedMaxTills;
         var maxUsers = requestedMaxUsers ?? computedMaxUsers;
 
+        var businessTypeResolution = await ResolveBusinessTypeIdAsync(request.BusinessType, cancellationToken);
+        if (businessTypeResolution.IsFailure)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(businessTypeResolution.Error);
+        }
+
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
@@ -201,9 +207,16 @@ public sealed partial class PlatformTenantService
             NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
             null, // dataRegion
             platformUserId,
-            now);
+            now,
+            NormalizeOptionalText(request.DefaultLocale),
+            NormalizeOptionalText(request.OperatingMode));
 
-        var profile = CreateTenantProfileOrNull(tenantId, request, platformUserId, now);
+        var profile = CreateTenantProfileOrNull(
+            tenantId,
+            request,
+            platformUserId,
+            now,
+            businessTypeResolution.Value);
         var address = CreateTenantAddressOrNull(tenantId, request, now);
 
         var subscriptionRequest = request.Subscription;
@@ -491,6 +504,12 @@ public sealed partial class PlatformTenantService
                 ValidationFailed with { Message = "Invalid tenant billing status." });
         }
 
+        var businessTypeResolution = await ResolveBusinessTypeIdAsync(request.BusinessType, cancellationToken);
+        if (businessTypeResolution.IsFailure)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(businessTypeResolution.Error);
+        }
+
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
@@ -503,7 +522,9 @@ public sealed partial class PlatformTenantService
             NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
             null, // dataRegion
             platformUserId,
-            now);
+            now,
+            NormalizeOptionalText(request.DefaultLocale),
+            NormalizeOptionalText(request.OperatingMode));
 
         var subscription = TenantSubscription.Create(
             Guid.NewGuid(),
@@ -599,11 +620,32 @@ public sealed partial class PlatformTenantService
                !string.IsNullOrWhiteSpace(request.TaxNumber);
     }
 
+    private async Task<ApplicationResult<Guid?>> ResolveBusinessTypeIdAsync(
+        string? businessTypeCode,
+        CancellationToken cancellationToken)
+    {
+        var normalized = NormalizeOptionalText(businessTypeCode);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return ApplicationResult<Guid?>.Success(null);
+        }
+
+        var businessTypeId = await _repository.GetActiveBusinessTypeIdByCodeAsync(normalized, cancellationToken);
+        if (businessTypeId is null)
+        {
+            return ApplicationResult<Guid?>.Failure(
+                ValidationFailed with { Message = "Business type is invalid." });
+        }
+
+        return ApplicationResult<Guid?>.Success(businessTypeId);
+    }
+
     private static TenantProfile? CreateTenantProfileOrNull(
         Guid tenantId,
         CreatePlatformTenantRequest request,
         Guid platformUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? businessTypeId)
     {
         var legalName = NormalizeOptionalText(request.LegalName);
         var registrationNumber = NormalizeOptionalText(request.RegistrationNumber);
@@ -619,7 +661,8 @@ public sealed partial class PlatformTenantService
                              !string.IsNullOrWhiteSpace(contactName) ||
                              !string.IsNullOrWhiteSpace(contactEmail) ||
                              !string.IsNullOrWhiteSpace(contactPhone) ||
-                             !string.IsNullOrWhiteSpace(countryCode);
+                             !string.IsNullOrWhiteSpace(countryCode) ||
+                             businessTypeId.HasValue;
 
         if (!hasProfileData)
         {
@@ -629,7 +672,7 @@ public sealed partial class PlatformTenantService
         return TenantProfile.Create(
             Guid.NewGuid(),
             tenantId,
-            null, // businessTypeId
+            businessTypeId,
             string.IsNullOrWhiteSpace(legalName) ? (request.Name ?? "Unknown") : legalName,
             null, // tradingName
             contactName,
@@ -648,20 +691,12 @@ public sealed partial class PlatformTenantService
         DateTimeOffset now)
     {
         var address = request.Address;
-        if (address is null)
-        {
-            return null;
-        }
+        var topLevelCountryCode = NormalizeOptionalText(request.CountryCode);
+        var addressCountryCode = NormalizeOptionalText(address?.CountryCode) ?? topLevelCountryCode;
 
-        var hasAddressData =
-            !string.IsNullOrWhiteSpace(address.Line1) ||
-            !string.IsNullOrWhiteSpace(address.Line2) ||
-            !string.IsNullOrWhiteSpace(address.City) ||
-            !string.IsNullOrWhiteSpace(address.State) ||
-            !string.IsNullOrWhiteSpace(address.PostalCode) ||
-            !string.IsNullOrWhiteSpace(address.CountryCode);
-
-        if (!hasAddressData)
+        // Country persists only through tenant_addresses. Top-level countryCode alone
+        // creates a primary REGISTERED address so country is not silently dropped.
+        if (string.IsNullOrWhiteSpace(addressCountryCode))
         {
             return null;
         }
@@ -669,12 +704,12 @@ public sealed partial class PlatformTenantService
         return TenantAddress.CreateRegistered(
             Guid.NewGuid(),
             tenantId,
-            address.Line1 ?? string.Empty,
-            address.Line2,
-            address.City,
-            address.State,
-            address.PostalCode,
-            address.CountryCode ?? "US",
+            address?.Line1 ?? string.Empty,
+            address?.Line2,
+            address?.City,
+            address?.State,
+            address?.PostalCode,
+            addressCountryCode,
             true, // isPrimary
             "ACTIVE", // status
             null, // createdByPlatformUserId

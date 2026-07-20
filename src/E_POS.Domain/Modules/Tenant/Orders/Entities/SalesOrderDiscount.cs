@@ -17,6 +17,9 @@ public class SalesOrderDiscount : AuditableEntity
     public decimal DiscountValue { get; protected set; }
     public decimal DiscountAmount { get; protected set; }
     public string? ManualDiscountReason { get; protected set; }
+    public bool? ApprovalRequiredSnapshot { get; protected set; }
+    public Guid? ApprovedByTenantUserId { get; protected set; }
+    public DateTimeOffset? ApprovedAt { get; protected set; }
     public Guid? AppliedByTenantUserId { get; protected set; }
     public DateTimeOffset AppliedAt { get; protected set; }
 
@@ -36,6 +39,45 @@ public class SalesOrderDiscount : AuditableEntity
         string? manualDiscountReason,
         Guid appliedByTenantUserId,
         DateTimeOffset now) =>
+        CreateForPosSale(
+            id,
+            tenantId,
+            salesOrderId,
+            salesOrderLineId,
+            discountPolicyId,
+            discountTypeId,
+            discountTargetScope,
+            discountCodeSnapshot,
+            discountNameSnapshot,
+            calculationMethodSnapshot,
+            discountValue,
+            discountAmount,
+            manualDiscountReason,
+            null,
+            null,
+            null,
+            appliedByTenantUserId,
+            now);
+
+    public static SalesOrderDiscount CreateForPosSale(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid? salesOrderLineId,
+        Guid discountPolicyId,
+        Guid discountTypeId,
+        string discountTargetScope,
+        string discountCodeSnapshot,
+        string discountNameSnapshot,
+        string calculationMethodSnapshot,
+        decimal discountValue,
+        decimal discountAmount,
+        string? manualDiscountReason,
+        bool? approvalRequiredSnapshot,
+        Guid? approvedByTenantUserId,
+        DateTimeOffset? approvedAt,
+        Guid appliedByTenantUserId,
+        DateTimeOffset now) =>
         new()
         {
             Id = id,
@@ -52,6 +94,9 @@ public class SalesOrderDiscount : AuditableEntity
             DiscountValue = discountValue,
             DiscountAmount = discountAmount,
             ManualDiscountReason = string.IsNullOrWhiteSpace(manualDiscountReason) ? null : manualDiscountReason.Trim(),
+            ApprovalRequiredSnapshot = approvalRequiredSnapshot,
+            ApprovedByTenantUserId = approvedByTenantUserId,
+            ApprovedAt = approvedAt,
             AppliedByTenantUserId = appliedByTenantUserId,
             AppliedAt = now,
             CreatedAt = now

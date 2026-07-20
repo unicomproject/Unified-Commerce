@@ -51,4 +51,11 @@ public class TenantProfile : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void UpdateBusinessType(Guid? businessTypeId, Guid? updatedBy, DateTimeOffset now)
+    {
+        BusinessTypeId = businessTypeId;
+        UpdatedByPlatformUserId = updatedBy;
+        UpdatedAt = now;
+    }
 }

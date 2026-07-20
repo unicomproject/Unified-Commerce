@@ -13,5 +13,10 @@ public sealed record OutletResponse(
     OutletAddressResponse Address,
     IReadOnlyList<OutletBusinessHourResponse> BusinessHours,
     bool CollectionEnabled,
+    int? PreparationLeadMinutes,
+    int? PickupWindowMinutes,
+    TimeOnly? CollectionCutoffTime,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    Guid? CreatedByTenantUserId,
+    DateTimeOffset? UpdatedAt,
+    Guid? UpdatedByTenantUserId);

@@ -155,6 +155,10 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .IsUnique()
             .HasDatabaseName("uq_tenant_users_tenant_id_email");
 
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_tenant_users_tenant_id_id");
+
         builder.HasIndex(x => new { x.TenantId, x.UnmaskedPhone })
             .IsUnique()
             .HasDatabaseName("uq_tenant_users_tenant_id_unmasked_phone")

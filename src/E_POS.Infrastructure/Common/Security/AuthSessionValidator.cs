@@ -30,8 +30,45 @@ public sealed class AuthSessionValidator : IAuthSessionValidator
         {
             PlatformAuthConstants.IdentityType => IsPlatformSessionActiveAsync(principal, sessionId, cancellationToken),
             TenantAuthConstants.IdentityType => IsTenantSessionActiveAsync(principal, sessionId, cancellationToken),
+            "customer" => IsCustomerSessionActiveAsync(principal, sessionId, cancellationToken),
             _ => Task.FromResult(false)
         };
+    }
+
+    private Task<bool> IsCustomerSessionActiveAsync(
+        ClaimsPrincipal principal,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        var customerIdValue = principal.FindFirst("sub")?.Value ??
+                              principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var tenantIdValue = principal.FindFirst("tenant_id")?.Value;
+        if (!Guid.TryParse(customerIdValue, out var customerId) ||
+            !Guid.TryParse(tenantIdValue, out var tenantId))
+            return Task.FromResult(false);
+
+        var now = DateTimeOffset.UtcNow;
+        return (
+            from session in _dbContext.CustomerAuthSessions.AsNoTracking()
+            join account in _dbContext.CustomerAuthAccounts.AsNoTracking()
+                on new { session.TenantId, Id = session.CustomerAuthAccountId }
+                equals new { account.TenantId, account.Id }
+            join customer in _dbContext.Customers.AsNoTracking()
+                on new { account.TenantId, Id = account.CustomerId }
+                equals new { customer.TenantId, customer.Id }
+            join tenant in _dbContext.Tenants.AsNoTracking()
+                on customer.TenantId equals tenant.Id
+            where session.Id == sessionId &&
+                  session.TenantId == tenantId &&
+                  customer.Id == customerId &&
+                  session.Status == "ACTIVE" &&
+                  session.RevokedAt == null &&
+                  session.ExpiresAt > now &&
+                  account.Status == "ACTIVE" &&
+                  customer.Status == "ACTIVE" &&
+                  tenant.Status.ToLower() == "active"
+            select session.Id)
+            .AnyAsync(cancellationToken);
     }
 
     private Task<bool> IsPlatformSessionActiveAsync(

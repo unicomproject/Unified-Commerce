@@ -12,6 +12,7 @@ public class ShoppingCart : AuditableEntity
     public string SalesChannel { get; protected set; } = string.Empty;
     public string CurrencyCode { get; protected set; } = string.Empty;
     public string CartStatus { get; protected set; } = string.Empty;
+
     public decimal SubtotalAmount { get; protected set; }
     public decimal DiscountAmount { get; protected set; }
     public decimal TaxAmount { get; protected set; }
@@ -20,5 +21,74 @@ public class ShoppingCart : AuditableEntity
     public DateTimeOffset? ExpiresAt { get; protected set; }
     public Guid? ConvertedCheckoutSessionId { get; protected set; }
     public Guid? ConvertedOrderId { get; protected set; }
+    public bool IsTaxInclusive { get; protected set; }
+
+    protected ShoppingCart() { }
+
+    public static ShoppingCart Create(
+        Guid tenantId,
+        Guid? salesChannelId,
+        Guid? customerId,
+        string? anonymousSessionId,
+        string cartNumber,
+        string currencyCode,
+        bool isTaxInclusive,
+        DateTimeOffset expiresAt,
+        DateTimeOffset now)
+    {
+        if (!customerId.HasValue && string.IsNullOrWhiteSpace(anonymousSessionId))
+            throw new ArgumentException("A customer or anonymous session is required.");
+
+        return new ShoppingCart
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            SalesChannelId = salesChannelId,
+            CustomerId = customerId,
+            AnonymousSessionId = anonymousSessionId?.Trim(),
+            CartNumber = cartNumber.Trim().ToUpperInvariant(),
+            SalesChannel = "ECOMMERCE_WEB",
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            IsTaxInclusive = isTaxInclusive,
+            CartStatus = "ACTIVE",
+            ExpiresAt = expiresAt,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    public void UpdateTotals(decimal subtotal, decimal discount, decimal tax, decimal charge, DateTimeOffset now)
+    {
+        SubtotalAmount = decimal.Round(subtotal, 4, MidpointRounding.AwayFromZero);
+        DiscountAmount = decimal.Round(discount, 4, MidpointRounding.AwayFromZero);
+        TaxAmount = decimal.Round(tax, 4, MidpointRounding.AwayFromZero);
+        ChargeAmount = decimal.Round(charge, 4, MidpointRounding.AwayFromZero);
+        
+        if (IsTaxInclusive)
+        {
+            TotalAmount = decimal.Round(SubtotalAmount - DiscountAmount + ChargeAmount, 4, MidpointRounding.AwayFromZero);
+        }
+        else
+        {
+            TotalAmount = decimal.Round(SubtotalAmount - DiscountAmount + TaxAmount + ChargeAmount, 4, MidpointRounding.AwayFromZero);
+        }
+        
+        UpdatedAt = now;
+    }
+
+    public void Cancel(DateTimeOffset now)
+    {
+        CartStatus = "CANCELLED";
+        UpdatedAt = now;
+    }
+
+    public void MarkConverted(Guid checkoutSessionId, Guid orderId, Guid customerId, DateTimeOffset now)
+    {
+        CustomerId = customerId;
+        ConvertedCheckoutSessionId = checkoutSessionId;
+        ConvertedOrderId = orderId;
+        CartStatus = "CONVERTED";
+        UpdatedAt = now;
+    }
 }
 

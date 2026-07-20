@@ -68,6 +68,12 @@ public interface IPlatformTenantRepository
     Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken);
+
+    Task<Guid?> GetActiveBusinessTypeIdByCodeAsync(string businessCode, CancellationToken cancellationToken);
+
+    Task<TenantProfile?> GetTenantProfileEntityByTenantIdAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    Task UpsertTenantProfileAsync(TenantProfile profile, CancellationToken cancellationToken);
 }
 
 public interface IPlatformTenantService

@@ -28,4 +28,9 @@ public sealed class StorefrontCategoryService : IStorefrontCategoryService
     {
         return await _repository.GetChildCategoriesAsync(tenantId, parentCategoryId, cancellationToken);
     }
+
+    public async Task<StorefrontCategoryListReadModel?> GetCategoryBySlugAsync(Guid tenantId, string slug, CancellationToken cancellationToken = default)
+    {
+        return await _repository.GetCategoryBySlugAsync(tenantId, slug, cancellationToken);
+    }
 }

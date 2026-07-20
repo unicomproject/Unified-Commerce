@@ -8,7 +8,15 @@ public class ProductRatingSummaryConfiguration : IEntityTypeConfiguration<Produc
 {
     public void Configure(EntityTypeBuilder<ProductRatingSummary> builder)
     {
-        builder.ToTable("product_rating_summaries");
+        builder.ToTable("product_rating_summaries", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_product_rating_summaries_average",
+                "average_rating BETWEEN 0 AND 5");
+            table.HasCheckConstraint(
+                "ck_product_rating_summaries_counts",
+                "total_reviews >= 0 AND five_star_count >= 0 AND four_star_count >= 0 AND three_star_count >= 0 AND two_star_count >= 0 AND one_star_count >= 0");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -46,11 +54,11 @@ public class ProductRatingSummaryConfiguration : IEntityTypeConfiguration<Produc
 
         // Constraints and indexes
         builder.HasIndex(x => x.TenantId).HasDatabaseName("ix_product_rating_summaries_tenant_id");
-        
-        builder.HasIndex(x => x.ProductId)
+
+        builder.HasIndex(x => new { x.TenantId, x.ProductId })
             .IsUnique()
-            .HasDatabaseName("ix_product_rating_summaries_product_id");
-        
+            .HasDatabaseName("ux_product_rating_summaries_tenant_product");
+
         // Tenant FK
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()

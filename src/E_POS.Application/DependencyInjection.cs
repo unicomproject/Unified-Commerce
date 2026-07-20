@@ -29,6 +29,18 @@ using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Application.Modules.Tenant.Discount.Services;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
 using E_POS.Application.Modules.ECommerce.Customer.Services;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Services;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
+using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerWishlist.Services;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Services;
+using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
+using E_POS.Application.Modules.ECommerce.ProductReviews.Services;
+using E_POS.Application.Modules.Tenant.Reports.Contracts;
+using E_POS.Application.Modules.Tenant.Reports.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -105,6 +117,7 @@ public static class DependencyInjection
 
         services.AddScoped<ITenantAdminInventoryService, TenantAdminInventoryService>();
         services.AddScoped<ITenantAdminInventoryRequestValidator, TenantAdminInventoryRequestValidator>();
+        services.AddScoped<ITenantAdminReportsService, TenantAdminReportsService>();
 
         // ECommerce Storefront
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
@@ -113,6 +126,13 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontFulfillmentService, StorefrontFulfillmentService>();
         services.AddScoped<IStorefrontTenantService, StorefrontTenantService>();
         services.AddScoped<IStorefrontService, StorefrontService>();
+        services.AddScoped<IStorefrontCartService, StorefrontCartService>();
+        services.AddScoped<IStorefrontCheckoutService, StorefrontCheckoutService>();
+        services.AddScoped<ICustomerAuthService, CustomerAuthService>();
+        services.AddScoped<ICustomerWishlistService, CustomerWishlistService>();
+        services.AddScoped<ICustomerOrderService, CustomerOrderService>();
+        services.AddScoped<IClickCollectOrderStatusService, ClickCollectOrderStatusService>();
+        services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;
     }

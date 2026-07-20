@@ -37,16 +37,28 @@ public sealed class PosReceiptRepository : IPosReceiptRepository
             return new PosReceiptPrintRepositoryResult("pos_receipts.invalid_print_status", null);
         }
 
-        var receipt = await _dbContext.Receipts
+        var receipts = await _dbContext.Receipts
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.SalesOrderId == saleId)
             .OrderByDescending(x => x.IssuedAt)
-            .Select(x => new { x.Id, x.ReceiptNumber })
-            .FirstOrDefaultAsync(cancellationToken);
+            .Select(x => new { x.Id, x.ReceiptNumber, x.ReceiptStatus, x.ReceiptType })
+            .Take(10)
+            .ToListAsync(cancellationToken);
+
+        var receipt = receipts.FirstOrDefault(x =>
+                string.Equals(x.ReceiptType, "REFUND", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.ReceiptType, "EXCHANGE", StringComparison.OrdinalIgnoreCase))
+            ?? receipts.FirstOrDefault();
 
         if (receipt is null)
         {
             return new PosReceiptPrintRepositoryResult("pos_receipts.receipt_not_found", null);
+        }
+
+        if (!string.Equals(receipt.ReceiptStatus, "ISSUED", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(receipt.ReceiptStatus, "PRINTED", StringComparison.OrdinalIgnoreCase))
+        {
+            return new PosReceiptPrintRepositoryResult("pos_receipts.receipt_not_completed", null);
         }
 
         var nextAttemptNumber = await _dbContext.ReceiptPrintLogs

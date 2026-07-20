@@ -3,6 +3,7 @@ using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -75,7 +76,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .OrderBy(x => x)
             .ToListAsync(cancellationToken);
 
-        var operatingModes = new List<string> { "STANDARD" };
+        var operatingModes = TenantOperatingModeConstants.All.ToList();
 
         var plans = await _dbContext.SubscriptionPlans
             .AsNoTracking()
@@ -177,15 +178,22 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
 
         var lastActivityAt = await GetLastActivityAtAsync(tenantId, tenant.UpdatedAt, cancellationToken);
 
-        var profile = await _dbContext.TenantProfiles
-            .AsNoTracking()
-            .Where(x => x.TenantId == tenantId)
-            .Select(x => new PlatformTenantProfileDetailDto(
-                x.LegalName,
-                x.PrimaryContactName,
-                x.PrimaryEmail,
-                x.PrimaryPhone,
-                x.WebsiteUrl))
+        var profile = await (
+            from tenantProfile in _dbContext.TenantProfiles.AsNoTracking()
+            where tenantProfile.TenantId == tenantId
+            join businessType in _dbContext.BusinessTypes.AsNoTracking()
+                on tenantProfile.BusinessTypeId equals businessType.Id into businessTypes
+            from businessType in businessTypes.DefaultIfEmpty()
+            select new
+            {
+                Profile = new PlatformTenantProfileDetailDto(
+                    tenantProfile.LegalName,
+                    tenantProfile.PrimaryContactName,
+                    tenantProfile.PrimaryEmail,
+                    tenantProfile.PrimaryPhone,
+                    tenantProfile.WebsiteUrl),
+                BusinessTypeCode = businessType != null ? businessType.BusinessCode : null
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
         var address = await _dbContext.TenantAddresses
@@ -220,12 +228,12 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             tenant.DisplayName,
             tenant.Status,
             currentSubscription?.SubscriptionStatus ?? "UNKNOWN",
-            "STANDARD",
+            tenant.OperatingMode ?? string.Empty,
             tenant.BaseCurrencyCode,
             tenant.DefaultTimezone,
-            "en-US",
-            null,
-            Profile: profile,
+            tenant.DefaultLocale ?? string.Empty,
+            profile?.BusinessTypeCode,
+            Profile: profile?.Profile,
             PrimaryAddress: address,
             Subscription: subscriptionDto,
             userCount,
@@ -542,12 +550,29 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 group => group.Key,
                 group => group.Select(x => x.FeatureCode).ToHashSet(StringComparer.OrdinalIgnoreCase));
 
+        var profileBusinessTypes = await (
+            from profile in _dbContext.TenantProfiles.AsNoTracking()
+            join businessType in _dbContext.BusinessTypes.AsNoTracking()
+                on profile.BusinessTypeId equals businessType.Id into businessTypes
+            from businessType in businessTypes.DefaultIfEmpty()
+            select new
+            {
+                profile.TenantId,
+                BusinessTypeCode = businessType != null ? businessType.BusinessCode : null
+            })
+            .ToListAsync(cancellationToken);
+
+        var businessTypeByTenant = profileBusinessTypes
+            .GroupBy(x => x.TenantId)
+            .ToDictionary(group => group.Key, group => group.First().BusinessTypeCode);
+
         return tenants
             .Select(tenant =>
             {
                 currentSubscriptions.TryGetValue(tenant.Id, out var subscription);
                 featuresByTenant.TryGetValue(tenant.Id, out var featureCodes);
                 featureCodes ??= [];
+                businessTypeByTenant.TryGetValue(tenant.Id, out var businessTypeCode);
 
                 return new TenantRow
                 {
@@ -556,11 +581,11 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                     Name = tenant.DisplayName,
                     Status = tenant.Status,
                     BillingStatus = subscription?.SubscriptionStatus ?? "UNKNOWN",
-                    OperatingMode = "STANDARD",
+                    OperatingMode = tenant.OperatingMode ?? string.Empty,
                     BaseCurrency = tenant.BaseCurrencyCode,
                     DefaultTimezone = tenant.DefaultTimezone,
-                    DefaultLocale = "en-US",
-                    BusinessType = null,
+                    DefaultLocale = tenant.DefaultLocale ?? string.Empty,
+                    BusinessType = businessTypeCode,
                     CreatedAt = tenant.CreatedAt,
                     UpdatedAt = tenant.UpdatedAt,
                     OutletCount = outletCounts.GetValueOrDefault(tenant.Id),

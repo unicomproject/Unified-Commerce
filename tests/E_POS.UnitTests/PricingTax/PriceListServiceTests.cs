@@ -221,6 +221,7 @@ public sealed class PriceListServiceTests
         public Task<bool> HasActiveTillOrDeviceAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult<string?>("active");
         public Task<bool> IsOutletManagementFeatureEnabledAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> IsClickCollectFeatureEnabledAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<OutletCreateOptionsResponse> GetCreateOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult(new OutletCreateOptionsResponse([], [], [], new OutletCreateDefaultsResponse("LK", "UTC", "ACTIVE")));
         public Task<bool> AddAsync(Outlet outlet, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? pickupMapping, CancellationToken cancellationToken) => Task.FromResult(true);
