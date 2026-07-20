@@ -98,6 +98,16 @@ public static class DependencyInjection
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();
         services.AddScoped<IPlatformPasswordResetRepository, PlatformPasswordResetRepository>();
+        services.AddScoped<IPlatformPasswordResetLinkBuilder, PlatformPasswordResetLinkBuilder>();
+        services.AddScoped<IPlatformPasswordResetDeliveryService, AdminSecureLinkPasswordResetDeliveryService>();
+        services.AddScoped(static provider =>
+        {
+            var configuration = provider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var section = configuration.GetSection("PlatformPasswordReset");
+            return new PlatformPasswordResetSettings(
+                section["PublicAppBaseUrl"] ?? "http://localhost:4200",
+                section["ResetPath"] ?? "/reset-password");
+        });
         services.AddScoped<IPlatformSubscriptionPlanRepository, PlatformSubscriptionPlanRepository>();
         services.AddScoped<ITenantUsageCounterRepository, TenantUsageCounterRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();

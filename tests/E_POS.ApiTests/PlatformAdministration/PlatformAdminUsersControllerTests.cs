@@ -172,7 +172,7 @@ public sealed class PlatformAdminUsersControllerTests
         FakePlatformUserService service,
         Guid? platformUserId)
     {
-        var controller = new PlatformAdminUsersController(service)
+        var controller = new PlatformAdminUsersController(service, new FakePasswordResetService())
         {
             ControllerContext = new ControllerContext
             {
@@ -267,6 +267,45 @@ public sealed class PlatformAdminUsersControllerTests
         {
             return Task.FromResult(_detailResult);
         }
+    }
+
+    private sealed class FakePasswordResetService : IPlatformPasswordResetService
+    {
+        public Task<ApplicationResult<PlatformPasswordResetTokenIssueResult>> CreatePendingResetTokenAsync(
+            Guid platformUserId,
+            CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        public Task<ApplicationResult<PlatformPasswordResetTokenValidationResult>> ValidateResetTokenAsync(
+            string rawToken,
+            CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        public Task<ApplicationResult> MarkTokenUsedAsync(string rawToken, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        public Task<ApplicationResult<int>> RevokeActivePendingTokensAsync(
+            Guid platformUserId,
+            CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        public Task<ApplicationResult<InitiatePlatformPasswordResetResponse>> InitiateAdminPasswordResetAsync(
+            Guid targetUserId,
+            Guid actorPlatformUserId,
+            PlatformAuthClientContext? clientContext,
+            CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        public Task<ApplicationResult<ValidatePlatformPasswordResetTokenResponse>> ValidatePublicTokenAsync(
+            string rawToken,
+            CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        public Task<ApplicationResult<CompletePlatformPasswordResetResponse>> CompletePasswordResetAsync(
+            CompletePlatformPasswordResetRequest request,
+            PlatformAuthClientContext? clientContext,
+            CancellationToken cancellationToken)
+            => throw new NotImplementedException();
     }
 }
 

@@ -23,5 +23,6 @@ public static class PlatformAuthAlignmentConstants
     {
         public const string Logout = "LOGOUT";
         public const string RefreshTokenReuse = "REFRESH_TOKEN_REUSE";
+        public const string PasswordReset = "PASSWORD_RESET";
     }
 }

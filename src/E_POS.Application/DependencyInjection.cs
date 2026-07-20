@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformUserService, PlatformUserService>();
         services.AddScoped<IPlatformAuditLogService, PlatformAuditLogService>();
         services.AddScoped<IPlatformPasswordResetService, PlatformPasswordResetService>();
+        services.AddScoped<IPlatformPasswordPolicyValidator, PlatformPasswordPolicyValidator>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
         services.AddScoped<ITenantUsageCounterService, TenantUsageCounterService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
