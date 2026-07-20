@@ -184,7 +184,7 @@ public class SalesOrderLine : AuditableEntity
             productTypeSnapshot, productStructureSnapshot, quantity, unitPrice,
             lineSubtotalAmount, lineDiscountAmount, lineTaxAmount, now);
         line.FulfilledQuantity = 0;
-        line.LineStatus = "PENDING";
+        line.LineStatus = "ACTIVE";
         return line;
     }
 

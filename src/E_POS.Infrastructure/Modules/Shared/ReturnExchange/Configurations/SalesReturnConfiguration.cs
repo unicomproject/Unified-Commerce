@@ -8,7 +8,27 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
 {
     public void Configure(EntityTypeBuilder<SalesReturn> builder)
     {
-        builder.ToTable("sales_returns");
+        builder.ToTable("sales_returns", t =>
+        {
+            t.HasCheckConstraint(
+                "ck_sales_returns_total_requested_qty",
+                "total_requested_qty >= 0");
+            t.HasCheckConstraint(
+                "ck_sales_returns_total_received_qty",
+                "total_received_qty >= 0");
+            t.HasCheckConstraint(
+                "ck_sales_returns_total_refund_amount",
+                "total_refund_amount >= 0");
+            t.HasCheckConstraint(
+                "ck_sales_returns_total_exchange_amount",
+                "total_exchange_amount >= 0");
+            t.HasCheckConstraint(
+                "ck_sales_returns_return_status",
+                "return_status IN ('REQUESTED', 'APPROVED', 'RECEIVED', 'COMPLETED', 'CANCELLED', 'REJECTED')");
+            t.HasCheckConstraint(
+                "ck_sales_returns_return_channel",
+                "return_channel IN ('POS', 'ONLINE', 'PHONE', 'OTHER')");
+        });
 
         builder.HasKey(x => x.Id).HasName("pk_sales_returns");
 
@@ -149,6 +169,12 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
             .HasColumnType("text")
             .IsRequired(false);
 
+        builder.Property(x => x.IdempotencyKey)
+            .HasColumnName("idempotency_key")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired(false);
+
         builder.Property(x => x.CreatedByTenantUserId)
             .HasColumnName("created_by_tenant_user_id")
             .IsRequired(false);
@@ -168,6 +194,15 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
         builder.HasIndex(x => new { x.TenantId, x.SalesOrderId })
             .HasDatabaseName("ix_sales_returns_tenant_sales_order_id");
 
+        builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+            .IsUnique()
+            .HasFilter("idempotency_key IS NOT NULL")
+            .HasDatabaseName("ux_sales_returns_tenant_idempotency_key");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_sales_returns_tenant_id_id");
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -176,33 +211,38 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.Orders.Entities.DocumentNumberSequence>()
             .WithMany()
-            .HasForeignKey(x => x.DocumentNumberSequenceId)
+            .HasForeignKey(x => new { x.TenantId, x.DocumentNumberSequenceId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_returns_1549e8c2");
+            .HasConstraintName("fk_sales_returns_document_number_sequence_tenant");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrder>()
             .WithMany()
-            .HasForeignKey(x => x.SalesOrderId)
+            .HasForeignKey(x => new { x.TenantId, x.SalesOrderId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_returns_8e3771a4");
+            .HasConstraintName("fk_sales_returns_sales_order_tenant");
 
         builder.HasOne<E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer>()
             .WithMany()
-            .HasForeignKey(x => x.CustomerId)
+            .HasForeignKey(x => new { x.TenantId, x.CustomerId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_returns_f8fcc58d");
+            .HasConstraintName("fk_sales_returns_customer_tenant");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet>()
             .WithMany()
-            .HasForeignKey(x => x.OutletId)
+            .HasForeignKey(x => new { x.TenantId, x.OutletId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_returns_8bbbda2e");
+            .HasConstraintName("fk_sales_returns_outlet_tenant");
 
         builder.HasOne<E_POS.Domain.Modules.Shared.ReturnExchange.Entities.ReturnReason>()
             .WithMany()
-            .HasForeignKey(x => x.ReturnReasonId)
+            .HasForeignKey(x => new { x.TenantId, x.ReturnReasonId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_returns_8308f645");
+            .HasConstraintName("fk_sales_returns_return_reason_tenant");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
             .WithMany()
@@ -218,4 +258,3 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
         // </second-brain-constraints>
     }
 }
-

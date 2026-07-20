@@ -24,6 +24,7 @@ using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
@@ -32,6 +33,7 @@ using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -53,6 +55,7 @@ using E_POS.Infrastructure.Modules.ECommerce.ProductReviews.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
+using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Services;
 
 
 namespace E_POS.Infrastructure;
@@ -78,6 +81,10 @@ public static class DependencyInjection
         services.AddDbContext<EPosDbContext>(options =>
         {
             options.UseNpgsql(dataSource);
+            // Hand-written SQL migrations (inspection drafts/media) intentionally skip
+            // regenerating the EF model snapshot, matching prior POS return migrations.
+            options.ConfigureWarnings(warnings =>
+                warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
@@ -134,8 +141,11 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
+        services.AddScoped<IPosSaleLinePricingCalculator, PosSaleLinePricingCalculator>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
         services.AddScoped<IPosReturnRepository, PosReturnRepository>();
+        services.AddScoped<IReturnInspectionMediaStorage, LocalReturnInspectionMediaStorage>();
+        services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();

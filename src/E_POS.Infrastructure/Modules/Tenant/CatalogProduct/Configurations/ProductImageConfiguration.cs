@@ -118,15 +118,21 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
 
         builder.HasOne<Product>()
             .WithMany()
-            .HasForeignKey(x => x.ProductId)
+            .HasForeignKey(x => new { x.TenantId, x.ProductId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_product_images_product_id_products");
+            .HasConstraintName("fk_product_images_product_tenant");
 
         builder.HasOne<ProductVariant>()
             .WithMany()
-            .HasForeignKey(x => x.ProductVariantId)
+            .HasForeignKey(x => new { x.TenantId, x.ProductVariantId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_product_images_product_variant_id_product_variants");
+            .HasConstraintName("fk_product_images_variant_tenant");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_product_images_tenant_id_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_product_images_sort_order", "sort_order >= 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_product_images_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));

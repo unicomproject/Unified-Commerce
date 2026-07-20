@@ -28,6 +28,7 @@ public class SalesReturn : AuditableEntity
     public decimal TotalRefundAmount { get; protected set; }
     public decimal TotalExchangeAmount { get; protected set; }
     public string? Notes { get; protected set; }
+    public string? IdempotencyKey { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
@@ -42,6 +43,7 @@ public class SalesReturn : AuditableEntity
         decimal totalQuantity,
         decimal totalRefundAmount,
         string? notes,
+        string idempotencyKey,
         Guid tenantUserId,
         DateTimeOffset now) =>
         CreateCompleted(
@@ -59,6 +61,7 @@ public class SalesReturn : AuditableEntity
             totalQuantity,
             totalRefundAmount,
             notes,
+            idempotencyKey,
             tenantUserId,
             now);
 
@@ -77,6 +80,7 @@ public class SalesReturn : AuditableEntity
         decimal totalQuantity,
         decimal totalRefundAmount,
         string? notes,
+        string idempotencyKey,
         Guid tenantUserId,
         DateTimeOffset now) => new()
         {
@@ -102,6 +106,45 @@ public class SalesReturn : AuditableEntity
             TotalApprovedQty = totalQuantity,
             TotalRefundAmount = totalRefundAmount,
             TotalExchangeAmount = 0,
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            IdempotencyKey = idempotencyKey.Trim(),
+            CreatedByTenantUserId = tenantUserId,
+            UpdatedByTenantUserId = tenantUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+    public static SalesReturn CreateCompletedExchange(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid? customerId,
+        Guid outletId,
+        Guid returnReasonId,
+        string returnNumber,
+        decimal totalQuantity,
+        decimal totalExchangeAmount,
+        string? notes,
+        Guid tenantUserId,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            CustomerId = customerId,
+            OutletId = outletId,
+            ReturnReasonId = returnReasonId,
+            ReturnNumber = returnNumber.Trim().ToUpperInvariant(),
+            ReturnChannel = "POS",
+            ReturnStatus = "COMPLETED",
+            RequestedAt = now,
+            ApprovedAt = now,
+            ReceivedAt = now,
+            CompletedAt = now,
+            TotalRequestedQty = totalQuantity,
+            TotalReceivedQty = totalQuantity,
+            TotalRefundAmount = 0,
+            TotalExchangeAmount = totalExchangeAmount,
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
             CreatedByTenantUserId = tenantUserId,
             UpdatedByTenantUserId = tenantUserId,

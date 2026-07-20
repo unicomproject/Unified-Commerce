@@ -293,6 +293,77 @@ public sealed class PosProductCatalogRepositoryTests
         Assert.True(summary.HasVariants);
         Assert.Null(summary.VariantId);
         Assert.Equal(10000, summary.BasePrice);
+        Assert.Equal("in_stock", summary.StockStatus);
+        Assert.Equal(35m, summary.AvailableQuantity);
+    }
+
+    [Fact]
+    public async Task ListAndDetail_AllActiveVariantsHaveZeroAvailable_ReturnOutOfStock()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var firstVariantId = Guid.NewGuid();
+        var secondVariantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedVariableProductAsync(
+            dbContext, tenantId, productId, firstVariantId, secondVariantId, outletId);
+
+        foreach (var balance in dbContext.InventoryBalances)
+        {
+            balance.AdjustQuantities(0m, 0m, 0m, 0m, Now);
+        }
+        await dbContext.SaveChangesAsync();
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var listResult = await repository.ListProductsAsync(
+            tenantId, deviceId, null, null, CancellationToken.None);
+        var detailResult = await repository.GetProductDetailAsync(
+            tenantId, deviceId, productId, CancellationToken.None);
+
+        var summary = Assert.Single(listResult.Products);
+        Assert.Equal("out_of_stock", summary.StockStatus);
+        Assert.Equal(0m, summary.AvailableQuantity);
+        Assert.NotNull(detailResult.Product);
+        Assert.Equal(summary.StockStatus, detailResult.Product.StockStatus);
+        Assert.All(detailResult.Product.Variants, variant =>
+        {
+            Assert.Equal(0m, variant.StockQty);
+            Assert.Equal("out_of_stock", variant.StockStatus);
+        });
+    }
+
+    [Fact]
+    public async Task ListAndDetail_StockAtAnotherOutletOnly_ReturnOutOfStockForDeviceOutlet()
+    {
+        var tenantId = Guid.NewGuid();
+        var deviceOutletId = Guid.NewGuid();
+        var otherOutletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var firstVariantId = Guid.NewGuid();
+        var secondVariantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, deviceOutletId, deviceId);
+        await SeedVariableProductAsync(
+            dbContext, tenantId, productId, firstVariantId, secondVariantId, otherOutletId);
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var listResult = await repository.ListProductsAsync(
+            tenantId, deviceId, null, null, CancellationToken.None);
+        var detailResult = await repository.GetProductDetailAsync(
+            tenantId, deviceId, productId, CancellationToken.None);
+
+        var summary = Assert.Single(listResult.Products);
+        Assert.Equal("out_of_stock", summary.StockStatus);
+        Assert.Equal(0m, summary.AvailableQuantity);
+        Assert.NotNull(detailResult.Product);
+        Assert.Equal("out_of_stock", detailResult.Product.StockStatus);
+        Assert.All(detailResult.Product.Variants, variant => Assert.Equal(0m, variant.StockQty));
     }
 
     [Fact]
