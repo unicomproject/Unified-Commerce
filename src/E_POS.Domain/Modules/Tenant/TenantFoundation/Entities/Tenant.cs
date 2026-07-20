@@ -11,6 +11,8 @@ public class Tenant : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public string BaseCurrencyCode { get; protected set; } = string.Empty;
     public string DefaultTimezone { get; protected set; } = string.Empty;
+    public string? DefaultLocale { get; protected set; }
+    public string? OperatingMode { get; protected set; }
     public string? DataRegion { get; protected set; }
     public DateTimeOffset? ActivatedAt { get; protected set; }
     public DateTimeOffset? SuspendedAt { get; protected set; }
@@ -28,7 +30,9 @@ public class Tenant : AuditableEntity
         string defaultTimezone,
         string? dataRegion,
         Guid? createdByPlatformUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? defaultLocale = null,
+        string? operatingMode = null)
     {
         return new Tenant
         {
@@ -39,6 +43,8 @@ public class Tenant : AuditableEntity
             Status = status,
             BaseCurrencyCode = baseCurrencyCode.Trim(),
             DefaultTimezone = defaultTimezone.Trim(),
+            DefaultLocale = NormalizeOptional(defaultLocale),
+            OperatingMode = NormalizeOptional(operatingMode),
             DataRegion = dataRegion?.Trim(),
             CreatedByPlatformUserId = createdByPlatformUserId,
             UpdatedByPlatformUserId = createdByPlatformUserId,
@@ -52,11 +58,25 @@ public class Tenant : AuditableEntity
         string defaultTimezone,
         string? dataRegion,
         Guid? updatedBy,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? defaultLocale = null,
+        string? operatingMode = null,
+        bool updateLocale = false,
+        bool updateOperatingMode = false)
     {
         DisplayName = displayName.Trim();
         DefaultTimezone = defaultTimezone.Trim();
         DataRegion = dataRegion?.Trim();
+        if (updateLocale)
+        {
+            DefaultLocale = NormalizeOptional(defaultLocale);
+        }
+
+        if (updateOperatingMode)
+        {
+            OperatingMode = NormalizeOptional(operatingMode);
+        }
+
         UpdatedByPlatformUserId = updatedBy;
         UpdatedAt = now;
     }
@@ -81,5 +101,11 @@ public class Tenant : AuditableEntity
         SuspendedAt = now;
         UpdatedByPlatformUserId = updatedBy;
         UpdatedAt = now;
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 }

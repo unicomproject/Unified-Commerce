@@ -287,6 +287,15 @@ public sealed class EPosDbContext : DbContext
 
     // Return, Inspection and Exchange
     public DbSet<ReturnInspection> ReturnInspections => Set<ReturnInspection>();
+    public DbSet<ReturnInspectionDraft> ReturnInspectionDrafts => Set<ReturnInspectionDraft>();
+    public DbSet<ReturnInspectionDraftLine> ReturnInspectionDraftLines => Set<ReturnInspectionDraftLine>();
+    public DbSet<ReturnExchangeReplacementDraftLine> ReturnExchangeReplacementDraftLines =>
+        Set<ReturnExchangeReplacementDraftLine>();
+    public DbSet<ReturnInspectionMedia> ReturnInspectionMedia => Set<ReturnInspectionMedia>();
+    public DbSet<ReturnInspectionCondition> ReturnInspectionConditions =>
+        Set<ReturnInspectionCondition>();
+    public DbSet<ReturnInspectionMediaStaging> ReturnInspectionMediaStaging =>
+        Set<ReturnInspectionMediaStaging>();
     public DbSet<ReturnReason> ReturnReasons => Set<ReturnReason>();
     public DbSet<SalesExchange> SalesExchanges => Set<SalesExchange>();
     public DbSet<SalesExchangeEvent> SalesExchangeEvents => Set<SalesExchangeEvent>();

@@ -152,7 +152,51 @@ public sealed class PlatformDashboardRepositoryTests
         Assert.Equal("TEN-003", dashboard.RecentTenants[0].Code);
         Assert.Contains(dashboard.AttentionItems, x => x.Type == "suspended_tenants" && x.Count == 1);
         Assert.Contains(dashboard.AttentionItems, x => x.Type == "past_due_subscriptions" && x.Count == 1);
+        Assert.Contains(dashboard.AttentionItems, x => x.Type == "pending_billing" && x.Count == 1);
+        Assert.Contains(dashboard.AttentionItems, x => x.Type == "setup_pending" && x.Count == 0);
         Assert.Equal(Now, dashboard.GeneratedAt);
+    }
+
+    [Fact]
+    public async Task GetDashboardAsync_AttentionCounts_DoNotSwapPastDueAndPendingBilling()
+    {
+        await using var dbContext = CreateDbContext();
+        var pastDueTenantId = Guid.Parse("11111111-1111-4111-8111-111111111201");
+        var activeTenantId = Guid.Parse("11111111-1111-4111-8111-111111111202");
+        var secondPastDueTenantId = Guid.Parse("11111111-1111-4111-8111-111111111203");
+
+        dbContext.Tenants.AddRange(
+            Tenant.Create(pastDueTenantId, "TEN-PD1", "ten-pd1", "Past Due One", "active", "LKR", "Asia/Colombo", null, null, Now),
+            Tenant.Create(activeTenantId, "TEN-ACT", "ten-act", "Active Billing", "active", "LKR", "Asia/Colombo", null, null, Now),
+            Tenant.Create(secondPastDueTenantId, "TEN-PD2", "ten-pd2", "Past Due Two", "active", "LKR", "Asia/Colombo", null, null, Now));
+
+        var activeSubscriptionId = Guid.Parse("22222222-2222-4222-8222-222222222302");
+        dbContext.TenantSubscriptions.AddRange(
+            TenantSubscription.Create(Guid.Parse("22222222-2222-4222-8222-222222222301"), pastDueTenantId, Guid.NewGuid(), "PAST_DUE", Now),
+            TenantSubscription.Create(activeSubscriptionId, activeTenantId, Guid.NewGuid(), "ACTIVE", Now),
+            TenantSubscription.Create(Guid.Parse("22222222-2222-4222-8222-222222222303"), secondPastDueTenantId, Guid.NewGuid(), "PAST_DUE", Now));
+
+        var pendingInvoice = SubscriptionInvoice.CreateDraft(
+            Guid.Parse("66666666-6666-4666-8666-666666666701"),
+            activeTenantId,
+            activeSubscriptionId,
+            "INV-ATTN-001",
+            50m,
+            "MONTHLY",
+            Now.AddDays(14),
+            Now);
+        pendingInvoice.Issue(Now);
+        dbContext.SubscriptionInvoices.Add(pendingInvoice);
+        await dbContext.SaveChangesAsync();
+
+        IPlatformDashboardRepository repository = new PlatformDashboardRepository(dbContext);
+        var dashboard = await repository.GetDashboardAsync(Now, CancellationToken.None);
+
+        var pastDue = Assert.Single(dashboard.AttentionItems, x => x.Type == "past_due_subscriptions");
+        var pendingBilling = Assert.Single(dashboard.AttentionItems, x => x.Type == "pending_billing");
+        Assert.Equal(2, pastDue.Count);
+        Assert.Equal(1, pendingBilling.Count);
+        Assert.Equal(1, dashboard.PendingBillingCount);
     }
 
     [Fact]

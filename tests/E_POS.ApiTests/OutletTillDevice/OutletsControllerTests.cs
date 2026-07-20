@@ -155,7 +155,9 @@ public sealed class OutletsControllerTests
             null,
             null,
             DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow);
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow,
+            Guid.NewGuid());
     }
 
     private sealed class FakeOutletService : IOutletService

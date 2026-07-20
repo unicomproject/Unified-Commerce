@@ -45,7 +45,7 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
             request.CollectionEnabled,
             request.PreparationLeadMinutes,
             request.PickupWindowMinutes,
-            allowDeletedStatus: true);
+            allowDeletedStatus: false);
     }
 
     private static ApplicationError? ValidateWriteRequest(
@@ -342,9 +342,32 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
 
     private static bool IsValidTimezone(string timezone)
     {
+        var normalized = timezone.Trim();
         try
         {
-            _ = TimeZoneInfo.FindSystemTimeZoneById(timezone.Trim());
+            _ = TimeZoneInfo.FindSystemTimeZoneById(normalized);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TryResolveConvertedTimezone(normalized);
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryResolveConvertedTimezone(string timezone)
+    {
+        if (!TimeZoneInfo.TryConvertIanaIdToWindowsId(timezone, out var windowsTimezoneId))
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(windowsTimezoneId);
             return true;
         }
         catch (TimeZoneNotFoundException)

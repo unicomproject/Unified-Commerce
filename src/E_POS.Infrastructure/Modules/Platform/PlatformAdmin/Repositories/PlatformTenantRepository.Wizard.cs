@@ -3,6 +3,7 @@ using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
@@ -263,6 +264,37 @@ public sealed partial class PlatformTenantRepository
                 bootstrapCodes.Contains(permission.PermissionCode))
             .Select(permission => permission.Id)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Guid?> GetActiveBusinessTypeIdByCodeAsync(string businessCode, CancellationToken cancellationToken)
+    {
+        var normalized = businessCode.Trim();
+        return await _dbContext.BusinessTypes
+            .AsNoTracking()
+            .Where(type => type.Status == "ACTIVE" && type.BusinessCode == normalized)
+            .Select(type => (Guid?)type.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<TenantProfile?> GetTenantProfileEntityByTenantIdAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.TenantProfiles
+            .FirstOrDefaultAsync(profile => profile.TenantId == tenantId, cancellationToken);
+    }
+
+    public async Task UpsertTenantProfileAsync(TenantProfile profile, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        var exists = await _dbContext.TenantProfiles
+            .AnyAsync(existing => existing.Id == profile.Id, cancellationToken);
+
+        if (!exists)
+        {
+            _dbContext.TenantProfiles.Add(profile);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken)

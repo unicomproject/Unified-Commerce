@@ -73,6 +73,70 @@ public sealed class PlatformTenantCreateRequestValidatorTests
     }
 
     [Fact]
+    public void ValidateWizard_ConflictingCountryCodes_FailsValidation()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(
+            countryCode: "GB",
+            address: new CreatePlatformTenantAddressRequest { CountryCode = "LK" }));
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, item => item.Field == "countryCode");
+        Assert.Contains(error.FieldErrors!, item => item.Field == "address.countryCode");
+    }
+
+    [Fact]
+    public void ValidateWizard_MatchingCountryCodes_Succeeds()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(
+            countryCode: "GB",
+            address: new CreatePlatformTenantAddressRequest { CountryCode = "GB" }));
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void ValidateWizard_InvalidLocale_FailsValidation()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(defaultLocale: "xx-YY"));
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, item => item.Field == "defaultLocale");
+    }
+
+    [Fact]
+    public void ValidateWizard_InvalidOperatingMode_FailsValidation()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(operatingMode: "STANDARD"));
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, item => item.Field == "operatingMode");
+    }
+
+    [Fact]
+    public void ValidateWizard_ValidLocaleAndOperatingMode_Succeeds()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(
+            defaultLocale: "en-GB",
+            operatingMode: TenantOperatingModeConstants.PosOnly,
+            countryCode: "GB"));
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void ValidateUpdate_InvalidLocale_FailsValidation()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateUpdate(new UpdatePlatformTenantRequest
+        {
+            Name = "Tenant",
+            DefaultLocale = "not-a-locale"
+        });
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, item => item.Field == "defaultLocale");
+    }
+
+    [Fact]
     public void ValidateWizard_InvalidPayload_ReturnsFieldLevelErrors()
     {
         var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(
@@ -96,6 +160,8 @@ public sealed class PlatformTenantCreateRequestValidatorTests
         string? subscriptionStatus = TenantSubscriptionStatusConstants.Trial,
         string? paymentMethod = "manual",
         string? tenantAdminEmail = "admin@tenant.com",
+        string? defaultLocale = null,
+        string? operatingMode = null,
         CreatePlatformTenantAddressRequest? address = null)
     {
         return new CreatePlatformTenantRequest
@@ -104,6 +170,8 @@ public sealed class PlatformTenantCreateRequestValidatorTests
             Name = "Tenant",
             CountryCode = countryCode,
             BaseCurrency = baseCurrency,
+            DefaultLocale = defaultLocale,
+            OperatingMode = operatingMode,
             BillingStatus = billingStatus,
             SubscriptionPlanId = Guid.Parse("81111111-1111-4111-8111-111111111111"),
             Address = address,

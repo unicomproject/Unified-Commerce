@@ -17,4 +17,6 @@ public sealed record OutletResponse(
     int? PickupWindowMinutes,
     TimeOnly? CollectionCutoffTime,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    Guid? CreatedByTenantUserId,
+    DateTimeOffset? UpdatedAt,
+    Guid? UpdatedByTenantUserId);

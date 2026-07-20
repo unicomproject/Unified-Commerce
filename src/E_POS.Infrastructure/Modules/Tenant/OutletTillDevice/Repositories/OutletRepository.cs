@@ -288,7 +288,9 @@ public sealed class OutletRepository : IOutletRepository
             pickupMapping?.PickupWindowMinutes,
             pickupMapping?.CollectionCutoffTime,
             outlet.CreatedAt,
-            outlet.UpdatedAt);
+            outlet.CreatedByTenantUserId,
+            outlet.UpdatedAt,
+            outlet.UpdatedByTenantUserId);
     }
 
     public async Task<OutletEditAggregate?> GetEditAggregateAsync(
@@ -530,6 +532,19 @@ public sealed class OutletRepository : IOutletRepository
         FulfillmentMethodOutlet? newPickupMapping,
         CancellationToken cancellationToken)
     {
+        var transaction = _dbContext.Database.IsRelational()
+            ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        if (aggregate.Outlet.IsDefaultOutlet)
+        {
+            await ClearOtherDefaultOutletsAsync(
+                aggregate.Outlet.TenantId,
+                aggregate.Outlet.Id,
+                aggregate.Outlet.UpdatedAt ?? aggregate.Outlet.CreatedAt,
+                cancellationToken);
+        }
+
         if (aggregate.PhysicalAddress is null)
         {
             _dbContext.OutletAddresses.Add(address);
@@ -543,7 +558,22 @@ public sealed class OutletRepository : IOutletRepository
             _dbContext.FulfillmentMethodOutlets.Add(newPickupMapping);
         }
 
-        return await SaveChangesHandlingUniqueViolationAsync(cancellationToken);
+        var saved = await SaveChangesHandlingUniqueViolationAsync(cancellationToken);
+        if (saved && transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+        else if (!saved && transaction is not null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+        }
+
+        if (transaction is not null)
+        {
+            await transaction.DisposeAsync();
+        }
+
+        return saved;
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)

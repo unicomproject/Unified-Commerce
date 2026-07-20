@@ -22,15 +22,16 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         Guid deviceId,
         Guid? categoryId,
         string? search,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? outletId = null)
     {
-        var deviceExists = await _dbContext.PosDevices
+        var deviceOutletId = await _dbContext.PosDevices
             .AsNoTracking()
-            .AnyAsync(
-                x => x.TenantId == tenantId && x.Id == deviceId,
-                cancellationToken);
+            .Where(x => x.TenantId == tenantId && x.Id == deviceId)
+            .Select(x => (Guid?)x.OutletId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!deviceExists)
+        if (!deviceOutletId.HasValue)
         {
             return new PosProductCatalogRepositoryResult("pos_products.device_not_found", []);
         }
@@ -78,7 +79,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             .Where(x =>
                 x.TenantId == tenantId &&
                 productIds.Contains(x.ProductId) &&
-                x.Status != ProductConstants.DeletedStatus &&
+                x.Status == ProductConstants.ActiveStatus &&
                 x.IsSellable)
             .ToListAsync(cancellationToken);
 
@@ -117,40 +118,54 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             .GroupBy(x => x.ProductId)
             .ToDictionary(x => x.Key, x => x.First());
 
-        var defaultVariantIds = products
-            .Select(product =>
-            {
-                variantsByProduct.TryGetValue(product.Id, out var productVariants);
-                productVariants ??= [];
-
-                return productVariants.FirstOrDefault(x => x.IsDefaultVariant)?.Id ??
-                       productVariants.FirstOrDefault()?.Id;
-            })
-            .Where(x => x.HasValue)
-            .Select(x => x!.Value)
-            .Distinct()
-            .ToList();
-
         var inventoryByVariant = new Dictionary<Guid, decimal>();
-        if (defaultVariantIds.Count > 0)
+        if (variantIds.Count > 0)
         {
-            var inventoryRows = await _dbContext.InventoryBalances
-                .AsNoTracking()
-                .Where(x =>
-                    x.TenantId == tenantId &&
-                    x.ProductVariantId.HasValue &&
-                    defaultVariantIds.Contains(x.ProductVariantId.Value))
-                .GroupBy(x => x.ProductVariantId!.Value)
-                .Select(group => new
-                {
-                    VariantId = group.Key,
-                    AvailableQuantity = group.Sum(x => x.AvailableQuantity),
-                })
+            var scopedOutletId = outletId is { } requestedOutletId && requestedOutletId != Guid.Empty
+                ? requestedOutletId
+                : deviceOutletId.Value;
+            var inventoryRows = await (
+                        from balance in _dbContext.InventoryBalances.AsNoTracking()
+                        join location in _dbContext.InventoryLocations.AsNoTracking()
+                            on balance.InventoryLocationId equals location.Id
+                        where balance.TenantId == tenantId &&
+                              location.TenantId == tenantId &&
+                              location.OutletId == scopedOutletId &&
+                              location.IsSellableLocation &&
+                              location.Status == "ACTIVE" &&
+                              balance.ProductVariantId.HasValue &&
+                              variantIds.Contains(balance.ProductVariantId.Value)
+                        group balance by balance.ProductVariantId!.Value
+                        into groupRows
+                        select new
+                        {
+                            VariantId = groupRows.Key,
+                            AvailableQuantity = groupRows.Sum(x => x.AvailableQuantity),
+                        })
                 .ToListAsync(cancellationToken);
 
             inventoryByVariant = inventoryRows.ToDictionary(
                 x => x.VariantId,
                 x => x.AvailableQuantity);
+        }
+
+        var barcodeByVariant = new Dictionary<Guid, string>();
+        if (variantIds.Count > 0)
+        {
+            var barcodeRows = await _dbContext.ProductBarcodes
+                .AsNoTracking()
+                .Where(x =>
+                    x.TenantId == tenantId &&
+                    x.ProductVariantId.HasValue &&
+                    variantIds.Contains(x.ProductVariantId.Value) &&
+                    x.Status == "ACTIVE")
+                .OrderByDescending(x => x.IsPrimaryBarcode)
+                .ThenBy(x => x.Id)
+                .Select(x => new { VariantId = x.ProductVariantId!.Value, x.Barcode })
+                .ToListAsync(cancellationToken);
+            barcodeByVariant = barcodeRows
+                .GroupBy(x => x.VariantId)
+                .ToDictionary(g => g.Key, g => g.First().Barcode);
         }
 
         var imageRows = await _dbContext.ProductImages
@@ -222,15 +237,19 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             categoryByProduct.TryGetValue(product.Id, out var categoryInfo);
             imageByProduct.TryGetValue(product.Id, out var imageStorageKey);
 
-            decimal? availableQuantity = null;
-            if (defaultVariant?.Id is { } defaultVariantId &&
-                inventoryByVariant.TryGetValue(defaultVariantId, out var quantity))
-            {
-                availableQuantity = quantity;
-            }
+            var availableQuantities = productVariants
+                .Where(variant => inventoryByVariant.ContainsKey(variant.Id))
+                .Select(variant => inventoryByVariant[variant.Id])
+                .ToList();
+            decimal? availableQuantity = availableQuantities.Count == 0
+                ? null
+                : availableQuantities.Sum(quantity => Math.Max(0m, quantity));
 
             reorderRulesByProduct.TryGetValue(product.Id, out var minStockQuantity);
-            var stockStatus = ResolveStockStatus(availableQuantity, minStockQuantity);
+            var stockStatus = ResolveProductStockStatus(
+                availableQuantities,
+                availableQuantity,
+                minStockQuantity);
 
             summaries.Add(new PosProductSummaryResponseDto(
                 product.Id,
@@ -243,7 +262,11 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                 (int)Math.Round(minPrice ?? 0m, MidpointRounding.AwayFromZero),
                 hasVariants,
                 stockStatus,
-                availableQuantity));
+                availableQuantity,
+                defaultVariant?.Sku,
+                defaultVariant is null
+                    ? null
+                    : barcodeByVariant.GetValueOrDefault(defaultVariant.Id)));
         }
 
         return new PosProductCatalogRepositoryResult(null, summaries);
@@ -254,13 +277,13 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         Guid deviceId,
         CancellationToken cancellationToken)
     {
-        var deviceExists = await _dbContext.PosDevices
+        var deviceOutletId = await _dbContext.PosDevices
             .AsNoTracking()
-            .AnyAsync(
-                x => x.TenantId == tenantId && x.Id == deviceId,
-                cancellationToken);
+            .Where(x => x.TenantId == tenantId && x.Id == deviceId)
+            .Select(x => (Guid?)x.OutletId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!deviceExists)
+        if (!deviceOutletId.HasValue)
         {
             return new PosProductCatalogCategoriesRepositoryResult("pos_products.device_not_found", []);
         }
@@ -290,13 +313,13 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         Guid productId,
         CancellationToken cancellationToken)
     {
-        var deviceExists = await _dbContext.PosDevices
+        var deviceOutletId = await _dbContext.PosDevices
             .AsNoTracking()
-            .AnyAsync(
-                x => x.TenantId == tenantId && x.Id == deviceId,
-                cancellationToken);
+            .Where(x => x.TenantId == tenantId && x.Id == deviceId)
+            .Select(x => (Guid?)x.OutletId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!deviceExists)
+        if (!deviceOutletId.HasValue)
         {
             return new PosProductDetailRepositoryResult("pos_products.device_not_found", null);
         }
@@ -331,7 +354,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == productId &&
-                x.Status != ProductConstants.DeletedStatus &&
+                x.Status == ProductConstants.ActiveStatus &&
                 x.IsSellable)
             .OrderByDescending(x => x.IsDefaultVariant)
             .ThenBy(x => x.VariantName)
@@ -371,17 +394,23 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         }
 
         var inventoryByVariant = new Dictionary<Guid, decimal>();
-        var inventoryRows = await _dbContext.InventoryBalances
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.ProductVariantId.HasValue &&
-                variantIds.Contains(x.ProductVariantId.Value))
-            .GroupBy(x => x.ProductVariantId!.Value)
-            .Select(group => new
+        var inventoryRows = await (
+            from balance in _dbContext.InventoryBalances.AsNoTracking()
+            join location in _dbContext.InventoryLocations.AsNoTracking()
+                on balance.InventoryLocationId equals location.Id
+            where balance.TenantId == tenantId &&
+                  location.TenantId == tenantId &&
+                  location.OutletId == deviceOutletId.Value &&
+                  location.IsSellableLocation &&
+                  location.Status == "ACTIVE" &&
+                  balance.ProductVariantId.HasValue &&
+                  variantIds.Contains(balance.ProductVariantId.Value)
+            group balance by balance.ProductVariantId!.Value
+            into groupRows
+            select new
             {
-                VariantId = group.Key,
-                AvailableQuantity = group.Sum(x => x.AvailableQuantity),
+                VariantId = groupRows.Key,
+                AvailableQuantity = groupRows.Sum(x => x.AvailableQuantity),
             })
             .ToListAsync(cancellationToken);
 
@@ -468,7 +497,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             var price = pricesByVariant[variant.Id];
             minPrice = minPrice.HasValue ? Math.Min(minPrice.Value, price) : price;
 
-            inventoryByVariant.TryGetValue(variant.Id, out var availableQuantity);
+            decimal? availableQuantity = inventoryByVariant.TryGetValue(variant.Id, out var qty) ? qty : null;
             var stockStatus = ResolveStockStatus(availableQuantity, reorderRule);
 
             var attributes = variantOptionLinks
@@ -493,6 +522,13 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                 attributes));
         }
 
+        var productAvailableQuantities = variantDetails
+            .Where(x => x.StockQty.HasValue)
+            .Select(x => x.StockQty!.Value)
+            .ToList();
+        var productAvailableQuantity = productAvailableQuantities.Count > 0
+            ? productAvailableQuantities.Sum(quantity => Math.Max(0m, quantity))
+            : (decimal?)null;
         var detail = new PosProductDetailResponseDto(
             product.Id,
             product.ProductName,
@@ -502,7 +538,12 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             (int)Math.Round(minPrice ?? 0m, MidpointRounding.AwayFromZero),
             hasVariants,
             variantGroups,
-            variantDetails);
+            variantDetails,
+            ResolveProductStockStatus(
+                productAvailableQuantities,
+                productAvailableQuantity,
+                reorderRule),
+            productAvailableQuantity);
 
         return new PosProductDetailRepositoryResult(null, detail);
     }
@@ -619,6 +660,24 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         }
 
         return "in_stock";
+    }
+
+    private static string ResolveProductStockStatus(
+        IReadOnlyCollection<decimal> variantAvailableQuantities,
+        decimal? totalAvailableQuantity,
+        decimal? minStockQuantity)
+    {
+        if (variantAvailableQuantities.Count == 0)
+        {
+            return ResolveStockStatus(totalAvailableQuantity, minStockQuantity);
+        }
+
+        if (!variantAvailableQuantities.Any(quantity => quantity > 0m))
+        {
+            return "out_of_stock";
+        }
+
+        return ResolveStockStatus(totalAvailableQuantity, minStockQuantity);
     }
 
     private static string? ResolveImageValue(string? imageUrl, string imageStorageKey)

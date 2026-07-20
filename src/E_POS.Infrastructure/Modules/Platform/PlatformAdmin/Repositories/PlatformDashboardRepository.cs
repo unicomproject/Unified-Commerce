@@ -25,7 +25,6 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
                 x.TenantCode,
                 x.DisplayName,
                 x.Status,
-                "UNKNOWN",
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
 
@@ -63,14 +62,14 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
             Attention(
                 "past_due_subscriptions",
                 "Past Due Subscriptions",
-                "Tenant subscriptions with past due billing status.",
-                pendingBilling,
+                "Tenant subscriptions with PAST_DUE status.",
+                pastDueSubscriptions,
                 "critical"),
             Attention(
                 "pending_billing",
                 "Pending Billing",
-                "Tenants with pending, failed, or overdue billing status.",
-                pastDueSubscriptions,
+                "Issued invoices that are PENDING with a balance due.",
+                pendingBilling,
                 "warning")
         };
 
@@ -125,7 +124,6 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
         string TenantCode,
         string Name,
         string Status,
-        string BillingStatus,
         DateTimeOffset CreatedAt);
 
     private sealed record SubscriptionSnapshot(Guid TenantId, string SubscriptionStatus);

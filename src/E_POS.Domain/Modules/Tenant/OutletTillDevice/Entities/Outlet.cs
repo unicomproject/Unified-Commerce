@@ -76,6 +76,7 @@ public class Outlet : AuditableEntity
 
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
+        IsDefaultOutlet = false;
         Status = OutletConstants.DeletedStatus;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;

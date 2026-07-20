@@ -11,6 +11,10 @@ public interface IPlatformUserRepository
 
     Task<PlatformUser?> GetUserEntityByIdAsync(Guid userId, CancellationToken cancellationToken);
 
+    Task<PlatformUser?> GetUserEntityByNormalizedEmailAsync(
+        string normalizedEmail,
+        CancellationToken cancellationToken);
+
     Task<bool> EmailExistsAsync(
         string normalizedEmail,
         Guid? excludingUserId,

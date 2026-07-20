@@ -475,6 +475,21 @@ public sealed class PlatformUserServiceTests
             return Task.FromResult(UserEntity?.Id == userId ? UserEntity : null);
         }
 
+        public Task<PlatformUser?> GetUserEntityByNormalizedEmailAsync(
+            string normalizedEmail,
+            CancellationToken cancellationToken)
+        {
+            if (UserEntity is null)
+            {
+                return Task.FromResult<PlatformUser?>(null);
+            }
+
+            return Task.FromResult(
+                string.Equals(UserEntity.NormalizedEmail, normalizedEmail, StringComparison.Ordinal)
+                    ? UserEntity
+                    : null);
+        }
+
         public Task<bool> EmailExistsAsync(
             string normalizedEmail,
             Guid? excludingUserId,

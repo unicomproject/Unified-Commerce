@@ -9,7 +9,8 @@ public interface IPosProductCatalogRepository
         Guid deviceId,
         Guid? categoryId,
         string? search,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Guid? outletId = null);
 
     Task<PosProductCatalogCategoriesRepositoryResult> ListCategoriesAsync(
         Guid tenantId,

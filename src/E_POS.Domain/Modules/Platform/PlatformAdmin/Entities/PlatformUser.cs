@@ -65,6 +65,12 @@ public class PlatformUser : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void SetDisplayName(string? displayName, DateTimeOffset now)
+    {
+        DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+        UpdatedAt = now;
+    }
+
     public void RecordSuccessfulLogin(DateTimeOffset now)
     {
         LastLoginAt = now;

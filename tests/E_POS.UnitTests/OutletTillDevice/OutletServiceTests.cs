@@ -215,6 +215,70 @@ public sealed class OutletServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithIanaTimezone_SucceedsOnWindows()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with { Timezone = "Asia/Colombo" };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithInvalidEmail_ReturnsValidationFailure()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with { Email = "not-an-email" };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "email");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithUnsupportedOutletType_ReturnsValidationFailure()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with { OutletType = "RETAIL" };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "outletType");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithDeletedStatus_ReturnsValidationFailure()
+    {
+        var service = CreateService(new FakeOutletRepository());
+        var request = CreateValidRequest() with { Status = OutletConstants.DeletedStatus };
+
+        var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "status");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithDeletedStatus_ReturnsValidationFailure()
+    {
+        var aggregate = new OutletEditAggregate(
+            Outlet.Create(Guid.NewGuid(), TenantId, "Main Outlet", "OUT001", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now),
+            OutletAddress.Create(Guid.NewGuid(), TenantId, Guid.NewGuid(), "1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null, UserId, Now),
+            [],
+            null);
+        var service = CreateService(new FakeOutletRepository { EditAggregate = aggregate });
+        var request = CreateValidUpdateRequest() with { Status = OutletConstants.DeletedStatus };
+
+        var result = await service.UpdateAsync(CreateContext(), aggregate.Outlet.Id, request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Error.FieldErrors ?? [], field => field.Field == "status");
+    }
+
+    [Fact]
     public async Task CreateAsync_WithInvalidCountryCode_ReturnsValidationFailure()
     {
         var service = CreateService(new FakeOutletRepository());
@@ -366,6 +430,21 @@ public sealed class OutletServiceTests
             false);
     }
 
+    private static OutletUpdateRequest CreateValidUpdateRequest()
+    {
+        return new OutletUpdateRequest(
+            "Updated Outlet",
+            "ACTIVE",
+            "STORE",
+            "UTC",
+            false,
+            "+94770000000",
+            "updated@example.com",
+            new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null),
+            [new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null)],
+            false);
+    }
+
     private sealed class FakeCodeSequenceRepository : ICodeSequenceRepository
     {
         private int _nextValue;
@@ -448,7 +527,9 @@ public sealed class OutletServiceTests
                 null,
                 null,
                 Now,
-                Now);
+                UserId,
+                Now,
+                UserId);
         }
     }
 }
