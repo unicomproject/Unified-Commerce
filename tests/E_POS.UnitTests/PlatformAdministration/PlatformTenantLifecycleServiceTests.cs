@@ -180,6 +180,45 @@ public sealed class PlatformTenantLifecycleServiceTests
     }
 
     [Fact]
+    public async Task UpdateTenantAsync_NameOnly_DoesNotEraseLocaleOrOperatingMode()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeLifecycleTenantRepository
+        {
+            TenantEntity = Tenant.Create(
+                tenantId,
+                "TEN-LOCALE-KEEP",
+                "ten-locale-keep",
+                "Locale Tenant",
+                TenantStatusConstants.Draft,
+                "GBP",
+                "Europe/London",
+                null,
+                null,
+                Now,
+                "en-GB",
+                TenantOperatingModeConstants.PosOnly),
+            DetailResponse = CreateDetail(tenantId, TenantStatusConstants.Draft)
+        };
+
+        var service = CreateService(
+            repository,
+            new FakePlatformSubscriptionPlanRepository(),
+            permissions: AllTenantPermissions());
+
+        var result = await service.UpdateTenantAsync(
+            tenantId,
+            new UpdatePlatformTenantRequest { Name = "Renamed Locale Tenant" },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Renamed Locale Tenant", repository.TenantEntity!.DisplayName);
+        Assert.Equal("en-GB", repository.TenantEntity.DefaultLocale);
+        Assert.Equal(TenantOperatingModeConstants.PosOnly, repository.TenantEntity.OperatingMode);
+    }
+
+    [Fact]
     public async Task UpdateTenantAsync_WhenMissing_ReturnsNotFound()
     {
         var service = CreateService(
@@ -497,6 +536,29 @@ public sealed class PlatformTenantLifecycleServiceTests
         public PlatformTenantDetailResponse? DetailResponse { get; init; }
         public IReadOnlySet<Guid> IncludedFeatureIds { get; init; } = new HashSet<Guid>();
         public IReadOnlyList<ResolvedTenantFeature> ResolvedFeatures { get; init; } = [];
+        public Dictionary<string, Guid> BusinessTypeIdsByCode { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public TenantProfile? ProfileEntity { get; set; }
+        public TenantProfile? UpsertedProfile { get; private set; }
+
+        public Task<Guid?> GetActiveBusinessTypeIdByCodeAsync(string businessCode, CancellationToken cancellationToken)
+        {
+            if (BusinessTypeIdsByCode.TryGetValue(businessCode.Trim(), out var id))
+            {
+                return Task.FromResult<Guid?>(id);
+            }
+
+            return Task.FromResult<Guid?>(null);
+        }
+
+        public Task<TenantProfile?> GetTenantProfileEntityByTenantIdAsync(Guid tenantId, CancellationToken cancellationToken)
+            => Task.FromResult(ProfileEntity);
+
+        public Task UpsertTenantProfileAsync(TenantProfile profile, CancellationToken cancellationToken)
+        {
+            UpsertedProfile = profile;
+            ProfileEntity = profile;
+            return Task.CompletedTask;
+        }
 
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,

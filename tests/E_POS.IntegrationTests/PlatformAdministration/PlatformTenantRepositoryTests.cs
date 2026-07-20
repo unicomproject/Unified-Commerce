@@ -5,6 +5,7 @@ using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Persistence;
@@ -95,7 +96,8 @@ public sealed class PlatformTenantRepositoryTests
 
         Assert.Contains("active", options.Statuses);
         Assert.Contains("ACTIVE", options.BillingStatuses);
-        Assert.Contains("STANDARD", options.OperatingModes);
+        Assert.Contains(TenantOperatingModeConstants.UnifiedEpos, options.OperatingModes);
+        Assert.Contains(TenantOperatingModeConstants.PosOnly, options.OperatingModes);
         Assert.Contains(options.Plans, plan => plan.Id == planId);
     }
 
@@ -140,6 +142,77 @@ public sealed class PlatformTenantRepositoryTests
         Assert.Equal(["online_store"], detail.EnabledFeatureCodes);
         Assert.Null(detail.Profile);
         Assert.Null(detail.PrimaryAddress);
+    }
+
+    [Fact]
+    public async Task GetTenantDetailAsync_WhenLocaleModeBusinessTypeAndCountrySeeded_ReturnsPersistedValues()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+        var businessTypeId = Guid.Parse("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+
+        dbContext.BusinessTypes.Add(BusinessType.Create(
+            businessTypeId,
+            "retail",
+            "Retail",
+            null,
+            "ACTIVE",
+            Now));
+
+        dbContext.Tenants.Add(Tenant.Create(
+            tenantId,
+            "TEN-LOCALE",
+            "ten-locale",
+            "Locale Tenant",
+            "active",
+            "GBP",
+            "Europe/London",
+            null,
+            null,
+            Now,
+            "en-GB",
+            TenantOperatingModeConstants.PosOnly));
+
+        dbContext.TenantProfiles.Add(TenantProfile.Create(
+            Guid.NewGuid(),
+            tenantId,
+            businessTypeId,
+            "Locale Tenant Ltd",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Now));
+
+        dbContext.TenantAddresses.Add(TenantAddress.CreateRegistered(
+            Guid.NewGuid(),
+            tenantId,
+            "10 Downing Street",
+            null,
+            "London",
+            null,
+            null,
+            "GB",
+            true,
+            "ACTIVE",
+            null,
+            Now));
+
+        await dbContext.SaveChangesAsync();
+
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+        var detail = await repository.GetTenantDetailAsync(tenantId, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Equal("en-GB", detail!.DefaultLocale);
+        Assert.Equal(TenantOperatingModeConstants.PosOnly, detail.OperatingMode);
+        Assert.Equal("retail", detail.BusinessType);
+        Assert.NotNull(detail.PrimaryAddress);
+        Assert.Equal("GB", detail.PrimaryAddress!.CountryCode);
     }
 
     [Fact]
