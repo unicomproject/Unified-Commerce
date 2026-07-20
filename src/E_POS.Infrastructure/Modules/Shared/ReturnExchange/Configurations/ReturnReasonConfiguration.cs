@@ -8,7 +8,15 @@ public sealed class ReturnReasonConfiguration : IEntityTypeConfiguration<ReturnR
 {
     public void Configure(EntityTypeBuilder<ReturnReason> builder)
     {
-        builder.ToTable("return_reasons");
+        builder.ToTable("return_reasons", t =>
+        {
+            t.HasCheckConstraint(
+                "ck_return_reasons_applies_to",
+                "applies_to IN ('RETURN', 'EXCHANGE', 'BOTH')");
+            t.HasCheckConstraint(
+                "ck_return_reasons_sort_order",
+                "sort_order >= 0");
+        });
 
         builder.HasKey(x => x.Id).HasName("pk_return_reasons");
 
@@ -44,15 +52,31 @@ public sealed class ReturnReasonConfiguration : IEntityTypeConfiguration<ReturnR
             .HasMaxLength(150)
             .IsRequired();
 
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(x => x.AppliesTo)
             .HasColumnName("applies_to")
             .HasColumnType("varchar(40)")
             .HasMaxLength(40)
             .IsRequired();
 
+        builder.Property(x => x.RequiresNote)
+            .HasColumnName("requires_note")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(x => x.RequiresInspection)
             .HasColumnName("requires_inspection")
             .IsRequired();
+
+        builder.Property(x => x.RequiresManagerApproval)
+            .HasColumnName("requires_manager_approval")
+            .IsRequired()
+            .HasDefaultValue(false);
 
         builder.Property(x => x.IsActive)
             .HasColumnName("is_active")
@@ -67,6 +91,10 @@ public sealed class ReturnReasonConfiguration : IEntityTypeConfiguration<ReturnR
             .IsUnique()
             .HasDatabaseName("ux_return_reasons_978380c7");
 
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_return_reasons_tenant_id_id");
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -75,4 +103,3 @@ public sealed class ReturnReasonConfiguration : IEntityTypeConfiguration<ReturnR
         // </second-brain-constraints>
     }
 }
-

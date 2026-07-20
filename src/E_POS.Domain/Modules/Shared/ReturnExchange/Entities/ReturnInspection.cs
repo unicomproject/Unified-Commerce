@@ -15,5 +15,19 @@ public class ReturnInspection : AuditableEntity
     public decimal? RejectQuantity { get; protected set; }
     public string? InspectionNotes { get; protected set; }
     public DateTimeOffset? InspectedAt { get; protected set; }
+
+    public static ReturnInspection CreateCompleted(
+        Guid id, Guid tenantId, Guid salesReturnLineId, Guid inspectedBy, string conditionCode,
+        string restockDecision, decimal restockQty, decimal rejectQty, string? notes,
+        DateTimeOffset inspectedAt, Guid? inventoryLocationId = null) =>
+        new()
+        {
+            Id = id, TenantId = tenantId, SalesReturnLineId = salesReturnLineId,
+            InspectedByTenantUserId = inspectedBy, InventoryLocationId = inventoryLocationId,
+            InspectionStatus = "COMPLETED", ConditionCode = conditionCode.Trim().ToUpperInvariant(),
+            RestockDecision = restockDecision, RestockQuantity = restockQty,
+            RejectQuantity = rejectQty, InspectionNotes = notes, InspectedAt = inspectedAt,
+            CreatedAt = inspectedAt
+        };
 }
 

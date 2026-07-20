@@ -84,9 +84,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
             context.HasPermission(SalesPermissions.Sale.Create);
 
         var canViewReturns =
-            context.HasPermission(ReturnsPermissions.ViewReturns) ||
-            context.HasPermission(ReturnsPermissions.ViewRefunds) ||
-            context.HasPermission(ReturnsPermissions.CreateRefund);
+            context.HasPermission(ReturnsPermissions.ViewReturns);
 
         var canCreateCustomers =
             context.HasPermission(CustomerPermissions.Create);

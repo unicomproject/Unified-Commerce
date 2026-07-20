@@ -71,6 +71,8 @@ public sealed class CustomersControllerTests
         var result = await controller.List(
             deviceId,
             "Kamal",
+            null,
+            null,
             1,
             20,
             CancellationToken.None);
@@ -99,12 +101,61 @@ public sealed class CustomersControllerTests
         var result = await controller.List(
             Guid.NewGuid(),
             null,
+            null,
+            null,
             1,
             20,
             CancellationToken.None);
 
         var forbidden = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
+    }
+
+    [Fact]
+    public async Task Summary_WithValidContext_ReturnsOk()
+    {
+        var service = new FakeCustomerService
+        {
+            SummaryResult = ApplicationResult<PosCustomerSummaryResponseDto>.Success(
+                new PosCustomerSummaryResponseDto(10, 8, 5, 2, "UTC"))
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "customers.view");
+
+        var result = await controller.Summary(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Update_WithValidRequest_ReturnsOk()
+    {
+        var customerId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var service = new FakeCustomerService
+        {
+            UpdateResult = ApplicationResult<PosCustomerListItemResponseDto>.Success(
+                new PosCustomerListItemResponseDto(
+                    customerId,
+                    "Updated Name",
+                    "+94771234567",
+                    null,
+                    "ACTIVE",
+                    "CUS000001",
+                    "POS"))
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "customers.update");
+
+        var result = await controller.Update(
+            customerId,
+            deviceId,
+            new PosCustomerUpdateRequestDto("Updated Name", "+94771234567", null, "ACTIVE"),
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(customerId, service.UpdateCustomerId);
+        Assert.Equal("Updated Name", service.UpdateRequest?.FullName);
     }
 
     [Fact]
@@ -149,6 +200,10 @@ public sealed class CustomersControllerTests
             ApplicationResult<PosCustomerListResponseDto>.Failure(
                 new ApplicationError("pos_customers.list_failed", "Customers could not be loaded."));
 
+        public ApplicationResult<PosCustomerSummaryResponseDto> SummaryResult { get; init; } =
+            ApplicationResult<PosCustomerSummaryResponseDto>.Failure(
+                new ApplicationError("pos_customers.summary_failed", "Summary unavailable."));
+
         public TenantRequestContext? Context { get; private set; }
         public Guid? DeviceId { get; private set; }
         public string? Search { get; private set; }
@@ -173,6 +228,8 @@ public sealed class CustomersControllerTests
             TenantRequestContext context,
             Guid? deviceId,
             string? search,
+            string? status,
+            string? source,
             int page,
             int pageSize,
             CancellationToken cancellationToken)
@@ -183,6 +240,62 @@ public sealed class CustomersControllerTests
             Page = page;
             PageSize = pageSize;
             return Task.FromResult(Result);
+        }
+
+        public Task<ApplicationResult<PosCustomerSummaryResponseDto>> GetSummaryAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(SummaryResult);
+
+        public Task<ApplicationResult<PosCustomerListItemResponseDto>> GetByIdAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            Guid customerId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(CreateResult);
+
+        public Task<ApplicationResult<PosCustomerOrdersResponseDto>> GetOrdersAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            Guid customerId,
+            int page,
+            int pageSize,
+            DateTimeOffset? fromDate,
+            DateTimeOffset? toDate,
+            string? status,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosCustomerOrdersResponseDto>.Success(
+                new PosCustomerOrdersResponseDto([], page, pageSize, 0, 0)));
+
+        public Task<ApplicationResult<PosCustomerAttachToSaleResponseDto>> AttachToSaleAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            Guid customerId,
+            PosCustomerAttachToSaleRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosCustomerAttachToSaleResponseDto>.Failure(
+                new ApplicationError("pos_customers.attach_failed", "Attach failed.")));
+
+        public ApplicationResult<PosCustomerListItemResponseDto> UpdateResult { get; init; } =
+            ApplicationResult<PosCustomerListItemResponseDto>.Failure(
+                new ApplicationError("pos_customers.update_failed", "Customer could not be updated."));
+
+        public Guid? UpdateCustomerId { get; private set; }
+        public PosCustomerUpdateRequestDto? UpdateRequest { get; private set; }
+
+        public Task<ApplicationResult<PosCustomerListItemResponseDto>> UpdateAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            Guid customerId,
+            PosCustomerUpdateRequestDto request,
+            CancellationToken cancellationToken)
+        {
+            Context = context;
+            DeviceId = deviceId;
+            UpdateCustomerId = customerId;
+            UpdateRequest = request;
+            return Task.FromResult(UpdateResult);
         }
     }
 }
