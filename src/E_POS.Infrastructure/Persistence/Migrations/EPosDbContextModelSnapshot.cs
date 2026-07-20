@@ -8137,7 +8137,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("document_number_sequence_id");
 
-                    b.Property<string?>("IdempotencyKey")
+                    b.Property<string>("IdempotencyKey")
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)")
                         .HasColumnName("idempotency_key");

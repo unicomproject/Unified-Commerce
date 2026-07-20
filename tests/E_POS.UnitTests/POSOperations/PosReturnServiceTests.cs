@@ -173,7 +173,7 @@ public sealed class PosReturnServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("REFUND", result.Value.Resolution);
+        Assert.Equal("REFUND", result.Value!.Resolution);
         Assert.Equal(returnId, repository.CompletionReturnId);
     }
 
@@ -1852,10 +1852,10 @@ public sealed class PosReturnServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value.Items.Count);
-        Assert.DoesNotContain(result.Value.Items, x => x.Code == "STORE_CREDIT");
-        Assert.Contains(result.Value.Items, x => x.Code == "ORIGINAL_PAYMENT" && x.Enabled);
-        Assert.Contains(result.Value.Items, x => x.Code == "CASH" && x.Enabled);
+        Assert.Equal(2, result.Value!.Items.Count);
+        Assert.DoesNotContain(result.Value!.Items, x => x.Code == "STORE_CREDIT");
+        Assert.Contains(result.Value!.Items, x => x.Code == "ORIGINAL_PAYMENT" && x.Enabled);
+        Assert.Contains(result.Value!.Items, x => x.Code == "CASH" && x.Enabled);
     }
 
     [Fact]
@@ -1892,7 +1892,7 @@ public sealed class PosReturnServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("CASH", result.Value.MethodCode);
+        Assert.Equal("CASH", result.Value!.MethodCode);
         Assert.Equal("CASH", repository.SavedRefundMethodCode);
     }
 
