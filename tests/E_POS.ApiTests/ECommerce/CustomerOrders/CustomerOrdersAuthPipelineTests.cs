@@ -18,7 +18,7 @@ using Xunit;
 
 namespace E_POS.ApiTests.ECommerce.CustomerOrders;
 
-public sealed class CustomerOrdersAuthPipelineTests
+public sealed class CustomerOrdersAuthPipelineTests : IClassFixture<CustomerOrdersAuthPipelineTests.CustomerOrdersApiFactory>
 {
     private const string Issuer = "TM-EPOS";
     private const string CustomerAudience = "TM-EPOS-Customer";
@@ -29,11 +29,17 @@ public sealed class CustomerOrdersAuthPipelineTests
     private static readonly Guid CustomerId = Guid.NewGuid();
     private static readonly Guid TenantUserId = Guid.NewGuid();
 
+    private readonly CustomerOrdersApiFactory _factory;
+
+    public CustomerOrdersAuthPipelineTests(CustomerOrdersApiFactory factory)
+    {
+        _factory = factory;
+    }
+
     [Fact]
     public async Task CustomerOrders_WithValidCustomerJwt_ReturnsOk()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateCustomerToken());
 
         var response = await client.GetAsync("/api/v1/ecommerce/storefront/orders");
@@ -44,8 +50,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task CustomerOrders_WithoutToken_ReturnsUnauthorized()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
 
         var response = await client.GetAsync("/api/v1/ecommerce/storefront/orders");
 
@@ -55,8 +60,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task CustomerOrders_WithTenantJwt_ReturnsForbidden()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateTenantToken(["fulfillment.orders.manage"]));
 
         var response = await client.GetAsync("/api/v1/ecommerce/storefront/orders");
@@ -67,8 +71,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task CustomerOrders_WithExpiredCustomerJwt_ReturnsUnauthorized()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateCustomerToken(expiresAt: DateTime.UtcNow.AddMinutes(-10)));
 
         var response = await client.GetAsync("/api/v1/ecommerce/storefront/orders");
@@ -79,8 +82,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task CustomerOrders_WithWrongAudience_ReturnsUnauthorized()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateToken(
             CustomerKey,
             audience: "TM-EPOS-Unknown",
@@ -96,8 +98,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task CustomerOrderCancel_WithValidCustomerJwt_ReturnsOk()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateCustomerToken());
 
         var response = await client.PostAsJsonAsync(
@@ -110,8 +111,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task CustomerOrderCancel_WithTenantJwt_ReturnsForbidden()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateTenantToken(["fulfillment.orders.manage"]));
 
         var response = await client.PostAsJsonAsync(
@@ -124,8 +124,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task TenantStatusUpdate_WithValidTenantJwtAndPermission_ReturnsOk()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateTenantToken(["fulfillment.orders.manage"]));
 
         var response = await client.PatchAsJsonAsync(
@@ -138,8 +137,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task TenantStatusUpdate_WithCustomerJwt_ReturnsForbidden()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateCustomerToken());
 
         var response = await client.PatchAsJsonAsync(
@@ -152,8 +150,7 @@ public sealed class CustomerOrdersAuthPipelineTests
     [Fact]
     public async Task TenantStatusUpdate_WithTenantJwtMissingPermission_ReturnsForbidden()
     {
-        await using var factory = new CustomerOrdersApiFactory();
-        var client = factory.CreateClient();
+        var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = Bearer(CreateTenantToken(["tenant.dashboard.view"]));
 
         var response = await client.PatchAsJsonAsync(
@@ -224,7 +221,7 @@ public sealed class CustomerOrdersAuthPipelineTests
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private sealed class CustomerOrdersApiFactory : WebApplicationFactory<Program>
+    public sealed class CustomerOrdersApiFactory : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
