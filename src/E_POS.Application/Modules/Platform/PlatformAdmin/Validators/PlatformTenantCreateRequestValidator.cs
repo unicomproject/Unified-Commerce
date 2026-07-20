@@ -32,6 +32,20 @@ public static partial class PlatformTenantCreateRequestValidator
             .Select(item => item.Value)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+    private static readonly HashSet<string> AllowedLocales =
+        TenantCreateWizardReferenceData.Locales
+            .Select(item => item.Value)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly HashSet<string> AllowedOperatingModes =
+        TenantOperatingModeConstants.All
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly HashSet<string> AllowedCountryCodes =
+        TenantCreateWizardReferenceData.CountryCodes
+            .Select(item => item.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     public static ApplicationError? ValidateWizard(CreatePlatformTenantRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -40,11 +54,15 @@ public static partial class PlatformTenantCreateRequestValidator
 
         ValidateCountryCode(fieldErrors, "countryCode", request.CountryCode, required: false);
         ValidateCurrencyCode(fieldErrors, "baseCurrency", request.BaseCurrency, required: false);
+        ValidateLocale(fieldErrors, "defaultLocale", request.DefaultLocale, required: false);
+        ValidateOperatingMode(fieldErrors, "operatingMode", request.OperatingMode, required: false);
 
         if (request.Address is not null)
         {
             ValidateCountryCode(fieldErrors, "address.countryCode", request.Address.CountryCode, required: false);
         }
+
+        ValidateCountryCodeConsistency(fieldErrors, request.CountryCode, request.Address?.CountryCode);
 
         ValidateBillingStatus(fieldErrors, request.BillingStatus);
 
@@ -66,6 +84,25 @@ public static partial class PlatformTenantCreateRequestValidator
 
         return ApplicationError.ValidationFailed(
             "One or more tenant create fields are invalid.",
+            fieldErrors);
+    }
+
+    public static ApplicationError? ValidateUpdate(UpdatePlatformTenantRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var fieldErrors = new List<ApplicationFieldError>();
+        ValidateCurrencyCode(fieldErrors, "baseCurrency", request.BaseCurrency, required: false);
+        ValidateLocale(fieldErrors, "defaultLocale", request.DefaultLocale, required: false);
+        ValidateOperatingMode(fieldErrors, "operatingMode", request.OperatingMode, required: false);
+
+        if (fieldErrors.Count == 0)
+        {
+            return null;
+        }
+
+        return ApplicationError.ValidationFailed(
+            "One or more tenant update fields are invalid.",
             fieldErrors);
     }
 
@@ -91,6 +128,87 @@ public static partial class PlatformTenantCreateRequestValidator
             fieldErrors.Add(new ApplicationFieldError(
                 fieldName,
                 "Country code must be exactly 2 letters (for example LK)."));
+            return;
+        }
+
+        if (!AllowedCountryCodes.Contains(normalized))
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                fieldName,
+                "Country code is not in the supported catalogue."));
+        }
+    }
+
+    private static void ValidateCountryCodeConsistency(
+        ICollection<ApplicationFieldError> fieldErrors,
+        string? topLevelCountryCode,
+        string? addressCountryCode)
+    {
+        var topLevel = NormalizeOptionalText(topLevelCountryCode);
+        var address = NormalizeOptionalText(addressCountryCode);
+        if (string.IsNullOrWhiteSpace(topLevel) || string.IsNullOrWhiteSpace(address))
+        {
+            return;
+        }
+
+        if (!string.Equals(topLevel, address, StringComparison.OrdinalIgnoreCase))
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "countryCode",
+                "countryCode and address.countryCode must match when both are provided."));
+            fieldErrors.Add(new ApplicationFieldError(
+                "address.countryCode",
+                "countryCode and address.countryCode must match when both are provided."));
+        }
+    }
+
+    private static void ValidateLocale(
+        ICollection<ApplicationFieldError> fieldErrors,
+        string fieldName,
+        string? value,
+        bool required)
+    {
+        var normalized = NormalizeOptionalText(value);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            if (required)
+            {
+                fieldErrors.Add(new ApplicationFieldError(fieldName, "Locale is required."));
+            }
+
+            return;
+        }
+
+        if (!AllowedLocales.Contains(normalized))
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                fieldName,
+                "Locale is not in the supported catalogue."));
+        }
+    }
+
+    private static void ValidateOperatingMode(
+        ICollection<ApplicationFieldError> fieldErrors,
+        string fieldName,
+        string? value,
+        bool required)
+    {
+        var normalized = NormalizeOptionalText(value);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            if (required)
+            {
+                fieldErrors.Add(new ApplicationFieldError(fieldName, "Operating mode is required."));
+            }
+
+            return;
+        }
+
+        if (!AllowedOperatingModes.Contains(normalized))
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                fieldName,
+                "Operating mode is not in the supported catalogue."));
         }
     }
 
@@ -196,5 +314,3 @@ public static partial class PlatformTenantCreateRequestValidator
     [GeneratedRegex("^[A-Za-z]{3}$", RegexOptions.CultureInvariant)]
     private static partial Regex IsoCurrencyCodeRegex();
 }
-
-

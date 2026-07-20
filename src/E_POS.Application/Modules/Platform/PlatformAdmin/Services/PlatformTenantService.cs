@@ -4,6 +4,7 @@ using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Mappers;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
@@ -19,8 +20,6 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
     private const int MaxPageSize = 100;
     private const string DefaultBaseCurrency = "LKR";
     private const string DefaultTimezone = "Asia/Colombo";
-    private const string DefaultLocale = "en-LK";
-    private const string DefaultOperatingMode = "unified_epos";
 
     private static readonly ApplicationError AccessDenied = new(
         "platform_tenants.access_denied",
@@ -167,14 +166,60 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                 ValidationFailed with { Message = "Tenant name is required." });
         }
 
+        var updateValidationError = PlatformTenantCreateRequestValidator.ValidateUpdate(request);
+        if (updateValidationError is not null)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(updateValidationError);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
         tenant.UpdateDetails(
             name,
             NormalizeOptionalText(request.DefaultTimezone) ?? tenant.DefaultTimezone,
             null, // dataRegion
             platformUserId,
-            _dateTimeProvider.UtcNow);
+            now,
+            request.DefaultLocale,
+            request.OperatingMode,
+            updateLocale: request.DefaultLocale is not null,
+            updateOperatingMode: request.OperatingMode is not null);
 
         await _repository.UpdateTenantAsync(tenant, cancellationToken);
+
+        if (request.BusinessType is not null)
+        {
+            var businessTypeResolution = await ResolveBusinessTypeIdAsync(request.BusinessType, cancellationToken);
+            if (businessTypeResolution.IsFailure)
+            {
+                return ApplicationResult<PlatformTenantDetailResponse>.Failure(businessTypeResolution.Error);
+            }
+
+            var profile = await _repository.GetTenantProfileEntityByTenantIdAsync(tenantId, cancellationToken);
+            if (profile is null && businessTypeResolution.Value.HasValue)
+            {
+                profile = TenantProfile.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    businessTypeResolution.Value,
+                    name,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    platformUserId,
+                    now);
+                await _repository.UpsertTenantProfileAsync(profile, cancellationToken);
+            }
+            else if (profile is not null)
+            {
+                profile.UpdateBusinessType(businessTypeResolution.Value, platformUserId, now);
+                await _repository.UpsertTenantProfileAsync(profile, cancellationToken);
+            }
+        }
+
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
     }
 

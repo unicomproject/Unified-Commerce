@@ -64,6 +64,18 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<E_POS.Domain.
             .HasMaxLength(80)
             .IsRequired();
 
+        builder.Property(x => x.DefaultLocale)
+            .HasColumnName("default_locale")
+            .HasColumnType("varchar(20)")
+            .HasMaxLength(20)
+            .IsRequired(false);
+
+        builder.Property(x => x.OperatingMode)
+            .HasColumnName("operating_mode")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired(false);
+
         builder.Property(x => x.DataRegion)
             .HasColumnName("data_region")
             .HasColumnType("varchar(50)")

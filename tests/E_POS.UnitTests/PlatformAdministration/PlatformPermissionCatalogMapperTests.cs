@@ -51,7 +51,7 @@ public sealed class PlatformPermissionCatalogMapperTests
         var catalog = PlatformPermissionCatalogMapper.BuildCatalog(permissions);
 
         Assert.Equal(
-            ["dashboard", "tenants", "subscription_plans", "modules", "features", "users", "audit", "settings", "billing", "integrations", "permissions", "roles", "return_policy_templates"],
+            ["dashboard", "tenants", "subscription_plans", "return_policy_templates", "modules", "features", "users", "audit", "settings", "billing", "integrations", "permissions", "roles"],
             catalog.Modules.Select(module => module.Key).ToList());
 
         var tenantModule = catalog.Modules.Single(module => module.Key == "tenants");

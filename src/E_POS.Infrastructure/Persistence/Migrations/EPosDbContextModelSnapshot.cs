@@ -21610,11 +21610,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(80)")
                         .HasColumnName("default_timezone");
 
+                    b.Property<string>("DefaultLocale")
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnName("default_locale");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)")
                         .HasColumnName("display_name");
+
+                    b.Property<string>("OperatingMode")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("operating_mode");
 
                     b.Property<string>("Status")
                         .IsRequired()

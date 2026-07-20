@@ -2,7 +2,9 @@ namespace E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 
 /// <summary>
 /// TM-EPOS Option A platform permission codes (plural domain segments).
-/// Matches Angular platform-admin contracts in permission-keys.ts.
+/// Authoritative assignable catalogue for seeds, role assignment, and authz.
+/// Angular <c>permission-keys.ts</c> holds a guarded UI subset (31 codes); the five
+/// <c>return_policy_templates.*</c> codes are backend/API-only until Platform Admin UI ships.
 /// </summary>
 public static class PlatformPermissionCodes
 {

@@ -244,6 +244,32 @@ public sealed class PlatformTenantServiceTests
 
         public PlatformTenantDetailResponse? DetailResponse { get; init; }
 
+        public Dictionary<string, Guid> BusinessTypeIdsByCode { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public TenantProfile? ProfileEntity { get; set; }
+
+        public TenantProfile? UpsertedProfile { get; private set; }
+
+        public Task<Guid?> GetActiveBusinessTypeIdByCodeAsync(string businessCode, CancellationToken cancellationToken)
+        {
+            if (BusinessTypeIdsByCode.TryGetValue(businessCode.Trim(), out var id))
+            {
+                return Task.FromResult<Guid?>(id);
+            }
+
+            return Task.FromResult<Guid?>(null);
+        }
+
+        public Task<TenantProfile?> GetTenantProfileEntityByTenantIdAsync(Guid tenantId, CancellationToken cancellationToken)
+            => Task.FromResult(ProfileEntity);
+
+        public Task UpsertTenantProfileAsync(TenantProfile profile, CancellationToken cancellationToken)
+        {
+            UpsertedProfile = profile;
+            ProfileEntity = profile;
+            return Task.CompletedTask;
+        }
+
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,
             CancellationToken cancellationToken)
