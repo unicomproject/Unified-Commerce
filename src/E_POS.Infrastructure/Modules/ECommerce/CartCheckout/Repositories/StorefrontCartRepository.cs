@@ -428,6 +428,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
             ChargeTotal = cart.ChargeAmount,
             GrandTotal = cart.TotalAmount,
             TotalQuantity = readItems.Sum(x => x.Quantity),
+            IsTaxInclusive = cart.IsTaxInclusive,
             ExpiresAt = cart.ExpiresAt
         };
     }
@@ -438,7 +439,8 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         {
             CurrencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken),
             Status = Active,
-            Items = []
+            Items = [],
+            IsTaxInclusive = false // Default or lookup if needed, but empty cart has no tax.
         };
 
     private async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>

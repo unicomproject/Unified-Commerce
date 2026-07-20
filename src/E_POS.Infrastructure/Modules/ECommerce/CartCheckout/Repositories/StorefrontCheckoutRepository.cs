@@ -1001,6 +1001,7 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             ChargeTotal = checkout.ChargeAmount,
             GrandTotal = checkout.TotalAmount,
             TotalQuantity = lines.Sum(x => x.Quantity),
+            IsTaxInclusive = checkout.IsTaxInclusive,
             ExpiresAt = checkout.ExpiredAt,
             Items = lines.Select(x => new StorefrontCheckoutLineReadModel
             {

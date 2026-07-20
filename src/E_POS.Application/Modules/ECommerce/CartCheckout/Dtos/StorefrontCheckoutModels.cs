@@ -36,6 +36,7 @@ public sealed class StorefrontCheckoutReadModel
     public decimal ChargeTotal { get; set; }
     public decimal GrandTotal { get; set; }
     public decimal TotalQuantity { get; set; }
+    public bool IsTaxInclusive { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }
     public IReadOnlyList<StorefrontCheckoutLineReadModel> Items { get; set; } = [];
     public StorefrontCheckoutOrderReadModel? Order { get; set; }
