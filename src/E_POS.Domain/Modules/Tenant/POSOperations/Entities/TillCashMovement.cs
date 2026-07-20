@@ -38,5 +38,30 @@ public class TillCashMovement : AuditableEntity
             CreatedAt = now,
             UpdatedAt = now
         };
+
+    public static TillCashMovement CreateCashIn(
+        Guid id,
+        Guid tenantId,
+        Guid tillSessionId,
+        decimal amount,
+        string currencyCode,
+        string reason,
+        string referenceNumber,
+        Guid tenantUserId,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            TillSessionId = tillSessionId,
+            MovementType = "CASH_IN",
+            Amount = amount,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            Reason = reason.Trim(),
+            ReferenceNumber = referenceNumber.Trim().ToUpperInvariant(),
+            PerformedByTenantUserId = tenantUserId,
+            PerformedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

@@ -66,13 +66,13 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
 
         if (request.CustomerId is { } customerId && customerId != Guid.Empty)
         {
-            var customerExists = await _dbContext.Customers
-                .AsNoTracking()
-                .AnyAsync(x => x.TenantId == tenantId && x.Id == customerId, cancellationToken);
-
-            if (!customerExists)
+            var customerError = await ValidateCheckoutCustomerAsync(
+                tenantId,
+                customerId,
+                cancellationToken);
+            if (customerError is not null)
             {
-                return new PosCheckoutCalculationResult("pos_checkout.customer_not_found", null);
+                return new PosCheckoutCalculationResult(customerError, null);
             }
         }
 
@@ -262,13 +262,13 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
 
         if (request.CustomerId is { } customerId && customerId != Guid.Empty)
         {
-            var customerExists = await _dbContext.Customers
-                .AsNoTracking()
-                .AnyAsync(x => x.TenantId == tenantId && x.Id == customerId, cancellationToken);
-
-            if (!customerExists)
+            var customerError = await ValidateCheckoutCustomerAsync(
+                tenantId,
+                customerId,
+                cancellationToken);
+            if (customerError is not null)
             {
-                return new PosCheckoutStartPaymentResult("pos_checkout.customer_not_found", null);
+                return new PosCheckoutStartPaymentResult(customerError, null);
             }
         }
 
@@ -500,7 +500,9 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         {
             customerNameSnapshot = await _dbContext.Customers
                 .AsNoTracking()
-                .Where(x => x.TenantId == tenantId && x.Id == selectedCustomerId)
+                .Where(x => x.TenantId == tenantId &&
+                            x.Id == selectedCustomerId &&
+                            x.Status == ActiveStatus)
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync(cancellationToken);
         }
@@ -651,11 +653,11 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                     Guid.NewGuid(), tenantId, movementId, "SALES_ORDER", saleId, orderLine.Id, now));
                 remainingQuantity -= quantity;
             }
-            if (variantBalances.Count > 0 && remainingQuantity > 0)
+            if (remainingQuantity > 0)
                 return new PosCheckoutStartPaymentResult("pos_checkout.stock_conflict", null);
         }
 
-        var salesPayment = SalesPayment.CreateCompletedPosPayment(
+        var salesPaymentRecords = PosCompletedPaymentPersistence.CreateCash(
             paymentId,
             tenantId,
             saleId,
@@ -673,12 +675,9 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             tenantUserId,
             now);
 
-        _dbContext.SalesPayments.Add(salesPayment);
-        _dbContext.SalesPaymentTransactions.Add(SalesPaymentTransaction.CreateCompletedCash(
-            Guid.NewGuid(), tenantId, paymentId, grandTotal, currencyCode,
-            idempotencyKey, tenantUserId, now));
-        _dbContext.SalesPaymentEvents.Add(SalesPaymentEvent.RecordPaid(
-            Guid.NewGuid(), tenantId, paymentId, tenantUserId, now));
+        _dbContext.SalesPayments.Add(salesPaymentRecords.Payment);
+        _dbContext.SalesPaymentTransactions.Add(salesPaymentRecords.Transaction);
+        _dbContext.SalesPaymentEvents.Add(salesPaymentRecords.Event);
 
         var receiptDataJson = JsonSerializer.Serialize(new
         {
@@ -772,6 +771,32 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             responseLines);
 
         return new PosCheckoutStartPaymentResult(null, response);
+    }
+
+    private async Task<string?> ValidateCheckoutCustomerAsync(
+        Guid tenantId,
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        var status = await _dbContext.Customers
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Id == customerId)
+            .Select(x => x.Status)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (status is null)
+        {
+            return "pos_checkout.customer_not_found";
+        }
+
+        return status.Trim().ToUpperInvariant() switch
+        {
+            ActiveStatus => null,
+            "INACTIVE" => "pos_checkout.customer_inactive",
+            "BLOCKED" => "pos_checkout.customer_blocked",
+            "DELETED" => "pos_checkout.customer_deleted",
+            _ => "pos_checkout.customer_not_eligible"
+        };
     }
 
     private async Task<Guid> EnsurePosSalesChannelAsync(

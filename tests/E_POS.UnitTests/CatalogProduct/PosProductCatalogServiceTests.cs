@@ -67,7 +67,8 @@ public sealed class PosProductCatalogServiceTests
             Guid deviceId,
             Guid? categoryId,
             string? search,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Guid? outletId = null)
         {
             ListProductsCallCount++;
             return Task.FromResult(ListProductsResult);

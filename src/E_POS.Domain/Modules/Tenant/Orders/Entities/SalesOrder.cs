@@ -110,13 +110,106 @@ public class SalesOrder : AuditableEntity
         Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
+        return CreateCompletedOrder(
+            id,
+            tenantId,
+            orderNumber,
+            "POS_SALE",
+            salesChannelId,
+            customerId,
+            customerNameSnapshot,
+            tillId,
+            tillSessionId,
+            priceListId,
+            currencyCode,
+            subtotalAmount,
+            discountAmount,
+            taxAmount,
+            totalAmount,
+            paidAmount,
+            businessDate,
+            reportingOutletId,
+            reportingOutletCodeSnapshot,
+            reportingOutletNameSnapshot,
+            createdByTenantUserId,
+            now);
+    }
+
+    public static SalesOrder CreateCompletedExchangeOrder(
+        Guid id,
+        Guid tenantId,
+        string orderNumber,
+        Guid salesChannelId,
+        Guid? customerId,
+        string? customerNameSnapshot,
+        Guid tillId,
+        Guid tillSessionId,
+        Guid? priceListId,
+        string currencyCode,
+        decimal subtotalAmount,
+        decimal discountAmount,
+        decimal taxAmount,
+        decimal totalAmount,
+        decimal paidAmount,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        return CreateCompletedOrder(
+            id,
+            tenantId,
+            orderNumber,
+            "EXCHANGE_ORDER",
+            salesChannelId,
+            customerId,
+            customerNameSnapshot,
+            tillId,
+            tillSessionId,
+            priceListId,
+            currencyCode,
+            subtotalAmount,
+            discountAmount,
+            taxAmount,
+            totalAmount,
+            paidAmount,
+            DateOnly.FromDateTime(now.UtcDateTime),
+            null,
+            null,
+            null,
+            createdByTenantUserId,
+            now);
+    }
+
+    private static SalesOrder CreateCompletedOrder(
+        Guid id,
+        Guid tenantId,
+        string orderNumber,
+        string orderType,
+        Guid salesChannelId,
+        Guid? customerId,
+        string? customerNameSnapshot,
+        Guid tillId,
+        Guid tillSessionId,
+        Guid? priceListId,
+        string currencyCode,
+        decimal subtotalAmount,
+        decimal discountAmount,
+        decimal taxAmount,
+        decimal totalAmount,
+        decimal paidAmount,
+        DateOnly businessDate,
+        Guid? reportingOutletId,
+        string? reportingOutletCodeSnapshot,
+        string? reportingOutletNameSnapshot,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
         return new SalesOrder
         {
             Id = id,
             TenantId = tenantId,
             OrderNumber = orderNumber.Trim(),
             SalesChannelId = salesChannelId,
-            OrderType = "POS_SALE",
+            OrderType = orderType,
             BusinessDate = businessDate,
             ReportingOutletId = reportingOutletId,
             ReportingOutletCodeSnapshot = reportingOutletCodeSnapshot?.Trim(),
@@ -248,6 +341,28 @@ public class SalesOrder : AuditableEntity
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public bool TryAssignCustomer(Guid customerId, string? customerNameSnapshot, Guid updatedByTenantUserId, DateTimeOffset now)
+    {
+        if (!string.Equals(Status, "DRAFT", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (string.Equals(PaymentStatus, "PAID", StringComparison.OrdinalIgnoreCase) ||
+            CancelledAt.HasValue)
+        {
+            return false;
+        }
+
+        CustomerId = customerId;
+        CustomerNameSnapshot = string.IsNullOrWhiteSpace(customerNameSnapshot)
+            ? null
+            : customerNameSnapshot.Trim();
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+        return true;
     }
 
     public void RecordRefund(decimal amount, Guid tenantUserId, DateTimeOffset now)

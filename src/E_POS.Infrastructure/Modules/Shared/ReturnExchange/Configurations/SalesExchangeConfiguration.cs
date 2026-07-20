@@ -92,6 +92,12 @@ public sealed class SalesExchangeConfiguration : IEntityTypeConfiguration<SalesE
             .HasColumnType("text")
             .IsRequired(false);
 
+        builder.Property(x => x.IdempotencyKey)
+            .HasColumnName("idempotency_key")
+            .HasColumnType("varchar(120)")
+            .HasMaxLength(120)
+            .IsRequired(false);
+
         builder.Property(x => x.CreatedByTenantUserId)
             .HasColumnName("created_by_tenant_user_id")
             .IsRequired(false);
@@ -104,6 +110,14 @@ public sealed class SalesExchangeConfiguration : IEntityTypeConfiguration<SalesE
         builder.HasIndex(x => new { x.TenantId, x.ExchangeNumber })
             .IsUnique()
             .HasDatabaseName("ux_sales_exchanges_3413dbba");
+        builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+            .IsUnique()
+            .HasFilter("idempotency_key IS NOT NULL")
+            .HasDatabaseName("ux_sales_exchanges_tenant_idempotency_key");
+        builder.HasIndex(x => new { x.TenantId, x.SalesReturnId })
+            .IsUnique()
+            .HasFilter("sales_return_id IS NOT NULL")
+            .HasDatabaseName("ux_sales_exchanges_sales_return");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
