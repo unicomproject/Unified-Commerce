@@ -150,6 +150,7 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
         CancellationToken cancellationToken)
     {
         var productIds = wishlist.Items.Select(x => x.ProductId).Distinct().ToList();
+        var currencyCode = await ResolveCurrencyAsync(wishlist.TenantId, cancellationToken);
         if (productIds.Count == 0)
         {
             return new CustomerWishlistReadModel
@@ -181,17 +182,24 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
                     productIds.Contains(x.ProductId))
                 .ToDictionaryAsync(x => x.Id, cancellationToken);
 
-        var priceRows = await _dbContext.Set<PriceListItem>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == wishlist.TenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.Status == ActiveStatus &&
-                x.MinQuantity <= 1m &&
-                (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                (!x.ValidUntil.HasValue || x.ValidUntil >= now))
-            .OrderByDescending(x => x.ValidFrom ?? DateTimeOffset.MinValue)
-            .ThenBy(x => x.MinQuantity)
+        var priceRows = await (from item in _dbContext.Set<PriceListItem>().AsNoTracking()
+                join priceList in _dbContext.Set<PriceList>().AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == wishlist.TenantId &&
+                      productIds.Contains(item.ProductId) &&
+                      item.Status == ActiveStatus &&
+                      item.MinQuantity <= 1m &&
+                      priceList.Status == ActiveStatus &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now)
+                orderby priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select item)
             .ToListAsync(cancellationToken);
         var productPrices = priceRows
             .Where(x => !x.ProductVariantId.HasValue)
@@ -264,6 +272,7 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
                     ProductSlug = product.ProductSlug,
                     VariantName = variant?.VariantName,
                     Price = price,
+                    CurrencyCode = currencyCode,
                     ImageUrl = imageUrl,
                     IsInStock = inventory.Count == 0 || inventory.Sum(x => x.AvailableQuantity) > 0m,
                     IsAvailable = productAvailable && variantAvailable,
@@ -290,4 +299,10 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
         Name = DefaultWishlistName,
         Items = []
     };
+
+    private async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await _dbContext.Tenants.AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => x.BaseCurrencyCode)
+            .FirstOrDefaultAsync(cancellationToken) ?? "LKR";
 }

@@ -590,8 +590,24 @@ public sealed class StorefrontCheckoutRepositoryTests
             "ACTIVE",
             null,
             Now));
+        var priceListId = Guid.NewGuid();
+        dbContext.PriceLists.Add(PriceList.Create(
+            priceListId,
+            tenantId,
+            $"PL-{priceListId:N}"[..20],
+            "Default LKR Price List",
+            "STANDARD",
+            "LKR",
+            false,
+            true,
+            0,
+            null,
+            null,
+            "ACTIVE",
+            null,
+            Now));
         dbContext.PriceListItems.Add(PriceListItem.Create(
-            Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null,
+            Guid.NewGuid(), tenantId, priceListId, productId, null, null,
             25m, null, 1m, null, null, "ACTIVE", null, Now));
         var selectedBalance = InventoryBalance.Create(
             selectedBalanceId, tenantId, selectedLocationId, productId, null, null, Now);

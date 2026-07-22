@@ -45,9 +45,44 @@ public sealed class CustomerWishlistRepositoryTests
         await using var dbContext = CreateDbContext();
         dbContext.Customers.Add(CreateCustomer(tenantId, customerId));
         dbContext.Products.Add(CreateProduct(tenantId, productId));
+        var priceListId = Guid.NewGuid();
+        var usdPriceListId = Guid.NewGuid();
+        dbContext.PriceLists.Add(PriceList.Create(
+            priceListId,
+            tenantId,
+            $"PL-{priceListId:N}"[..20],
+            "Default LKR Price List",
+            "STANDARD",
+            "LKR",
+            false,
+            true,
+            0,
+            null,
+            null,
+            "ACTIVE",
+            null,
+            Now));
+        dbContext.PriceLists.Add(PriceList.Create(
+            usdPriceListId,
+            tenantId,
+            $"PL-{usdPriceListId:N}"[..20],
+            "USD Price List",
+            "STANDARD",
+            "USD",
+            false,
+            false,
+            100,
+            null,
+            null,
+            "ACTIVE",
+            null,
+            Now));
         dbContext.PriceListItems.Add(PriceListItem.Create(
-            Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null,
+            Guid.NewGuid(), tenantId, priceListId, productId, null, null,
             74.99m, null, 1m, null, null, "ACTIVE", null, Now));
+        dbContext.PriceListItems.Add(PriceListItem.Create(
+            Guid.NewGuid(), tenantId, usdPriceListId, productId, null, null,
+            1.99m, null, 1m, null, null, "ACTIVE", null, Now));
         dbContext.ProductImages.Add(ProductImage.Create(
             Guid.NewGuid(), tenantId, productId, null, null,
             "jersey-main", "/images/jersey.jpg", "Jersey", "MAIN", "image/jpeg",
@@ -68,6 +103,7 @@ public sealed class CustomerWishlistRepositoryTests
         Assert.Equal("Home Jersey", item.ProductName);
         Assert.Equal("home-jersey", item.ProductSlug);
         Assert.Equal(74.99m, item.Price);
+        Assert.Equal("LKR", item.CurrencyCode);
         Assert.Equal("/images/jersey.jpg", item.ImageUrl);
         Assert.True(item.IsInStock);
         Assert.True(item.IsAvailable);

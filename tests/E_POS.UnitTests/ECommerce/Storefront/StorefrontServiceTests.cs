@@ -270,8 +270,8 @@ public sealed class StorefrontServiceTests
         {
             BestSellers =
             [
-                (productWithDetails, rating, 9.99m, "/images/apple.jpg"),
-                (productWithFallbacks, null, null, null)
+                (productWithDetails, rating, 9.99m, "LKR", "/images/apple.jpg"),
+                (productWithFallbacks, null, null, "LKR", null)
             ]
         };
         var service = new StorefrontService(
@@ -290,6 +290,7 @@ public sealed class StorefrontServiceTests
                 Assert.Equal(productWithDetails.Id, first.Id);
                 Assert.Equal("Apple", first.Name);
                 Assert.Equal(9.99m, first.Price);
+                Assert.Equal("LKR", first.CurrencyCode);
                 Assert.Equal("/images/apple.jpg", first.ImageUrl);
                 Assert.Equal(4.5m, first.Rating);
                 Assert.Equal(12, first.ReviewCount);
@@ -299,6 +300,7 @@ public sealed class StorefrontServiceTests
                 Assert.Equal(productWithFallbacks.Id, second.Id);
                 Assert.Equal("Bread", second.Name);
                 Assert.Equal(0m, second.Price);
+                Assert.Equal("LKR", second.CurrencyCode);
                 Assert.Empty(second.ImageUrl);
                 Assert.Equal(0m, second.Rating);
                 Assert.Equal(0, second.ReviewCount);
@@ -477,7 +479,7 @@ public sealed class StorefrontServiceTests
     }
 
     [Fact]
-    public async Task ResolveTenantIdAsync_ReturnsRepositoryTenantId()
+    public async Task ResolveTenantAsync_ReturnsRepositoryTenantId()
     {
         var resolvedTenantId = Guid.NewGuid();
         var repository = new FakeStorefrontRepository { ResolvedTenantId = resolvedTenantId };
@@ -488,9 +490,10 @@ public sealed class StorefrontServiceTests
             new StorefrontFulfillmentService(repository),
             new StorefrontTenantService(repository));
 
-        var result = await service.ResolveTenantIdAsync("demo-store", CancellationToken.None);
+        var result = await service.ResolveTenantAsync("demo-store", CancellationToken.None);
 
-        Assert.Equal(resolvedTenantId, result);
+        Assert.Equal(resolvedTenantId, result.TenantId);
+        Assert.Equal("USD", result.BaseCurrencyCode);
         Assert.Equal("demo-store", repository.ResolvedSlug);
     }
 
@@ -513,7 +516,7 @@ public sealed class StorefrontServiceTests
         public IEnumerable<StorefrontCategoryListReadModel> ChildCategories { get; init; } = [];
         public StorefrontPagedReadModel<StorefrontProductListReadModel> ProductListingPage { get; init; } = new();
         public StorefrontProductDetailReadModel? ProductDetail { get; init; }
-        public IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string? PrimaryImageUrl)> BestSellers { get; init; } = [];
+        public IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)> BestSellers { get; init; } = [];
         public IEnumerable<StorefrontStoreReadModel> Stores { get; init; } = [];
         public StorefrontCollectionConfigurationReadModel? CollectionConfiguration { get; init; }
         public Guid? ResolvedTenantId { get; init; }
@@ -583,7 +586,7 @@ public sealed class StorefrontServiceTests
             ProductDetailTenantId = tenantId;
             ProductDetailSlug = slug;
             return Task.FromResult(ProductDetail);
-        }        public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        }        public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
         {
             BestSellersTenantId = tenantId;
             return Task.FromResult(BestSellers);
@@ -611,10 +614,10 @@ public sealed class StorefrontServiceTests
             return Task.FromResult(CollectionConfiguration);
         }
 
-        public Task<Guid?> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
+        public Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
         {
             ResolvedSlug = slug;
-            return Task.FromResult(ResolvedTenantId);
+            return Task.FromResult<(Guid?, string?)>((ResolvedTenantId, "USD"));
         }
     }
 }

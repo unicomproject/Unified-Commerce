@@ -516,10 +516,10 @@ public sealed class StorefrontControllerTests
             return Task.FromResult(CollectionOptionsResult);
         }
 
-        public Task<Guid?> ResolveTenantIdAsync(string slug, CancellationToken cancellationToken = default)
+        public Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
         {
             ResolvedSlug = slug;
-            return Task.FromResult(ResolvedTenantId);
+            return Task.FromResult<(Guid?, string?)>((ResolvedTenantId, "USD"));
         }
     }
 }
