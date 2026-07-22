@@ -22,4 +22,10 @@ public interface IPosProductCatalogService
         Guid? deviceId,
         Guid productId,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PosBarcodeProductResponseDto>> GetProductByBarcodeAsync(
+        TenantRequestContext context,
+        Guid? deviceId,
+        string? barcode,
+        CancellationToken cancellationToken);
 }

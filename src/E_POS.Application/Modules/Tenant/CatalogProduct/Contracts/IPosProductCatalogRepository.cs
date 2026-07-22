@@ -22,6 +22,12 @@ public interface IPosProductCatalogRepository
         Guid deviceId,
         Guid productId,
         CancellationToken cancellationToken);
+
+    Task<PosBarcodeProductRepositoryResult> GetProductByBarcodeAsync(
+        Guid tenantId,
+        Guid deviceId,
+        string barcode,
+        CancellationToken cancellationToken);
 }
 
 public sealed record PosProductCatalogRepositoryResult(
@@ -41,6 +47,13 @@ public sealed record PosProductCatalogCategoriesRepositoryResult(
 public sealed record PosProductDetailRepositoryResult(
     string? ErrorCode,
     PosProductDetailResponseDto? Product)
+{
+    public bool IsSuccess => ErrorCode is null;
+}
+
+public sealed record PosBarcodeProductRepositoryResult(
+    string? ErrorCode,
+    PosBarcodeProductResponseDto? Product)
 {
     public bool IsSuccess => ErrorCode is null;
 }

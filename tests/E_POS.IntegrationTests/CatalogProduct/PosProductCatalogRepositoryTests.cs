@@ -197,7 +197,7 @@ public sealed class PosProductCatalogRepositoryTests
     }
 
     [Fact]
-    public async Task ListProductsAsync_WithSkuSearch_ReturnsMatchingProduct()
+    public async Task ListProductsAsync_WithPartialSkuOrBarcodeSearch_ReturnsMatchingProduct()
     {
         var tenantId = Guid.NewGuid();
         var outletId = Guid.NewGuid();
@@ -244,19 +244,124 @@ public sealed class PosProductCatalogRepositoryTests
             null,
             Now));
 
+        dbContext.ProductBarcodes.Add(ProductBarcode.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            variantId,
+            "1234567890123",
+            "EAN13",
+            null,
+            1m,
+            true,
+            ProductConstants.ActiveStatus,
+            null,
+            Now));
+
         await dbContext.SaveChangesAsync();
 
         var repository = new PosProductCatalogRepository(dbContext);
-        var result = await repository.ListProductsAsync(
+        var skuResult = await repository.ListProductsAsync(
             tenantId,
             deviceId,
             null,
-            "CAP-SKU-99",
+            "SKU-9",
             CancellationToken.None);
 
+        Assert.True(skuResult.IsSuccess);
+        var skuProduct = Assert.Single(skuResult.Products);
+        Assert.Equal("Sports Cap", skuProduct.Name);
+        Assert.Equal(variantId, skuProduct.VariantId);
+        Assert.Equal("CAP-SKU-99", skuProduct.Sku);
+
+        var barcodeResult = await repository.ListProductsAsync(
+            tenantId,
+            deviceId,
+            null,
+            "456789",
+            CancellationToken.None);
+
+        Assert.True(barcodeResult.IsSuccess);
+        var barcodeProduct = Assert.Single(barcodeResult.Products);
+        Assert.Equal("Sports Cap", barcodeProduct.Name);
+        Assert.Equal(variantId, barcodeProduct.VariantId);
+        Assert.Equal("1234567890123", barcodeProduct.Barcode);
+    }
+
+    [Fact]
+    public async Task GetProductByBarcodeAsync_ExactSecondaryBarcode_ReturnsExactVariantQuantityPriceAndStock()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 2500m);
+        dbContext.Products.Add(Product.Create(
+            productId, tenantId, "CAP-EXACT", "Exact Cap", "exact-cap", "STANDARD", "SIMPLE",
+            null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(
+            variantId, tenantId, productId, "BLUE", "Blue", "CAP-EXACT-BLU",
+            Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductBarcodes.AddRange(
+            ProductBarcode.Create(Guid.NewGuid(), tenantId, productId, variantId, "2000000000114",
+                "EAN13", null, 1m, true, ProductConstants.ActiveStatus, null, Now),
+            ProductBarcode.Create(Guid.NewGuid(), tenantId, productId, variantId, "82111001003",
+                "CODE128", null, 2m, false, ProductConstants.ActiveStatus, null, Now));
+        dbContext.InventoryLocations.Add(InventoryLocation.Create(
+            locationId, tenantId, outletId, null, "SALES", "Sales Floor", "SALES",
+            true, true, true, false, "ACTIVE", null, Now));
+        var balance = InventoryBalance.Create(
+            Guid.NewGuid(), tenantId, locationId, productId, variantId, null, Now);
+        balance.AdjustQuantities(10m, 0m, 0m, 0m, Now);
+        dbContext.InventoryBalances.Add(balance);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.GetProductByBarcodeAsync(
+            tenantId, deviceId, "82111001003", CancellationToken.None);
+
         Assert.True(result.IsSuccess);
-        var summary = Assert.Single(result.Products);
-        Assert.Equal("Sports Cap", summary.Name);
+        Assert.NotNull(result.Product);
+        Assert.Equal(variantId, result.Product.VariantId);
+        Assert.Equal("82111001003", result.Product.Barcode);
+        Assert.Equal(2m, result.Product.QuantityPerScan);
+        Assert.Equal(2500, result.Product.Price);
+        Assert.Equal(10m, result.Product.AvailableQuantity);
+    }
+
+    [Theory]
+    [InlineData("200000000011")]
+    [InlineData("00000000114")]
+    [InlineData("200000")]
+    public async Task GetProductByBarcodeAsync_PartialBarcode_DoesNotMatch(string partialBarcode)
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        dbContext.Products.Add(Product.Create(
+            productId, tenantId, "EXACT", "Exact", "exact", "STANDARD", "SIMPLE",
+            null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(
+            variantId, tenantId, productId, "DEFAULT", "Default", "EXACT-SKU",
+            Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductBarcodes.Add(ProductBarcode.Create(
+            Guid.NewGuid(), tenantId, productId, variantId, "2000000000114", "EAN13", null,
+            1m, true, ProductConstants.ActiveStatus, null, Now));
+        await dbContext.SaveChangesAsync();
+
+        var result = await new PosProductCatalogRepository(dbContext).GetProductByBarcodeAsync(
+            tenantId, deviceId, partialBarcode, CancellationToken.None);
+
+        Assert.Equal("pos_barcode.not_found", result.ErrorCode);
     }
 
     [Fact]
@@ -791,7 +896,20 @@ public sealed class PosProductCatalogRepositoryTests
         Guid outletId,
         Guid deviceId)
     {
-        dbContext.PosDevices.Add(PosDevice.Create(
+        dbContext.Outlets.Add(Outlet.Create(
+            outletId,
+            tenantId,
+            "Main Store",
+            "MAIN",
+            "ACTIVE",
+            "STORE",
+            "Asia/Colombo",
+            true,
+            null,
+            null,
+            null,
+            Now));
+        var device = PosDevice.Create(
             deviceId,
             tenantId,
             outletId,
@@ -800,7 +918,11 @@ public sealed class PosProductCatalogRepositoryTests
             "TABLET",
             "ACTIVE",
             null,
-            Now));
+            Now);
+        device.PairForActivation(
+            "Front Counter", "TABLET", "WINDOWS", "1.0.0", Guid.NewGuid().ToString("N"),
+            Guid.NewGuid(), Now);
+        dbContext.PosDevices.Add(device);
         await dbContext.SaveChangesAsync();
     }
 

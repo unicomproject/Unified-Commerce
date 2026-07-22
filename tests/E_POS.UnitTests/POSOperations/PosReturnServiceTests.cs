@@ -2590,6 +2590,13 @@ public sealed class PosReturnServiceTests
             Guid productId,
             CancellationToken cancellationToken) =>
             Task.FromResult(new PosProductDetailRepositoryResult("not_supported", null));
+
+        public Task<PosBarcodeProductRepositoryResult> GetProductByBarcodeAsync(
+            Guid tenantId,
+            Guid deviceId,
+            string barcode,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new PosBarcodeProductRepositoryResult("not_supported", null));
     }
 
     private sealed class FakeReturnInspectionMediaStorage : IReturnInspectionMediaStorage
