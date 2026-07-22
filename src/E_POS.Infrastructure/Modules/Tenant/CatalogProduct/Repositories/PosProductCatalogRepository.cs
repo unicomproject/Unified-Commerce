@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -58,11 +59,13 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                     link.CategoryId == requestedCategoryId));
         }
 
-        productsQuery = await ApplySearchFilterAsync(
+        var searchFilter = await ApplySearchFilterAsync(
             productsQuery,
             tenantId,
             search,
             cancellationToken);
+        productsQuery = searchFilter.Products;
+        var matchedVariantIds = searchFilter.MatchedVariantIds;
 
         var products = await productsQuery
             .OrderBy(x => x.ProductName)
@@ -251,6 +254,42 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                 availableQuantity,
                 minStockQuantity);
 
+            var searchMatchedVariants = productVariants
+                .Where(variant => matchedVariantIds.Contains(variant.Id))
+                .ToList();
+
+            if (searchMatchedVariants.Count > 0)
+            {
+                foreach (var matchedVariant in searchMatchedVariants)
+                {
+                    var matchedAvailableQuantity = inventoryByVariant.GetValueOrDefault(matchedVariant.Id);
+                    var hasInventory = inventoryByVariant.ContainsKey(matchedVariant.Id);
+                    var matchedStockStatus = ResolveStockStatus(
+                        hasInventory ? matchedAvailableQuantity : null,
+                        minStockQuantity);
+
+                    summaries.Add(new PosProductSummaryResponseDto(
+                        product.Id,
+                        matchedVariant.Id,
+                        product.ProductName,
+                        product.ShortDescription,
+                        imageStorageKey,
+                        categoryInfo?.CategoryId,
+                        string.IsNullOrWhiteSpace(categoryInfo?.CategoryName) ? "General" : categoryInfo!.CategoryName,
+                        (int)Math.Round(
+                            pricesByVariant.GetValueOrDefault(matchedVariant.Id),
+                            MidpointRounding.AwayFromZero),
+                        hasVariants,
+                        matchedStockStatus,
+                        hasInventory ? matchedAvailableQuantity : null,
+                        matchedVariant.Sku,
+                        barcodeByVariant.GetValueOrDefault(matchedVariant.Id),
+                        matchedVariant.VariantName));
+                }
+
+                continue;
+            }
+
             summaries.Add(new PosProductSummaryResponseDto(
                 product.Id,
                 hasVariants ? null : defaultVariant?.Id,
@@ -270,6 +309,161 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         }
 
         return new PosProductCatalogRepositoryResult(null, summaries);
+    }
+
+    public async Task<PosBarcodeProductRepositoryResult> GetProductByBarcodeAsync(
+        Guid tenantId,
+        Guid deviceId,
+        string barcode,
+        CancellationToken cancellationToken)
+    {
+        var device = await _dbContext.PosDevices
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.Id == deviceId &&
+                x.Status == PosDeviceConstants.ActiveStatus &&
+                x.IsTrusted)
+            .Select(x => new { x.OutletId })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (device is null)
+        {
+            return new PosBarcodeProductRepositoryResult("pos_device.invalid", null);
+        }
+
+        var outletIsActive = await _dbContext.Outlets
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.TenantId == tenantId &&
+                x.Id == device.OutletId &&
+                x.Status == OutletConstants.ActiveStatus,
+                cancellationToken);
+        if (!outletIsActive)
+        {
+            return new PosBarcodeProductRepositoryResult("pos_device.invalid", null);
+        }
+
+        var matchedBarcode = await _dbContext.ProductBarcodes
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.Barcode == barcode &&
+                x.Status == ProductConstants.ActiveStatus)
+            .Select(x => new
+            {
+                x.ProductId,
+                x.ProductVariantId,
+                x.Barcode,
+                x.BarcodeType,
+                x.QuantityPerScan,
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (matchedBarcode is null)
+        {
+            return new PosBarcodeProductRepositoryResult("pos_barcode.not_found", null);
+        }
+
+        var product = await _dbContext.Products
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x =>
+                x.TenantId == tenantId &&
+                x.Id == matchedBarcode.ProductId,
+                cancellationToken);
+        if (product is null || product.Status != ProductConstants.ActiveStatus || !product.IsSellable)
+        {
+            return new PosBarcodeProductRepositoryResult("pos_product.unavailable", null);
+        }
+
+        var hiddenProductIds = await ResolveHiddenProductIdsAsync(
+            tenantId,
+            [product.Id],
+            cancellationToken);
+        if (hiddenProductIds.Contains(product.Id))
+        {
+            return new PosBarcodeProductRepositoryResult("pos_product.unavailable", null);
+        }
+
+        var variants = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.ProductId == product.Id &&
+                x.Status == ProductConstants.ActiveStatus &&
+                x.IsSellable)
+            .ToListAsync(cancellationToken);
+
+        var resolvedVariants = matchedBarcode.ProductVariantId.HasValue
+            ? variants.Where(x => x.Id == matchedBarcode.ProductVariantId.Value).ToList()
+            : variants;
+        if (resolvedVariants.Count == 0)
+        {
+            return new PosBarcodeProductRepositoryResult("pos_variant.unavailable", null);
+        }
+        if (resolvedVariants.Count > 1)
+        {
+            return new PosBarcodeProductRepositoryResult("pos_barcode.ambiguous", null);
+        }
+
+        var variant = resolvedVariants[0];
+        var defaultPriceListId = await _dbContext.PriceLists
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == "ACTIVE")
+            .Select(x => (Guid?)x.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (!defaultPriceListId.HasValue)
+        {
+            return new PosBarcodeProductRepositoryResult("pos_price.unavailable", null);
+        }
+
+        var price = await _dbContext.PriceListItems
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.PriceListId == defaultPriceListId.Value &&
+                x.ProductVariantId == variant.Id &&
+                x.Status == "ACTIVE")
+            .Select(x => (decimal?)x.SellingPrice)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (!price.HasValue)
+        {
+            return new PosBarcodeProductRepositoryResult("pos_price.unavailable", null);
+        }
+
+        var availableQuantity = await (
+                from balance in _dbContext.InventoryBalances.AsNoTracking()
+                join location in _dbContext.InventoryLocations.AsNoTracking()
+                    on balance.InventoryLocationId equals location.Id
+                where balance.TenantId == tenantId &&
+                      location.TenantId == tenantId &&
+                      location.OutletId == device.OutletId &&
+                      location.IsSellableLocation &&
+                      location.Status == "ACTIVE" &&
+                      balance.ProductVariantId == variant.Id
+                select (decimal?)balance.AvailableQuantity)
+            .SumAsync(cancellationToken);
+
+        var minStockQuantity = await _dbContext.InventoryReorderRules
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ProductId == product.Id && x.Status == "ACTIVE")
+            .Select(x => x.MinStockQuantity)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new PosBarcodeProductRepositoryResult(
+            null,
+            new PosBarcodeProductResponseDto(
+                product.Id,
+                variant.Id,
+                matchedBarcode.Barcode,
+                matchedBarcode.BarcodeType,
+                product.ProductName,
+                variant.VariantName,
+                variant.Sku,
+                matchedBarcode.QuantityPerScan,
+                (int)Math.Round(price.Value, MidpointRounding.AwayFromZero),
+                availableQuantity,
+                ResolveStockStatus(availableQuantity, minStockQuantity)));
     }
 
     public async Task<PosProductCatalogCategoriesRepositoryResult> ListCategoriesAsync(
@@ -548,7 +742,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         return new PosProductDetailRepositoryResult(null, detail);
     }
 
-    private async Task<IQueryable<Domain.Modules.Tenant.CatalogProduct.Entities.Product>> ApplySearchFilterAsync(
+    private async Task<PosCatalogSearchFilter> ApplySearchFilterAsync(
         IQueryable<Domain.Modules.Tenant.CatalogProduct.Entities.Product> productsQuery,
         Guid tenantId,
         string? search,
@@ -556,39 +750,57 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
     {
         if (string.IsNullOrWhiteSpace(search))
         {
-            return productsQuery;
+            return new PosCatalogSearchFilter(productsQuery, []);
         }
 
         var term = search.Trim();
         var normalizedTerm = term.ToUpperInvariant();
 
-        var directMatchProductIds = await (
+        var directMatches = await (
                 from variant in _dbContext.ProductVariants.AsNoTracking()
+                join product in _dbContext.Products.AsNoTracking()
+                    on variant.ProductId equals product.Id
                 where variant.TenantId == tenantId &&
-                      variant.Status != ProductConstants.DeletedStatus
-                let skuMatch = variant.Sku != null && variant.Sku.ToUpper() == normalizedTerm
+                      product.TenantId == tenantId &&
+                      variant.Status == ProductConstants.ActiveStatus &&
+                      variant.IsSellable
+                let skuMatch = variant.Sku != null && variant.Sku.ToUpper().Contains(normalizedTerm)
                 let barcodeMatch = _dbContext.ProductBarcodes.Any(barcode =>
                     barcode.TenantId == tenantId &&
                     barcode.ProductVariantId == variant.Id &&
-                    barcode.Barcode.ToUpper() == normalizedTerm)
-                where skuMatch || barcodeMatch
-                select variant.ProductId)
+                    barcode.Status == ProductConstants.ActiveStatus &&
+                    barcode.Barcode.ToUpper().Contains(normalizedTerm))
+                let productVariantNameMatch =
+                    (product.ProductName + " " + variant.VariantName).ToUpper() == normalizedTerm
+                where skuMatch || barcodeMatch || productVariantNameMatch
+                select new { variant.ProductId, VariantId = variant.Id })
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        if (directMatchProductIds.Count > 0)
+        if (directMatches.Count > 0)
         {
-            return productsQuery.Where(product => directMatchProductIds.Contains(product.Id));
+            var directMatchProductIds = directMatches.Select(x => x.ProductId).Distinct().ToList();
+            return new PosCatalogSearchFilter(
+                productsQuery.Where(product => directMatchProductIds.Contains(product.Id)),
+                directMatches.Select(x => x.VariantId).ToHashSet());
         }
 
         if (_dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
         {
             var pattern = $"%{term}%";
-            return productsQuery.Where(product => EF.Functions.ILike(product.ProductName, pattern));
+            return new PosCatalogSearchFilter(
+                productsQuery.Where(product => EF.Functions.ILike(product.ProductName, pattern)),
+                []);
         }
 
-        return productsQuery.Where(product => product.ProductName.ToUpper().Contains(normalizedTerm));
+        return new PosCatalogSearchFilter(
+            productsQuery.Where(product => product.ProductName.ToUpper().Contains(normalizedTerm)),
+            []);
     }
+
+    private sealed record PosCatalogSearchFilter(
+        IQueryable<Domain.Modules.Tenant.CatalogProduct.Entities.Product> Products,
+        HashSet<Guid> MatchedVariantIds);
 
     private async Task<HashSet<Guid>> ResolveHiddenProductIdsAsync(
         Guid tenantId,

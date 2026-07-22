@@ -55,12 +55,56 @@ public sealed class PosProductCatalogServiceTests
         Assert.Equal(1, repository.ListProductsCallCount);
     }
 
+    [Fact]
+    public async Task GetProductByBarcode_TrimsOnlyAndCallsRepository()
+    {
+        var repository = new FakePosProductCatalogRepository
+        {
+            BarcodeResult = new PosBarcodeProductRepositoryResult(
+                null,
+                new PosBarcodeProductResponseDto(
+                    Guid.NewGuid(), Guid.NewGuid(), "00200000000114", "EAN13", "Cap", "Blue",
+                    "CAP-BLU", 1m, 2500, 10m, "in_stock")),
+        };
+        var service = new PosProductCatalogService(repository);
+        var context = new TenantRequestContext(
+            Guid.NewGuid(), Guid.NewGuid(),
+            new[] { ProductPosPermissions.View, ProductPosPermissions.Search });
+
+        var result = await service.GetProductByBarcodeAsync(
+            context, Guid.NewGuid(), "  00200000000114\r\n", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("00200000000114", repository.Barcode);
+    }
+
+    [Fact]
+    public async Task GetProductByBarcode_EmptyBarcode_DoesNotCallRepository()
+    {
+        var repository = new FakePosProductCatalogRepository();
+        var service = new PosProductCatalogService(repository);
+        var context = new TenantRequestContext(
+            Guid.NewGuid(), Guid.NewGuid(),
+            new[] { ProductPosPermissions.View, ProductPosPermissions.Search });
+
+        var result = await service.GetProductByBarcodeAsync(
+            context, Guid.NewGuid(), " \r\n ", CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_barcode.invalid", result.Error.Code);
+        Assert.Null(repository.Barcode);
+    }
+
     private sealed class FakePosProductCatalogRepository : IPosProductCatalogRepository
     {
         public int ListProductsCallCount { get; private set; }
 
         public PosProductCatalogRepositoryResult ListProductsResult { get; init; } =
             new("pos_products.list_failed", Array.Empty<PosProductSummaryResponseDto>());
+
+        public PosBarcodeProductRepositoryResult BarcodeResult { get; init; } =
+            new("pos_barcode.not_found", null);
+        public string? Barcode { get; private set; }
 
         public Task<PosProductCatalogRepositoryResult> ListProductsAsync(
             Guid tenantId,
@@ -93,6 +137,16 @@ public sealed class PosProductCatalogServiceTests
             return Task.FromResult(new PosProductDetailRepositoryResult(
                 "pos_products.product_not_found",
                 null));
+        }
+
+        public Task<PosBarcodeProductRepositoryResult> GetProductByBarcodeAsync(
+            Guid tenantId,
+            Guid deviceId,
+            string barcode,
+            CancellationToken cancellationToken)
+        {
+            Barcode = barcode;
+            return Task.FromResult(BarcodeResult);
         }
     }
 }

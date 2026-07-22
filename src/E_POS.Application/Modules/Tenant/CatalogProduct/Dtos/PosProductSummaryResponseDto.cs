@@ -13,7 +13,8 @@ public sealed record PosProductSummaryResponseDto(
     string StockStatus,
     decimal? AvailableQuantity,
     string? Sku = null,
-    string? Barcode = null)
+    string? Barcode = null,
+    string? VariantName = null)
 {
     public string? ImageUrl => ImageStorageKey;
 }
