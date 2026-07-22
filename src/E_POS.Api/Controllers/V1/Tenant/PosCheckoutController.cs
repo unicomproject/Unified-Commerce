@@ -94,6 +94,7 @@ public sealed class PosCheckoutController : ControllerBase
                 => UnprocessableEntity(CreateError(error)),
             "pos_checkout.discount_application_not_found" => NotFound(CreateError(error)),
             "pos_checkout.discount_approval_required" or
+            "pos_checkout.discount_application_expired" or
             "pos_checkout.discount_application_invalid" or
             "pos_checkout.discount_context_mismatch" or
             "pos_checkout.discount_policy_inactive" or
@@ -128,6 +129,7 @@ public sealed class PosCheckoutController : ControllerBase
                 => UnprocessableEntity(CreateError(error)),
             "pos_checkout.discount_application_not_found" => NotFound(CreateError(error)),
             "pos_checkout.discount_approval_required" or
+            "pos_checkout.discount_application_expired" or
             "pos_checkout.discount_application_invalid" or
             "pos_checkout.discount_context_mismatch" or
             "pos_checkout.discount_policy_inactive" or
