@@ -26,7 +26,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
     {
         var cart = await FindActiveCartAsync(tenantId, sessionId, now, false, cancellationToken);
         return cart is null
-            ? StorefrontCartRepositoryResult.Success(await CreateEmptyReadModelAsync(tenantId, cancellationToken))
+            ? StorefrontCartRepositoryResult.Success(await CreateEmptyReadModelAsync(tenantId, now, cancellationToken))
             : StorefrontCartRepositoryResult.Success(await BuildReadModelAsync(cart, cancellationToken));
     }
 
@@ -139,7 +139,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
     {
         var cart = await FindActiveCartAsync(tenantId, sessionId, now, true, cancellationToken);
         if (cart is null)
-            return StorefrontCartRepositoryResult.Success(await CreateEmptyReadModelAsync(tenantId, cancellationToken));
+            return StorefrontCartRepositoryResult.Success(await CreateEmptyReadModelAsync(tenantId, now, cancellationToken));
 
         var items = await _dbContext.Set<ShoppingCartItem>()
             .Where(x => x.TenantId == tenantId && x.ShoppingCartId == cart.Id && x.LineStatus == Active)
@@ -159,9 +159,11 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         bool tracking,
         CancellationToken cancellationToken)
     {
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
         var query = _dbContext.Set<ShoppingCart>().Where(x =>
             x.TenantId == tenantId &&
             x.AnonymousSessionId == sessionId &&
+            x.CurrencyCode == currencyCode &&
             x.CartStatus == Active &&
             (!x.ExpiresAt.HasValue || x.ExpiresAt > now));
         if (!tracking) query = query.AsNoTracking();
@@ -171,13 +173,8 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
     private async Task<ShoppingCart> CreateCartAsync(
         Guid tenantId, string sessionId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var isTaxInclusive = await _dbContext.Set<PriceList>()
-            .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == Active)
-            .Select(x => x.PriceIncludesTax)
-            .FirstOrDefaultAsync(cancellationToken);
-
         var currency = await ResolveCurrencyAsync(tenantId, cancellationToken);
+        var isTaxInclusive = await ResolveTaxInclusiveAsync(tenantId, currency, now, cancellationToken);
         var cart = ShoppingCart.Create(
             tenantId,
             PlatformSalesChannelSeedConstants.OnlineChannelId,
@@ -277,16 +274,25 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var rows = await _dbContext.Set<PriceListItem>().AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.ProductId == productId &&
-                        x.Status == Active && x.MinQuantity <= quantity &&
-                        (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                        (!x.ValidUntil.HasValue || x.ValidUntil >= now) &&
-                        (!x.ProductVariantId.HasValue || x.ProductVariantId == variantId))
-            .OrderByDescending(x => x.ProductVariantId.HasValue)
-            .ThenByDescending(x => x.ValidFrom)
-            .ThenByDescending(x => x.MinQuantity)
-            .Select(x => (decimal?)x.SellingPrice)
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
+        var rows = await (from item in _dbContext.Set<PriceListItem>().AsNoTracking()
+                join priceList in _dbContext.Set<PriceList>().AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == tenantId && item.ProductId == productId &&
+                      item.Status == Active && item.MinQuantity <= quantity &&
+                      priceList.Status == Active &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now) &&
+                      (!item.ProductVariantId.HasValue || item.ProductVariantId == variantId)
+                orderby item.ProductVariantId.HasValue descending,
+                        priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select (decimal?)item.SellingPrice)
             .FirstOrDefaultAsync(cancellationToken);
         return rows;
     }
@@ -434,20 +440,39 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
     }
 
     private async Task<StorefrontCartReadModel> CreateEmptyReadModelAsync(
-        Guid tenantId, CancellationToken cancellationToken) =>
-        new()
+        Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
+        return new StorefrontCartReadModel
         {
-            CurrencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken),
+            CurrencyCode = currencyCode,
             Status = Active,
             Items = [],
-            IsTaxInclusive = false // Default or lookup if needed, but empty cart has no tax.
+            IsTaxInclusive = await ResolveTaxInclusiveAsync(tenantId, currencyCode, now, cancellationToken)
         };
+    }
 
     private async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>
         await _dbContext.Set<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().AsNoTracking()
             .Where(x => x.Id == tenantId)
             .Select(x => x.BaseCurrencyCode)
             .FirstOrDefaultAsync(cancellationToken) ?? "LKR";
+
+    private async Task<bool> ResolveTaxInclusiveAsync(
+        Guid tenantId,
+        string currencyCode,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        await _dbContext.Set<PriceList>().AsNoTracking()
+            .Where(x => x.TenantId == tenantId &&
+                        x.Status == Active &&
+                        x.CurrencyCode == currencyCode &&
+                        (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
+                        (!x.ValidUntil.HasValue || x.ValidUntil >= now))
+            .OrderByDescending(x => x.IsDefaultPriceList)
+            .ThenByDescending(x => x.Priority)
+            .Select(x => x.PriceIncludesTax)
+            .FirstOrDefaultAsync(cancellationToken);
 
     private sealed record CartSelection(
         string? ErrorCode,

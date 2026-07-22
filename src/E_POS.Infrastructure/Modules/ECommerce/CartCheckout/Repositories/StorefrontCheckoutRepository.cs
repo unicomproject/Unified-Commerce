@@ -55,29 +55,51 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
                 cancellationToken);
         if (outlet is null) return Failure("storefront_checkout.outlet_not_found");
 
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
         var cart = await _dbContext.ShoppingCarts.FirstOrDefaultAsync(x =>
             x.TenantId == tenantId &&
             x.AnonymousSessionId == cartSessionId &&
+            x.CurrencyCode == currencyCode &&
             x.CartStatus == Active &&
             (!x.ExpiresAt.HasValue || x.ExpiresAt > now),
             cancellationToken);
         if (cart is null) return Failure("storefront_checkout.cart_not_found");
-
-        var existingSession = await _dbContext.CheckoutSessions.AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId && x.CustomerId == customerId && x.CartId == cart.Id &&
-                (x.CheckoutStatus == "STARTED" || x.CheckoutStatus == "PENDING") &&
-                (!x.ExpiredAt.HasValue || x.ExpiredAt > now))
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (existingSession is not null)
-            return Success(await BuildReadModelAsync(existingSession, cancellationToken));
 
         var items = await _dbContext.ShoppingCartItems
             .Where(x => x.TenantId == tenantId && x.ShoppingCartId == cart.Id && x.LineStatus == Active)
             .OrderBy(x => x.LineNumber)
             .ToListAsync(cancellationToken);
         if (items.Count == 0) return Failure("storefront_checkout.cart_empty");
+
+        var existingSession = await _dbContext.CheckoutSessions
+            .Where(x =>
+                x.TenantId == tenantId && x.CustomerId == customerId && x.CartId == cart.Id &&
+                (x.CheckoutStatus == "STARTED" || x.CheckoutStatus == "PENDING") &&
+                (!x.ExpiredAt.HasValue || x.ExpiredAt > now))
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingSession is not null)
+        {
+            var existingLines = await _dbContext.CheckoutSessionLines.AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.CheckoutSessionId == existingSession.Id)
+                .ToListAsync(cancellationToken);
+
+            var isStale = existingSession.SelectedOutletId != request.SelectedOutletId ||
+                          existingLines.Count != items.Count ||
+                          existingLines.Any(el =>
+                          {
+                              var match = items.FirstOrDefault(i => i.ProductId == el.ProductId && i.ProductVariantId == el.ProductVariantId);
+                              return match is null || match.Quantity != el.Quantity;
+                          });
+
+            if (!isStale)
+            {
+                return Success(await BuildReadModelAsync(existingSession, cancellationToken));
+            }
+
+            await ExpireSessionInternalAsync(tenantId, existingSession, now, cancellationToken);
+        }
 
         var onlineSalesChannelId = await ResolveOnlineSalesChannelIdAsync(tenantId, cancellationToken);
         if (!onlineSalesChannelId.HasValue)
@@ -866,19 +888,29 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
         Guid? variantId,
         decimal quantity,
         DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        await _dbContext.PriceListItems.AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId && x.ProductId == productId &&
-                x.Status == Active && x.MinQuantity <= quantity &&
-                (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                (!x.ValidUntil.HasValue || x.ValidUntil >= now) &&
-                (!x.ProductVariantId.HasValue || x.ProductVariantId == variantId))
-            .OrderByDescending(x => x.ProductVariantId.HasValue)
-            .ThenByDescending(x => x.ValidFrom)
-            .ThenByDescending(x => x.MinQuantity)
-            .Select(x => (decimal?)x.SellingPrice)
+        CancellationToken cancellationToken)
+    {
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
+        return await (from item in _dbContext.PriceListItems.AsNoTracking()
+                join priceList in _dbContext.PriceLists.AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == tenantId && item.ProductId == productId &&
+                      item.Status == Active && item.MinQuantity <= quantity &&
+                      priceList.Status == Active &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now) &&
+                      (!item.ProductVariantId.HasValue || item.ProductVariantId == variantId)
+                orderby item.ProductVariantId.HasValue descending,
+                        priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select (decimal?)item.SellingPrice)
             .FirstOrDefaultAsync(cancellationToken);
+    }
 
     private async Task<decimal> ResolveTaxPercentAsync(
         Guid tenantId,
@@ -928,6 +960,12 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
                         x.Status == Active)
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
+
+    private async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await _dbContext.Tenants.AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => x.BaseCurrencyCode)
+            .FirstOrDefaultAsync(cancellationToken) ?? "LKR";
 
     private async Task<string> GenerateOrderSequenceAsync(
         Guid tenantId,
@@ -1020,6 +1058,57 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             }).ToList(),
             Order = orderModel
         };
+    }
+
+    private async Task ExpireSessionInternalAsync(
+        Guid tenantId,
+        CheckoutSession session,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        session.Expire(now);
+
+        if (session.InventoryReservationId.HasValue)
+        {
+            var reservation = await _dbContext.InventoryReservations
+                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == session.InventoryReservationId.Value, cancellationToken);
+
+            if (reservation is not null)
+            {
+                reservation.Release("STALE_CHECKOUT_REPLACED", now, null);
+                reservation.UpdateStatus("CANCELLED", null, now);
+
+                var reservationLines = await _dbContext.InventoryReservationLines
+                    .Where(x => x.TenantId == tenantId && x.InventoryReservationId == reservation.Id)
+                    .ToListAsync(cancellationToken);
+
+                var lineIds = reservationLines.Select(x => x.Id).ToList();
+
+                var allocations = await _dbContext.InventoryReservationAllocations
+                    .Where(x => x.TenantId == tenantId && lineIds.Contains(x.InventoryReservationLineId))
+                    .ToListAsync(cancellationToken);
+
+                var balanceIds = allocations.Select(x => x.InventoryBalanceId).Distinct().ToList();
+                var balances = await _dbContext.InventoryBalances
+                    .Where(x => x.TenantId == tenantId && balanceIds.Contains(x.Id))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var allocation in allocations)
+                {
+                    if (allocation.AllocatedQuantity > allocation.ReleasedQuantity)
+                    {
+                        var unreleased = allocation.AllocatedQuantity - allocation.ReleasedQuantity;
+                        var balance = balances.FirstOrDefault(b => b.Id == allocation.InventoryBalanceId);
+                        balance?.AdjustQuantities(0m, -unreleased, 0m, 0m, now);
+                        allocation.UpdateQuantities(unreleased, 0m, now);
+                    }
+                    allocation.Release(now, now);
+                    allocation.UpdateStatus("CANCELLED", now);
+                }
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static string? FirstNonEmpty(string? preferred, string? fallback) =>

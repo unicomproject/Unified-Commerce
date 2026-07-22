@@ -24,13 +24,13 @@ public class StorefrontTenantController : ControllerBase
             return BadRequest(new { message = "Tenant slug is required." });
         }
 
-        var tenantId = await _storefrontTenantService.ResolveTenantIdAsync(slug, cancellationToken);
+        var result = await _storefrontTenantService.ResolveTenantAsync(slug, cancellationToken);
 
-        if (tenantId == null)
+        if (result.TenantId == null)
         {
             return NotFound(new { message = "Tenant not found or inactive." });
         }
 
-        return Ok(new { tenantId });
+        return Ok(new { tenantId = result.TenantId, currencyCode = result.BaseCurrencyCode });
     }
 }

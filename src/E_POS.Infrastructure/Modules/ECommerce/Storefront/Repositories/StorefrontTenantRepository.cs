@@ -15,13 +15,14 @@ public sealed class StorefrontTenantRepository : IStorefrontTenantRepository
         _dbContext = dbContext;
     }
 
-    public async Task<Guid?> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
+    public async Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
     {
         var normalizedSlug = slug.Trim();
         var tenant = await _dbContext.Set<TenantEntity>()
             .AsNoTracking()
+            .Select(t => new { t.Id, t.TenantSlug, t.Status, t.BaseCurrencyCode })
             .FirstOrDefaultAsync(t => t.TenantSlug == normalizedSlug && t.Status.ToLower() == TenantStatusConstants.Active, cancellationToken);
 
-        return tenant?.Id;
+        return (tenant?.Id, tenant?.BaseCurrencyCode);
     }
 }

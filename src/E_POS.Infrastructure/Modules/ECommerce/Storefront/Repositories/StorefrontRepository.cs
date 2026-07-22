@@ -63,7 +63,7 @@ public sealed class StorefrontRepository : IStorefrontRepository
         return _productRepository.GetProductDetailAsync(tenantId, slug, cancellationToken);
     }
 
-    public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return _productRepository.GetBestSellersAsync(tenantId, cancellationToken);
     }
@@ -91,7 +91,7 @@ public sealed class StorefrontRepository : IStorefrontRepository
             cancellationToken);
     }
 
-    public Task<Guid?> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
+    public Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
     {
         return _tenantRepository.GetTenantIdBySlugAsync(slug, cancellationToken);
     }

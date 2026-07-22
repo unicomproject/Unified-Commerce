@@ -228,8 +228,54 @@ public sealed class StorefrontRepositoryTests
         var activeResult = await repository.GetTenantIdBySlugAsync(" demo-store ", CancellationToken.None);
         var inactiveResult = await repository.GetTenantIdBySlugAsync("old-store", CancellationToken.None);
 
-        Assert.Equal(activeTenantId, activeResult);
-        Assert.Null(inactiveResult);
+        Assert.Equal(activeTenantId, activeResult.TenantId);
+        Assert.Equal("LKR", activeResult.BaseCurrencyCode);
+        Assert.Null(inactiveResult.TenantId);
+    }
+
+    [Fact]
+    public async Task GetProductsAsync_UsesTenantBaseCurrencyPriceListAndReturnsCurrencyCode()
+    {
+        var tenantId = Guid.NewGuid();
+        var category = CreateCategory(tenantId, "JERSEYS", "Jerseys", 1, CategoryConstants.ActiveStatus);
+        var productId = Guid.NewGuid();
+        var usdPriceListId = Guid.NewGuid();
+        var lkrPriceListId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        dbContext.Tenants.Add(TenantEntity.Create(
+            tenantId,
+            $"T{tenantId:N}"[..12],
+            $"tenant-{tenantId:N}",
+            "Tenant",
+            TenantStatusConstants.Active,
+            "USD",
+            "Asia/Colombo",
+            null,
+            null,
+            Now));
+        dbContext.Categories.Add(category);
+        dbContext.Products.Add(CreateProduct(tenantId, productId, "HOME", "Home Jersey", true, ProductConstants.ActiveStatus));
+        dbContext.ProductCategories.Add(ProductCategory.Create(Guid.NewGuid(), tenantId, productId, category.Id, true, 1, null, Now));
+        dbContext.PriceLists.AddRange(
+            CreatePriceList(tenantId, usdPriceListId, "USD", isDefault: true),
+            CreatePriceList(tenantId, lkrPriceListId, "LKR", isDefault: false, priority: 100));
+        dbContext.PriceListItems.AddRange(
+            PriceListItem.Create(Guid.NewGuid(), tenantId, usdPriceListId, productId, null, null, 74.99m, null, 1m, null, null, "ACTIVE", null, Now),
+            PriceListItem.Create(Guid.NewGuid(), tenantId, lkrPriceListId, productId, null, null, 20900m, null, 1m, null, null, "ACTIVE", null, Now));
+        await dbContext.SaveChangesAsync();
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
+
+        var result = await repository.GetProductsAsync(tenantId, category.Id, "popular", 1, 20, CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(74.99m, item.Price);
+        Assert.Equal("USD", item.CurrencyCode);
     }
 
     [Fact]
@@ -245,6 +291,7 @@ public sealed class StorefrontRepositoryTests
         var notSellableProductId = Guid.NewGuid();
         var otherCategoryProductId = Guid.NewGuid();
         var otherTenantProductId = Guid.NewGuid();
+        var priceListId = Guid.NewGuid();
         var homeRating = ProductRatingSummary.Create(tenantId, homeProductId);
         Set(homeRating, "AverageRating", 4.8m);
         Set(homeRating, "TotalReviews", 128);
@@ -268,9 +315,10 @@ public sealed class StorefrontRepositoryTests
             ProductCategory.Create(Guid.NewGuid(), tenantId, notSellableProductId, category.Id, true, 0, null, Now),
             ProductCategory.Create(Guid.NewGuid(), tenantId, otherCategoryProductId, otherCategory.Id, true, 0, null, Now),
             ProductCategory.Create(Guid.NewGuid(), otherTenantId, otherTenantProductId, category.Id, true, 0, null, Now));
+        dbContext.PriceLists.Add(CreatePriceList(tenantId, priceListId));
         dbContext.PriceListItems.AddRange(
-            PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), homeProductId, null, null, 74.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now),
-            PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), kidsProductId, null, null, 54.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now));
+            PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, homeProductId, null, null, 74.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now),
+            PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, kidsProductId, null, null, 54.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now));
         dbContext.ProductImages.Add(
             ProductImage.Create(Guid.NewGuid(), tenantId, homeProductId, null, null, "home-main", "/images/home.jpg", null, "MAIN", "image/jpeg", null, null, null, null, 1, true, "ACTIVE", null, Now));
         dbContext.ProductRatingSummaries.Add(homeRating);
@@ -298,6 +346,7 @@ public sealed class StorefrontRepositoryTests
                 Assert.Equal("home", first.Slug);
                 Assert.Equal("Sky Blue", first.ShortDescription);
                 Assert.Equal(74.99m, first.Price);
+                Assert.Equal("LKR", first.CurrencyCode);
                 Assert.Equal("/images/home.jpg", first.ImageUrl);
                 Assert.Equal(4.8m, first.Rating);
                 Assert.Equal(128, first.ReviewCount);
@@ -308,6 +357,7 @@ public sealed class StorefrontRepositoryTests
             {
                 Assert.Equal(kidsProductId, second.Id);
                 Assert.Equal(54.99m, second.Price);
+                Assert.Equal("LKR", second.CurrencyCode);
                 Assert.Empty(second.ImageUrl);
                 Assert.False(second.IsInStock);
                 Assert.Null(second.Badge);
@@ -332,6 +382,7 @@ public sealed class StorefrontRepositoryTests
         var salesUomId = Guid.NewGuid();
         var colourOptionId = Guid.NewGuid();
         var sizeOptionId = Guid.NewGuid();
+        var priceListId = Guid.NewGuid();
         var skyBlueValueId = Guid.NewGuid();
         var smallValueId = Guid.NewGuid();
         var mediumValueId = Guid.NewGuid();
@@ -387,9 +438,10 @@ public sealed class StorefrontRepositoryTests
             CreateProduct(tenantId, Guid.NewGuid(), "OLDDETAIL", "Old Detail", true, ProductConstants.InactiveStatus),
             CreateProduct(tenantId, Guid.NewGuid(), "NOSALEDETAIL", "No Sale Detail", false, ProductConstants.ActiveStatus),
             CreateProduct(otherTenantId, Guid.NewGuid(), "OTHERDETAIL", "Other Detail", true, ProductConstants.ActiveStatus));
+        dbContext.PriceLists.Add(CreatePriceList(tenantId, priceListId));
         dbContext.PriceListItems.AddRange(
-            PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null, 74.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now),
-            PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, mediumVariantId, null, 79.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now));
+            PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, productId, null, null, 74.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now),
+            PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, productId, mediumVariantId, null, 79.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now));
         dbContext.ProductImages.AddRange(
             ProductImage.Create(Guid.NewGuid(), tenantId, productId, null, null, "home-alt", "/images/home-alt.jpg", "Side", "MAIN", "image/jpeg", null, null, null, null, 1, false, "ACTIVE", null, Now),
             ProductImage.Create(Guid.NewGuid(), tenantId, productId, null, null, "home-main", "/images/home-main.jpg", "Front", "MAIN", "image/jpeg", null, null, null, null, 2, true, "ACTIVE", null, Now));
@@ -444,6 +496,7 @@ public sealed class StorefrontRepositoryTests
         Assert.Equal("Sky Blue", result.ShortDescription);
         Assert.Equal("Show your City pride with the official Manchester City Home Jersey 2024/25.", result.LongDescription);
         Assert.Equal(74.99m, result.Price);
+        Assert.Equal("LKR", result.CurrencyCode);
         Assert.Equal(4.8m, result.Rating);
         Assert.Equal(128, result.ReviewCount);
         Assert.True(result.IsInStock);
@@ -478,6 +531,7 @@ public sealed class StorefrontRepositoryTests
                 Assert.Equal("Sky Blue", first.Colour);
                 Assert.Equal("S", first.Size);
                 Assert.Equal(74.99m, first.Price);
+                Assert.Equal("LKR", first.CurrencyCode);
                 Assert.True(first.IsDefault);
                 Assert.True(first.IsInStock);
             },
@@ -486,6 +540,7 @@ public sealed class StorefrontRepositoryTests
                 Assert.Equal(mediumVariantId, second.Id);
                 Assert.Equal("M", second.Size);
                 Assert.Equal(79.99m, second.Price);
+                Assert.Equal("LKR", second.CurrencyCode);
                 Assert.False(second.IsDefault);
                 Assert.False(second.IsInStock);
             });
@@ -501,8 +556,9 @@ public sealed class StorefrontRepositoryTests
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         var productId = Guid.NewGuid();
-        var olderPrice = PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null, 15m, null, 1m, null, null, "ACTIVE", null, Now);
-        var latestPrice = PriceListItem.Create(Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null, 12.50m, null, 1m, DateTimeOffset.UtcNow.AddDays(-1), null, "ACTIVE", null, Now);
+        var priceListId = Guid.NewGuid();
+        var olderPrice = PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, productId, null, null, 15m, null, 1m, null, null, "ACTIVE", null, Now);
+        var latestPrice = PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, productId, null, null, 12.50m, null, 1m, DateTimeOffset.UtcNow.AddDays(-1), null, "ACTIVE", null, Now);
         var rating = ProductRatingSummary.Create(tenantId, productId);
         Set(rating, "AverageRating", 4.25m);
         Set(rating, "TotalReviews", 7);
@@ -513,6 +569,7 @@ public sealed class StorefrontRepositoryTests
             CreateProduct(tenantId, Guid.NewGuid(), "DRAFT", "Draft", true, ProductConstants.InactiveStatus),
             CreateProduct(tenantId, Guid.NewGuid(), "NOSALE", "No Sale", false, ProductConstants.ActiveStatus),
             CreateProduct(otherTenantId, Guid.NewGuid(), "OTHER", "Other", true, ProductConstants.ActiveStatus));
+        dbContext.PriceLists.Add(CreatePriceList(tenantId, priceListId));
         dbContext.PriceListItems.AddRange(olderPrice, latestPrice);
         dbContext.ProductImages.AddRange(
             ProductImage.Create(Guid.NewGuid(), tenantId, productId, null, null, "apple-main", "/images/apple-main.jpg", null, "MAIN", "image/jpeg", null, null, null, null, 2, true, "ACTIVE", null, Now),
@@ -531,6 +588,7 @@ public sealed class StorefrontRepositoryTests
         var item = Assert.Single(result);
         Assert.Equal(productId, item.Product.Id);
         Assert.Equal(12.50m, item.SellingPrice);
+        Assert.Equal("LKR", item.CurrencyCode);
         Assert.Equal("/images/apple-main.jpg", item.PrimaryImageUrl);
         Assert.Equal(4.25m, item.Rating?.AverageRating);
         Assert.Equal(7, item.Rating?.TotalReviews);
@@ -574,6 +632,29 @@ public sealed class StorefrontRepositoryTests
     {
         return Product.Create(productId, tenantId, code, name, code.ToLowerInvariant(), "STANDARD", "SIMPLE", null, null, returnPolicyId, shortDescription, longDescription, isSellable, true, status, null, Now);
     }
+
+    private static PriceList CreatePriceList(
+        Guid tenantId,
+        Guid priceListId,
+        string currencyCode = "LKR",
+        bool isDefault = true,
+        int priority = 0) =>
+        PriceList.Create(
+            priceListId,
+            tenantId,
+            $"PL-{priceListId:N}"[..20],
+            $"{currencyCode} Storefront Price List",
+            "STANDARD",
+            currencyCode,
+            false,
+            isDefault,
+            priority,
+            null,
+            null,
+            "ACTIVE",
+            null,
+            Now);
+
     private static void Set<T>(object entity, string propertyName, T value)
     {
         var property = entity.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
