@@ -1,3 +1,5 @@
+using E_POS.Application.Common.Models;
+
 namespace E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 
 public interface IPlatformPasswordResetLinkBuilder
@@ -7,7 +9,7 @@ public interface IPlatformPasswordResetLinkBuilder
 
 public interface IPlatformPasswordResetDeliveryService
 {
-    Task<PlatformPasswordResetDeliveryResult> DeliverAsync(
+    Task<ApplicationResult<PlatformPasswordResetDeliveryResult>> DeliverAsync(
         PlatformPasswordResetDeliveryRequest request,
         CancellationToken cancellationToken);
 }
@@ -15,6 +17,7 @@ public interface IPlatformPasswordResetDeliveryService
 public sealed record PlatformPasswordResetDeliveryRequest(
     Guid PlatformUserId,
     string Email,
+    string? DisplayName,
     string RawToken,
     string ResetUrl,
     DateTimeOffset ExpiresAt);

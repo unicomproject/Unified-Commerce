@@ -24,6 +24,8 @@ using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
+using E_POS.Application.Common.Email;
+using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
@@ -99,7 +101,12 @@ public static class DependencyInjection
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();
         services.AddScoped<IPlatformPasswordResetRepository, PlatformPasswordResetRepository>();
         services.AddScoped<IPlatformPasswordResetLinkBuilder, PlatformPasswordResetLinkBuilder>();
-        services.AddScoped<IPlatformPasswordResetDeliveryService, AdminSecureLinkPasswordResetDeliveryService>();
+        services.AddSingleton<IValidateOptions<AzureCommunicationEmailOptions>, AzureCommunicationEmailOptionsValidator>();
+        services.AddOptions<AzureCommunicationEmailOptions>()
+            .Bind(configuration.GetSection(AzureCommunicationEmailOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IApplicationEmailSender, AzureCommunicationEmailSender>();
+        services.AddScoped<IPlatformPasswordResetDeliveryService, AcsPlatformPasswordResetDeliveryService>();
         services.AddScoped(static provider =>
         {
             var configuration = provider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();

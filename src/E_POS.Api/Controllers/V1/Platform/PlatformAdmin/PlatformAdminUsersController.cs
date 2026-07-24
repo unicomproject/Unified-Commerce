@@ -195,6 +195,8 @@ public sealed class PlatformAdminUsersController : ControllerBase
                 StatusCode(StatusCodes.Status409Conflict, CreateLegacyError(error.Code, error.Message)),
             "platform_users.access_denied" =>
                 StatusCode(StatusCodes.Status403Forbidden, CreateLegacyError(error.Code, error.Message)),
+            "platform_password_reset.email_not_configured" or "email.not_configured" or "email.provider_failed" =>
+                StatusCode(StatusCodes.Status502BadGateway, CreateLegacyError(error.Code, error.Message)),
             _ => BadRequest(CreateLegacyError(error.Code, error.Message))
         };
     }

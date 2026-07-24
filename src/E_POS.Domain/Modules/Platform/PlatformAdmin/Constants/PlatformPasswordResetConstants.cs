@@ -8,6 +8,7 @@ public static class PlatformPasswordResetConstants
 
     public const string DeliveryModeAdminSecureLink = "admin_secure_link";
     public const string DeliveryModePendingEmail = "pending_email";
+    public const string DeliveryModeEmail = "email";
 
     public static class TokenStatus
     {

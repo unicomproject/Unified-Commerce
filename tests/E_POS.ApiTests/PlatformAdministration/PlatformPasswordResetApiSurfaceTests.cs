@@ -31,4 +31,19 @@ public sealed class PlatformPasswordResetApiSurfaceTests
             method!.GetCustomAttributes(inherit: true),
             attribute => attribute is HttpPostAttribute);
     }
+
+    [Fact]
+    public void ApiAssembly_DoesNotExposeTenantPasswordResetControllers()
+    {
+        var apiAssembly = typeof(PlatformPasswordResetController).Assembly;
+        var controllerNames = apiAssembly
+            .GetTypes()
+            .Where(type => typeof(ControllerBase).IsAssignableFrom(type) && type is { IsAbstract: false })
+            .Select(type => type.Name)
+            .ToList();
+
+        Assert.DoesNotContain(
+            controllerNames,
+            name => name.Contains("TenantPasswordReset", StringComparison.OrdinalIgnoreCase));
+    }
 }

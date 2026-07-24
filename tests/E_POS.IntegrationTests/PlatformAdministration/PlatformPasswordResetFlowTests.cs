@@ -240,12 +240,13 @@ public sealed class PlatformPasswordResetFlowTests
 
     private sealed class PassthroughDeliveryService : IPlatformPasswordResetDeliveryService
     {
-        public Task<PlatformPasswordResetDeliveryResult> DeliverAsync(
+        public Task<ApplicationResult<PlatformPasswordResetDeliveryResult>> DeliverAsync(
             PlatformPasswordResetDeliveryRequest request,
             CancellationToken cancellationToken)
-            => Task.FromResult(new PlatformPasswordResetDeliveryResult(
-                PlatformPasswordResetConstants.DeliveryModeAdminSecureLink,
-                request.ResetUrl,
-                "ok"));
+            => Task.FromResult(ApplicationResult<PlatformPasswordResetDeliveryResult>.Success(
+                new PlatformPasswordResetDeliveryResult(
+                    PlatformPasswordResetConstants.DeliveryModeAdminSecureLink,
+                    request.ResetUrl,
+                    "ok")));
     }
 }

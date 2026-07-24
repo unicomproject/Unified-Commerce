@@ -234,10 +234,23 @@ public sealed class PlatformPasswordResetService : IPlatformPasswordResetService
             new PlatformPasswordResetDeliveryRequest(
                 targetUserId,
                 user.Email,
+                user.DisplayName,
                 created.Value.RawToken,
                 resetUrl,
                 created.Value.ExpiresAt),
             cancellationToken);
+
+        if (delivery.IsFailure || delivery.Value is null)
+        {
+            await WriteAuditAsync(
+                targetUserId,
+                PlatformPasswordResetConstants.AuditMethod.PasswordResetFailed,
+                PlatformPasswordResetConstants.AuditStatus.Failed,
+                delivery.Error.Code,
+                clientContext,
+                cancellationToken);
+            return ApplicationResult<InitiatePlatformPasswordResetResponse>.Failure(delivery.Error);
+        }
 
         await WriteAuditAsync(
             targetUserId,
@@ -252,9 +265,9 @@ public sealed class PlatformPasswordResetService : IPlatformPasswordResetService
                 targetUserId,
                 user.Email,
                 created.Value.ExpiresAt,
-                delivery.DeliveryMode,
-                delivery.ResetUrlForAdmin,
-                delivery.Message));
+                delivery.Value.DeliveryMode,
+                delivery.Value.ResetUrlForAdmin,
+                delivery.Value.Message));
     }
 
     public async Task<ApplicationResult<ValidatePlatformPasswordResetTokenResponse>> ValidatePublicTokenAsync(

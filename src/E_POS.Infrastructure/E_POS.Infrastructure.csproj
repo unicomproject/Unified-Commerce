@@ -9,6 +9,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="E_POS.UnitTests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Communication.Email" Version="1.1.0" />
+    <PackageReference Include="Azure.Identity" Version="1.14.2" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.9" />

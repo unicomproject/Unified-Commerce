@@ -1,4 +1,5 @@
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
@@ -265,12 +266,13 @@ public sealed class PlatformPasswordResetServiceTests
 
     private sealed class PassthroughDeliveryService : IPlatformPasswordResetDeliveryService
     {
-        public Task<PlatformPasswordResetDeliveryResult> DeliverAsync(
+        public Task<ApplicationResult<PlatformPasswordResetDeliveryResult>> DeliverAsync(
             PlatformPasswordResetDeliveryRequest request,
             CancellationToken cancellationToken)
-            => Task.FromResult(new PlatformPasswordResetDeliveryResult(
-                PlatformPasswordResetConstants.DeliveryModeAdminSecureLink,
-                request.ResetUrl,
-                "ok"));
+            => Task.FromResult(ApplicationResult<PlatformPasswordResetDeliveryResult>.Success(
+                new PlatformPasswordResetDeliveryResult(
+                    PlatformPasswordResetConstants.DeliveryModeAdminSecureLink,
+                    request.ResetUrl,
+                    "ok")));
     }
 }
