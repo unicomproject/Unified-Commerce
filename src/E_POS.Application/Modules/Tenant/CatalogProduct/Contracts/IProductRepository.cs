@@ -1,4 +1,5 @@
-using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+﻿using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 
@@ -18,9 +19,12 @@ public interface IProductRepository
     Task AddCategoryLinksAsync(IEnumerable<ProductCategory> links, CancellationToken cancellationToken);
     Task AddCollectionLinksAsync(IEnumerable<ProductCollection> links, CancellationToken cancellationToken);
     Task AddImagesAsync(IEnumerable<ProductImage> images, CancellationToken cancellationToken);
+    Task AddMediaAssetsAsync(IEnumerable<MediaAsset> mediaAssets, CancellationToken cancellationToken);
     Task AddChannelVisibilitiesAsync(IEnumerable<ProductChannelVisibility> visibilities, CancellationToken cancellationToken);
     Task AddPriceListItemAsync(PriceListItem priceListItem, CancellationToken cancellationToken);
-    Task ClearProductMappingsAsync(Guid productId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Guid>> GetProductImageMediaAssetIdsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken);
+    Task ClearProductMappingsAsync(Guid tenantId, Guid productId, bool clearImages, CancellationToken cancellationToken);
+    Task MarkMediaAssetsInactiveAsync(Guid tenantId, IReadOnlyCollection<Guid> mediaAssetIds, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
     
     // Helper to get the tenant default active price list

@@ -1,4 +1,4 @@
-using E_POS.Domain.Common.Entities;
+﻿using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
@@ -8,6 +8,7 @@ public class ProductImage : AuditableEntity
     public Guid ProductId { get; protected set; }
     public Guid? ProductVariantId { get; protected set; }
     public Guid? SalesChannelId { get; protected set; }
+    public Guid? MediaAssetId { get; protected set; }
     public string ImageStorageKey { get; protected set; } = string.Empty;
     public string? ImageUrl { get; protected set; }
     public string? AltText { get; protected set; }
@@ -42,7 +43,8 @@ public class ProductImage : AuditableEntity
         bool isPrimaryImage,
         string status,
         Guid? createdByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? mediaAssetId = null)
     {
         return new ProductImage
         {
@@ -51,6 +53,7 @@ public class ProductImage : AuditableEntity
             ProductId = productId,
             ProductVariantId = productVariantId,
             SalesChannelId = salesChannelId,
+            MediaAssetId = mediaAssetId,
             ImageStorageKey = imageStorageKey.Trim(),
             ImageUrl = imageUrl?.Trim(),
             AltText = altText?.Trim(),

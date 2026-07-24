@@ -1,4 +1,5 @@
-using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+﻿using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -78,6 +79,10 @@ public sealed class TenantProfileConfiguration : IEntityTypeConfiguration<Tenant
             .HasMaxLength(500)
             .IsRequired(false);
 
+        builder.Property(x => x.LogoMediaAssetId)
+            .HasColumnName("logo_media_asset_id")
+            .IsRequired(false);
+
         builder.Property(x => x.Description)
             .HasColumnName("description")
             .HasColumnType("text")
@@ -96,6 +101,16 @@ public sealed class TenantProfileConfiguration : IEntityTypeConfiguration<Tenant
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Cascade)
             .HasConstraintName("fk_tenant_profiles_tenant_id_tenants");
+
+        builder.HasOne<MediaAsset>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.LogoMediaAssetId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_tenant_profiles_logo_media_asset_tenant");
+
+        builder.HasIndex(x => new { x.TenantId, x.LogoMediaAssetId })
+            .HasDatabaseName("ix_tenant_profiles_tenant_id_logo_media_asset_id");
 
         builder.HasIndex(x => x.TenantId)
             .IsUnique()

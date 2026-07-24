@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -41,6 +42,17 @@ public sealed class BrandService : IBrandService
             ? normalizedCode.ToLowerInvariant()
             : request.BrandSlug.Trim().ToLowerInvariant();
 
+        var now = _dateTimeProvider.UtcNow;
+        var requestedLogoUrl = NormalizeLegacyMediaUrl(request.LogoUrl);
+        var mediaAsset = LegacyMediaAssetFactory.CreateImageFromUrl(
+            context.TenantId,
+            brandId,
+            "brands",
+            "BRAND_LOGO",
+            requestedLogoUrl,
+            context.UserId,
+            now);
+
         var brand = Brand.Create(
             brandId, 
             context.TenantId, 
@@ -48,10 +60,16 @@ public sealed class BrandService : IBrandService
             request.Name, 
             slug,
             request.Description,
-            request.LogoUrl,
+            requestedLogoUrl,
             request.Status,
             context.UserId,
-            _dateTimeProvider.UtcNow);
+            now);
+
+        if (mediaAsset is not null)
+        {
+            brand.UpdateLogo(mediaAsset.PublicUrl, mediaAsset.Id, context.UserId, now);
+            await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
+        }
 
         await _repository.AddAsync(brand, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, brandId, false, cancellationToken);
@@ -99,15 +117,66 @@ public sealed class BrandService : IBrandService
             ? normalizedCode.ToLowerInvariant()
             : request.BrandSlug.Trim().ToLowerInvariant();
 
+        var now = _dateTimeProvider.UtcNow;
+        var requestedLogoUrl = NormalizeLegacyMediaUrl(request.LogoUrl);
+        var previousMediaAssetId = brand.LogoMediaAssetId;
+        var shouldClearMedia = request.LogoUrl is not null && string.IsNullOrWhiteSpace(request.LogoUrl);
+        var shouldReplaceMedia = !shouldClearMedia &&
+            requestedLogoUrl is not null &&
+            (!previousMediaAssetId.HasValue ||
+             !string.Equals(brand.LogoUrl?.Trim(), requestedLogoUrl, StringComparison.Ordinal));
+
         brand.UpdateProfile(
             normalizedCode, 
             request.Name, 
             slug,
             request.Description,
-            request.LogoUrl,
+            shouldClearMedia ? null : requestedLogoUrl ?? brand.LogoUrl,
             request.Status,
             context.UserId,
-            _dateTimeProvider.UtcNow);
+            now);
+
+        if (shouldClearMedia)
+        {
+            brand.UpdateLogo(null, null, context.UserId, now);
+
+            if (previousMediaAssetId.HasValue)
+            {
+                await _repository.MarkMediaAssetInactiveAsync(
+                    context.TenantId,
+                    previousMediaAssetId.Value,
+                    context.UserId,
+                    now,
+                    cancellationToken);
+            }
+        }
+        else if (shouldReplaceMedia)
+        {
+            var mediaAsset = LegacyMediaAssetFactory.CreateImageFromUrl(
+                context.TenantId,
+                brandId,
+                "brands",
+                "BRAND_LOGO",
+                requestedLogoUrl,
+                context.UserId,
+                now);
+
+            if (mediaAsset is not null)
+            {
+                brand.UpdateLogo(mediaAsset.PublicUrl, mediaAsset.Id, context.UserId, now);
+                await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
+
+                if (previousMediaAssetId.HasValue)
+                {
+                    await _repository.MarkMediaAssetInactiveAsync(
+                        context.TenantId,
+                        previousMediaAssetId.Value,
+                        context.UserId,
+                        now,
+                        cancellationToken);
+                }
+            }
+        }
 
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, brandId, false, cancellationToken);
@@ -122,11 +191,29 @@ public sealed class BrandService : IBrandService
         var brand = await _repository.GetEditableAsync(context.TenantId, brandId, cancellationToken);
         if (brand is null) return ApplicationResult.Failure(NotFound);
 
-        brand.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
+        var now = _dateTimeProvider.UtcNow;
+        var mediaAssetId = brand.LogoMediaAssetId;
+
+        brand.SoftDelete(context.UserId, now);
+
+        if (mediaAssetId.HasValue)
+        {
+            await _repository.MarkMediaAssetInactiveAsync(
+                context.TenantId,
+                mediaAssetId.Value,
+                context.UserId,
+                now,
+                cancellationToken);
+        }
+
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }
 
+    private static string? NormalizeLegacyMediaUrl(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
     private static ApplicationError? ValidateAccess(TenantRequestContext context, string requiredPermission)
     {
         if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)

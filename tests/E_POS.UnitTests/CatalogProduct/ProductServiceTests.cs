@@ -4,6 +4,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -91,6 +92,91 @@ public sealed class ProductServiceTests
         Assert.Equal("SKU-1", repository.AddedVariant?.Sku);
     }
 
+    [Fact]
+    public async Task CreateAsync_WithLegacyImageUrls_CreatesMediaAssetsAndLinksProductImages()
+    {
+        var repository = new FakeProductRepository();
+        var service = new ProductService(repository, new ProductRequestValidator(), new FakeDateTimeProvider());
+
+        var result = await service.CreateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ProductCreateRequest(
+                Name: "Product 1", 
+                Description: null, 
+                ShortDescription: null, 
+                LongDescription: null, 
+                Status: "ACTIVE", 
+                ProductCode: "P-1", 
+                ProductType: null, 
+                ProductStructure: null, 
+                BusinessTypeId: null, 
+                BrandId: null, 
+                ReturnPolicyId: null, 
+                IsSellable: null, 
+                IsTaxable: null, 
+                Sku: "SKU-1", 
+                StockUomId: null, 
+                SalesUomId: null, 
+                Barcode: null, 
+                Price: null, 
+                CategoryIds: null, 
+                CollectionIds: null, 
+                ImageUrls: ["https://cdn.example.test/product.png"], 
+                SalesChannelIds: null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var mediaAsset = Assert.Single(repository.AddedMediaAssets);
+        var productImage = Assert.Single(repository.AddedImages);
+        Assert.Equal(mediaAsset.Id, productImage.MediaAssetId);
+        Assert.Equal("https://cdn.example.test/product.png", mediaAsset.PublicUrl);
+        Assert.Equal("https://cdn.example.test/product.png", productImage.ImageUrl);
+    }
+    [Fact]
+    public async Task DeleteAsync_WithLinkedMediaAssets_MarksMediaAssetsInactive()
+    {
+        var repository = new FakeProductRepository();
+        var service = new ProductService(repository, new ProductRequestValidator(), new FakeDateTimeProvider());
+
+        var createResult = await service.CreateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ProductCreateRequest(
+                Name: "Product 1", 
+                Description: null, 
+                ShortDescription: null, 
+                LongDescription: null, 
+                Status: "ACTIVE", 
+                ProductCode: "P-1", 
+                ProductType: null, 
+                ProductStructure: null, 
+                BusinessTypeId: null, 
+                BrandId: null, 
+                ReturnPolicyId: null, 
+                IsSellable: null, 
+                IsTaxable: null, 
+                Sku: "SKU-1", 
+                StockUomId: null, 
+                SalesUomId: null, 
+                Barcode: null, 
+                Price: null, 
+                CategoryIds: null, 
+                CollectionIds: null, 
+                ImageUrls: ["https://cdn.example.test/product.png"], 
+                SalesChannelIds: null),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+
+        var result = await service.DeleteAsync(
+            CreateContext([ProductConstants.DeletePermission]),
+            repository.AddedProduct!.Id,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var mediaAssetId = Assert.Single(repository.AddedMediaAssets).Id;
+        Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
+        Assert.Equal(ProductConstants.DeletedStatus, repository.AddedProduct.Status);
+    }
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string> permissions)
     {
         return new TenantRequestContext(TenantId, UserId, permissions);
@@ -105,6 +191,9 @@ public sealed class ProductServiceTests
     {
         public Product? AddedProduct { get; private set; }
         public ProductVariant? AddedVariant { get; private set; }
+        public List<ProductImage> AddedImages { get; } = [];
+        public List<MediaAsset> AddedMediaAssets { get; } = [];
+        public List<Guid> InactivatedMediaAssetIds { get; } = [];
 
         public Task<bool> ProductCodeExistsAsync(Guid tenantId, string productCode, Guid? excludeProductId, CancellationToken cancellationToken)
         {
@@ -179,6 +268,13 @@ public sealed class ProductServiceTests
 
         public Task AddImagesAsync(IEnumerable<ProductImage> images, CancellationToken cancellationToken)
         {
+            AddedImages.AddRange(images);
+            return Task.CompletedTask;
+        }
+
+        public Task AddMediaAssetsAsync(IEnumerable<MediaAsset> mediaAssets, CancellationToken cancellationToken)
+        {
+            AddedMediaAssets.AddRange(mediaAssets);
             return Task.CompletedTask;
         }
 
@@ -192,8 +288,24 @@ public sealed class ProductServiceTests
             return Task.CompletedTask;
         }
 
-        public Task ClearProductMappingsAsync(Guid productId, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<Guid>> GetProductImageMediaAssetIdsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken)
         {
+            return Task.FromResult<IReadOnlyList<Guid>>(AddedImages.Where(x => x.MediaAssetId.HasValue).Select(x => x.MediaAssetId!.Value).ToList());
+        }
+
+        public Task ClearProductMappingsAsync(Guid tenantId, Guid productId, bool clearImages, CancellationToken cancellationToken)
+        {
+            if (clearImages)
+            {
+                AddedImages.Clear();
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task MarkMediaAssetsInactiveAsync(Guid tenantId, IReadOnlyCollection<Guid> mediaAssetIds, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            InactivatedMediaAssetIds.AddRange(mediaAssetIds);
             return Task.CompletedTask;
         }
 

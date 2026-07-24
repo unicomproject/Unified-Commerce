@@ -1,4 +1,4 @@
-using E_POS.Domain.Common.Entities;
+﻿using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 
@@ -13,6 +13,7 @@ public class TenantProfile : AuditableEntity
     public string? PrimaryPhone { get; protected set; }
     public string? WebsiteUrl { get; protected set; }
     public string? LogoUrl { get; protected set; }
+    public Guid? LogoMediaAssetId { get; protected set; }
     public string? Description { get; protected set; }
     public Guid? CreatedByPlatformUserId { get; protected set; }
     public Guid? UpdatedByPlatformUserId { get; protected set; }

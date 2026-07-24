@@ -69,6 +69,52 @@ public sealed class TenantAdminProductServiceTests
     }
 
     [Fact]
+    public async Task ListAsync_IncludesResolvedPrimaryImageUrl()
+    {
+        var productId = Guid.NewGuid();
+        const string imageUrl = "https://cdn.example.test/product.png";
+        var productRepository = new FakeProductRepository
+        {
+            ListResponse = new ProductListResponse(
+                [
+                    new ProductSummaryResponse(
+                        productId,
+                        "PROD-001",
+                        "Image Product",
+                        ProductConstants.ActiveStatus,
+                        "SKU-001",
+                        null,
+                        10m,
+                        DateTimeOffset.UtcNow,
+                        null),
+                ],
+                1,
+                20,
+                1),
+        };
+        var tenantAdminRepository = new FakeTenantAdminProductRepository
+        {
+            PrimaryImageUrls = new Dictionary<Guid, string>
+            {
+                [productId] = imageUrl,
+            },
+        };
+        var service = CreateService(tenantAdminRepository, productRepository);
+
+        var result = await service.ListAsync(
+            CreateContext([TenantAdminProductPermissions.View]),
+            search: null,
+            page: 1,
+            pageSize: 20,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal(productId, item.Id);
+        Assert.Equal(imageUrl, item.ImageUrl);
+    }
+
+    [Fact]
     public async Task GetCreateOptionsAsync_WithoutCreatePermission_ReturnsPermissionDenied()
     {
         var service = CreateService(new FakeTenantAdminProductRepository());
@@ -732,6 +778,7 @@ public sealed class TenantAdminProductServiceTests
             "PIECE",
             null,
             null,
+            [],
             null,
             10m,
             null,
@@ -770,6 +817,9 @@ public sealed class TenantAdminProductServiceTests
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
             new([], [], [], [], [], [], []);
 
+        public IReadOnlyDictionary<Guid, string> PrimaryImageUrls { get; init; } =
+            new Dictionary<Guid, string>();
+
         public Task<TenantAdminProductSummaryResponse> GetSummaryAsync(
             Guid tenantId,
             CancellationToken cancellationToken) =>
@@ -785,6 +835,12 @@ public sealed class TenantAdminProductServiceTests
             IReadOnlyCollection<Guid> productIds,
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyDictionary<Guid, string>>(new Dictionary<Guid, string>());
+
+        public Task<IReadOnlyDictionary<Guid, string>> GetPrimaryImageUrlsAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> productIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(PrimaryImageUrls);
 
         public Guid? ResolvedUnitId { get; init; } = Guid.NewGuid();
 
@@ -977,6 +1033,8 @@ public sealed class TenantAdminProductServiceTests
 
         public IReadOnlyCollection<Guid> ExistingProductIds { get; init; } = [];
 
+        public ProductListResponse? ListResponse { get; init; }
+
         public Task<bool> ProductCodeExistsAsync(
             Guid tenantId,
             string productCode,
@@ -1004,7 +1062,7 @@ public sealed class TenantAdminProductServiceTests
             int pageSize,
             string? search,
             CancellationToken cancellationToken) =>
-            Task.FromResult(new ProductListResponse([], pageNumber, pageSize, 0));
+            Task.FromResult(ListResponse ?? new ProductListResponse([], pageNumber, pageSize, 0));
 
         public Task<ProductResponse?> GetByIdAsync(
             Guid tenantId,
@@ -1041,6 +1099,9 @@ public sealed class TenantAdminProductServiceTests
         public Task AddImagesAsync(IEnumerable<ProductImage> images, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
+        public Task AddMediaAssetsAsync(IEnumerable<E_POS.Domain.Modules.Shared.Media.Entities.MediaAsset> mediaAssets, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
         public Task AddChannelVisibilitiesAsync(
             IEnumerable<ProductChannelVisibility> visibilities,
             CancellationToken cancellationToken) =>
@@ -1049,7 +1110,13 @@ public sealed class TenantAdminProductServiceTests
         public Task AddPriceListItemAsync(PriceListItem priceListItem, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        public Task ClearProductMappingsAsync(Guid productId, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<Guid>> GetProductImageMediaAssetIdsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Guid>>(Array.Empty<Guid>());
+
+        public Task ClearProductMappingsAsync(Guid tenantId, Guid productId, bool clearImages, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task MarkMediaAssetsInactiveAsync(Guid tenantId, IReadOnlyCollection<Guid> mediaAssetIds, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;

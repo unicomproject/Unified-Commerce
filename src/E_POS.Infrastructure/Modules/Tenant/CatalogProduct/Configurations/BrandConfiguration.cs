@@ -1,6 +1,7 @@
-using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+﻿using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -63,6 +64,10 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
             .HasMaxLength(500)
             .IsRequired(false);
 
+        builder.Property(x => x.LogoMediaAssetId)
+            .HasColumnName("logo_media_asset_id")
+            .IsRequired(false);
+
         builder.Property(x => x.Status)
             .HasColumnName("status")
             .HasColumnType("varchar(40)")
@@ -82,6 +87,13 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_brands_tenant_id_tenants");
+
+        builder.HasOne<MediaAsset>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.LogoMediaAssetId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_brands_logo_media_asset_tenant");
 
         builder.HasOne<TenantUser>()
             .WithMany()
@@ -106,6 +118,9 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_brands_tenant_id_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.LogoMediaAssetId })
+            .HasDatabaseName("ix_brands_tenant_id_logo_media_asset_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_brands_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
     }

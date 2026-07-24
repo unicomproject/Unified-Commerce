@@ -1,4 +1,5 @@
-using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+﻿using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -42,6 +43,10 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
 
         builder.Property(x => x.SalesChannelId)
             .HasColumnName("sales_channel_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.MediaAssetId)
+            .HasColumnName("media_asset_id")
             .IsRequired(false);
 
         builder.Property(x => x.ImageStorageKey)
@@ -129,6 +134,16 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
             .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_product_images_variant_tenant");
+
+        builder.HasOne<MediaAsset>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.MediaAssetId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_product_images_media_asset_tenant");
+
+        builder.HasIndex(x => new { x.TenantId, x.MediaAssetId })
+            .HasDatabaseName("ix_product_images_tenant_id_media_asset_id");
 
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()

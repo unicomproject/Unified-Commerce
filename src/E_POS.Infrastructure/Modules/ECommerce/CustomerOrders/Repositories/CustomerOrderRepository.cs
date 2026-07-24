@@ -1,5 +1,7 @@
-using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
+using E_POS.Application.Modules.Shared.Media;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Infrastructure.Persistence;
@@ -220,21 +222,30 @@ public sealed class CustomerOrderRepository : ICustomerOrderRepository
         if (productIds.Count == 0)
             return [];
 
-        var images = await _dbContext.ProductImages
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.Status == ActiveStatus &&
-                x.ImageUrl != null)
-            .OrderByDescending(x => x.IsPrimaryImage)
-            .ThenBy(x => x.SortOrder)
-            .ThenBy(x => x.Id)
+        var images = await (from image in _dbContext.ProductImages.AsNoTracking()
+                            join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                            from mediaAsset in mediaAssets.DefaultIfEmpty()
+                            where image.TenantId == tenantId &&
+                                  productIds.Contains(image.ProductId) &&
+                                  image.Status == ActiveStatus
+                            orderby image.IsPrimaryImage descending, image.SortOrder, image.Id
+                            select new
+                            {
+                                Image = image,
+                                MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                            })
             .ToListAsync(cancellationToken);
 
         return images
-            .GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => x.First().ImageUrl);
+            .GroupBy(x => x.Image.ProductId)
+            .ToDictionary(
+                x => x.Key,
+                x => MediaUrlResolver.PreferMediaAsset(
+                    x.First().MediaPublicUrl,
+                    x.First().Image.ImageUrl,
+                    x.First().Image.ImageStorageKey));
     }
 
     private static CustomerOrderSummaryReadModel BuildSummary(

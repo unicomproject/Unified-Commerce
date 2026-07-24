@@ -1,5 +1,7 @@
+﻿using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Infrastructure.Persistence;
@@ -171,23 +173,29 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                 .ToDictionary(g => g.Key, g => g.First().Barcode);
         }
 
-        var imageRows = await _dbContext.ProductImages
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.Status == ActiveImageStatus)
-            .OrderBy(x => x.IsPrimaryImage ? 0 : 1)
-            .ThenBy(x => x.SortOrder)
-            .Select(x => new { x.ProductId, x.ImageStorageKey, x.ImageUrl })
+        var imageRows = await (from image in _dbContext.ProductImages.AsNoTracking()
+                               join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                   on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                   equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                               from mediaAsset in mediaAssets.DefaultIfEmpty()
+                               where image.TenantId == tenantId &&
+                                     productIds.Contains(image.ProductId) &&
+                                     image.Status == ActiveImageStatus
+                               orderby image.IsPrimaryImage ? 0 : 1, image.SortOrder
+                               select new
+                               {
+                                   image.ProductId,
+                                   image.ImageStorageKey,
+                                   image.ImageUrl,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                               })
             .ToListAsync(cancellationToken);
 
         var imageByProduct = imageRows
             .GroupBy(x => x.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => ResolveImageValue(x.First().ImageUrl, x.First().ImageStorageKey));
-
+                x => ResolveImageValue(x.First().MediaPublicUrl, x.First().ImageUrl, x.First().ImageStorageKey));
         var hiddenProductIds = await ResolveHiddenProductIdsAsync(
             tenantId,
             productIds,
@@ -619,17 +627,26 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                 select category.CategoryName)
             .FirstOrDefaultAsync(cancellationToken) ?? "General";
 
-        var imageStorageKey = await _dbContext.ProductImages
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.ProductId == productId &&
-                x.Status == ActiveImageStatus)
-            .OrderBy(x => x.IsPrimaryImage ? 0 : 1)
-            .ThenBy(x => x.SortOrder)
-            .Select(x => ResolveImageValue(x.ImageUrl, x.ImageStorageKey))
+        var imageStorageRow = await (from image in _dbContext.ProductImages.AsNoTracking()
+                                     join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                         on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                         equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                                     from mediaAsset in mediaAssets.DefaultIfEmpty()
+                                     where image.TenantId == tenantId &&
+                                           image.ProductId == productId &&
+                                           image.Status == ActiveImageStatus
+                                     orderby image.IsPrimaryImage ? 0 : 1, image.SortOrder
+                                     select new
+                                     {
+                                         image.ImageStorageKey,
+                                         image.ImageUrl,
+                                         MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                     })
             .FirstOrDefaultAsync(cancellationToken);
 
+        var imageStorageKey = imageStorageRow is null
+            ? null
+            : ResolveImageValue(imageStorageRow.MediaPublicUrl, imageStorageRow.ImageUrl, imageStorageRow.ImageStorageKey);
         var productOptions = await _dbContext.ProductOptions
             .AsNoTracking()
             .Where(x =>
@@ -892,13 +909,8 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         return ResolveStockStatus(totalAvailableQuantity, minStockQuantity);
     }
 
-    private static string? ResolveImageValue(string? imageUrl, string imageStorageKey)
+    private static string? ResolveImageValue(string? mediaPublicUrl, string? imageUrl, string imageStorageKey)
     {
-        if (!string.IsNullOrWhiteSpace(imageUrl))
-        {
-            return imageUrl.Trim();
-        }
-
-        return string.IsNullOrWhiteSpace(imageStorageKey) ? null : imageStorageKey.Trim();
+        return MediaUrlResolver.PreferMediaAsset(mediaPublicUrl, imageUrl, imageStorageKey);
     }
 }

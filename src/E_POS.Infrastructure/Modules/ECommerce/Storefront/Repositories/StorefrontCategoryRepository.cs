@@ -1,6 +1,7 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Infrastructure.Persistence;
@@ -18,14 +19,24 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IEnumerable<Category>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<StorefrontCategoryReadModel>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Set<Category>()
-            .AsNoTracking()
-            .Where(c => c.TenantId == tenantId && c.Status == CategoryConstants.ActiveStatus)
-            .OrderBy(c => c.SortOrder)
+        var rows = await (from category in _dbContext.Set<Category>().AsNoTracking()
+                          join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                              on new { category.TenantId, MediaAssetId = category.ImageMediaAssetId }
+                              equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                          from mediaAsset in mediaAssets.DefaultIfEmpty()
+                          where category.TenantId == tenantId && category.Status == CategoryConstants.ActiveStatus
+                          orderby category.SortOrder
+                          select new
+                          {
+                              Category = category,
+                              MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                          })
             .Take(10)
             .ToListAsync(cancellationToken);
+
+        return rows.Select(x => x.Category.ToReadModel(x.MediaPublicUrl));
     }
 
     public async Task<IEnumerable<StorefrontCategoryListReadModel>> GetRootCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -40,14 +51,25 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
 
     public async Task<StorefrontCategoryListReadModel?> GetCategoryBySlugAsync(Guid tenantId, string slug, CancellationToken cancellationToken = default)
     {
-        var category = await _dbContext.Set<Category>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.CategorySlug == slug && c.Status == CategoryConstants.ActiveStatus, cancellationToken);
+        var row = await (from category in _dbContext.Set<Category>().AsNoTracking()
+                         join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                             on new { category.TenantId, MediaAssetId = category.ImageMediaAssetId }
+                             equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                         from mediaAsset in mediaAssets.DefaultIfEmpty()
+                         where category.TenantId == tenantId &&
+                               category.CategorySlug == slug &&
+                               category.Status == CategoryConstants.ActiveStatus
+                         select new
+                         {
+                             Category = category,
+                             MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                         })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (category == null) return null;
+        if (row == null) return null;
 
-        var itemCount = await GetItemCountForCategoryAsync(tenantId, category.Id, cancellationToken);
-        return category.ToListReadModel(itemCount);
+        var itemCount = await GetItemCountForCategoryAsync(tenantId, row.Category.Id, cancellationToken);
+        return row.Category.ToListReadModel(itemCount, row.MediaPublicUrl);
     }
 
     private async Task<int> GetItemCountForCategoryAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken)
@@ -70,25 +92,30 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
 
     private async Task<IEnumerable<StorefrontCategoryListReadModel>> GetCategoriesByParentAsync(Guid tenantId, Guid? parentCategoryId, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Set<Category>()
-            .AsNoTracking()
-            .Where(c => c.TenantId == tenantId && c.Status == CategoryConstants.ActiveStatus);
-
-        query = parentCategoryId.HasValue
-            ? query.Where(c => c.ParentCategoryId == parentCategoryId.Value)
-            : query.Where(c => c.ParentCategoryId == null);
-
-        var categories = await query
-            .OrderBy(c => c.SortOrder)
-            .ThenBy(c => c.CategoryName)
+        var categoryRows = await (from category in _dbContext.Set<Category>().AsNoTracking()
+                                  join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                      on new { category.TenantId, MediaAssetId = category.ImageMediaAssetId }
+                                      equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                                  from mediaAsset in mediaAssets.DefaultIfEmpty()
+                                  where category.TenantId == tenantId &&
+                                        category.Status == CategoryConstants.ActiveStatus &&
+                                        (parentCategoryId.HasValue
+                                            ? category.ParentCategoryId == parentCategoryId.Value
+                                            : category.ParentCategoryId == null)
+                                  orderby category.SortOrder, category.CategoryName
+                                  select new
+                                  {
+                                      Category = category,
+                                      MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                  })
             .ToListAsync(cancellationToken);
 
-        if (categories.Count == 0)
+        if (categoryRows.Count == 0)
         {
             return [];
         }
 
-        var categoryIds = categories.Select(c => c.Id).ToList();
+        var categoryIds = categoryRows.Select(c => c.Category.Id).ToList();
         var productCategoryRows = await (
                 from productCategory in _dbContext.Set<ProductCategory>().AsNoTracking()
                 join product in _dbContext.Set<Product>().AsNoTracking()
@@ -106,6 +133,9 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
             .GroupBy(x => x.CategoryId)
             .ToDictionary(g => g.Key, g => g.Count());
 
-        return categories.Select(category => category.ToListReadModel(itemCounts.TryGetValue(category.Id, out var count) ? count : 0));
+        return categoryRows.Select(row =>
+            row.Category.ToListReadModel(
+                itemCounts.TryGetValue(row.Category.Id, out var count) ? count : 0,
+                row.MediaPublicUrl));
     }
 }

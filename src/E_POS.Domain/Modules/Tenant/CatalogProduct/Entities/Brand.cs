@@ -1,4 +1,4 @@
-using E_POS.Domain.Common.Entities;
+﻿using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
@@ -10,6 +10,7 @@ public class Brand : AuditableEntity
     public string BrandSlug { get; protected set; } = string.Empty;
     public string? Description { get; protected set; }
     public string? LogoUrl { get; protected set; }
+    public Guid? LogoMediaAssetId { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
@@ -66,6 +67,18 @@ public class Brand : AuditableEntity
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
         Status = "DELETED";
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateLogo(
+        string? logoUrl,
+        Guid? logoMediaAssetId,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        LogoUrl = logoUrl?.Trim();
+        LogoMediaAssetId = logoMediaAssetId;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

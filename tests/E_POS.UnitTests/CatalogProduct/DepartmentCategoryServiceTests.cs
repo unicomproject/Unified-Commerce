@@ -4,6 +4,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using Xunit;
@@ -63,6 +64,22 @@ public sealed class DepartmentCategoryServiceTests
     }
 
     [Fact]
+    public async Task CategoryCreateAsync_WithLegacyImageUrl_CreatesMediaAssetAndLinksCategory()
+    {
+        var repository = new FakeCategoryRepository();
+        var service = new CategoryService(repository, new CategoryRequestValidator(), new FakeDateTimeProvider());
+
+        var result = await service.CreateAsync(
+            CreateContext([CategoryConstants.CreatePermission]),
+            new CategoryCreateRequest(Guid.Empty, "FOOD", "Food", "food", null, "https://cdn.example.test/category.jpg", CategoryConstants.ActiveStatus, null, 1),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var mediaAsset = Assert.Single(repository.AddedMediaAssets);
+        Assert.Equal("https://cdn.example.test/category.jpg", mediaAsset.PublicUrl);
+        Assert.Equal(mediaAsset.Id, repository.AddedCategory?.ImageMediaAssetId);
+    }
+    [Fact]
     public async Task CategoryCreateAsync_WithMissingParent_ReturnsParentNotFound()
     {
         var repository = new FakeCategoryRepository { ParentExists = false };
@@ -97,6 +114,73 @@ public sealed class DepartmentCategoryServiceTests
         Assert.Equal("category.parent_self_reference", result.Error.Code);
     }
 
+    [Fact]
+    public async Task CategoryUpdateAsync_WithEmptyImageUrl_ClearsLinkedMediaAndMarksInactive()
+    {
+        var categoryId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var category = Category.Create(
+            categoryId,
+            TenantId,
+            Guid.Empty,
+            null,
+            "FOOD",
+            "Food",
+            "food",
+            null,
+            "https://cdn.example.test/category-old.png",
+            1,
+            CategoryConstants.ActiveStatus,
+            UserId,
+            Now);
+        category.UpdateImage("https://cdn.example.test/category-old.png", mediaAssetId, UserId, Now);
+        var repository = new FakeCategoryRepository { EditableCategory = category };
+        var service = new CategoryService(repository, new CategoryRequestValidator(), new FakeDateTimeProvider());
+
+        var result = await service.UpdateAsync(
+            CreateContext([CategoryConstants.UpdatePermission]),
+            categoryId,
+            new CategoryUpdateRequest(Guid.Empty, "FOOD", "Food", "food", null, " ", CategoryConstants.ActiveStatus, null, 1),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(category.ImageUrl);
+        Assert.Null(category.ImageMediaAssetId);
+        Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
+    }
+
+    [Fact]
+    public async Task CategoryDeleteAsync_WithLinkedMediaAsset_MarksMediaInactive()
+    {
+        var categoryId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var category = Category.Create(
+            categoryId,
+            TenantId,
+            Guid.Empty,
+            null,
+            "FOOD",
+            "Food",
+            "food",
+            null,
+            "https://cdn.example.test/category.png",
+            1,
+            CategoryConstants.ActiveStatus,
+            UserId,
+            Now);
+        category.UpdateImage("https://cdn.example.test/category.png", mediaAssetId, UserId, Now);
+        var repository = new FakeCategoryRepository { EditableCategory = category };
+        var service = new CategoryService(repository, new CategoryRequestValidator(), new FakeDateTimeProvider());
+
+        var result = await service.DeleteAsync(
+            CreateContext([CategoryConstants.DeletePermission]),
+            categoryId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(CategoryConstants.DeletedStatus, category.Status);
+        Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
+    }
     [Fact]
     public async Task CategoryDeleteAsync_WhenChildCategoriesExist_ReturnsConflict()
     {
@@ -166,6 +250,8 @@ public sealed class DepartmentCategoryServiceTests
         public bool HasChildCategories { get; init; }
         public Category? AddedCategory { get; private set; }
         public Category? EditableCategory { get; init; }
+        public List<MediaAsset> AddedMediaAssets { get; } = [];
+        public List<Guid> InactivatedMediaAssetIds { get; } = [];
 
         public Task<bool> CategoryCodeExistsAsync(Guid tenantId, string categoryCode, Guid? excludeCategoryId, CancellationToken cancellationToken)
         {
@@ -200,7 +286,7 @@ public sealed class DepartmentCategoryServiceTests
         public Task<CategoryResponse?> GetByIdAsync(Guid tenantId, Guid categoryId, bool includeDeleted, CancellationToken cancellationToken)
         {
             var category = AddedCategory ?? EditableCategory;
-            return Task.FromResult<CategoryResponse?>(new CategoryResponse(categoryId, category!.CategoryCode, category.CategoryName, category.ImageUrl, category.Status, category.ParentCategoryId, null, null, category.SortOrder, category.CreatedAt, category.UpdatedAt));
+            return Task.FromResult<CategoryResponse?>(new CategoryResponse(categoryId, category!.CategoryCode, category.CategoryName, category.ImageUrl, category.ImageMediaAssetId, category.Status, category.ParentCategoryId, null, null, category.SortOrder, category.CreatedAt, category.UpdatedAt));
         }
 
         public Task<Category?> GetEditableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken)
@@ -211,6 +297,18 @@ public sealed class DepartmentCategoryServiceTests
         public Task AddAsync(Category category, CancellationToken cancellationToken)
         {
             AddedCategory = category;
+            return Task.CompletedTask;
+        }
+
+        public Task AddMediaAssetAsync(MediaAsset mediaAsset, CancellationToken cancellationToken)
+        {
+            AddedMediaAssets.Add(mediaAsset);
+            return Task.CompletedTask;
+        }
+
+        public Task MarkMediaAssetInactiveAsync(Guid tenantId, Guid mediaAssetId, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            InactivatedMediaAssetIds.Add(mediaAssetId);
             return Task.CompletedTask;
         }
 

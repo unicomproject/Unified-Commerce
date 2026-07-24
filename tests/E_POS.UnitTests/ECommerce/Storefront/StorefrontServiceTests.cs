@@ -1,4 +1,4 @@
-using E_POS.Application.Common.Contracts;
+﻿using E_POS.Application.Common.Contracts;
 using System.Reflection;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
@@ -18,17 +18,17 @@ public sealed class StorefrontServiceTests
     [Fact]
     public async Task GetActiveBannersAsync_MapsBannersToReadModels()
     {
-        var banner = StorefrontBanner.Create(
-            TenantId,
-            null,
-            "HERO",
-            "Summer Sale",
-            "Fresh deals",
-            "/images/hero.jpg",
-            "Shop now",
-            "/shop",
-            1,
-            "ACTIVE");
+        var banner = new StorefrontBannerReadModel
+        {
+            Id = Guid.NewGuid(),
+            BannerType = "HERO",
+            Title = "Summer Sale",
+            Subtitle = "Fresh deals",
+            ImageUrl = "/images/hero.jpg",
+            ActionText = "Shop now",
+            ActionUrl = "/shop",
+            SortOrder = 1
+        };
         var repository = new FakeStorefrontRepository { Banners = [banner] };
         var service = new StorefrontService(
             new StorefrontBannerService(repository),
@@ -51,34 +51,18 @@ public sealed class StorefrontServiceTests
     [Fact]
     public async Task GetFeaturedCategoriesAsync_MapsImageUrlAndEmptyFallback()
     {
-        var categoryWithImage = Category.Create(
-            Guid.NewGuid(),
-            TenantId,
-            Guid.NewGuid(),
-            null,
-            "FRUIT",
-            "Fruit",
-            "fruit",
-            null,
-            "/images/fruit.jpg",
-            1,
-            CategoryConstants.ActiveStatus,
-            null,
-            Now);
-        var categoryWithoutImage = Category.Create(
-            Guid.NewGuid(),
-            TenantId,
-            Guid.NewGuid(),
-            null,
-            "BAKERY",
-            "Bakery",
-            "bakery",
-            null,
-            null,
-            2,
-            CategoryConstants.ActiveStatus,
-            null,
-            Now);
+        var categoryWithImage = new StorefrontCategoryReadModel
+        {
+            Id = Guid.NewGuid(),
+            Name = "Fruit",
+            ImageUrl = "/images/fruit.jpg"
+        };
+        var categoryWithoutImage = new StorefrontCategoryReadModel
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bakery",
+            ImageUrl = string.Empty
+        };
         var repository = new FakeStorefrontRepository { Categories = [categoryWithImage, categoryWithoutImage] };
         var service = new StorefrontService(
             new StorefrontBannerService(repository),
@@ -510,8 +494,8 @@ public sealed class StorefrontServiceTests
 
     private sealed class FakeStorefrontRepository : IStorefrontRepository
     {
-        public IEnumerable<StorefrontBanner> Banners { get; init; } = [];
-        public IEnumerable<Category> Categories { get; init; } = [];
+        public IEnumerable<StorefrontBannerReadModel> Banners { get; init; } = [];
+        public IEnumerable<StorefrontCategoryReadModel> Categories { get; init; } = [];
         public IEnumerable<StorefrontCategoryListReadModel> RootCategories { get; init; } = [];
         public IEnumerable<StorefrontCategoryListReadModel> ChildCategories { get; init; } = [];
         public StorefrontPagedReadModel<StorefrontProductListReadModel> ProductListingPage { get; init; } = new();
@@ -539,14 +523,14 @@ public sealed class StorefrontServiceTests
         public Guid? CollectionConfigurationOutletId { get; private set; }
         public string? ResolvedSlug { get; private set; }
 
-        public Task<IEnumerable<StorefrontBanner>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
+        public Task<IEnumerable<StorefrontBannerReadModel>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
         {
             BannersTenantId = tenantId;
             BannerType = bannerType;
             return Task.FromResult(Banners);
         }
 
-        public Task<IEnumerable<Category>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        public Task<IEnumerable<StorefrontCategoryReadModel>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
         {
             FeaturedCategoriesTenantId = tenantId;
             return Task.FromResult(Categories);

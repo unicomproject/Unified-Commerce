@@ -69,7 +69,7 @@ public sealed class DepartmentCategoryControllerTests
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var response = new CategoryResponse(Guid.NewGuid(), "FOOD", "Food", null, CategoryConstants.ActiveStatus, null, null, null, 1, Now, Now);
+        var response = new CategoryResponse(Guid.NewGuid(), "FOOD", "Food", null, null, CategoryConstants.ActiveStatus, null, null, null, 1, Now, Now);
         var service = new FakeCategoryService { CreateResult = ApplicationResult<CategoryResponse>.Success(response) };
         var controller = CreateCategoryController(service);
         SetTenantClaims(controller, tenantId, userId, CategoryConstants.CreatePermission);

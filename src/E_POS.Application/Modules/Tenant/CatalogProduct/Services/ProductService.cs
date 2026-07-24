@@ -1,7 +1,9 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -123,30 +125,21 @@ public sealed class ProductService : IProductService
             await _repository.AddCollectionLinksAsync(collectionLinks, cancellationToken);
         }
 
-        if (request.ImageUrls != null && request.ImageUrls.Length > 0)
+        var legacyImages = BuildProductImagesFromLegacyUrls(
+            context.TenantId,
+            productId,
+            request.ImageUrls,
+            context.UserId,
+            now);
+
+        if (legacyImages.MediaAssets.Count > 0)
         {
-            var images = request.ImageUrls.Select((imgUrl, idx) =>
-                ProductImage.Create(
-                    id: Guid.NewGuid(),
-                    tenantId: context.TenantId,
-                    productId: productId,
-                    productVariantId: null,
-                    salesChannelId: null,
-                    imageStorageKey: imgUrl,
-                    imageUrl: imgUrl,
-                    altText: null,
-                    imagePurpose: "PRODUCT",
-                    mimeType: null,
-                    fileSizeBytes: null,
-                    widthPx: null,
-                    heightPx: null,
-                    checksumHash: null,
-                    sortOrder: idx,
-                    isPrimaryImage: idx == 0,
-                    status: "ACTIVE",
-                    createdByTenantUserId: context.UserId,
-                    now: now));
-            await _repository.AddImagesAsync(images, cancellationToken);
+            await _repository.AddMediaAssetsAsync(legacyImages.MediaAssets, cancellationToken);
+        }
+
+        if (legacyImages.ProductImages.Count > 0)
+        {
+            await _repository.AddImagesAsync(legacyImages.ProductImages, cancellationToken);
         }
 
         if (request.SalesChannelIds != null && request.SalesChannelIds.Length > 0)
@@ -284,7 +277,22 @@ public sealed class ProductService : IProductService
                 now: now);
         }
 
-        await _repository.ClearProductMappingsAsync(productId, cancellationToken);
+        var replaceLegacyImages = request.ImageUrls is not null;
+        var replacedMediaAssetIds = replaceLegacyImages
+            ? await _repository.GetProductImageMediaAssetIdsAsync(context.TenantId, productId, cancellationToken)
+            : Array.Empty<Guid>();
+
+        await _repository.ClearProductMappingsAsync(context.TenantId, productId, replaceLegacyImages, cancellationToken);
+
+        if (replacedMediaAssetIds.Count > 0)
+        {
+            await _repository.MarkMediaAssetsInactiveAsync(
+                context.TenantId,
+                replacedMediaAssetIds,
+                context.UserId,
+                now,
+                cancellationToken);
+        }
 
         if (defaultVariant != null && !string.IsNullOrWhiteSpace(request.Barcode))
         {
@@ -318,30 +326,21 @@ public sealed class ProductService : IProductService
             await _repository.AddCollectionLinksAsync(collectionLinks, cancellationToken);
         }
 
-        if (request.ImageUrls != null && request.ImageUrls.Length > 0)
+        var legacyImages = BuildProductImagesFromLegacyUrls(
+            context.TenantId,
+            productId,
+            request.ImageUrls,
+            context.UserId,
+            now);
+
+        if (legacyImages.MediaAssets.Count > 0)
         {
-            var images = request.ImageUrls.Select((imgUrl, idx) =>
-                ProductImage.Create(
-                    id: Guid.NewGuid(),
-                    tenantId: context.TenantId,
-                    productId: productId,
-                    productVariantId: null,
-                    salesChannelId: null,
-                    imageStorageKey: imgUrl,
-                    imageUrl: imgUrl,
-                    altText: null,
-                    imagePurpose: "PRODUCT",
-                    mimeType: null,
-                    fileSizeBytes: null,
-                    widthPx: null,
-                    heightPx: null,
-                    checksumHash: null,
-                    sortOrder: idx,
-                    isPrimaryImage: idx == 0,
-                    status: "ACTIVE",
-                    createdByTenantUserId: context.UserId,
-                    now: now));
-            await _repository.AddImagesAsync(images, cancellationToken);
+            await _repository.AddMediaAssetsAsync(legacyImages.MediaAssets, cancellationToken);
+        }
+
+        if (legacyImages.ProductImages.Count > 0)
+        {
+            await _repository.AddImagesAsync(legacyImages.ProductImages, cancellationToken);
         }
 
         if (request.SalesChannelIds != null && request.SalesChannelIds.Length > 0)
@@ -408,6 +407,11 @@ public sealed class ProductService : IProductService
         if (product is null) return ApplicationResult<Guid>.Failure(NotFound);
 
         var now = _dateTimeProvider.UtcNow;
+        var mediaAssetIds = await _repository.GetProductImageMediaAssetIdsAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+
         product.SoftDelete(context.UserId, now);
 
         var defaultVariant = await _repository.GetDefaultVariantAsync(productId, cancellationToken);
@@ -416,10 +420,85 @@ public sealed class ProductService : IProductService
             defaultVariant.SoftDelete(context.UserId, now);
         }
 
+        if (mediaAssetIds.Count > 0)
+        {
+            await _repository.MarkMediaAssetsInactiveAsync(
+                context.TenantId,
+                mediaAssetIds,
+                context.UserId,
+                now,
+                cancellationToken);
+        }
+
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult<Guid>.Success(productId);
     }
 
+    private static ProductLegacyImageBuildResult BuildProductImagesFromLegacyUrls(
+        Guid tenantId,
+        Guid productId,
+        IReadOnlyCollection<string>? imageUrls,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        if (imageUrls is null || imageUrls.Count == 0)
+        {
+            return new ProductLegacyImageBuildResult([], []);
+        }
+
+        var mediaAssets = new List<MediaAsset>();
+        var productImages = new List<ProductImage>();
+        var sortOrder = 0;
+
+        foreach (var imageUrl in imageUrls)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl))
+            {
+                continue;
+            }
+
+            var normalizedImageUrl = imageUrl.Trim();
+            var mediaAsset = LegacyMediaAssetFactory.CreateImageFromUrl(
+                tenantId,
+                productId,
+                "products",
+                "PRODUCT",
+                normalizedImageUrl,
+                createdByTenantUserId,
+                now);
+
+            if (mediaAsset is not null)
+            {
+                mediaAssets.Add(mediaAsset);
+            }
+
+            productImages.Add(ProductImage.Create(
+                id: Guid.NewGuid(),
+                tenantId: tenantId,
+                productId: productId,
+                productVariantId: null,
+                salesChannelId: null,
+                imageStorageKey: normalizedImageUrl,
+                imageUrl: normalizedImageUrl,
+                altText: null,
+                imagePurpose: "PRODUCT",
+                mimeType: mediaAsset?.MimeType,
+                fileSizeBytes: mediaAsset?.FileSizeBytes,
+                widthPx: null,
+                heightPx: null,
+                checksumHash: mediaAsset?.ChecksumHash,
+                sortOrder: sortOrder,
+                isPrimaryImage: sortOrder == 0,
+                status: "ACTIVE",
+                createdByTenantUserId: createdByTenantUserId,
+                now: now,
+                mediaAssetId: mediaAsset?.Id));
+
+            sortOrder++;
+        }
+
+        return new ProductLegacyImageBuildResult(productImages, mediaAssets);
+    }
     private static string GenerateSlug(string name, string code)
     {
         var slugBase = name.Trim().ToLowerInvariant()
@@ -446,6 +525,9 @@ public sealed class ProductService : IProductService
         var prop = target.GetType().GetProperty(propertyName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
         prop?.SetValue(target, value);
     }
+    private sealed record ProductLegacyImageBuildResult(
+        IReadOnlyList<ProductImage> ProductImages,
+        IReadOnlyList<MediaAsset> MediaAssets);
 }
 
 

@@ -11,6 +11,11 @@ public interface ITenantAdminProductRepository
         IReadOnlyCollection<Guid> productIds,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyDictionary<Guid, string>> GetPrimaryImageUrlsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken);
+
     Task<TenantAdminProductCreateOptionsResponse> GetCreateOptionsAsync(
         Guid tenantId,
         CancellationToken cancellationToken);

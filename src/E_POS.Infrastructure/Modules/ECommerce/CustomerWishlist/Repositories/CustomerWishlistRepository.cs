@@ -1,6 +1,8 @@
-using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Dtos;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -210,25 +212,39 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
             .GroupBy(x => x.ProductVariantId!.Value)
             .ToDictionary(x => x.Key, x => x.First().SellingPrice);
 
-        var imageRows = await _dbContext.Set<ProductImage>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == wishlist.TenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.Status == ActiveStatus)
-            .OrderByDescending(x => x.IsPrimaryImage)
-            .ThenBy(x => x.SortOrder)
-            .ThenBy(x => x.Id)
+        var imageRows = await (from image in _dbContext.Set<ProductImage>().AsNoTracking()
+                               join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                   on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                   equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                               from mediaAsset in mediaAssets.DefaultIfEmpty()
+                               where image.TenantId == wishlist.TenantId &&
+                                     productIds.Contains(image.ProductId) &&
+                                     image.Status == ActiveStatus
+                               orderby image.IsPrimaryImage descending, image.SortOrder, image.Id
+                               select new
+                               {
+                                   Image = image,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                               })
             .ToListAsync(cancellationToken);
         var productImages = imageRows
-            .Where(x => !x.ProductVariantId.HasValue)
-            .GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => x.First().ImageUrl);
+            .Where(x => !x.Image.ProductVariantId.HasValue)
+            .GroupBy(x => x.Image.ProductId)
+            .ToDictionary(
+                x => x.Key,
+                x => MediaUrlResolver.PreferMediaAsset(
+                    x.First().MediaPublicUrl,
+                    x.First().Image.ImageUrl,
+                    x.First().Image.ImageStorageKey));
         var variantImages = imageRows
-            .Where(x => x.ProductVariantId.HasValue)
-            .GroupBy(x => x.ProductVariantId!.Value)
-            .ToDictionary(x => x.Key, x => x.First().ImageUrl);
-
+            .Where(x => x.Image.ProductVariantId.HasValue)
+            .GroupBy(x => x.Image.ProductVariantId!.Value)
+            .ToDictionary(
+                x => x.Key,
+                x => MediaUrlResolver.PreferMediaAsset(
+                    x.First().MediaPublicUrl,
+                    x.First().Image.ImageUrl,
+                    x.First().Image.ImageStorageKey));
         var inventoryRows = await _dbContext.Set<InventoryBalance>()
             .AsNoTracking()
             .Where(x => x.TenantId == wishlist.TenantId && productIds.Contains(x.ProductId))

@@ -5,6 +5,7 @@ public sealed record CategoryResponse(
     string CategoryCode,
     string CategoryName,
     string? ImageUrl,
+    Guid? ImageMediaAssetId,
     string Status,
     Guid? ParentCategoryId,
     string? ParentCategoryCode,

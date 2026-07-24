@@ -1,4 +1,5 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
+﻿using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Mappers;
@@ -56,19 +57,24 @@ public static class StorefrontProductMapper
         };
     }
 
-    public static StorefrontProductImageReadModel ToImageReadModel(ProductImage image, string fallbackAltText)
+    public static StorefrontProductImageReadModel ToImageReadModel(
+        ProductImage image,
+        string fallbackAltText,
+        string? mediaPublicUrl = null)
     {
         return new StorefrontProductImageReadModel
         {
             Id = image.Id,
-            Url = string.IsNullOrWhiteSpace(image.ImageUrl) ? image.ImageStorageKey : image.ImageUrl,
+            Url = MediaUrlResolver.PreferMediaAssetOrEmpty(mediaPublicUrl, image.ImageUrl, image.ImageStorageKey),
             AltText = image.AltText ?? fallbackAltText,
             SortOrder = image.SortOrder,
             IsPrimary = image.IsPrimaryImage
         };
     }
 
-    public static StorefrontProductOptionValueReadModel ToOptionValueReadModel(ProductOptionValue optionValue)
+    public static StorefrontProductOptionValueReadModel ToOptionValueReadModel(
+        ProductOptionValue optionValue,
+        string? mediaPublicUrl = null)
     {
         return new StorefrontProductOptionValueReadModel
         {
@@ -76,7 +82,7 @@ public static class StorefrontProductMapper
             Name = optionValue.ValueName,
             DisplayName = GetOptionDisplayName(optionValue),
             ColorHex = optionValue.ColorHex,
-            ImageUrl = optionValue.ImageUrl,
+            ImageUrl = MediaUrlResolver.PreferMediaAsset(mediaPublicUrl, optionValue.ImageUrl),
             SortOrder = optionValue.SortOrder
         };
     }

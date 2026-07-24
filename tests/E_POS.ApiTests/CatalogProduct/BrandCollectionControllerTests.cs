@@ -22,7 +22,7 @@ public sealed class BrandCollectionControllerTests
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var response = new BrandResponse(Guid.NewGuid(), "ACME", "Acme", BrandConstants.ActiveStatus, Now, Now);
+        var response = new BrandResponse(Guid.NewGuid(), "ACME", "Acme", null, null, BrandConstants.ActiveStatus, Now, Now);
         var service = new FakeBrandService { CreateResult = ApplicationResult<BrandResponse>.Success(response) };
         var controller = CreateBrandController(service);
         SetTenantClaims(controller, tenantId, userId, BrandConstants.CreatePermission);
