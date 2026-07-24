@@ -143,6 +143,10 @@ public sealed class PosHomeDashboardServiceTests
             var snapshot = new PosHomeDashboardDbSnapshot(
                 CashierTenantUserId: context.UserId,
                 CashierDisplayName: "Cashier 001",
+                CashierRoleLabel: "Cashier",
+                TenantDisplayName: "OneVerz",
+                TenantTradingName: null,
+                TenantLogoUrl: null,
                 DeviceId: Guid.NewGuid(),
                 DeviceCode: "POS-01",
                 DeviceName: "Front POS",
@@ -164,7 +168,13 @@ public sealed class PosHomeDashboardServiceTests
                 ReturnsRefundsCount: 0,
                 CustomersCount: 0,
                 ParkedSalesCount: 0,
-                CashDrawerBalance: 0);
+                CashDrawerBalance: 0,
+                GrossSalesAmount: 0,
+                TransactionCount: 0,
+                RefundAmount: 0,
+                RefundCount: 0,
+                DiscountAmount: 0,
+                NetSalesAmount: 0);
 
             return Task.FromResult(
                 new PosHomeContextResolutionResult(

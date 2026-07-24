@@ -131,7 +131,10 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     CashDrawer: new PosHomeCardDto(
                         canViewCashDrawer,
                         Balance: snapshot.CashDrawerBalance)),
-                Cashier: new PosHomeCashierDto(snapshot.CashierTenantUserId, snapshot.CashierDisplayName),
+                Cashier: new PosHomeCashierDto(
+                    snapshot.CashierTenantUserId,
+                    snapshot.CashierDisplayName,
+                    snapshot.CashierRoleLabel),
                 Device: new PosHomeDeviceDto(
                     snapshot.DeviceId,
                     snapshot.DeviceCode,
@@ -161,6 +164,22 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     CanViewReturns: canViewReturns,
                     CanViewParkedSales: canParkOrViewParkedSales,
                     CanViewCashDrawer: canViewCashDrawer,
-                    CanViewNotifications: canViewNotifications)));
+                    CanViewNotifications: canViewNotifications),
+                Branding: new PosHomeBrandingDto(
+                    string.IsNullOrWhiteSpace(snapshot.TenantTradingName)
+                        ? snapshot.TenantDisplayName
+                        : snapshot.TenantTradingName,
+                    snapshot.TenantLogoUrl),
+                Summary: new PosHomeSummaryDto(
+                    Scope: "CURRENT_TILL_SESSION",
+                    BusinessDate: snapshot.BusinessDate,
+                    TillSessionId: snapshot.TillSessionId,
+                    CurrencyCode: snapshot.CurrencyCode,
+                    GrossSalesAmount: snapshot.GrossSalesAmount,
+                    TransactionCount: snapshot.TransactionCount,
+                    RefundAmount: snapshot.RefundAmount,
+                    RefundCount: snapshot.RefundCount,
+                    DiscountAmount: snapshot.DiscountAmount,
+                    NetSalesAmount: snapshot.NetSalesAmount)));
     }
 }

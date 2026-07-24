@@ -1176,6 +1176,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         if (application.RequestedByTenantUserId != tenantUserId || application.PosDeviceId != deviceId ||
             application.TillSessionId != tillSessionId)
             return new("pos_checkout.discount_context_mismatch", null);
+        if (application.ApplicationStatus == "APPROVED" && application.ExpiresAt <= now)
+            return new("pos_checkout.discount_application_expired", null);
         if (!application.CanBeUsed(now))
             return new(application.ApplicationStatus == "PENDING_APPROVAL"
                 ? "pos_checkout.discount_approval_required"

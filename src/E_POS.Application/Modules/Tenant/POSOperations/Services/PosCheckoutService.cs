@@ -60,6 +60,14 @@ public sealed class PosCheckoutService : IPosCheckoutService
         "pos_checkout.customer_not_eligible",
         "The selected customer is not eligible for checkout.");
 
+    private static readonly ApplicationError PriceNotConfigured = new(
+        "pos_checkout.price_not_configured",
+        "One or more cart lines do not have a configured price.");
+
+    private static readonly ApplicationError DiscountApplicationExpired = new(
+        "pos_checkout.discount_application_expired",
+        "The approved discount has expired. Remove it or apply the discount again before checkout.");
+
     private readonly IPosCheckoutRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
@@ -143,6 +151,26 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.customer_blocked" => CustomerBlocked,
                     "pos_checkout.customer_deleted" => CustomerDeleted,
                     "pos_checkout.customer_not_eligible" => CustomerNotEligible,
+                    "pos_checkout.price_not_configured" => PriceNotConfigured,
+                    "pos_checkout.discount_application_expired" => DiscountApplicationExpired,
+                    "pos_checkout.discount_application_not_found" => new ApplicationError(
+                        "pos_checkout.discount_application_not_found",
+                        "The applied discount could not be found. Remove it and apply the discount again."),
+                    "pos_checkout.discount_approval_required" => new ApplicationError(
+                        "pos_checkout.discount_approval_required",
+                        "The discount requires manager approval before checkout."),
+                    "pos_checkout.discount_application_invalid" => new ApplicationError(
+                        "pos_checkout.discount_application_invalid",
+                        "The applied discount is no longer valid. Remove it and apply the discount again."),
+                    "pos_checkout.discount_context_mismatch" => new ApplicationError(
+                        "pos_checkout.discount_context_mismatch",
+                        "The applied discount belongs to a different till session or device."),
+                    "pos_checkout.discount_policy_inactive" => new ApplicationError(
+                        "pos_checkout.discount_policy_inactive",
+                        "The discount policy is no longer active."),
+                    "pos_checkout.discount_cart_changed" => new ApplicationError(
+                        "pos_checkout.discount_cart_changed",
+                        "The cart changed after the discount was approved. Apply the discount again."),
                     "pos_checkout.invalid_lines" => InvalidLines,
                     "pos_checkout.invalid_sale_type" => InvalidSaleType,
                     _ => new ApplicationError(
@@ -227,9 +255,8 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.payment_permission_denied" => new ApplicationError(
                         "pos_checkout.payment_permission_denied",
                         "You do not have permission to accept this payment method."),
-                    "pos_checkout.price_not_configured" => new ApplicationError(
-                        "pos_checkout.price_not_configured",
-                        "One or more cart lines do not have a configured price."),
+                    "pos_checkout.price_not_configured" => PriceNotConfigured,
+                    "pos_checkout.discount_application_expired" => DiscountApplicationExpired,
                     "pos_checkout.insufficient_stock" => new ApplicationError(
                         "pos_checkout.insufficient_stock",
                         "One or more cart lines do not have enough stock."),

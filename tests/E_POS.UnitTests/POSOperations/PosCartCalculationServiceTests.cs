@@ -40,6 +40,29 @@ public sealed class PosCartCalculationServiceTests
         Assert.False(repository.CalculateCalled);
     }
 
+    [Fact]
+    public async Task GetSummaryAsync_WithExpiredDiscount_ReturnsActionableError()
+    {
+        var repository = new FakeRepository
+        {
+            CalculationErrorCode = "pos_checkout.discount_application_expired"
+        };
+        var service = new PosCheckoutService(repository, new FakeDateTimeProvider());
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [SalesPermissions.Sale.Checkout]);
+
+        var result = await service.GetSummaryAsync(
+            context,
+            CreateRequest(),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_checkout.discount_application_expired", result.Error.Code);
+        Assert.Contains("expired", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static PosCheckoutSummaryRequestDto CreateRequest() =>
         new(
             Guid.NewGuid(),
@@ -50,6 +73,7 @@ public sealed class PosCartCalculationServiceTests
     private sealed class FakeRepository : IPosCheckoutRepository
     {
         public bool CalculateCalled { get; private set; }
+        public string? CalculationErrorCode { get; init; }
 
         public Task<PosCheckoutCalculationResult> CalculateSummaryAsync(
             Guid tenantId,
@@ -60,6 +84,11 @@ public sealed class PosCartCalculationServiceTests
             CancellationToken cancellationToken)
         {
             CalculateCalled = true;
+            if (CalculationErrorCode is not null)
+            {
+                return Task.FromResult(
+                    new PosCheckoutCalculationResult(CalculationErrorCode, null));
+            }
             var summary = new PosCheckoutSummaryResponseDto(
                 new PosCheckoutBillingSummaryDto(1, 100, 0, 0, 100, "LKR"),
                 new PosCheckoutSaleDetailsDto("New Sale", 1, now, "Cashier"),

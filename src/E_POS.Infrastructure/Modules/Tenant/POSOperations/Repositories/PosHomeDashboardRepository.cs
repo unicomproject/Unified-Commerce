@@ -49,6 +49,32 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 "Sign in again or contact your administrator.");
         }
 
+        var tenantBranding = await (
+                from tenant in _dbContext.Tenants.AsNoTracking()
+                join profile in _dbContext.TenantProfiles.AsNoTracking()
+                    on tenant.Id equals profile.TenantId into profiles
+                from profile in profiles.DefaultIfEmpty()
+                where tenant.Id == context.TenantId
+                select new
+                {
+                    tenant.DisplayName,
+                    TradingName = profile == null ? null : profile.TradingName,
+                    LogoUrl = profile == null ? null : profile.LogoUrl
+                })
+            .FirstAsync(cancellationToken);
+
+        var cashierRoleLabel = await (
+                from roleAssignment in _dbContext.TenantUserRoles.AsNoTracking()
+                join role in _dbContext.TenantRoles.AsNoTracking()
+                    on roleAssignment.TenantRoleId equals role.Id
+                where roleAssignment.TenantId == context.TenantId &&
+                      roleAssignment.TenantUserId == context.UserId &&
+                      roleAssignment.RevokedAt == null &&
+                      role.TenantId == context.TenantId
+                orderby roleAssignment.AssignedAt descending
+                select role.RoleName)
+            .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+
         _logger.LogDebug(
             "POS home context: tenant user resolved {UserId}.",
             context.UserId);
@@ -356,6 +382,35 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             tillSession.OpeningFloatAmount,
             cancellationToken);
 
+        var completedOrders = _dbContext.SalesOrders
+            .AsNoTracking()
+            .Where(order =>
+                order.TenantId == context.TenantId &&
+                order.TillSessionId == tillSession.Id &&
+                order.Status == "COMPLETED" &&
+                order.PaymentStatus == "PAID" &&
+                order.CancelledAt == null);
+
+        var transactionCount = await completedOrders.CountAsync(cancellationToken);
+        var grossSalesAmount = await completedOrders
+            .SumAsync(
+                order => (decimal?)(order.TotalAmount + order.DiscountAmount),
+                cancellationToken) ?? 0m;
+        var discountAmount = await completedOrders
+            .SumAsync(order => (decimal?)order.DiscountAmount, cancellationToken) ?? 0m;
+        var refundAmount = await completedOrders
+            .SumAsync(order => (decimal?)order.RefundedAmount, cancellationToken) ?? 0m;
+        var refundCount = await (
+                from refund in _dbContext.SalesRefunds.AsNoTracking()
+                join order in completedOrders on refund.SalesOrderId equals order.Id
+                where refund.TenantId == context.TenantId &&
+                      refund.RefundStatus == "COMPLETED" &&
+                      refund.CompletedAt != null &&
+                      refund.CancelledAt == null
+                select refund.Id)
+            .CountAsync(cancellationToken);
+        var netSalesAmount = grossSalesAmount - discountAmount - refundAmount;
+
         _logger.LogDebug(
             "POS home context resolved for user {UserId}, device {DeviceId}, till {TillId}, session {SessionId}.",
             context.UserId,
@@ -371,6 +426,10 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             Snapshot: new PosHomeDashboardDbSnapshot(
                 CashierTenantUserId: context.UserId,
                 CashierDisplayName: cashier.DisplayName ?? cashier.FullName,
+                CashierRoleLabel: cashierRoleLabel,
+                TenantDisplayName: tenantBranding.DisplayName,
+                TenantTradingName: tenantBranding.TradingName,
+                TenantLogoUrl: tenantBranding.LogoUrl,
                 DeviceId: device.Id,
                 DeviceCode: deviceCode,
                 DeviceName: deviceName,
@@ -392,7 +451,13 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 ReturnsRefundsCount: returnsRefundsCount,
                 CustomersCount: customersCount,
                 ParkedSalesCount: parkedSalesCount,
-                CashDrawerBalance: cashDrawerBalance));
+                CashDrawerBalance: cashDrawerBalance,
+                GrossSalesAmount: grossSalesAmount,
+                TransactionCount: transactionCount,
+                RefundAmount: refundAmount,
+                RefundCount: refundCount,
+                DiscountAmount: discountAmount,
+                NetSalesAmount: netSalesAmount));
     }
 
     private async Task<Guid?> ResolveTrustedDeviceIdByFingerprintAsync(

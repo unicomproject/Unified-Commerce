@@ -23,6 +23,10 @@ public sealed record PosHomeContextResolutionResult(
 public sealed record PosHomeDashboardDbSnapshot(
     Guid CashierTenantUserId,
     string CashierDisplayName,
+    string CashierRoleLabel,
+    string TenantDisplayName,
+    string? TenantTradingName,
+    string? TenantLogoUrl,
     Guid DeviceId,
     string DeviceCode,
     string DeviceName,
@@ -44,4 +48,10 @@ public sealed record PosHomeDashboardDbSnapshot(
     int ReturnsRefundsCount,
     int CustomersCount,
     int ParkedSalesCount,
-    double CashDrawerBalance);
+    double CashDrawerBalance,
+    decimal GrossSalesAmount,
+    int TransactionCount,
+    decimal RefundAmount,
+    int RefundCount,
+    decimal DiscountAmount,
+    decimal NetSalesAmount);
