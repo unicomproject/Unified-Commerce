@@ -148,6 +148,16 @@ public sealed record TenantAdminProductOutletDetailResponse(
     decimal OnHandQuantity,
     decimal AvailableQuantity);
 
+public sealed record TenantAdminProductImageResponse(
+    Guid ProductImageId,
+    Guid? MediaAssetId,
+    Guid? ProductVariantId,
+    string ImageUrl,
+    string? AltText,
+    string ImagePurpose,
+    int SortOrder,
+    bool IsPrimaryImage);
+
 public sealed record TenantAdminProductVariantDetailResponse(
     Guid VariantId,
     string? VariantName,
@@ -155,7 +165,8 @@ public sealed record TenantAdminProductVariantDetailResponse(
     string? Barcode,
     decimal SellingPrice,
     decimal? DiscountPrice,
-    string Status);
+    string Status,
+    IReadOnlyList<TenantAdminProductImageResponse> Images);
 
 public sealed record TenantAdminProductBatchDetailResponse(
     string BatchNumber,
@@ -175,6 +186,7 @@ public sealed record TenantAdminProductDetailResponse(
     string UnitType,
     string? ShortDescription,
     string? ImageUrl,
+    IReadOnlyList<TenantAdminProductImageResponse> Images,
     decimal? CostPrice,
     decimal SellingPrice,
     decimal? DiscountPrice,
@@ -197,7 +209,8 @@ public sealed record TenantAdminProductListItemResponse(
     string? Barcode,
     decimal? SellingPrice,
     string Status,
-    int OutletCount);
+    int OutletCount,
+    string? ImageUrl);
 
 public sealed record TenantAdminProductListResponse(
     TenantAdminProductSummaryResponse Summary,

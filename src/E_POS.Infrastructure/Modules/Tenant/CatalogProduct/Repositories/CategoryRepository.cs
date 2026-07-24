@@ -1,5 +1,7 @@
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Infrastructure.Persistence;
@@ -96,55 +98,111 @@ public sealed class CategoryRepository : ICategoryRepository
         var totalCount = await categories.CountAsync(cancellationToken);
         var rows = await (from category in categories
                           join parent in _dbContext.Categories.AsNoTracking()
-                              on category.ParentCategoryId equals parent.Id into parentJoin
+                              on new { category.TenantId, ParentCategoryId = category.ParentCategoryId }
+                              equals new { parent.TenantId, ParentCategoryId = (Guid?)parent.Id } into parentJoin
                           from parent in parentJoin.DefaultIfEmpty()
-                          select new { Category = category, Parent = parent })
+                          join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                              on new { category.TenantId, MediaAssetId = category.ImageMediaAssetId }
+                              equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                          from mediaAsset in mediaAssets.DefaultIfEmpty()
+                          select new
+                          {
+                              Category = category,
+                              Parent = parent,
+                              JoinedMediaAssetId = mediaAsset == null ? null : (Guid?)mediaAsset.Id,
+                              MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                              MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+                          })
             .OrderBy(x => x.Category.ParentCategoryId.HasValue)
             .ThenBy(x => x.Category.SortOrder)
             .ThenBy(x => x.Category.CategoryCode)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new CategorySummaryResponse(
-                x.Category.Id,
-                x.Category.CategoryCode,
-                x.Category.CategoryName,
-                x.Category.ImageUrl,
-                x.Category.Status,
-                x.Category.ParentCategoryId,
-                x.Parent == null ? null : x.Parent.CategoryCode,
-                x.Parent == null ? null : x.Parent.CategoryName,
-                x.Category.SortOrder,
-                x.Category.CreatedAt,
-                x.Category.UpdatedAt))
             .ToListAsync(cancellationToken);
 
-        return new CategoryListResponse(rows, pageNumber, pageSize, totalCount);
+        var items = rows
+            .Select(x =>
+            {
+                var hasActiveMedia = IsActiveMedia(
+                    x.Category.ImageMediaAssetId,
+                    x.JoinedMediaAssetId,
+                    x.MediaStatus);
+
+                return new CategorySummaryResponse(
+                    x.Category.Id,
+                    x.Category.CategoryCode,
+                    x.Category.CategoryName,
+                    ResolveImageUrl(
+                        x.Category.ImageMediaAssetId,
+                        hasActiveMedia,
+                        x.MediaPublicUrl,
+                        x.Category.ImageUrl),
+                    hasActiveMedia ? x.JoinedMediaAssetId : null,
+                    x.Category.Status,
+                    x.Category.ParentCategoryId,
+                    x.Parent == null ? null : x.Parent.CategoryCode,
+                    x.Parent == null ? null : x.Parent.CategoryName,
+                    x.Category.SortOrder,
+                    x.Category.CreatedAt,
+                    x.Category.UpdatedAt);
+            })
+            .ToList();
+
+        return new CategoryListResponse(items, pageNumber, pageSize, totalCount);
     }
 
-    public Task<CategoryResponse?> GetByIdAsync(Guid tenantId, Guid categoryId, bool includeDeleted, CancellationToken cancellationToken)
+    public async Task<CategoryResponse?> GetByIdAsync(Guid tenantId, Guid categoryId, bool includeDeleted, CancellationToken cancellationToken)
     {
         var categories = _dbContext.Categories
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Id == categoryId && (includeDeleted || x.Status != CategoryConstants.DeletedStatus));
 
-        return (from category in categories
-                join parent in _dbContext.Categories.AsNoTracking()
-                    on category.ParentCategoryId equals parent.Id into parentJoin
-                from parent in parentJoin.DefaultIfEmpty()
-                select new { Category = category, Parent = parent })
-            .Select(x => new CategoryResponse(
-                x.Category.Id,
-                x.Category.CategoryCode,
-                x.Category.CategoryName,
-                x.Category.ImageUrl,
-                x.Category.Status,
-                x.Category.ParentCategoryId,
-                x.Parent == null ? null : x.Parent.CategoryCode,
-                x.Parent == null ? null : x.Parent.CategoryName,
-                x.Category.SortOrder,
-                x.Category.CreatedAt,
-                x.Category.UpdatedAt))
+        var row = await (from category in categories
+                         join parent in _dbContext.Categories.AsNoTracking()
+                             on new { category.TenantId, ParentCategoryId = category.ParentCategoryId }
+                             equals new { parent.TenantId, ParentCategoryId = (Guid?)parent.Id } into parentJoin
+                         from parent in parentJoin.DefaultIfEmpty()
+                         join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                             on new { category.TenantId, MediaAssetId = category.ImageMediaAssetId }
+                             equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                         from mediaAsset in mediaAssets.DefaultIfEmpty()
+                         select new
+                         {
+                             Category = category,
+                             Parent = parent,
+                             JoinedMediaAssetId = mediaAsset == null ? null : (Guid?)mediaAsset.Id,
+                             MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                             MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+                         })
             .FirstOrDefaultAsync(cancellationToken);
+
+        if (row is null)
+        {
+            return null;
+        }
+
+        var hasActiveMedia = IsActiveMedia(
+            row.Category.ImageMediaAssetId,
+            row.JoinedMediaAssetId,
+            row.MediaStatus);
+
+        return new CategoryResponse(
+            row.Category.Id,
+            row.Category.CategoryCode,
+            row.Category.CategoryName,
+            ResolveImageUrl(
+                row.Category.ImageMediaAssetId,
+                hasActiveMedia,
+                row.MediaPublicUrl,
+                row.Category.ImageUrl),
+            hasActiveMedia ? row.JoinedMediaAssetId : null,
+            row.Category.Status,
+            row.Category.ParentCategoryId,
+            row.Parent == null ? null : row.Parent.CategoryCode,
+            row.Parent == null ? null : row.Parent.CategoryName,
+            row.Category.SortOrder,
+            row.Category.CreatedAt,
+            row.Category.UpdatedAt);
     }
 
     public Task<Category?> GetEditableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken)
@@ -159,10 +217,53 @@ public sealed class CategoryRepository : ICategoryRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public Task AddMediaAssetAsync(MediaAsset mediaAsset, CancellationToken cancellationToken)
+    {
+        _dbContext.MediaAssets.Add(mediaAsset);
+        return Task.CompletedTask;
+    }
+
+    public async Task MarkMediaAssetInactiveAsync(
+        Guid tenantId,
+        Guid mediaAssetId,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var mediaAsset = await _dbContext.MediaAssets
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == mediaAssetId, cancellationToken);
+
+        mediaAsset?.MarkInactive(updatedByTenantUserId, now);
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    private static bool IsActiveMedia(
+        Guid? linkedMediaAssetId,
+        Guid? joinedMediaAssetId,
+        string? mediaStatus)
+    {
+        return linkedMediaAssetId.HasValue &&
+               joinedMediaAssetId == linkedMediaAssetId &&
+               mediaStatus == "ACTIVE";
+    }
+
+    private static string? ResolveImageUrl(
+        Guid? linkedMediaAssetId,
+        bool hasActiveMedia,
+        string? mediaPublicUrl,
+        string? legacyImageUrl)
+    {
+        if (!linkedMediaAssetId.HasValue)
+        {
+            return MediaUrlResolver.PreferMediaAsset(null, legacyImageUrl);
+        }
+
+        return hasActiveMedia
+            ? MediaUrlResolver.PreferMediaAsset(mediaPublicUrl, legacyImageUrl)
+            : null;
+    }
 }
-
-

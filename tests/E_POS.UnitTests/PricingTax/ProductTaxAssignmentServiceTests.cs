@@ -1,4 +1,4 @@
-using E_POS.Application.Common.Contracts;
+﻿using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
@@ -153,9 +153,12 @@ public sealed class ProductTaxAssignmentServiceTests
         public Task AddCategoryLinksAsync(IEnumerable<ProductCategory> links, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task AddCollectionLinksAsync(IEnumerable<ProductCollection> links, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task AddImagesAsync(IEnumerable<ProductImage> images, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task AddMediaAssetsAsync(IEnumerable<E_POS.Domain.Modules.Shared.Media.Entities.MediaAsset> mediaAssets, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task AddChannelVisibilitiesAsync(IEnumerable<ProductChannelVisibility> visibilities, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task AddPriceListItemAsync(PriceListItem priceListItem, CancellationToken cancellationToken) => throw new NotImplementedException();
-        public Task ClearProductMappingsAsync(Guid productId, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task<IReadOnlyList<Guid>> GetProductImageMediaAssetIdsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task ClearProductMappingsAsync(Guid tenantId, Guid productId, bool clearImages, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task MarkMediaAssetsInactiveAsync(Guid tenantId, IReadOnlyCollection<Guid> mediaAssetIds, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task SaveChangesAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<Guid?> GetDefaultPriceListIdAsync(Guid tenantId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<ProductVariant?> GetDefaultVariantAsync(Guid productId, CancellationToken cancellationToken) => throw new NotImplementedException();

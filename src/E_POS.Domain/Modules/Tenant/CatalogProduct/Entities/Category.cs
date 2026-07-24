@@ -1,4 +1,4 @@
-using E_POS.Domain.Common.Entities;
+﻿using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
@@ -12,6 +12,7 @@ public class Category : AuditableEntity
     public string CategorySlug { get; protected set; } = string.Empty;
     public string? Description { get; protected set; }
     public string? ImageUrl { get; protected set; }
+    public Guid? ImageMediaAssetId { get; protected set; }
     public int SortOrder { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
@@ -81,6 +82,18 @@ public class Category : AuditableEntity
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
         Status = "DELETED";
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateImage(
+        string? imageUrl,
+        Guid? imageMediaAssetId,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        ImageUrl = imageUrl?.Trim();
+        ImageMediaAssetId = imageMediaAssetId;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

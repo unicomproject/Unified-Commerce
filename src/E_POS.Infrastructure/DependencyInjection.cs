@@ -10,6 +10,7 @@ using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Infrastructure.Common;
@@ -58,6 +59,8 @@ using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Services;
+using E_POS.Infrastructure.Modules.Shared.Media.Options;
+using E_POS.Infrastructure.Modules.Shared.Media.Services;
 
 
 namespace E_POS.Infrastructure;
@@ -72,6 +75,7 @@ public static class DependencyInjection
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.Configure<TenantJwtOptions>(configuration.GetSection(TenantJwtOptions.SectionName));
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
+        services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
         services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
@@ -119,6 +123,7 @@ public static class DependencyInjection
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
         services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
+        services.AddScoped<ICatalogMediaRepository, CatalogMediaRepository>();
         services.AddScoped<IPosProductCatalogRepository, PosProductCatalogRepository>();
         services.AddScoped<IPosCustomerRepository, PosCustomerRepository>();
         services.AddScoped<IReturnPolicyTemplateRepository, ReturnPolicyTemplateRepository>();
@@ -146,6 +151,7 @@ public static class DependencyInjection
         services.AddScoped<IPosSaleLinePricingCalculator, PosSaleLinePricingCalculator>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
         services.AddScoped<IPosReturnRepository, PosReturnRepository>();
+        services.AddScoped<IMediaObjectStorage, AzureBlobMediaObjectStorage>();
         services.AddScoped<IReturnInspectionMediaStorage, LocalReturnInspectionMediaStorage>();
         services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();

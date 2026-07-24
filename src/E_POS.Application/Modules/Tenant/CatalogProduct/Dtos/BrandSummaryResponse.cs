@@ -4,6 +4,8 @@ public sealed record BrandSummaryResponse(
     Guid Id,
     string BrandCode,
     string BrandName,
+    string? LogoUrl,
+    Guid? LogoMediaAssetId,
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt);

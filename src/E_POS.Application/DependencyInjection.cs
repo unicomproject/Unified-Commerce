@@ -1,4 +1,4 @@
-using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
+﻿using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Services;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Services;
@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
+        services.AddScoped<ICatalogMediaService, CatalogMediaService>();
         services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
         services.AddScoped<IPosProductCatalogService, PosProductCatalogService>();
         services.AddScoped<IPosCustomerService, PosCustomerService>();

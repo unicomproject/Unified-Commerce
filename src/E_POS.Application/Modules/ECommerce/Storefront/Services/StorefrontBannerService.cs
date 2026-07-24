@@ -1,6 +1,5 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
-using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Services;
 
@@ -15,7 +14,6 @@ public sealed class StorefrontBannerService : IStorefrontBannerService
 
     public async Task<IEnumerable<StorefrontBannerReadModel>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
     {
-        var banners = await _repository.GetActiveBannersAsync(tenantId, bannerType, cancellationToken);
-        return banners.ToReadModels();
+        return await _repository.GetActiveBannersAsync(tenantId, bannerType, cancellationToken);
     }
 }

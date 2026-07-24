@@ -472,6 +472,13 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 productIds,
                 cancellationToken);
 
+        var imageUrls = productIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await _tenantAdminProductRepository.GetPrimaryImageUrlsAsync(
+                context.TenantId,
+                productIds,
+                cancellationToken);
+
         var items = list.Items
             .Select(item => new TenantAdminProductListItemResponse(
                 item.Id,
@@ -481,7 +488,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 item.Barcode,
                 item.Price,
                 item.Status,
-                OutletCount: 0))
+                OutletCount: 0,
+                imageUrls.TryGetValue(item.Id, out var imageUrl) ? imageUrl : null))
             .ToList();
 
         var response = new TenantAdminProductListResponse(

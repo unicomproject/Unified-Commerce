@@ -1,4 +1,4 @@
-using E_POS.Application.Common.Contracts;
+﻿using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
@@ -210,9 +210,12 @@ public sealed class PriceListItemsServiceTests
         public Task AddCategoryLinksAsync(IEnumerable<ProductCategory> links, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task AddCollectionLinksAsync(IEnumerable<ProductCollection> links, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task AddImagesAsync(IEnumerable<ProductImage> images, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task AddMediaAssetsAsync(IEnumerable<E_POS.Domain.Modules.Shared.Media.Entities.MediaAsset> mediaAssets, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task AddChannelVisibilitiesAsync(IEnumerable<ProductChannelVisibility> visibilities, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task AddPriceListItemAsync(PriceListItem priceListItem, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task ClearProductMappingsAsync(Guid productId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<IReadOnlyList<Guid>> GetProductImageMediaAssetIdsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>(Array.Empty<Guid>());
+        public Task ClearProductMappingsAsync(Guid tenantId, Guid productId, bool clearImages, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task MarkMediaAssetsInactiveAsync(Guid tenantId, IReadOnlyCollection<Guid> mediaAssetIds, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<Guid?> GetDefaultPriceListIdAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult<Guid?>(null);
         public Task<ProductVariant?> GetDefaultVariantAsync(Guid productId, CancellationToken cancellationToken) => Task.FromResult<ProductVariant?>(null);
