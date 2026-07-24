@@ -1,6 +1,8 @@
-using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -353,11 +355,25 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         var variants = await _dbContext.Set<ProductVariant>().AsNoTracking()
             .Where(x => x.TenantId == cart.TenantId && variantIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
-        var images = await _dbContext.Set<ProductImage>().AsNoTracking()
-            .Where(x => x.TenantId == cart.TenantId && productIds.Contains(x.ProductId) &&
-                        x.Status == Active && x.IsPrimaryImage &&
-                        (!x.ProductVariantId.HasValue || variantIds.Contains(x.ProductVariantId.Value)))
-            .OrderBy(x => x.SortOrder)
+        var images = await (from image in _dbContext.Set<ProductImage>().AsNoTracking()
+                            join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                            from mediaAsset in mediaAssets.DefaultIfEmpty()
+                            where image.TenantId == cart.TenantId &&
+                                  productIds.Contains(image.ProductId) &&
+                                  image.Status == Active &&
+                                  image.IsPrimaryImage &&
+                                  (!image.ProductVariantId.HasValue || variantIds.Contains(image.ProductVariantId.Value))
+                            orderby image.SortOrder
+                            select new
+                            {
+                                image.ProductId,
+                                image.ProductVariantId,
+                                image.ImageUrl,
+                                image.ImageStorageKey,
+                                MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                            })
             .ToListAsync(cancellationToken);
         var balances = await _dbContext.Set<InventoryBalance>().AsNoTracking()
             .Where(x => x.TenantId == cart.TenantId && productIds.Contains(x.ProductId))
@@ -409,7 +425,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
                 Name = item.ProductNameSnapshot,
                 VariantName = variant?.VariantName,
                 Sku = item.SkuSnapshot,
-                ImageUrl = image?.ImageUrl,
+                ImageUrl = image is null ? null : MediaUrlResolver.PreferMediaAsset(image.MediaPublicUrl, image.ImageUrl, image.ImageStorageKey),
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
                 Subtotal = item.LineSubtotalAmount,

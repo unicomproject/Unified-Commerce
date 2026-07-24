@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+﻿using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Platform.PlatformFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
@@ -22,6 +22,7 @@ using E_POS.Domain.Modules.Shared.Refund.Entities;
 using E_POS.Domain.Modules.Shared.ReturnExchange.Entities;
 using E_POS.Domain.Modules.Shared.Notification.Entities;
 using E_POS.Domain.Modules.Shared.Integration.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.OfflineSync.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -262,6 +263,9 @@ public sealed class EPosDbContext : DbContext
 
     // Storefront
     public DbSet<StorefrontBanner> StorefrontBanners => Set<StorefrontBanner>();
+
+    // Shared Media
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
 
     // Fulfilment and Pickup
     public DbSet<FulfillmentMethod> FulfillmentMethods => Set<FulfillmentMethod>();

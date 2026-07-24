@@ -1,6 +1,8 @@
+﻿using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Infrastructure.Persistence;
@@ -125,38 +127,50 @@ public sealed class ProductRepository : IProductRepository
 
         var variant = await _dbContext.ProductVariants
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.ProductId == productId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ProductId == productId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
 
         var barcodeVal = variant != null
-            ? await _dbContext.ProductBarcodes.AsNoTracking().Where(x => x.ProductVariantId == variant.Id).Select(x => x.Barcode).FirstOrDefaultAsync(cancellationToken)
+            ? await _dbContext.ProductBarcodes.AsNoTracking().Where(x => x.TenantId == tenantId && x.ProductVariantId == variant.Id).Select(x => x.Barcode).FirstOrDefaultAsync(cancellationToken)
             : null;
 
         var priceVal = (variant != null && defaultPriceListId.HasValue)
-            ? await _dbContext.PriceListItems.AsNoTracking().Where(x => x.PriceListId == defaultPriceListId.Value && x.ProductVariantId == variant.Id).Select(x => (decimal?)x.SellingPrice).FirstOrDefaultAsync(cancellationToken)
+            ? await _dbContext.PriceListItems.AsNoTracking().Where(x => x.TenantId == tenantId && x.PriceListId == defaultPriceListId.Value && x.ProductVariantId == variant.Id).Select(x => (decimal?)x.SellingPrice).FirstOrDefaultAsync(cancellationToken)
             : null;
 
         var categoryIds = await _dbContext.ProductCategories
             .AsNoTracking()
-            .Where(x => x.ProductId == productId)
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId)
             .Select(x => x.CategoryId)
             .ToArrayAsync(cancellationToken);
 
         var collectionIds = await _dbContext.ProductCollections
             .AsNoTracking()
-            .Where(x => x.ProductId == productId)
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId)
             .Select(x => x.CollectionId)
             .ToArrayAsync(cancellationToken);
 
-        var imageUrls = await _dbContext.ProductImages
-            .AsNoTracking()
-            .Where(x => x.ProductId == productId)
-            .OrderBy(x => x.SortOrder)
-            .Select(x => x.ImageUrl ?? string.Empty)
-            .ToArrayAsync(cancellationToken);
+        var imageRows = await (from image in _dbContext.ProductImages.AsNoTracking()
+                               join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                   on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                   equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                               from mediaAsset in mediaAssets.DefaultIfEmpty()
+                               where image.TenantId == tenantId && image.ProductId == productId
+                               orderby image.SortOrder
+                               select new
+                               {
+                                   image.ImageUrl,
+                                   image.ImageStorageKey,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                               })
+            .ToListAsync(cancellationToken);
+
+        var imageUrls = imageRows
+            .Select(x => MediaUrlResolver.PreferMediaAssetOrEmpty(x.MediaPublicUrl, x.ImageUrl, x.ImageStorageKey))
+            .ToArray();
 
         var salesChannelIds = await _dbContext.ProductChannelVisibilities
             .AsNoTracking()
-            .Where(x => x.ProductId == productId)
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId)
             .Select(x => x.SalesChannelId)
             .ToArrayAsync(cancellationToken);
 
@@ -219,6 +233,12 @@ public sealed class ProductRepository : IProductRepository
         return Task.CompletedTask;
     }
 
+    public Task AddMediaAssetsAsync(IEnumerable<MediaAsset> mediaAssets, CancellationToken cancellationToken)
+    {
+        _dbContext.MediaAssets.AddRange(mediaAssets);
+        return Task.CompletedTask;
+    }
+
     public Task AddChannelVisibilitiesAsync(IEnumerable<ProductChannelVisibility> visibilities, CancellationToken cancellationToken)
     {
         _dbContext.ProductChannelVisibilities.AddRange(visibilities);
@@ -231,22 +251,57 @@ public sealed class ProductRepository : IProductRepository
         return Task.CompletedTask;
     }
 
-    public async Task ClearProductMappingsAsync(Guid productId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Guid>> GetProductImageMediaAssetIdsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken)
     {
-        var categories = await _dbContext.ProductCategories.Where(x => x.ProductId == productId).ToListAsync(cancellationToken);
+        return await _dbContext.ProductImages
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId && x.MediaAssetId.HasValue)
+            .Select(x => x.MediaAssetId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task ClearProductMappingsAsync(Guid tenantId, Guid productId, bool clearImages, CancellationToken cancellationToken)
+    {
+        var categories = await _dbContext.ProductCategories.Where(x => x.TenantId == tenantId && x.ProductId == productId).ToListAsync(cancellationToken);
         _dbContext.ProductCategories.RemoveRange(categories);
 
-        var collections = await _dbContext.ProductCollections.Where(x => x.ProductId == productId).ToListAsync(cancellationToken);
+        var collections = await _dbContext.ProductCollections.Where(x => x.TenantId == tenantId && x.ProductId == productId).ToListAsync(cancellationToken);
         _dbContext.ProductCollections.RemoveRange(collections);
 
-        var images = await _dbContext.ProductImages.Where(x => x.ProductId == productId).ToListAsync(cancellationToken);
-        _dbContext.ProductImages.RemoveRange(images);
+        if (clearImages)
+        {
+            var images = await _dbContext.ProductImages.Where(x => x.TenantId == tenantId && x.ProductId == productId).ToListAsync(cancellationToken);
+            _dbContext.ProductImages.RemoveRange(images);
+        }
 
-        var barcodes = await _dbContext.ProductBarcodes.Where(x => x.ProductId == productId).ToListAsync(cancellationToken);
+        var barcodes = await _dbContext.ProductBarcodes.Where(x => x.TenantId == tenantId && x.ProductId == productId).ToListAsync(cancellationToken);
         _dbContext.ProductBarcodes.RemoveRange(barcodes);
 
-        var channels = await _dbContext.ProductChannelVisibilities.Where(x => x.ProductId == productId).ToListAsync(cancellationToken);
+        var channels = await _dbContext.ProductChannelVisibilities.Where(x => x.TenantId == tenantId && x.ProductId == productId).ToListAsync(cancellationToken);
         _dbContext.ProductChannelVisibilities.RemoveRange(channels);
+    }
+
+    public async Task MarkMediaAssetsInactiveAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> mediaAssetIds,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (mediaAssetIds.Count == 0)
+        {
+            return;
+        }
+
+        var mediaAssets = await _dbContext.MediaAssets
+            .Where(x => x.TenantId == tenantId && mediaAssetIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var mediaAsset in mediaAssets)
+        {
+            mediaAsset.MarkInactive(updatedByTenantUserId, now);
+        }
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)

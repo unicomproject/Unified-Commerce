@@ -1,6 +1,8 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
+using E_POS.Application.Modules.Shared.Media;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -259,9 +261,18 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             .Select(x => x.Model)
             .ToList();
 
-        var categories = await _dbContext.Set<Category>().AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status == ActiveStatus)
-            .OrderBy(x => x.SortOrder)
+        var categoryRows = await (from category in _dbContext.Set<Category>().AsNoTracking()
+                                  join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                      on new { category.TenantId, MediaAssetId = category.ImageMediaAssetId }
+                                      equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                                  from mediaAsset in mediaAssets.DefaultIfEmpty()
+                                  where category.TenantId == tenantId && category.Status == ActiveStatus
+                                  orderby category.SortOrder
+                                  select new
+                                  {
+                                      Category = category,
+                                      MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                  })
             .ToListAsync(cancellationToken);
         var collections = await _dbContext.Set<Collection>().AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Status == ActiveStatus &&
@@ -272,14 +283,14 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            categories = categories.Where(x => x.CategoryName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-                                               (x.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+            categoryRows = categoryRows.Where(x => x.Category.CategoryName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                                                   (x.Category.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
             collections = collections.Where(x => x.CollectionName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                                                   (x.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
         }
         else
         {
-            categories = [];
+            categoryRows = [];
             collections = [];
         }
 
@@ -289,9 +300,13 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             {
                 Items = productPage, TotalCount = totalProducts, Page = request.Page, PageSize = request.PageSize
             },
-            Categories = categories.Select(x => new StorefrontSearchMatchReadModel
+            Categories = categoryRows.Select(x => new StorefrontSearchMatchReadModel
             {
-                Id = x.Id, Name = x.CategoryName, Slug = x.CategorySlug, Description = x.Description, ImageUrl = x.ImageUrl
+                Id = x.Category.Id,
+                Name = x.Category.CategoryName,
+                Slug = x.Category.CategorySlug,
+                Description = x.Category.Description,
+                ImageUrl = MediaUrlResolver.PreferMediaAsset(x.MediaPublicUrl, x.Category.ImageUrl)
             }).ToList(),
             Collections = collections.Select(x => new StorefrontSearchMatchReadModel
             {
@@ -462,37 +477,55 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
     private async Task<Dictionary<Guid, string?>> GetPrimaryImagesByProductAsync(Guid tenantId, IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken)
     {
-        var imageRows = await _dbContext.Set<ProductImage>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.ProductVariantId == null &&
-                x.IsPrimaryImage &&
-                x.Status == ActiveStatus)
-            .OrderBy(x => x.SortOrder)
+        var imageRows = await (from image in _dbContext.Set<ProductImage>().AsNoTracking()
+                               join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                   on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                   equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                               from mediaAsset in mediaAssets.DefaultIfEmpty()
+                               where image.TenantId == tenantId &&
+                                     productIds.Contains(image.ProductId) &&
+                                     image.ProductVariantId == null &&
+                                     image.IsPrimaryImage &&
+                                     image.Status == ActiveStatus
+                               orderby image.SortOrder
+                               select new
+                               {
+                                   Image = image,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                               })
             .ToListAsync(cancellationToken);
 
         return imageRows
-            .GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => x.First().ImageUrl);
+            .GroupBy(x => x.Image.ProductId)
+            .ToDictionary(
+                x => x.Key,
+                x =>
+                {
+                    var first = x.First();
+                    return MediaUrlResolver.PreferMediaAsset(first.MediaPublicUrl, first.Image.ImageUrl, first.Image.ImageStorageKey);
+                });
     }
 
     private async Task<IReadOnlyList<StorefrontProductImageReadModel>> GetProductImagesAsync(Guid tenantId, Product product, CancellationToken cancellationToken)
     {
-        var imageRows = await _dbContext.Set<ProductImage>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.ProductId == product.Id &&
-                x.Status == ActiveStatus)
-            .OrderByDescending(x => x.IsPrimaryImage)
-            .ThenBy(x => x.SortOrder)
-            .ThenBy(x => x.Id)
+        var imageRows = await (from image in _dbContext.Set<ProductImage>().AsNoTracking()
+                               join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                   on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                   equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                               from mediaAsset in mediaAssets.DefaultIfEmpty()
+                               where image.TenantId == tenantId &&
+                                     image.ProductId == product.Id &&
+                                     image.Status == ActiveStatus
+                               orderby image.IsPrimaryImage descending, image.SortOrder, image.Id
+                               select new
+                               {
+                                   Image = image,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                               })
             .ToListAsync(cancellationToken);
 
         return imageRows
-            .Select(image => StorefrontProductMapper.ToImageReadModel(image, product.ProductName))
+            .Select(row => StorefrontProductMapper.ToImageReadModel(row.Image, product.ProductName, row.MediaPublicUrl))
             .ToList();
     }
 
@@ -548,17 +581,33 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             .ToListAsync(cancellationToken);
 
         var optionIds = options.Select(x => x.Id).ToList();
-        var optionValues = optionIds.Count == 0
-            ? []
-            : await _dbContext.Set<ProductOptionValue>()
-                .AsNoTracking()
-                .Where(x =>
-                    x.TenantId == tenantId &&
-                    optionIds.Contains(x.ProductOptionId) &&
-                    x.Status == ActiveStatus)
-                .OrderBy(x => x.SortOrder)
-                .ThenBy(x => x.ValueName)
+        IReadOnlyList<ProductOptionValueMedia> optionValues;
+        if (optionIds.Count == 0)
+        {
+            optionValues = [];
+        }
+        else
+        {
+            var optionValueRows = await (from optionValue in _dbContext.Set<ProductOptionValue>().AsNoTracking()
+                                         join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                             on new { optionValue.TenantId, MediaAssetId = optionValue.ImageMediaAssetId }
+                                             equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                                         from mediaAsset in mediaAssets.DefaultIfEmpty()
+                                         where optionValue.TenantId == tenantId &&
+                                               optionIds.Contains(optionValue.ProductOptionId) &&
+                                               optionValue.Status == ActiveStatus
+                                         orderby optionValue.SortOrder, optionValue.ValueName
+                                         select new
+                                         {
+                                             OptionValue = optionValue,
+                                             MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                         })
                 .ToListAsync(cancellationToken);
+
+            optionValues = optionValueRows
+                .Select(x => new ProductOptionValueMedia(x.OptionValue, x.MediaPublicUrl))
+                .ToList();
+        }
 
         var variantOptionLinks = variantIds.Count == 0
             ? []
@@ -581,15 +630,15 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
         var linkedOptionValueIds = variantOptions.VariantOptionLinks.Select(x => x.ProductOptionValueId).ToHashSet();
         var selectableOptionValues = linkedOptionValueIds.Count == 0
             ? variantOptions.OptionValues
-            : variantOptions.OptionValues.Where(x => linkedOptionValueIds.Contains(x.Id)).ToList();
+            : variantOptions.OptionValues.Where(x => linkedOptionValueIds.Contains(x.OptionValue.Id)).ToList();
 
         return selectableOptionValues
-            .Where(x => optionIds.Contains(x.ProductOptionId))
-            .GroupBy(x => x.Id)
+            .Where(x => optionIds.Contains(x.OptionValue.ProductOptionId))
+            .GroupBy(x => x.OptionValue.Id)
             .Select(x => x.First())
-            .OrderBy(x => x.SortOrder)
-            .ThenBy(StorefrontProductMapper.GetOptionDisplayName)
-            .Select(StorefrontProductMapper.ToOptionValueReadModel)
+            .OrderBy(x => x.OptionValue.SortOrder)
+            .ThenBy(x => StorefrontProductMapper.GetOptionDisplayName(x.OptionValue))
+            .Select(x => StorefrontProductMapper.ToOptionValueReadModel(x.OptionValue, x.MediaPublicUrl))
             .ToList();
     }
 
@@ -602,7 +651,7 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
         string currencyCode)
     {
         var optionById = variantOptions.Options.ToDictionary(x => x.Id);
-        var optionValueById = variantOptions.OptionValues.ToDictionary(x => x.Id);
+        var optionValueById = variantOptions.OptionValues.ToDictionary(x => x.OptionValue.Id, x => x.OptionValue);
         var variantOptionLinksByVariant = variantOptions.VariantOptionLinks
             .GroupBy(x => x.ProductVariantId)
             .ToDictionary(x => x.Key, x => x.ToList());
@@ -692,8 +741,10 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
     private sealed record ProductInventoryRow(Guid? ProductVariantId, decimal AvailableQuantity);
 
+    private sealed record ProductOptionValueMedia(ProductOptionValue OptionValue, string? MediaPublicUrl);
+
     private sealed record ProductVariantOptions(
         IReadOnlyList<ProductOption> Options,
-        IReadOnlyList<ProductOptionValue> OptionValues,
+        IReadOnlyList<ProductOptionValueMedia> OptionValues,
         IReadOnlyList<ProductVariantOptionValue> VariantOptionLinks);
 }

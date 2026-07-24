@@ -4,6 +4,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using Xunit;
@@ -46,6 +47,83 @@ public sealed class BrandCollectionServiceTests
         Assert.Equal(TenantId, repository.AddedBrand?.TenantId);
     }
 
+    [Fact]
+    public async Task BrandCreateAsync_WithLegacyLogoUrl_CreatesMediaAssetAndLinksBrand()
+    {
+        var repository = new FakeBrandRepository();
+        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider());
+
+        var result = await service.CreateAsync(
+            CreateContext([BrandConstants.CreatePermission]),
+            new BrandCreateRequest("ACME", "Acme", null, null, "https://cdn.example.test/brand.png", BrandConstants.ActiveStatus),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var mediaAsset = Assert.Single(repository.AddedMediaAssets);
+        Assert.Equal("https://cdn.example.test/brand.png", mediaAsset.PublicUrl);
+        Assert.Equal(mediaAsset.Id, repository.AddedBrand?.LogoMediaAssetId);
+    }
+    [Fact]
+    public async Task BrandUpdateAsync_WithEmptyLogoUrl_ClearsLinkedMediaAndMarksInactive()
+    {
+        var brandId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var brand = Brand.Create(
+            brandId,
+            TenantId,
+            "ACME",
+            "Acme",
+            "acme",
+            null,
+            "https://cdn.example.test/brand-old.png",
+            BrandConstants.ActiveStatus,
+            UserId,
+            Now);
+        brand.UpdateLogo("https://cdn.example.test/brand-old.png", mediaAssetId, UserId, Now);
+        var repository = new FakeBrandRepository { EditableBrand = brand };
+        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider());
+
+        var result = await service.UpdateAsync(
+            CreateContext([BrandConstants.UpdatePermission]),
+            brandId,
+            new BrandUpdateRequest("ACME", "Acme", "acme", null, " ", BrandConstants.ActiveStatus),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(brand.LogoUrl);
+        Assert.Null(brand.LogoMediaAssetId);
+        Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
+    }
+
+    [Fact]
+    public async Task BrandDeleteAsync_WithLinkedMediaAsset_MarksMediaInactive()
+    {
+        var brandId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var brand = Brand.Create(
+            brandId,
+            TenantId,
+            "ACME",
+            "Acme",
+            "acme",
+            null,
+            "https://cdn.example.test/brand.png",
+            BrandConstants.ActiveStatus,
+            UserId,
+            Now);
+        brand.UpdateLogo("https://cdn.example.test/brand.png", mediaAssetId, UserId, Now);
+        var repository = new FakeBrandRepository { EditableBrand = brand };
+        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider());
+
+        var result = await service.DeleteAsync(
+            CreateContext([BrandConstants.DeletePermission]),
+            brandId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(BrandConstants.DeletedStatus, brand.Status);
+        Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
+    }
     [Fact]
     public async Task CollectionCreateAsync_WithCreatePermission_NormalizesCodeAndPersists()
     {
@@ -92,6 +170,9 @@ public sealed class BrandCollectionServiceTests
     private sealed class FakeBrandRepository : IBrandRepository
     {
         public Brand? AddedBrand { get; private set; }
+        public Brand? EditableBrand { get; init; }
+        public List<MediaAsset> AddedMediaAssets { get; } = [];
+        public List<Guid> InactivatedMediaAssetIds { get; } = [];
 
         public Task<bool> BrandCodeExistsAsync(Guid tenantId, string brandCode, Guid? excludeBrandId, CancellationToken cancellationToken)
         {
@@ -105,17 +186,30 @@ public sealed class BrandCollectionServiceTests
 
         public Task<BrandResponse?> GetByIdAsync(Guid tenantId, Guid brandId, bool includeDeleted, CancellationToken cancellationToken)
         {
-            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, AddedBrand!.BrandCode, AddedBrand.BrandName, AddedBrand.Status, AddedBrand.CreatedAt, AddedBrand.UpdatedAt));
+            var brand = AddedBrand ?? EditableBrand;
+            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, brand!.BrandCode, brand.BrandName, brand.LogoUrl, brand.LogoMediaAssetId, brand.Status, brand.CreatedAt, brand.UpdatedAt));
         }
 
         public Task<Brand?> GetEditableAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)
         {
-            return Task.FromResult<Brand?>(AddedBrand);
+            return Task.FromResult<Brand?>(AddedBrand ?? EditableBrand);
         }
 
         public Task AddAsync(Brand brand, CancellationToken cancellationToken)
         {
             AddedBrand = brand;
+            return Task.CompletedTask;
+        }
+
+        public Task AddMediaAssetAsync(MediaAsset mediaAsset, CancellationToken cancellationToken)
+        {
+            AddedMediaAssets.Add(mediaAsset);
+            return Task.CompletedTask;
+        }
+
+        public Task MarkMediaAssetInactiveAsync(Guid tenantId, Guid mediaAssetId, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            InactivatedMediaAssetIds.Add(mediaAssetId);
             return Task.CompletedTask;
         }
 

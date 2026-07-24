@@ -1,4 +1,4 @@
-using E_POS.Domain.Common.Entities;
+﻿using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
@@ -12,6 +12,7 @@ public class ProductOptionValue : AuditableEntity
     public string? DisplayName { get; protected set; }
     public string? ColorHex { get; protected set; }
     public string? ImageUrl { get; protected set; }
+    public Guid? ImageMediaAssetId { get; protected set; }
     public int SortOrder { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
