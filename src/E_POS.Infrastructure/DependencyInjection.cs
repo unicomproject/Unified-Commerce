@@ -58,6 +58,9 @@ using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Services;
+using E_POS.Infrastructure.Modules.Shared.Storage.Options;
+using E_POS.Application.Modules.Shared.Storage.Contracts;
+using E_POS.Infrastructure.Modules.Shared.Storage.Services;
 
 
 namespace E_POS.Infrastructure;
@@ -74,6 +77,8 @@ public static class DependencyInjection
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
+        services.Configure<AzureBlobStorageOptions>(
+            configuration.GetSection(AzureBlobStorageOptions.SectionName));
         services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
@@ -90,6 +95,7 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+        services.AddSingleton<IAzureSasTokenProvider, AzureBlobSasTokenProvider>();
         services.AddScoped<IPasswordHashService, PasswordHashService>();
         services.AddScoped<IJwtTokenFactory, JwtTokenFactory>();
         services.AddScoped<IRefreshTokenGenerator, RefreshTokenGenerator>();
