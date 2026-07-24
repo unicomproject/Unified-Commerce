@@ -177,6 +177,44 @@ public sealed class PosProductsControllerTests
     }
 
     [Fact]
+    public async Task GetProductByBarcode_WithExactMatch_ReturnsOk()
+    {
+        var deviceId = Guid.NewGuid();
+        var barcode = "00200000000114";
+        var response = new PosBarcodeProductResponseDto(
+            Guid.NewGuid(), Guid.NewGuid(), barcode, "EAN13", "Sports Cap", "Blue", "CAP-BLU",
+            2m, 2500, 10m, "in_stock");
+        var service = new FakePosProductCatalogService
+        {
+            GetProductByBarcodeResult = ApplicationResult<PosBarcodeProductResponseDto>.Success(response),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "products.search");
+
+        var result = await controller.GetProductByBarcode(barcode, deviceId, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(barcode, service.Barcode);
+        Assert.Equal(deviceId, service.DeviceId);
+    }
+
+    [Fact]
+    public async Task GetProductByBarcode_WhenAmbiguous_ReturnsConflict()
+    {
+        var service = new FakePosProductCatalogService
+        {
+            GetProductByBarcodeResult = ApplicationResult<PosBarcodeProductResponseDto>.Failure(
+                new ApplicationError("pos_barcode.ambiguous", "Barcode is ambiguous.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "products.search");
+
+        var result = await controller.GetProductByBarcode("82111001003", Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<ConflictObjectResult>(result);
+    }
+
+    [Fact]
     public void Controller_RequiresTenantOnlyPolicy()
     {
         var authorize = Assert.Single(typeof(PosProductsController).GetCustomAttributes<AuthorizeAttribute>());
@@ -215,10 +253,15 @@ public sealed class PosProductsControllerTests
             ApplicationResult<PosProductDetailResponseDto>.Failure(
                 new ApplicationError("pos_products.product_not_found", "Product could not be found."));
 
+        public ApplicationResult<PosBarcodeProductResponseDto> GetProductByBarcodeResult { get; init; } =
+            ApplicationResult<PosBarcodeProductResponseDto>.Failure(
+                new ApplicationError("pos_barcode.not_found", "Barcode could not be found."));
+
         public TenantRequestContext? Context { get; private set; }
         public Guid? DeviceId { get; private set; }
         public Guid? ProductId { get; private set; }
         public string? Search { get; private set; }
+        public string? Barcode { get; private set; }
 
         public Task<ApplicationResult<IReadOnlyList<PosProductSummaryResponseDto>>> ListProductsAsync(
             TenantRequestContext context,
@@ -253,6 +296,18 @@ public sealed class PosProductsControllerTests
             DeviceId = deviceId;
             ProductId = productId;
             return Task.FromResult(GetProductDetailResult);
+        }
+
+        public Task<ApplicationResult<PosBarcodeProductResponseDto>> GetProductByBarcodeAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            string? barcode,
+            CancellationToken cancellationToken)
+        {
+            Context = context;
+            DeviceId = deviceId;
+            Barcode = barcode;
+            return Task.FromResult(GetProductByBarcodeResult);
         }
     }
 }

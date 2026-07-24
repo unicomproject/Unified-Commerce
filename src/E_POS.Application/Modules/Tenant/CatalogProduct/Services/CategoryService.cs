@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -44,6 +45,17 @@ public sealed class CategoryService : ICategoryService
             ? normalizedCode.ToLowerInvariant()
             : request.CategorySlug.Trim().ToLowerInvariant();
 
+        var now = _dateTimeProvider.UtcNow;
+        var requestedImageUrl = NormalizeLegacyMediaUrl(request.ImageUrl);
+        var mediaAsset = LegacyMediaAssetFactory.CreateImageFromUrl(
+            context.TenantId,
+            categoryId,
+            "categories",
+            "CATEGORY",
+            requestedImageUrl,
+            context.UserId,
+            now);
+
         var category = Category.Create(
             categoryId, 
             context.TenantId, 
@@ -53,11 +65,17 @@ public sealed class CategoryService : ICategoryService
             request.Name, 
             slug,
             request.Description,
-            request.ImageUrl,
+            requestedImageUrl,
             request.SortOrder,
             request.Status, 
             context.UserId,
-            _dateTimeProvider.UtcNow);
+            now);
+
+        if (mediaAsset is not null)
+        {
+            category.UpdateImage(mediaAsset.PublicUrl, mediaAsset.Id, context.UserId, now);
+            await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
+        }
 
         await _repository.AddAsync(category, cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, categoryId, false, cancellationToken);
@@ -108,6 +126,15 @@ public sealed class CategoryService : ICategoryService
             ? normalizedCode.ToLowerInvariant()
             : request.CategorySlug.Trim().ToLowerInvariant();
 
+        var now = _dateTimeProvider.UtcNow;
+        var requestedImageUrl = NormalizeLegacyMediaUrl(request.ImageUrl);
+        var previousMediaAssetId = category.ImageMediaAssetId;
+        var shouldClearMedia = request.ImageUrl is not null && string.IsNullOrWhiteSpace(request.ImageUrl);
+        var shouldReplaceMedia = !shouldClearMedia &&
+            requestedImageUrl is not null &&
+            (!previousMediaAssetId.HasValue ||
+             !string.Equals(category.ImageUrl?.Trim(), requestedImageUrl, StringComparison.Ordinal));
+
         category.UpdateProfile(
             request.DepartmentId,
             request.ParentCategoryId, 
@@ -115,11 +142,53 @@ public sealed class CategoryService : ICategoryService
             request.Name, 
             slug,
             request.Description,
-            request.ImageUrl,
+            shouldClearMedia ? null : requestedImageUrl ?? category.ImageUrl,
             request.SortOrder,
             request.Status, 
             context.UserId,
-            _dateTimeProvider.UtcNow);
+            now);
+
+        if (shouldClearMedia)
+        {
+            category.UpdateImage(null, null, context.UserId, now);
+
+            if (previousMediaAssetId.HasValue)
+            {
+                await _repository.MarkMediaAssetInactiveAsync(
+                    context.TenantId,
+                    previousMediaAssetId.Value,
+                    context.UserId,
+                    now,
+                    cancellationToken);
+            }
+        }
+        else if (shouldReplaceMedia)
+        {
+            var mediaAsset = LegacyMediaAssetFactory.CreateImageFromUrl(
+                context.TenantId,
+                categoryId,
+                "categories",
+                "CATEGORY",
+                requestedImageUrl,
+                context.UserId,
+                now);
+
+            if (mediaAsset is not null)
+            {
+                category.UpdateImage(mediaAsset.PublicUrl, mediaAsset.Id, context.UserId, now);
+                await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
+
+                if (previousMediaAssetId.HasValue)
+                {
+                    await _repository.MarkMediaAssetInactiveAsync(
+                        context.TenantId,
+                        previousMediaAssetId.Value,
+                        context.UserId,
+                        now,
+                        cancellationToken);
+                }
+            }
+        }
 
         await _repository.SaveChangesAsync(cancellationToken);
         var response = await _repository.GetByIdAsync(context.TenantId, categoryId, false, cancellationToken);
@@ -144,11 +213,29 @@ public sealed class CategoryService : ICategoryService
             return ApplicationResult.Failure(new ApplicationError("category.delete_conflict", "Category cannot be deleted while products are linked."));
         }
 
-        category.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
+        var now = _dateTimeProvider.UtcNow;
+        var mediaAssetId = category.ImageMediaAssetId;
+
+        category.SoftDelete(context.UserId, now);
+
+        if (mediaAssetId.HasValue)
+        {
+            await _repository.MarkMediaAssetInactiveAsync(
+                context.TenantId,
+                mediaAssetId.Value,
+                context.UserId,
+                now,
+                cancellationToken);
+        }
+
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
     }
 
+    private static string? NormalizeLegacyMediaUrl(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
     private async Task<ApplicationError?> ValidateParentAsync(Guid tenantId, Guid? categoryId, Guid? parentCategoryId, CancellationToken cancellationToken)
     {
         if (!parentCategoryId.HasValue) return null;

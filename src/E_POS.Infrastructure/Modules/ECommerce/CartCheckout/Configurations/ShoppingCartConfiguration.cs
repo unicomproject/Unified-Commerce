@@ -66,6 +66,11 @@ public sealed class ShoppingCartConfiguration : IEntityTypeConfiguration<Shoppin
             .HasMaxLength(3)
             .IsRequired();
 
+        builder.Property(x => x.IsTaxInclusive)
+            .HasColumnName("is_tax_included")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(x => x.SubtotalAmount)
             .HasColumnName("subtotal_amount")
             .HasColumnType("numeric(18,4)")

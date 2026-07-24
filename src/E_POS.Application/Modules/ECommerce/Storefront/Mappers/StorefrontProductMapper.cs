@@ -1,4 +1,5 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
+﻿using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Mappers;
@@ -9,13 +10,16 @@ public static class StorefrontProductMapper
         Product product,
         ProductRatingSummary? rating,
         decimal? sellingPrice,
+        string currencyCode,
         string? primaryImageUrl)
     {
         return new StorefrontProductReadModel
         {
             Id = product.Id,
             Name = product.ProductName,
+            Slug = product.ProductSlug,
             Price = sellingPrice ?? 0m,
+            CurrencyCode = currencyCode,
             ImageUrl = primaryImageUrl ?? string.Empty,
             Rating = rating?.AverageRating ?? 0m,
             ReviewCount = rating?.TotalReviews ?? 0
@@ -23,9 +27,9 @@ public static class StorefrontProductMapper
     }
 
     public static IEnumerable<StorefrontProductReadModel> ToBestSellerReadModels(
-        this IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string? PrimaryImageUrl)> products)
+        this IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)> products)
     {
-        return products.Select(x => ToBestSellerReadModel(x.Product, x.Rating, x.SellingPrice, x.PrimaryImageUrl));
+        return products.Select(x => ToBestSellerReadModel(x.Product, x.Rating, x.SellingPrice, x.CurrencyCode, x.PrimaryImageUrl));
     }
 
     public static StorefrontProductListReadModel ToListReadModel(
@@ -34,7 +38,8 @@ public static class StorefrontProductMapper
         string? primaryImageUrl,
         decimal averageRating,
         int reviewCount,
-        bool isInStock)
+        bool isInStock,
+        string currencyCode)
     {
         return new StorefrontProductListReadModel
         {
@@ -43,6 +48,7 @@ public static class StorefrontProductMapper
             Slug = product.ProductSlug,
             ShortDescription = product.ShortDescription ?? string.Empty,
             Price = sellingPrice ?? 0m,
+            CurrencyCode = currencyCode,
             ImageUrl = primaryImageUrl ?? string.Empty,
             Rating = averageRating,
             ReviewCount = reviewCount,
@@ -51,19 +57,24 @@ public static class StorefrontProductMapper
         };
     }
 
-    public static StorefrontProductImageReadModel ToImageReadModel(ProductImage image, string fallbackAltText)
+    public static StorefrontProductImageReadModel ToImageReadModel(
+        ProductImage image,
+        string fallbackAltText,
+        string? mediaPublicUrl = null)
     {
         return new StorefrontProductImageReadModel
         {
             Id = image.Id,
-            Url = string.IsNullOrWhiteSpace(image.ImageUrl) ? image.ImageStorageKey : image.ImageUrl,
+            Url = MediaUrlResolver.PreferMediaAssetOrEmpty(mediaPublicUrl, image.ImageUrl, image.ImageStorageKey),
             AltText = image.AltText ?? fallbackAltText,
             SortOrder = image.SortOrder,
             IsPrimary = image.IsPrimaryImage
         };
     }
 
-    public static StorefrontProductOptionValueReadModel ToOptionValueReadModel(ProductOptionValue optionValue)
+    public static StorefrontProductOptionValueReadModel ToOptionValueReadModel(
+        ProductOptionValue optionValue,
+        string? mediaPublicUrl = null)
     {
         return new StorefrontProductOptionValueReadModel
         {
@@ -71,7 +82,7 @@ public static class StorefrontProductMapper
             Name = optionValue.ValueName,
             DisplayName = GetOptionDisplayName(optionValue),
             ColorHex = optionValue.ColorHex,
-            ImageUrl = optionValue.ImageUrl,
+            ImageUrl = MediaUrlResolver.PreferMediaAsset(mediaPublicUrl, optionValue.ImageUrl),
             SortOrder = optionValue.SortOrder
         };
     }
@@ -81,7 +92,8 @@ public static class StorefrontProductMapper
         string? colour,
         string? size,
         decimal price,
-        bool isInStock)
+        bool isInStock,
+        string currencyCode)
     {
         return new StorefrontProductVariantReadModel
         {
@@ -91,6 +103,7 @@ public static class StorefrontProductMapper
             Colour = colour,
             Size = size,
             Price = price,
+            CurrencyCode = currencyCode,
             IsDefault = variant.IsDefaultVariant,
             IsInStock = isInStock
         };
@@ -99,6 +112,7 @@ public static class StorefrontProductMapper
     public static StorefrontProductDetailReadModel ToDetailReadModel(
         Product product,
         decimal price,
+        string currencyCode,
         ProductRatingSummary? rating,
         bool isInStock,
         IReadOnlyList<StorefrontProductImageReadModel> images,
@@ -119,6 +133,7 @@ public static class StorefrontProductMapper
             ShortDescription = product.ShortDescription ?? string.Empty,
             LongDescription = product.LongDescription ?? string.Empty,
             Price = price,
+            CurrencyCode = currencyCode,
             Rating = averageRating,
             ReviewCount = reviewCount,
             IsInStock = isInStock,

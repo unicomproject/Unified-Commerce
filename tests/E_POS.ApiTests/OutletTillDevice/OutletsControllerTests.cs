@@ -24,13 +24,24 @@ public sealed class OutletsControllerTests
         var controller = CreateController(service);
         SetTenantClaims(controller, tenantId, userId, "tenant.outlets.manage");
 
-        var result = await controller.Create(CreateRequest(), CancellationToken.None);
+        var request = CreateRequest() with
+        {
+            CollectionEnabled = true,
+            PreparationLeadMinutes = 45,
+            PickupWindowMinutes = 30,
+            CollectionCutoffTime = new TimeOnly(16, 0)
+        };
+
+        var result = await controller.Create(request, CancellationToken.None);
 
         var created = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Same(response, created.Value);
         Assert.Equal(tenantId, service.CreateContext?.TenantId);
         Assert.Equal(userId, service.CreateContext?.UserId);
         Assert.Contains("tenant.outlets.manage", service.CreateContext!.Permissions);
+        Assert.Equal(45, service.CreateRequest!.PreparationLeadMinutes);
+        Assert.Equal(30, service.CreateRequest.PickupWindowMinutes);
+        Assert.Equal(new TimeOnly(16, 0), service.CreateRequest.CollectionCutoffTime);
     }
 
     [Fact]
@@ -140,6 +151,9 @@ public sealed class OutletsControllerTests
             new OutletAddressResponse(Guid.NewGuid(), "PHYSICAL", "1 Main Street", null, "Colombo", null, null, "LK", null, null, true, "ACTIVE"),
             [],
             false,
+            null,
+            null,
+            null,
             DateTimeOffset.UtcNow,
             Guid.NewGuid(),
             DateTimeOffset.UtcNow,
@@ -156,6 +170,7 @@ public sealed class OutletsControllerTests
         }
 
         public TenantRequestContext? CreateContext { get; private set; }
+        public OutletCreateRequest? CreateRequest { get; private set; }
 
         public TenantRequestContext? ListContext { get; private set; }
 
@@ -168,6 +183,7 @@ public sealed class OutletsControllerTests
         public Task<ApplicationResult<OutletResponse>> CreateAsync(TenantRequestContext context, OutletCreateRequest request, CancellationToken cancellationToken)
         {
             CreateContext = context;
+            CreateRequest = request;
             return Task.FromResult(_createResult);
         }
 

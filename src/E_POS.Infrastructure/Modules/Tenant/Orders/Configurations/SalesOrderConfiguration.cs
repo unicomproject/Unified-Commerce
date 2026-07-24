@@ -70,6 +70,19 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
             .HasColumnType("varchar(40)")
             .HasMaxLength(40);
 
+        builder.Property(x => x.RequestedCollectionAt)
+            .HasColumnName("requested_collection_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.RequestedCollectionEndAt)
+            .HasColumnName("requested_collection_end_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(x => x.CollectionTimezoneSnapshot)
+            .HasColumnName("collection_timezone_snapshot")
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80);
+
         builder.Property(x => x.BusinessDate)
             .HasColumnName("business_date")
             .HasColumnType("date")
@@ -123,6 +136,11 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
             .HasColumnType("char(3)")
             .HasMaxLength(3)
             .IsRequired();
+
+        builder.Property(x => x.IsTaxInclusive)
+            .HasColumnName("is_tax_included")
+            .IsRequired()
+            .HasDefaultValue(false);
 
         builder.Property(x => x.SubtotalAmount)
             .HasColumnName("subtotal_amount")
@@ -343,6 +361,3 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
         });
     }
 }
-
-
-

@@ -66,6 +66,27 @@ public sealed class StorefrontCheckoutController : ControllerBase
             : ToErrorResult(result.Error);
     }
 
+    [HttpPatch("{sessionId:guid}/collection")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateCollection(
+        [FromRoute] Guid sessionId,
+        [FromBody] UpdateStorefrontCheckoutCollectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCustomerContext(out var tenantId, out var customerId))
+            return InvalidSession();
+
+        var result = await _service.UpdateCollectionAsync(
+            tenantId, customerId, sessionId, request, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { success = true, message = "Checkout collection selection updated successfully.", data = result.Value })
+            : ToErrorResult(result.Error);
+    }
+
     [HttpPost("{sessionId:guid}/confirm")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -97,6 +118,9 @@ public sealed class StorefrontCheckoutController : ControllerBase
         return error.Code switch
         {
             "storefront_checkout.invalid_customer_context" => Unauthorized(response),
+            "storefront_checkout.tenant_unavailable" or
+            "storefront_checkout.feature_disabled" =>
+                StatusCode(StatusCodes.Status403Forbidden, response),
             "storefront_checkout.customer_not_found" or
             "storefront_checkout.outlet_not_found" or
             "storefront_checkout.cart_not_found" or
@@ -106,7 +130,10 @@ public sealed class StorefrontCheckoutController : ControllerBase
             "storefront_checkout.variant_unavailable" or
             "storefront_checkout.price_not_configured" or
             "storefront_checkout.insufficient_stock" or
-            "storefront_checkout.pickup_slot_unavailable" or
+            "storefront_checkout.collection_configuration_missing" or
+            "storefront_checkout.collection_time_unavailable" or
+            "storefront_checkout.invalid_outlet_timezone" or
+            "storefront_checkout.collection_required" or
             "storefront_checkout.session_expired" or
             "storefront_checkout.invalid_state" or
             "storefront_checkout.uom_not_configured" or

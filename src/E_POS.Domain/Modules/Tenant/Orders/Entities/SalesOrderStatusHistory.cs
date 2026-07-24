@@ -13,5 +13,32 @@ public class SalesOrderStatusHistory : AuditableEntity
     public Guid? ChangedByTenantUserId { get; protected set; }
     public DateTimeOffset ChangedAt { get; protected set; }
     public string? ChangeReason { get; protected set; }
+
+    public static SalesOrderStatusHistory Create(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        int sequenceNumber,
+        string statusType,
+        string? oldStatus,
+        string newStatus,
+        Guid? changedByTenantUserId,
+        DateTimeOffset changedAt,
+        string? changeReason = null)
+    {
+        return new SalesOrderStatusHistory
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            SequenceNumber = sequenceNumber,
+            StatusType = statusType.Trim().ToUpperInvariant(),
+            OldStatus = string.IsNullOrWhiteSpace(oldStatus) ? null : oldStatus.Trim().ToUpperInvariant(),
+            NewStatus = newStatus.Trim().ToUpperInvariant(),
+            ChangedByTenantUserId = changedByTenantUserId,
+            ChangedAt = changedAt,
+            ChangeReason = string.IsNullOrWhiteSpace(changeReason) ? null : changeReason.Trim()
+        };
+    }
 }
 

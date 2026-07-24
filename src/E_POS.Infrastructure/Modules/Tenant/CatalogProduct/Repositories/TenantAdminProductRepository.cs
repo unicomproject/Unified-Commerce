@@ -1,5 +1,7 @@
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -77,6 +79,70 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .ToDictionary(
                 group => group.Key,
                 group => group.First().CategoryName);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, string>> GetPrimaryImageUrlsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken)
+    {
+        if (productIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        var rows = await (
+            from image in _dbContext.ProductImages.AsNoTracking()
+            join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+            from mediaAsset in mediaAssets.DefaultIfEmpty()
+            where image.TenantId == tenantId &&
+                  productIds.Contains(image.ProductId) &&
+                  image.Status == "ACTIVE"
+            select new
+            {
+                image.Id,
+                image.ProductId,
+                image.ProductVariantId,
+                image.MediaAssetId,
+                image.ImageUrl,
+                image.ImageStorageKey,
+                image.SortOrder,
+                image.IsPrimaryImage,
+                JoinedMediaAssetId = mediaAsset == null ? null : (Guid?)mediaAsset.Id,
+                MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Where(row =>
+                !row.MediaAssetId.HasValue ||
+                (row.JoinedMediaAssetId.HasValue && row.MediaStatus == "ACTIVE"))
+            .Select(row => new
+            {
+                row.Id,
+                row.ProductId,
+                row.ProductVariantId,
+                row.SortOrder,
+                row.IsPrimaryImage,
+                ImageUrl = MediaUrlResolver.PreferMediaAsset(
+                    row.MediaPublicUrl,
+                    row.ImageUrl,
+                    row.ImageStorageKey),
+            })
+            .Where(row => !string.IsNullOrWhiteSpace(row.ImageUrl))
+            .GroupBy(row => row.ProductId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(row => row.ProductVariantId.HasValue ? 1 : 0)
+                    .ThenByDescending(row => row.IsPrimaryImage)
+                    .ThenBy(row => row.SortOrder)
+                    .ThenBy(row => row.Id)
+                    .First()
+                    .ImageUrl!);
     }
 
     public async Task<TenantAdminProductCreateOptionsResponse> GetCreateOptionsAsync(
@@ -368,17 +434,64 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         var categoryId = parentCategory?.Id ?? subCategory?.Id ?? Guid.Empty;
         var categoryName = parentCategory?.CategoryName ?? subCategory?.CategoryName ?? string.Empty;
 
-        var imageUrl = await _dbContext.ProductImages
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.ProductId == productId &&
-                x.Status == "ACTIVE")
-            .OrderByDescending(x => x.IsPrimaryImage)
-            .ThenBy(x => x.SortOrder)
-            .Select(x => x.ImageUrl)
-            .FirstOrDefaultAsync(cancellationToken);
+        var imageRows = await (
+            from image in _dbContext.ProductImages.AsNoTracking()
+            join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+            from mediaAsset in mediaAssets.DefaultIfEmpty()
+            where image.TenantId == tenantId &&
+                  image.ProductId == productId &&
+                  image.Status == "ACTIVE"
+            select new
+            {
+                image.Id,
+                image.ProductVariantId,
+                image.MediaAssetId,
+                image.ImageUrl,
+                image.ImageStorageKey,
+                image.AltText,
+                image.ImagePurpose,
+                image.SortOrder,
+                image.IsPrimaryImage,
+                JoinedMediaAssetId = mediaAsset == null ? null : (Guid?)mediaAsset.Id,
+                MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+            })
+            .ToListAsync(cancellationToken);
 
+        var images = imageRows
+            .Where(row =>
+                !row.MediaAssetId.HasValue ||
+                (row.JoinedMediaAssetId.HasValue && row.MediaStatus == "ACTIVE"))
+            .Select(row => new
+            {
+                Row = row,
+                ImageUrl = MediaUrlResolver.PreferMediaAsset(
+                    row.MediaPublicUrl,
+                    row.ImageUrl,
+                    row.ImageStorageKey),
+            })
+            .Where(item => !string.IsNullOrWhiteSpace(item.ImageUrl))
+            .OrderBy(item => item.Row.ProductVariantId.HasValue ? 1 : 0)
+            .ThenByDescending(item => item.Row.IsPrimaryImage)
+            .ThenBy(item => item.Row.SortOrder)
+            .ThenBy(item => item.Row.Id)
+            .Select(item => new TenantAdminProductImageResponse(
+                item.Row.Id,
+                item.Row.MediaAssetId,
+                item.Row.ProductVariantId,
+                item.ImageUrl!,
+                item.Row.AltText,
+                item.Row.ImagePurpose,
+                item.Row.SortOrder,
+                item.Row.IsPrimaryImage))
+            .ToList();
+
+        var productImages = images
+            .Where(image => image.ProductVariantId is null)
+            .ToList();
+        var imageUrl = images.FirstOrDefault()?.ImageUrl;
         var taxInfo = await (
             from assignment in _dbContext.ProductTaxAssignments.AsNoTracking()
             join tax in _dbContext.TaxClasses.AsNoTracking()
@@ -469,7 +582,8 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                     barcode,
                     price.SellingPrice,
                     price.CompareAtPrice,
-                    variant.Status);
+                    variant.Status,
+                    images.Where(image => image.ProductVariantId == variant.Id).ToList());
             })
             .ToList();
 
@@ -515,6 +629,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             unitType,
             product.ShortDescription,
             imageUrl,
+            productImages,
             CostPrice: null,
             defaultSellingPrice,
             defaultDiscountPrice,

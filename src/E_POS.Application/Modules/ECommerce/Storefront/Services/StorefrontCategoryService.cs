@@ -1,6 +1,5 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
-using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Services;
 
@@ -15,8 +14,7 @@ public sealed class StorefrontCategoryService : IStorefrontCategoryService
 
     public async Task<IEnumerable<StorefrontCategoryReadModel>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        var categories = await _repository.GetFeaturedCategoriesAsync(tenantId, cancellationToken);
-        return categories.ToReadModels();
+        return await _repository.GetFeaturedCategoriesAsync(tenantId, cancellationToken);
     }
 
     public async Task<IEnumerable<StorefrontCategoryListReadModel>> GetRootCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)

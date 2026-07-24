@@ -5,6 +5,7 @@ public static class DevelopmentPosCashierPermissionAssignmentSeedData
     public static IReadOnlyList<string> PermissionCodes { get; } =
         DevelopmentPosNewSalePermissionsSeedData.CashierPermissionCodes
             .Concat(DevelopmentPosPaymentReceiptPermissionsSeedData.CashierPermissionCodes)
+            .Concat(DevelopmentPosReturnsExchangePermissionsSeedData.CashierPermissionCodes)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static code => code, StringComparer.Ordinal)
             .ToList();

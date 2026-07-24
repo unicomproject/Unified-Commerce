@@ -1,6 +1,8 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
+using E_POS.Application.Modules.Shared.Media;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -62,8 +64,9 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
         var productIds = products.Select(x => x.Product.Id).ToList();
         var now = DateTimeOffset.UtcNow;
+        var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
         var ratingsByProduct = await GetRatingsByProductAsync(tenantId, productIds, cancellationToken);
-        var pricesByProduct = await GetProductPricesByProductAsync(tenantId, productIds, now, cancellationToken);
+        var pricesByProduct = await GetProductPricesByProductAsync(tenantId, productIds, currencyCode, now, cancellationToken);
         var imagesByProduct = await GetPrimaryImagesByProductAsync(tenantId, productIds, cancellationToken);
         var inventoryByProduct = await GetInventoryByProductAsync(tenantId, productIds, cancellationToken);
 
@@ -84,7 +87,8 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
                     primaryImageUrl,
                     averageRating,
                     reviewCount,
-                    !hasInventory || availableQuantity > 0m),
+                    !hasInventory || availableQuantity > 0m,
+                    currencyCode),
                 row.SortOrder,
                 product.CreatedAt,
                 averageRating,
@@ -119,12 +123,13 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
         var productId = product.Id;
         var now = DateTimeOffset.UtcNow;
+        var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
         var rating = await GetRatingAsync(tenantId, productId, cancellationToken);
-        var productPrice = await GetProductPriceAsync(tenantId, productId, now, cancellationToken);
+        var productPrice = await GetProductPriceAsync(tenantId, productId, currencyCode, now, cancellationToken);
         var images = await GetProductImagesAsync(tenantId, product, cancellationToken);
         var variants = await GetProductVariantsAsync(tenantId, productId, cancellationToken);
         var variantIds = variants.Select(x => x.Id).ToList();
-        var variantPricesByVariant = await GetVariantPricesByVariantAsync(tenantId, productId, variantIds, now, cancellationToken);
+        var variantPricesByVariant = await GetVariantPricesByVariantAsync(tenantId, productId, variantIds, currencyCode, now, cancellationToken);
         var inventoryRows = await GetProductInventoryRowsAsync(tenantId, productId, cancellationToken);
         var inventoryByVariant = inventoryRows
             .Where(x => x.ProductVariantId.HasValue)
@@ -133,7 +138,7 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
         var colours = BuildSelectableOptionValues(variantOptions, StorefrontProductMapper.IsColourOption);
         var sizes = BuildSelectableOptionValues(variantOptions, StorefrontProductMapper.IsSizeOption);
-        var variantModels = BuildVariantModels(variants, productPrice, variantPricesByVariant, inventoryByVariant, variantOptions);
+        var variantModels = BuildVariantModels(variants, productPrice, variantPricesByVariant, inventoryByVariant, variantOptions, currencyCode);
         var highlights = await GetHighlightsAsync(tenantId, productId, cancellationToken);
         var returnInfo = StorefrontProductMapper.BuildReturnInfo(await GetReturnPolicyAsync(tenantId, product.ReturnPolicyId, cancellationToken));
         var isInStock = variantModels.Count > 0
@@ -144,6 +149,7 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
         return StorefrontProductMapper.ToDetailReadModel(
             product,
             detailPrice,
+            currencyCode,
             rating,
             isInStock,
             images,
@@ -226,7 +232,8 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
         productIds = products.Select(x => x.Id).ToList();
         var now = DateTimeOffset.UtcNow;
-        var prices = await GetProductPricesByProductAsync(tenantId, productIds, now, cancellationToken);
+        var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
+        var prices = await GetProductPricesByProductAsync(tenantId, productIds, currencyCode, now, cancellationToken);
         var ratings = await GetRatingsByProductAsync(tenantId, productIds, cancellationToken);
         var images = await GetPrimaryImagesByProductAsync(tenantId, productIds, cancellationToken);
         var inventory = await GetInventoryByProductAsync(tenantId, productIds, cancellationToken);
@@ -239,7 +246,7 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             var hasInventory = inventory.TryGetValue(product.Id, out var quantity);
             return new ProductListingSortItem(
                 StorefrontProductMapper.ToListReadModel(product, price, image, rating?.AverageRating ?? 0m,
-                    rating?.TotalReviews ?? 0, !hasInventory || quantity > 0m),
+                    rating?.TotalReviews ?? 0, !hasInventory || quantity > 0m, currencyCode),
                 0, product.CreatedAt, rating?.AverageRating ?? 0m, rating?.TotalReviews ?? 0);
         }).ToList();
 
@@ -254,9 +261,18 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             .Select(x => x.Model)
             .ToList();
 
-        var categories = await _dbContext.Set<Category>().AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status == ActiveStatus)
-            .OrderBy(x => x.SortOrder)
+        var categoryRows = await (from category in _dbContext.Set<Category>().AsNoTracking()
+                                  join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                      on new { category.TenantId, MediaAssetId = category.ImageMediaAssetId }
+                                      equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                                  from mediaAsset in mediaAssets.DefaultIfEmpty()
+                                  where category.TenantId == tenantId && category.Status == ActiveStatus
+                                  orderby category.SortOrder
+                                  select new
+                                  {
+                                      Category = category,
+                                      MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                  })
             .ToListAsync(cancellationToken);
         var collections = await _dbContext.Set<Collection>().AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Status == ActiveStatus &&
@@ -267,14 +283,14 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            categories = categories.Where(x => x.CategoryName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-                                               (x.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+            categoryRows = categoryRows.Where(x => x.Category.CategoryName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                                                   (x.Category.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
             collections = collections.Where(x => x.CollectionName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                                                   (x.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
         }
         else
         {
-            categories = [];
+            categoryRows = [];
             collections = [];
         }
 
@@ -284,9 +300,13 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             {
                 Items = productPage, TotalCount = totalProducts, Page = request.Page, PageSize = request.PageSize
             },
-            Categories = categories.Select(x => new StorefrontSearchMatchReadModel
+            Categories = categoryRows.Select(x => new StorefrontSearchMatchReadModel
             {
-                Id = x.Id, Name = x.CategoryName, Slug = x.CategorySlug, Description = x.Description, ImageUrl = x.ImageUrl
+                Id = x.Category.Id,
+                Name = x.Category.CategoryName,
+                Slug = x.Category.CategorySlug,
+                Description = x.Category.Description,
+                ImageUrl = MediaUrlResolver.PreferMediaAsset(x.MediaPublicUrl, x.Category.ImageUrl)
             }).ToList(),
             Collections = collections.Select(x => new StorefrontSearchMatchReadModel
             {
@@ -295,9 +315,10 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
         };
     }
 
-    public async Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
+        var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
 
         var products = await _dbContext.Set<Product>()
             .AsNoTracking()
@@ -313,7 +334,7 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
         var productIds = products.Select(p => p.Id).ToList();
         var ratingsByProduct = await GetRatingsByProductAsync(tenantId, productIds, cancellationToken);
-        var pricesByProduct = await GetProductPricesByProductAsync(tenantId, productIds, now, cancellationToken);
+        var pricesByProduct = await GetProductPricesByProductAsync(tenantId, productIds, currencyCode, now, cancellationToken);
         var imagesByProduct = await GetPrimaryImagesByProductAsync(tenantId, productIds, cancellationToken);
 
         return products.Select(product =>
@@ -321,9 +342,15 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             ratingsByProduct.TryGetValue(product.Id, out var rating);
             pricesByProduct.TryGetValue(product.Id, out var sellingPrice);
             imagesByProduct.TryGetValue(product.Id, out var primaryImageUrl);
-            return (product, rating, sellingPrice, primaryImageUrl);
+            return (product, rating, sellingPrice, currencyCode, primaryImageUrl);
         });
     }
+
+    private async Task<string> ResolveCurrencyCodeAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await _dbContext.Tenants.AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => x.BaseCurrencyCode)
+            .FirstOrDefaultAsync(cancellationToken) ?? "LKR";
 
     private async Task<Product?> GetProductBySlugAsync(Guid tenantId, string slug, CancellationToken cancellationToken)
     {
@@ -362,38 +389,51 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             .ToDictionary(x => x.Key, x => x.First());
     }
 
-    private async Task<decimal?> GetProductPriceAsync(Guid tenantId, Guid productId, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<decimal?> GetProductPriceAsync(Guid tenantId, Guid productId, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        return await _dbContext.Set<PriceListItem>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.ProductId == productId &&
-                x.ProductVariantId == null &&
-                x.Status == ActiveStatus &&
-                x.MinQuantity <= 1m &&
-                (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                (!x.ValidUntil.HasValue || x.ValidUntil >= now))
-            .OrderByDescending(x => x.ValidFrom ?? DateTimeOffset.MinValue)
-            .ThenBy(x => x.MinQuantity)
-            .Select(x => (decimal?)x.SellingPrice)
+        return await (from item in _dbContext.Set<PriceListItem>().AsNoTracking()
+                join priceList in _dbContext.Set<PriceList>().AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == tenantId &&
+                      item.ProductId == productId &&
+                      item.ProductVariantId == null &&
+                      item.Status == ActiveStatus &&
+                      item.MinQuantity <= 1m &&
+                      priceList.Status == ActiveStatus &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now)
+                orderby priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select (decimal?)item.SellingPrice)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<Dictionary<Guid, decimal?>> GetProductPricesByProductAsync(Guid tenantId, IReadOnlyCollection<Guid> productIds, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<Dictionary<Guid, decimal?>> GetProductPricesByProductAsync(Guid tenantId, IReadOnlyCollection<Guid> productIds, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var priceRows = await _dbContext.Set<PriceListItem>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.Status == ActiveStatus &&
-                x.ProductVariantId == null &&
-                x.MinQuantity <= 1m &&
-                (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                (!x.ValidUntil.HasValue || x.ValidUntil >= now))
-            .OrderByDescending(x => x.ValidFrom ?? DateTimeOffset.MinValue)
-            .ThenBy(x => x.MinQuantity)
+        var priceRows = await (from item in _dbContext.Set<PriceListItem>().AsNoTracking()
+                join priceList in _dbContext.Set<PriceList>().AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == tenantId &&
+                      productIds.Contains(item.ProductId) &&
+                      item.Status == ActiveStatus &&
+                      item.MinQuantity <= 1m &&
+                      priceList.Status == ActiveStatus &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now)
+                orderby item.ProductVariantId.HasValue,
+                        priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select new { item.ProductId, item.SellingPrice })
             .ToListAsync(cancellationToken);
 
         return priceRows
@@ -401,26 +441,33 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             .ToDictionary(x => x.Key, x => (decimal?)x.First().SellingPrice);
     }
 
-    private async Task<Dictionary<Guid, decimal?>> GetVariantPricesByVariantAsync(Guid tenantId, Guid productId, IReadOnlyCollection<Guid> variantIds, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<Dictionary<Guid, decimal?>> GetVariantPricesByVariantAsync(Guid tenantId, Guid productId, IReadOnlyCollection<Guid> variantIds, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
     {
         if (variantIds.Count == 0)
         {
             return [];
         }
 
-        var variantPriceRows = await _dbContext.Set<PriceListItem>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.ProductId == productId &&
-                x.ProductVariantId.HasValue &&
-                variantIds.Contains(x.ProductVariantId.Value) &&
-                x.Status == ActiveStatus &&
-                x.MinQuantity <= 1m &&
-                (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                (!x.ValidUntil.HasValue || x.ValidUntil >= now))
-            .OrderByDescending(x => x.ValidFrom ?? DateTimeOffset.MinValue)
-            .ThenBy(x => x.MinQuantity)
+        var variantPriceRows = await (from item in _dbContext.Set<PriceListItem>().AsNoTracking()
+                join priceList in _dbContext.Set<PriceList>().AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == tenantId &&
+                      item.ProductId == productId &&
+                      item.ProductVariantId.HasValue &&
+                      variantIds.Contains(item.ProductVariantId.Value) &&
+                      item.Status == ActiveStatus &&
+                      item.MinQuantity <= 1m &&
+                      priceList.Status == ActiveStatus &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now)
+                orderby priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select item)
             .ToListAsync(cancellationToken);
 
         return variantPriceRows
@@ -430,37 +477,55 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
     private async Task<Dictionary<Guid, string?>> GetPrimaryImagesByProductAsync(Guid tenantId, IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken)
     {
-        var imageRows = await _dbContext.Set<ProductImage>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.ProductVariantId == null &&
-                x.IsPrimaryImage &&
-                x.Status == ActiveStatus)
-            .OrderBy(x => x.SortOrder)
+        var imageRows = await (from image in _dbContext.Set<ProductImage>().AsNoTracking()
+                               join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                   on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                   equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                               from mediaAsset in mediaAssets.DefaultIfEmpty()
+                               where image.TenantId == tenantId &&
+                                     productIds.Contains(image.ProductId) &&
+                                     image.ProductVariantId == null &&
+                                     image.IsPrimaryImage &&
+                                     image.Status == ActiveStatus
+                               orderby image.SortOrder
+                               select new
+                               {
+                                   Image = image,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                               })
             .ToListAsync(cancellationToken);
 
         return imageRows
-            .GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => x.First().ImageUrl);
+            .GroupBy(x => x.Image.ProductId)
+            .ToDictionary(
+                x => x.Key,
+                x =>
+                {
+                    var first = x.First();
+                    return MediaUrlResolver.PreferMediaAsset(first.MediaPublicUrl, first.Image.ImageUrl, first.Image.ImageStorageKey);
+                });
     }
 
     private async Task<IReadOnlyList<StorefrontProductImageReadModel>> GetProductImagesAsync(Guid tenantId, Product product, CancellationToken cancellationToken)
     {
-        var imageRows = await _dbContext.Set<ProductImage>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.ProductId == product.Id &&
-                x.Status == ActiveStatus)
-            .OrderByDescending(x => x.IsPrimaryImage)
-            .ThenBy(x => x.SortOrder)
-            .ThenBy(x => x.Id)
+        var imageRows = await (from image in _dbContext.Set<ProductImage>().AsNoTracking()
+                               join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                   on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                   equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                               from mediaAsset in mediaAssets.DefaultIfEmpty()
+                               where image.TenantId == tenantId &&
+                                     image.ProductId == product.Id &&
+                                     image.Status == ActiveStatus
+                               orderby image.IsPrimaryImage descending, image.SortOrder, image.Id
+                               select new
+                               {
+                                   Image = image,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                               })
             .ToListAsync(cancellationToken);
 
         return imageRows
-            .Select(image => StorefrontProductMapper.ToImageReadModel(image, product.ProductName))
+            .Select(row => StorefrontProductMapper.ToImageReadModel(row.Image, product.ProductName, row.MediaPublicUrl))
             .ToList();
     }
 
@@ -516,17 +581,33 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
             .ToListAsync(cancellationToken);
 
         var optionIds = options.Select(x => x.Id).ToList();
-        var optionValues = optionIds.Count == 0
-            ? []
-            : await _dbContext.Set<ProductOptionValue>()
-                .AsNoTracking()
-                .Where(x =>
-                    x.TenantId == tenantId &&
-                    optionIds.Contains(x.ProductOptionId) &&
-                    x.Status == ActiveStatus)
-                .OrderBy(x => x.SortOrder)
-                .ThenBy(x => x.ValueName)
+        IReadOnlyList<ProductOptionValueMedia> optionValues;
+        if (optionIds.Count == 0)
+        {
+            optionValues = [];
+        }
+        else
+        {
+            var optionValueRows = await (from optionValue in _dbContext.Set<ProductOptionValue>().AsNoTracking()
+                                         join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                             on new { optionValue.TenantId, MediaAssetId = optionValue.ImageMediaAssetId }
+                                             equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                                         from mediaAsset in mediaAssets.DefaultIfEmpty()
+                                         where optionValue.TenantId == tenantId &&
+                                               optionIds.Contains(optionValue.ProductOptionId) &&
+                                               optionValue.Status == ActiveStatus
+                                         orderby optionValue.SortOrder, optionValue.ValueName
+                                         select new
+                                         {
+                                             OptionValue = optionValue,
+                                             MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                         })
                 .ToListAsync(cancellationToken);
+
+            optionValues = optionValueRows
+                .Select(x => new ProductOptionValueMedia(x.OptionValue, x.MediaPublicUrl))
+                .ToList();
+        }
 
         var variantOptionLinks = variantIds.Count == 0
             ? []
@@ -549,15 +630,15 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
         var linkedOptionValueIds = variantOptions.VariantOptionLinks.Select(x => x.ProductOptionValueId).ToHashSet();
         var selectableOptionValues = linkedOptionValueIds.Count == 0
             ? variantOptions.OptionValues
-            : variantOptions.OptionValues.Where(x => linkedOptionValueIds.Contains(x.Id)).ToList();
+            : variantOptions.OptionValues.Where(x => linkedOptionValueIds.Contains(x.OptionValue.Id)).ToList();
 
         return selectableOptionValues
-            .Where(x => optionIds.Contains(x.ProductOptionId))
-            .GroupBy(x => x.Id)
+            .Where(x => optionIds.Contains(x.OptionValue.ProductOptionId))
+            .GroupBy(x => x.OptionValue.Id)
             .Select(x => x.First())
-            .OrderBy(x => x.SortOrder)
-            .ThenBy(StorefrontProductMapper.GetOptionDisplayName)
-            .Select(StorefrontProductMapper.ToOptionValueReadModel)
+            .OrderBy(x => x.OptionValue.SortOrder)
+            .ThenBy(x => StorefrontProductMapper.GetOptionDisplayName(x.OptionValue))
+            .Select(x => StorefrontProductMapper.ToOptionValueReadModel(x.OptionValue, x.MediaPublicUrl))
             .ToList();
     }
 
@@ -566,10 +647,11 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
         decimal? productPrice,
         IReadOnlyDictionary<Guid, decimal?> variantPricesByVariant,
         IReadOnlyDictionary<Guid, decimal> inventoryByVariant,
-        ProductVariantOptions variantOptions)
+        ProductVariantOptions variantOptions,
+        string currencyCode)
     {
         var optionById = variantOptions.Options.ToDictionary(x => x.Id);
-        var optionValueById = variantOptions.OptionValues.ToDictionary(x => x.Id);
+        var optionValueById = variantOptions.OptionValues.ToDictionary(x => x.OptionValue.Id, x => x.OptionValue);
         var variantOptionLinksByVariant = variantOptions.VariantOptionLinks
             .GroupBy(x => x.ProductVariantId)
             .ToDictionary(x => x.Key, x => x.ToList());
@@ -586,7 +668,8 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
                 colour,
                 size,
                 variantPrice ?? productPrice ?? 0m,
-                !variantHasInventory || variantAvailableQuantity > 0m);
+                !variantHasInventory || variantAvailableQuantity > 0m,
+                currencyCode);
         }).ToList();
     }
 
@@ -658,8 +741,10 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
 
     private sealed record ProductInventoryRow(Guid? ProductVariantId, decimal AvailableQuantity);
 
+    private sealed record ProductOptionValueMedia(ProductOptionValue OptionValue, string? MediaPublicUrl);
+
     private sealed record ProductVariantOptions(
         IReadOnlyList<ProductOption> Options,
-        IReadOnlyList<ProductOptionValue> OptionValues,
+        IReadOnlyList<ProductOptionValueMedia> OptionValues,
         IReadOnlyList<ProductVariantOptionValue> VariantOptionLinks);
 }

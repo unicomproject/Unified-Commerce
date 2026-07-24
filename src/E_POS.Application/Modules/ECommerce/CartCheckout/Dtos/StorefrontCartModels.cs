@@ -25,6 +25,7 @@ public sealed class StorefrontCartReadModel
     public decimal ChargeTotal { get; set; }
     public decimal GrandTotal { get; set; }
     public decimal TotalQuantity { get; set; }
+    public bool IsTaxInclusive { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }
 }
 

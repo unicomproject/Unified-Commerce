@@ -27,6 +27,10 @@ public sealed class PosProductCatalogService : IPosProductCatalogService
         "pos_products.product_not_found",
         "POS product could not be found.");
 
+    private static readonly ApplicationError InvalidBarcode = new(
+        "pos_barcode.invalid",
+        "Barcode is required.");
+
     private readonly IPosProductCatalogRepository _repository;
 
     public PosProductCatalogService(IPosProductCatalogRepository repository)
@@ -159,6 +163,54 @@ public sealed class PosProductCatalogService : IPosProductCatalogService
         }
 
         return ApplicationResult<PosProductDetailResponseDto>.Success(result.Product);
+    }
+
+    public async Task<ApplicationResult<PosBarcodeProductResponseDto>> GetProductByBarcodeAsync(
+        TenantRequestContext context,
+        Guid? deviceId,
+        string? barcode,
+        CancellationToken cancellationToken)
+    {
+        if (!HasViewPermission(context) || !HasSearchPermission(context))
+        {
+            return ApplicationResult<PosBarcodeProductResponseDto>.Failure(SearchPermissionDenied);
+        }
+
+        if (!deviceId.HasValue || deviceId.Value == Guid.Empty)
+        {
+            return ApplicationResult<PosBarcodeProductResponseDto>.Failure(InvalidDeviceId);
+        }
+
+        var normalizedBarcode = barcode?.Trim();
+        if (string.IsNullOrEmpty(normalizedBarcode))
+        {
+            return ApplicationResult<PosBarcodeProductResponseDto>.Failure(InvalidBarcode);
+        }
+
+        var result = await _repository.GetProductByBarcodeAsync(
+            context.TenantId,
+            deviceId.Value,
+            normalizedBarcode,
+            cancellationToken);
+
+        if (!result.IsSuccess || result.Product is null)
+        {
+            var errorCode = result.ErrorCode ?? "pos_barcode.not_found";
+            return ApplicationResult<PosBarcodeProductResponseDto>.Failure(new ApplicationError(
+                errorCode,
+                errorCode switch
+                {
+                    "pos_barcode.not_found" => "Barcode could not be found.",
+                    "pos_barcode.ambiguous" => "Barcode does not resolve to a single sellable variant.",
+                    "pos_product.unavailable" => "Product is unavailable.",
+                    "pos_variant.unavailable" => "Product variant is unavailable.",
+                    "pos_price.unavailable" => "Product price is unavailable.",
+                    "pos_device.invalid" => "POS device or outlet is unavailable.",
+                    _ => "Barcode could not be resolved."
+                }));
+        }
+
+        return ApplicationResult<PosBarcodeProductResponseDto>.Success(result.Product);
     }
 
     private static bool HasViewPermission(TenantRequestContext context) =>

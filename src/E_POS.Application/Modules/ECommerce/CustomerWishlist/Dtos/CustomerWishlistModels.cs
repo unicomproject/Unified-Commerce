@@ -24,6 +24,7 @@ public sealed class CustomerWishlistItemReadModel
     public string ProductSlug { get; set; } = string.Empty;
     public string? VariantName { get; set; }
     public decimal Price { get; set; }
+    public string CurrencyCode { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
     public bool IsInStock { get; set; }
     public bool IsAvailable { get; set; }

@@ -289,7 +289,7 @@ public sealed class PosHoldRepository : IPosHoldRepository
         var order = SalesOrder.CreateHeldPosSale(
             saleId, tenantId, orderNumber, reference, salesChannelId,
             request.CustomerId, customerName, session.TillId, session.SessionId,
-            priceList.Id, summary.BillingSummary.Currency,
+            priceList.Id, summary.BillingSummary.Currency, priceList.PriceIncludesTax,
             summary.BillingSummary.Subtotal, summary.BillingSummary.Discount,
             summary.BillingSummary.Tax, summary.BillingSummary.TotalPayable,
             request.Reason, tenantUserId, now);
@@ -336,12 +336,15 @@ public sealed class PosHoldRepository : IPosHoldRepository
                 detail.Variant.Sku, detail.Product.ProductName, detail.Variant.VariantName,
                 detail.Uom.UomCode, detail.Uom.UomName, detail.Product.ProductType,
                 detail.Product.ProductStructure, requestedLine.Qty, unitPrice,
-                lineSubtotal, lineDiscount, lineTax, now);
+                lineSubtotal, lineDiscount, lineTax, priceList.PriceIncludesTax, now);
             _dbContext.SalesOrderLines.Add(line);
+            var lineTotal = priceList.PriceIncludesTax
+                ? lineSubtotal - lineDiscount
+                : lineSubtotal - lineDiscount + lineTax;
             responseLines.Add(new PosHoldLineDto(
                 line.Id, detail.Variant.Id, detail.Product.ProductName,
                 detail.Variant.VariantName, detail.Variant.Sku, requestedLine.Qty,
-                ToMoney(unitPrice), ToMoney(lineSubtotal - lineDiscount + lineTax)));
+                ToMoney(unitPrice), ToMoney(lineTotal)));
         }
 
         var hold = PosOrderHold.Create(

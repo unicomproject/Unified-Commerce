@@ -79,6 +79,9 @@ public sealed class PosReceiptService : IPosReceiptService
                 result.ErrorCode switch
                 {
                     "pos_receipts.receipt_not_found" => ReceiptNotFound,
+                    "pos_receipts.receipt_not_completed" => new ApplicationError(
+                        "pos_receipts.receipt_not_completed",
+                        "Only completed receipts can be printed."),
                     "pos_receipts.invalid_copies" => InvalidCopies,
                     "pos_receipts.invalid_print_status" => InvalidPrintStatus,
                     _ => new ApplicationError(

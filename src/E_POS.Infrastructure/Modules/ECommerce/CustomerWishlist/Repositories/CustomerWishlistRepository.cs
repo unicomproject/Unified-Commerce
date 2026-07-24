@@ -1,6 +1,8 @@
-using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Dtos;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -150,6 +152,7 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
         CancellationToken cancellationToken)
     {
         var productIds = wishlist.Items.Select(x => x.ProductId).Distinct().ToList();
+        var currencyCode = await ResolveCurrencyAsync(wishlist.TenantId, cancellationToken);
         if (productIds.Count == 0)
         {
             return new CustomerWishlistReadModel
@@ -181,17 +184,24 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
                     productIds.Contains(x.ProductId))
                 .ToDictionaryAsync(x => x.Id, cancellationToken);
 
-        var priceRows = await _dbContext.Set<PriceListItem>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == wishlist.TenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.Status == ActiveStatus &&
-                x.MinQuantity <= 1m &&
-                (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                (!x.ValidUntil.HasValue || x.ValidUntil >= now))
-            .OrderByDescending(x => x.ValidFrom ?? DateTimeOffset.MinValue)
-            .ThenBy(x => x.MinQuantity)
+        var priceRows = await (from item in _dbContext.Set<PriceListItem>().AsNoTracking()
+                join priceList in _dbContext.Set<PriceList>().AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == wishlist.TenantId &&
+                      productIds.Contains(item.ProductId) &&
+                      item.Status == ActiveStatus &&
+                      item.MinQuantity <= 1m &&
+                      priceList.Status == ActiveStatus &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now)
+                orderby priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select item)
             .ToListAsync(cancellationToken);
         var productPrices = priceRows
             .Where(x => !x.ProductVariantId.HasValue)
@@ -202,25 +212,39 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
             .GroupBy(x => x.ProductVariantId!.Value)
             .ToDictionary(x => x.Key, x => x.First().SellingPrice);
 
-        var imageRows = await _dbContext.Set<ProductImage>()
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == wishlist.TenantId &&
-                productIds.Contains(x.ProductId) &&
-                x.Status == ActiveStatus)
-            .OrderByDescending(x => x.IsPrimaryImage)
-            .ThenBy(x => x.SortOrder)
-            .ThenBy(x => x.Id)
+        var imageRows = await (from image in _dbContext.Set<ProductImage>().AsNoTracking()
+                               join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                   on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                   equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                               from mediaAsset in mediaAssets.DefaultIfEmpty()
+                               where image.TenantId == wishlist.TenantId &&
+                                     productIds.Contains(image.ProductId) &&
+                                     image.Status == ActiveStatus
+                               orderby image.IsPrimaryImage descending, image.SortOrder, image.Id
+                               select new
+                               {
+                                   Image = image,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                               })
             .ToListAsync(cancellationToken);
         var productImages = imageRows
-            .Where(x => !x.ProductVariantId.HasValue)
-            .GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => x.First().ImageUrl);
+            .Where(x => !x.Image.ProductVariantId.HasValue)
+            .GroupBy(x => x.Image.ProductId)
+            .ToDictionary(
+                x => x.Key,
+                x => MediaUrlResolver.PreferMediaAsset(
+                    x.First().MediaPublicUrl,
+                    x.First().Image.ImageUrl,
+                    x.First().Image.ImageStorageKey));
         var variantImages = imageRows
-            .Where(x => x.ProductVariantId.HasValue)
-            .GroupBy(x => x.ProductVariantId!.Value)
-            .ToDictionary(x => x.Key, x => x.First().ImageUrl);
-
+            .Where(x => x.Image.ProductVariantId.HasValue)
+            .GroupBy(x => x.Image.ProductVariantId!.Value)
+            .ToDictionary(
+                x => x.Key,
+                x => MediaUrlResolver.PreferMediaAsset(
+                    x.First().MediaPublicUrl,
+                    x.First().Image.ImageUrl,
+                    x.First().Image.ImageStorageKey));
         var inventoryRows = await _dbContext.Set<InventoryBalance>()
             .AsNoTracking()
             .Where(x => x.TenantId == wishlist.TenantId && productIds.Contains(x.ProductId))
@@ -264,6 +288,7 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
                     ProductSlug = product.ProductSlug,
                     VariantName = variant?.VariantName,
                     Price = price,
+                    CurrencyCode = currencyCode,
                     ImageUrl = imageUrl,
                     IsInStock = inventory.Count == 0 || inventory.Sum(x => x.AvailableQuantity) > 0m,
                     IsAvailable = productAvailable && variantAvailable,
@@ -290,4 +315,10 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
         Name = DefaultWishlistName,
         Items = []
     };
+
+    private async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await _dbContext.Tenants.AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => x.BaseCurrencyCode)
+            .FirstOrDefaultAsync(cancellationToken) ?? "LKR";
 }

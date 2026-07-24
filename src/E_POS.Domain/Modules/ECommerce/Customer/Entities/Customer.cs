@@ -57,6 +57,51 @@ public class Customer : AuditableEntity
         return prefix + new string(trimmed.Where(char.IsDigit).ToArray());
     }
 
+    public void UpdateProfile(string firstName, string lastName, string email, string phone, DateTimeOffset now)
+    {
+        FirstName = firstName?.Trim();
+        LastName = lastName?.Trim();
+        Name = $"{FirstName} {LastName}".Trim();
+        
+        var trimmedPhone = phone?.Trim() ?? string.Empty;
+        var trimmedEmail = email?.Trim();
+        
+        Phone = trimmedPhone;
+        NormalizedPhone = NormalizePhone(trimmedPhone);
+        
+        Email = string.IsNullOrWhiteSpace(trimmedEmail) ? null : trimmedEmail;
+        NormalizedEmail = NormalizeEmail(trimmedEmail);
+        
+        UpdatedAt = now;
+    }
+
     public static string? NormalizeEmail(string? email) =>
         string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToUpperInvariant();
+
+    /// <summary>
+    /// Updates POS-editable profile fields. CustomerCode and SourceType remain immutable.
+    /// </summary>
+    public void UpdatePosProfile(
+        string fullName,
+        string phone,
+        string? email,
+        string status,
+        Guid updatedBy,
+        DateTimeOffset now)
+    {
+        Name = fullName.Trim();
+        Phone = phone.Trim();
+        NormalizedPhone = NormalizePhone(phone);
+        Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        NormalizedEmail = NormalizeEmail(email);
+        Status = status.Trim().ToUpperInvariant();
+        UpdatedBy = updatedBy;
+        UpdatedAt = now;
+    }
+
+    public static bool IsAllowedPosStatus(string status)
+    {
+        var normalized = status.Trim().ToUpperInvariant();
+        return normalized is "ACTIVE" or "INACTIVE" or "BLOCKED";
+    }
 }

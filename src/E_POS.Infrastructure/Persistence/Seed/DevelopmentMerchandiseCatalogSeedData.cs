@@ -61,7 +61,7 @@ public static class DevelopmentMerchandiseCatalogSeedData
             'POS',
             'LKR',
             true,
-            false,
+            true,
             0,
             'ACTIVE',
             '99999999-0003-4000-8000-000000000001',

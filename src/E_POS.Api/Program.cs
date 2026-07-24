@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using E_POS.Api.Common;
 using E_POS.Api.Extensions;
@@ -23,9 +24,22 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        var configuredOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? Array.Empty<string>();
+
+        if (configuredOrigins.Length > 0)
+        {
+            policy.WithOrigins(configuredOrigins);
+        }
+        else if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(IsDevelopmentOrigin);
+        }
+
+        policy.AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 builder.Services.AddEndpointsApiExplorer();
@@ -181,5 +195,30 @@ app.MapGet("/api/v1/health", () =>
 await DevelopmentPlatformAdminTestAccountSeedHost.RunIfDevelopmentAsync(app);
 
 app.Run();
+
+static bool IsDevelopmentOrigin(string origin)
+{
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+        return false;
+
+    var host = uri.Host;
+    if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    if (!IPAddress.TryParse(host, out var address))
+        return false;
+
+    if (IPAddress.IsLoopback(address))
+        return true;
+
+    var bytes = address.GetAddressBytes();
+    return bytes.Length == 4 &&
+           (bytes[0] == 10 ||
+            (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+            (bytes[0] == 192 && bytes[1] == 168));
+}
 
 public partial class Program;

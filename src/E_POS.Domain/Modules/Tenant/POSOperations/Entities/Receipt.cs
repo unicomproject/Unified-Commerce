@@ -120,5 +120,51 @@ public class Receipt : AuditableEntity
             CreatedAt = now,
             UpdatedAt = now
         };
+
+    public static Receipt CreateForExchange(
+        Guid id,
+        Guid tenantId,
+        string receiptNumber,
+        Guid salesOrderId,
+        Guid outletId,
+        Guid tillId,
+        Guid tillSessionId,
+        DateOnly businessDate,
+        Guid issuedByTenantUserId,
+        string currencyCode,
+        decimal subtotalAmount,
+        decimal discountAmount,
+        decimal taxAmount,
+        decimal totalAmount,
+        decimal paidAmount,
+        decimal changeAmount,
+        string receiptDataJson,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            ReceiptNumber = receiptNumber.Trim().ToUpperInvariant(),
+            SalesOrderId = salesOrderId,
+            ReceiptType = "EXCHANGE",
+            ReceiptStatus = "ISSUED",
+            OutletId = outletId,
+            TillId = tillId,
+            TillSessionId = tillSessionId,
+            BusinessDate = businessDate,
+            IssuedAt = now,
+            IssuedByTenantUserId = issuedByTenantUserId,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            SubtotalAmount = subtotalAmount,
+            DiscountAmount = discountAmount,
+            TaxAmount = taxAmount,
+            ChargeAmount = 0,
+            RoundingAmount = 0,
+            TotalAmount = totalAmount,
+            PaidAmount = paidAmount,
+            ChangeAmount = changeAmount,
+            ReceiptDataJson = receiptDataJson,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 

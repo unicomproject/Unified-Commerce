@@ -1,6 +1,7 @@
-using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+﻿using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -71,6 +72,10 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasMaxLength(500)
             .IsRequired(false);
 
+        builder.Property(x => x.ImageMediaAssetId)
+            .HasColumnName("image_media_asset_id")
+            .IsRequired(false);
+
         builder.Property(x => x.SortOrder)
             .HasColumnName("sort_order")
             .HasDefaultValue(0)
@@ -108,6 +113,13 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_categories_parent_category_id_categories");
 
+        builder.HasOne<MediaAsset>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.ImageMediaAssetId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_categories_image_media_asset_tenant");
+
         builder.HasOne<TenantUser>()
             .WithMany()
             .HasForeignKey(x => x.CreatedByTenantUserId)
@@ -131,6 +143,9 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_categories_tenant_id_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.ImageMediaAssetId })
+            .HasDatabaseName("ix_categories_tenant_id_image_media_asset_id");
 
         builder.HasIndex(x => new { x.TenantId, x.DepartmentId, x.Id })
             .IsUnique()

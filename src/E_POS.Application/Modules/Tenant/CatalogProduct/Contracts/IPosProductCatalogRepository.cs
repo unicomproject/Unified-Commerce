@@ -9,7 +9,8 @@ public interface IPosProductCatalogRepository
         Guid deviceId,
         Guid? categoryId,
         string? search,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Guid? outletId = null);
 
     Task<PosProductCatalogCategoriesRepositoryResult> ListCategoriesAsync(
         Guid tenantId,
@@ -20,6 +21,12 @@ public interface IPosProductCatalogRepository
         Guid tenantId,
         Guid deviceId,
         Guid productId,
+        CancellationToken cancellationToken);
+
+    Task<PosBarcodeProductRepositoryResult> GetProductByBarcodeAsync(
+        Guid tenantId,
+        Guid deviceId,
+        string barcode,
         CancellationToken cancellationToken);
 }
 
@@ -40,6 +47,13 @@ public sealed record PosProductCatalogCategoriesRepositoryResult(
 public sealed record PosProductDetailRepositoryResult(
     string? ErrorCode,
     PosProductDetailResponseDto? Product)
+{
+    public bool IsSuccess => ErrorCode is null;
+}
+
+public sealed record PosBarcodeProductRepositoryResult(
+    string? ErrorCode,
+    PosBarcodeProductResponseDto? Product)
 {
     public bool IsSuccess => ErrorCode is null;
 }

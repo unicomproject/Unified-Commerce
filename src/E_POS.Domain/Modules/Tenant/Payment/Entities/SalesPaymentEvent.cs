@@ -16,8 +16,12 @@ public class SalesPaymentEvent : AuditableEntity
     public Guid? EventByTenantUserId { get; protected set; }
 
     public static SalesPaymentEvent RecordPaid(
-        Guid id, Guid tenantId, Guid salesPaymentId, Guid? eventByTenantUserId,
-        DateTimeOffset now) => new()
+        Guid id,
+        Guid tenantId,
+        Guid salesPaymentId,
+        Guid? eventByTenantUserId,
+        DateTimeOffset now,
+        string? eventNote = null) => new()
         {
             Id = id,
             TenantId = tenantId,
@@ -26,7 +30,9 @@ public class SalesPaymentEvent : AuditableEntity
             EventType = "PAYMENT_COMPLETED",
             OldStatus = "PENDING",
             NewStatus = "PAID",
-            EventNote = "Cash payment completed at POS.",
+            EventNote = string.IsNullOrWhiteSpace(eventNote)
+                ? "Cash payment completed at POS."
+                : eventNote.Trim(),
             EventAt = now,
             EventByTenantUserId = eventByTenantUserId,
             CreatedAt = now,

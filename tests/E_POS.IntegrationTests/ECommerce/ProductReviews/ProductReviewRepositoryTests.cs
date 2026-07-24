@@ -304,6 +304,7 @@ public sealed class ProductReviewRepositoryTests
             Guid.NewGuid(),
             null,
             "GBP",
+            false,
             74.99m,
             0m,
             0m,
@@ -332,6 +333,7 @@ public sealed class ProductReviewRepositoryTests
             74.99m,
             0m,
             0m,
+            false,
             Now));
     }
 
@@ -343,3 +345,4 @@ public sealed class ProductReviewRepositoryTests
         return new EPosDbContext(options);
     }
 }
+

@@ -24,7 +24,9 @@ public sealed class PosReturnsControllerTests
             "DAMAGED",
             "CASH_REFUND",
             null,
-            [new PosReturnCreditPreviewLineRequestDto(Guid.NewGuid(), 1)]);
+            [new PosReturnCreditPreviewLineRequestDto(Guid.NewGuid(), 1)],
+            1,
+            "test-api-complete-1");
         var service = new FakeReturnService
         {
             CompleteResult = ApplicationResult<PosReturnReceiptDto>.Success(
@@ -43,6 +45,35 @@ public sealed class PosReturnsControllerTests
         Assert.Equal(saleId, service.CompleteSaleId);
         Assert.Equal(deviceId, service.CompleteDeviceId);
         Assert.Same(request, service.CompleteRequest);
+    }
+
+    [Fact]
+    public async Task GetCompletion_WithValidContext_ReturnsOkAndForwardsRequest()
+    {
+        var returnId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var service = new FakeReturnService
+        {
+            CompleteResult = ApplicationResult<PosReturnReceiptDto>.Success(
+                CreateReturnReceipt(returnId) with
+                {
+                    Resolution = "REFUND",
+                    CanPrint = true
+                })
+        };
+        var controller = CreateController(service);
+        SetClaims(
+            controller,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            ReturnsPermissions.CreateRefund);
+
+        var result = await controller.GetCompletion(
+            returnId,
+            deviceId,
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
     }
 
     [Fact]
@@ -72,6 +103,50 @@ public sealed class PosReturnsControllerTests
         Assert.Equal(saleId, service.CreditSaleId);
         Assert.Equal(deviceId, service.CreditDeviceId);
         Assert.Same(request, service.CreditRequest);
+    }
+
+    [Fact]
+    public async Task CheckSelectedSaleEligibility_WithValidContext_ReturnsOkAndForwardsRequest()
+    {
+        var saleId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var lineId = Guid.NewGuid();
+        var request = new PosReturnEligibilityCheckRequestDto(
+            [new PosReturnCreditPreviewLineRequestDto(lineId, 1)]);
+        var service = new FakeReturnService
+        {
+            EligibilityCheckResult = ApplicationResult<PosReturnSaleEligibilityDto>.Success(
+                new PosReturnSaleEligibilityDto(
+                    saleId,
+                    "RCP-001",
+                    null,
+                    "Walk-in Customer",
+                    DateTimeOffset.UtcNow,
+                    "Cash",
+                    string.Empty,
+                    "LKR",
+                    [],
+                    [],
+                    "ELIGIBLE",
+                    true,
+                    1,
+                    1,
+                    "Eligible",
+                    null))
+        };
+        var controller = CreateController(service);
+        SetClaims(controller, Guid.NewGuid(), Guid.NewGuid(), ReturnsPermissions.ViewReturns);
+
+        var result = await controller.CheckSelectedSaleEligibility(
+            saleId,
+            deviceId,
+            request,
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(saleId, service.EligibilityCheckSaleId);
+        Assert.Equal(deviceId, service.EligibilityCheckDeviceId);
+        Assert.Same(request, service.EligibilityCheckRequest);
     }
 
     [Fact]
@@ -123,6 +198,11 @@ public sealed class PosReturnsControllerTests
             deviceId,
             "invoice",
             "RCP-001",
+            null,
+            null,
+            null,
+            null,
+            null,
             1,
             20,
             CancellationToken.None);
@@ -131,6 +211,39 @@ public sealed class PosReturnsControllerTests
         Assert.Equal(deviceId, service.DeviceId);
         Assert.Equal("invoice", service.SearchType);
         Assert.Equal("RCP-001", service.Search);
+    }
+
+    [Fact]
+    public async Task GetReturnReasons_WithValidContext_ReturnsOkAndForwardsDeviceId()
+    {
+        var deviceId = Guid.NewGuid();
+        var reasonId = Guid.NewGuid();
+        var service = new FakeReturnService
+        {
+            ReasonsResult = ApplicationResult<IReadOnlyList<PosReturnReasonOptionDto>>.Success(
+                [
+                    new PosReturnReasonOptionDto(
+                        reasonId,
+                        "OTHER",
+                        "Other",
+                        null,
+                        6,
+                        true,
+                        true,
+                        false,
+                        false,
+                        false)
+                ])
+        };
+        var controller = CreateController(service);
+        SetClaims(controller, Guid.NewGuid(), Guid.NewGuid(), ReturnsPermissions.ViewReturns);
+
+        var result = await controller.GetReturnReasons(
+            deviceId,
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(deviceId, service.ReasonsDeviceId);
     }
 
     [Fact]
@@ -242,14 +355,24 @@ public sealed class PosReturnsControllerTests
         public ApplicationResult<PosReturnSaleEligibilityDto> EligibilityResult { get; init; } =
             ApplicationResult<PosReturnSaleEligibilityDto>.Failure(
                 new ApplicationError("pos_returns.failed", "Failed."));
+        public ApplicationResult<PosReturnSaleEligibilityDto> EligibilityCheckResult { get; init; } =
+            ApplicationResult<PosReturnSaleEligibilityDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed."));
         public ApplicationResult<PosReturnSaleSearchPageDto> Result { get; init; } =
             ApplicationResult<PosReturnSaleSearchPageDto>.Failure(
                 new ApplicationError("pos_returns.failed", "Failed."));
+        public ApplicationResult<IReadOnlyList<PosReturnReasonOptionDto>> ReasonsResult { get; init; } =
+            ApplicationResult<IReadOnlyList<PosReturnReasonOptionDto>>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed."));
         public Guid? DeviceId { get; private set; }
+        public Guid? ReasonsDeviceId { get; private set; }
         public string? SearchType { get; private set; }
         public string? Search { get; private set; }
         public Guid EligibilitySaleId { get; private set; }
         public Guid? EligibilityDeviceId { get; private set; }
+        public Guid EligibilityCheckSaleId { get; private set; }
+        public Guid? EligibilityCheckDeviceId { get; private set; }
+        public PosReturnEligibilityCheckRequestDto? EligibilityCheckRequest { get; private set; }
         public Guid CreditSaleId { get; private set; }
         public Guid? CreditDeviceId { get; private set; }
         public PosReturnCreditPreviewRequestDto? CreditRequest { get; private set; }
@@ -266,6 +389,13 @@ public sealed class PosReturnsControllerTests
             CompleteRequest = request;
             return Task.FromResult(CompleteResult);
         }
+
+        public Task<ApplicationResult<PosReturnReceiptDto>> GetCompletionAsync(
+            TenantRequestContext context,
+            Guid returnId,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(CompleteResult);
 
         public Task<ApplicationResult<PosReturnCreditPreviewDto>> PreviewCreditAsync(
             TenantRequestContext context,
@@ -291,11 +421,29 @@ public sealed class PosReturnsControllerTests
             return Task.FromResult(EligibilityResult);
         }
 
+        public Task<ApplicationResult<PosReturnSaleEligibilityDto>> CheckSelectedSaleEligibilityAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            PosReturnEligibilityCheckRequestDto request,
+            CancellationToken cancellationToken)
+        {
+            EligibilityCheckSaleId = saleId;
+            EligibilityCheckDeviceId = deviceId;
+            EligibilityCheckRequest = request;
+            return Task.FromResult(EligibilityCheckResult);
+        }
+
         public Task<ApplicationResult<PosReturnSaleSearchPageDto>> SearchOriginalSalesAsync(
             TenantRequestContext context,
             Guid? deviceId,
             string? searchType,
             string? search,
+            DateOnly? fromDate,
+            DateOnly? toDate,
+            string? paymentMethodCode,
+            decimal? minAmount,
+            decimal? maxAmount,
             int page,
             int pageSize,
             CancellationToken cancellationToken)
@@ -305,5 +453,164 @@ public sealed class PosReturnsControllerTests
             Search = search;
             return Task.FromResult(Result);
         }
+
+        public Task<ApplicationResult<IReadOnlyList<PosReturnInspectionConditionDto>>> GetInspectionConditionsAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<IReadOnlyList<PosReturnInspectionConditionDto>>.Success([]));
+
+        public Task<ApplicationResult<PosReturnInspectionValidateResponseDto>> ValidateInspectionAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            PosReturnInspectionValidateRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnInspectionValidateResponseDto>.Success(
+                new PosReturnInspectionValidateResponseDto(
+                    true,
+                    request.Lines.Count,
+                    request.Lines.Count,
+                    0,
+                    new Dictionary<string, int>(),
+                    [],
+                    false,
+                    200,
+                    5,
+                    5 * 1024 * 1024)));
+
+        public Task<ApplicationResult<PosReturnInspectionDraftResponseDto>> SaveInspectionDraftAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            PosReturnInspectionDraftSaveRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnInspectionDraftResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosReturnInspectionDraftResponseDto>> GetInspectionDraftAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnInspectionDraftResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosReturnInspectionMediaDto>> UploadInspectionMediaAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid saleLineId,
+            Guid? deviceId,
+            Stream fileStream,
+            string fileName,
+            string contentType,
+            long fileSizeBytes,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnInspectionMediaDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult> DeleteInspectionMediaAsync(
+            TenantRequestContext context,
+            Guid mediaId,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult.Success());
+
+        public Task<ApplicationResult<PosReturnInspectionMediaContentDto>> GetInspectionMediaAsync(
+            TenantRequestContext context,
+            Guid mediaId,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnInspectionMediaContentDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<IReadOnlyList<PosReturnReasonOptionDto>>> GetReturnReasonsAsync(
+            TenantRequestContext context,
+            Guid? deviceId,
+            CancellationToken cancellationToken)
+        {
+            ReasonsDeviceId = deviceId;
+            return Task.FromResult(ReasonsResult);
+        }
+
+        public Task<ApplicationResult<PosReturnReasonsValidateResponseDto>> ValidateReturnReasonsAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            PosReturnReasonsValidateRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnReasonsValidateResponseDto>.Success(
+                new PosReturnReasonsValidateResponseDto(saleId, false, 1000, [])));
+
+        public Task<ApplicationResult<PosReturnResolutionResponseDto>> SaveResolutionAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            PosReturnResolutionSaveRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnResolutionResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosReturnResolutionResponseDto>> GetResolutionAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnResolutionResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosReturnRefundMethodsResponseDto>> GetRefundMethodsAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnRefundMethodsResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosReturnRefundMethodSaveResponseDto>> SaveRefundMethodAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            PosReturnRefundMethodSaveRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReturnRefundMethodSaveResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosExchangeProductsResponseDto>> SearchExchangeProductsAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            string? search,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosExchangeProductsResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosExchangeReplacementSaveResponseDto>> SaveExchangeReplacementAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            PosExchangeReplacementSaveRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosExchangeReplacementSaveResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosExchangeReplacementSaveResponseDto>> GetExchangeReplacementAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosExchangeReplacementSaveResponseDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
+
+        public Task<ApplicationResult<PosExchangePreviewDto>> PreviewExchangeAsync(
+            TenantRequestContext context,
+            Guid saleId,
+            Guid? deviceId,
+            PosExchangePreviewRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosExchangePreviewDto>.Failure(
+                new ApplicationError("pos_returns.failed", "Failed.")));
     }
 }

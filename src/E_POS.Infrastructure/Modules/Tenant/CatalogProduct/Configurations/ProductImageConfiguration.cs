@@ -1,4 +1,5 @@
-using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+﻿using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -42,6 +43,10 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
 
         builder.Property(x => x.SalesChannelId)
             .HasColumnName("sales_channel_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.MediaAssetId)
+            .HasColumnName("media_asset_id")
             .IsRequired(false);
 
         builder.Property(x => x.ImageStorageKey)
@@ -118,15 +123,31 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
 
         builder.HasOne<Product>()
             .WithMany()
-            .HasForeignKey(x => x.ProductId)
+            .HasForeignKey(x => new { x.TenantId, x.ProductId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_product_images_product_id_products");
+            .HasConstraintName("fk_product_images_product_tenant");
 
         builder.HasOne<ProductVariant>()
             .WithMany()
-            .HasForeignKey(x => x.ProductVariantId)
+            .HasForeignKey(x => new { x.TenantId, x.ProductVariantId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_product_images_product_variant_id_product_variants");
+            .HasConstraintName("fk_product_images_variant_tenant");
+
+        builder.HasOne<MediaAsset>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.MediaAssetId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_product_images_media_asset_tenant");
+
+        builder.HasIndex(x => new { x.TenantId, x.MediaAssetId })
+            .HasDatabaseName("ix_product_images_tenant_id_media_asset_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_product_images_tenant_id_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_product_images_sort_order", "sort_order >= 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_product_images_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));

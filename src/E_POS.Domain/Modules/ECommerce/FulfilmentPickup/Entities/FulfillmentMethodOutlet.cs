@@ -14,7 +14,16 @@ public class FulfillmentMethodOutlet : AuditableEntity
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
-    public static FulfillmentMethodOutlet Create(Guid id, Guid tenantId, Guid fulfillmentMethodId, Guid outletId, string status, DateTimeOffset now)
+    public static FulfillmentMethodOutlet Create(
+        Guid id,
+        Guid tenantId,
+        Guid fulfillmentMethodId,
+        Guid outletId,
+        int? preparationLeadMinutes,
+        int? pickupWindowMinutes,
+        TimeOnly? cutoffTime,
+        string status,
+        DateTimeOffset now)
     {
         return new FulfillmentMethodOutlet
         {
@@ -22,6 +31,9 @@ public class FulfillmentMethodOutlet : AuditableEntity
             TenantId = tenantId,
             FulfillmentMethodId = fulfillmentMethodId,
             OutletId = outletId,
+            PreparationLeadMinutes = preparationLeadMinutes,
+            PickupWindowMinutes = pickupWindowMinutes,
+            CutoffTime = cutoffTime,
             Status = status,
             CreatedAt = now,
             UpdatedAt = now
@@ -30,6 +42,20 @@ public class FulfillmentMethodOutlet : AuditableEntity
 
     public void SetStatus(string status, DateTimeOffset now)
     {
+        Status = status;
+        UpdatedAt = now;
+    }
+
+    public void ConfigureCollection(
+        int? preparationLeadMinutes,
+        int? pickupWindowMinutes,
+        TimeOnly? cutoffTime,
+        string status,
+        DateTimeOffset now)
+    {
+        PreparationLeadMinutes = preparationLeadMinutes;
+        PickupWindowMinutes = pickupWindowMinutes;
+        CutoffTime = cutoffTime;
         Status = status;
         UpdatedAt = now;
     }

@@ -20,5 +20,11 @@ public class DocumentNumberSequence : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    public void Increment(DateTimeOffset now)
+    {
+        CurrentValue++;
+        LastGeneratedAt = now;
+    }
 }
 

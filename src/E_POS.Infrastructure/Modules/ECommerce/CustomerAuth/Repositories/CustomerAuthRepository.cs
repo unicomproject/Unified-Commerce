@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
+using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -193,6 +194,23 @@ public sealed class CustomerAuthRepository : ICustomerAuthRepository
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<CustomerEntity?> GetCustomerByIdAsync(
+        Guid tenantId,
+        Guid customerId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Customers
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == customerId, cancellationToken);
+    }
+
+    public async Task UpdateCustomerAsync(
+        CustomerEntity customer,
+        CancellationToken cancellationToken)
+    {
+        _dbContext.Customers.Update(customer);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private Task<CustomerLoginAccount?> FindRefreshAccountAsync(

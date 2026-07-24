@@ -44,7 +44,8 @@ public class SalesPayment : AuditableEntity
         string idempotencyKey,
         string requestHash,
         Guid? createdByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? externalReference = null)
     {
         return new SalesPayment
         {
@@ -62,6 +63,10 @@ public class SalesPayment : AuditableEntity
             PaidAmount = paidAmount,
             ChangeAmount = changeAmount,
             RefundedAmount = 0,
+            // Provider/terminal transaction id only — never full PAN or display mask.
+            ExternalReference = string.IsNullOrWhiteSpace(externalReference)
+                ? null
+                : externalReference.Trim(),
             IdempotencyKey = idempotencyKey.Trim(),
             PaymentNote = $"POS_REQUEST_HASH:{requestHash}",
             InitiatedAt = now,

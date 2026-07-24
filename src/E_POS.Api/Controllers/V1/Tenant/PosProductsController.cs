@@ -116,6 +116,39 @@ public sealed class PosProductsController : ControllerBase
         return Ok(new { data = result.Value });
     }
 
+    [HttpGet("products/by-barcode/{barcode}")]
+    [ProducesResponseType(typeof(PosBarcodeProductResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> GetProductByBarcode(
+        string barcode,
+        [FromQuery] Guid? deviceId,
+        CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(
+                new ApplicationError("pos_products.invalid_tenant_context", "Invalid tenant context.")));
+        }
+
+        var result = await _posProductCatalogService.GetProductByBarcodeAsync(
+            context,
+            deviceId,
+            barcode,
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return ToErrorResult(result.Error);
+        }
+
+        return Ok(new { data = result.Value });
+    }
+
     private IActionResult ToErrorResult(ApplicationError error)
     {
         return error.Code switch
@@ -124,6 +157,11 @@ public sealed class PosProductsController : ControllerBase
             "pos_products.device_not_found" => NotFound(CreateError(error)),
             "pos_products.product_not_found" => NotFound(CreateError(error)),
             "pos_products.invalid_tenant_context" => Unauthorized(CreateError(error)),
+            "pos_barcode.not_found" => NotFound(CreateError(error)),
+            "pos_barcode.ambiguous" => Conflict(CreateError(error)),
+            "pos_product.unavailable" or "pos_variant.unavailable" or "pos_price.unavailable" =>
+                UnprocessableEntity(CreateError(error)),
+            "pos_device.invalid" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             _ => BadRequest(CreateError(error))
         };
     }

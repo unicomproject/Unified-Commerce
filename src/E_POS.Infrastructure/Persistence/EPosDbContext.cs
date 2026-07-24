@@ -1,4 +1,4 @@
-using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+﻿using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Platform.PlatformFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
@@ -22,6 +22,7 @@ using E_POS.Domain.Modules.Shared.Refund.Entities;
 using E_POS.Domain.Modules.Shared.ReturnExchange.Entities;
 using E_POS.Domain.Modules.Shared.Notification.Entities;
 using E_POS.Domain.Modules.Shared.Integration.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.OfflineSync.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -263,6 +264,9 @@ public sealed class EPosDbContext : DbContext
     // Storefront
     public DbSet<StorefrontBanner> StorefrontBanners => Set<StorefrontBanner>();
 
+    // Shared Media
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+
     // Fulfilment and Pickup
     public DbSet<FulfillmentMethod> FulfillmentMethods => Set<FulfillmentMethod>();
     public DbSet<FulfillmentMethodOutlet> FulfillmentMethodOutlets => Set<FulfillmentMethodOutlet>();
@@ -287,6 +291,15 @@ public sealed class EPosDbContext : DbContext
 
     // Return, Inspection and Exchange
     public DbSet<ReturnInspection> ReturnInspections => Set<ReturnInspection>();
+    public DbSet<ReturnInspectionDraft> ReturnInspectionDrafts => Set<ReturnInspectionDraft>();
+    public DbSet<ReturnInspectionDraftLine> ReturnInspectionDraftLines => Set<ReturnInspectionDraftLine>();
+    public DbSet<ReturnExchangeReplacementDraftLine> ReturnExchangeReplacementDraftLines =>
+        Set<ReturnExchangeReplacementDraftLine>();
+    public DbSet<ReturnInspectionMedia> ReturnInspectionMedia => Set<ReturnInspectionMedia>();
+    public DbSet<ReturnInspectionCondition> ReturnInspectionConditions =>
+        Set<ReturnInspectionCondition>();
+    public DbSet<ReturnInspectionMediaStaging> ReturnInspectionMediaStaging =>
+        Set<ReturnInspectionMediaStaging>();
     public DbSet<ReturnReason> ReturnReasons => Set<ReturnReason>();
     public DbSet<SalesExchange> SalesExchanges => Set<SalesExchange>();
     public DbSet<SalesExchangeEvent> SalesExchangeEvents => Set<SalesExchangeEvent>();

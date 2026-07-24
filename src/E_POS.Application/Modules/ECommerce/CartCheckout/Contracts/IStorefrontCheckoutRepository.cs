@@ -16,6 +16,15 @@ public interface IStorefrontCheckoutRepository
         Guid tenantId,
         Guid customerId,
         Guid checkoutSessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<StorefrontCheckoutRepositoryResult> UpdateCollectionAsync(
+        Guid tenantId,
+        Guid customerId,
+        Guid checkoutSessionId,
+        UpdateStorefrontCheckoutCollectionRequest request,
+        DateTimeOffset now,
         CancellationToken cancellationToken);
 
     Task<StorefrontCheckoutRepositoryResult> ConfirmAsync(

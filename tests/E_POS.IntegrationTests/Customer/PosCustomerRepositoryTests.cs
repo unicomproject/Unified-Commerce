@@ -58,6 +58,8 @@ public sealed class PosCustomerRepositoryTests
         var result = await repository.ListAsync(
             tenantId,
             null,
+            null,
+            null,
             2,
             1,
             CancellationToken.None);

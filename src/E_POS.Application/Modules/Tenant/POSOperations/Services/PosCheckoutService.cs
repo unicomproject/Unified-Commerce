@@ -44,6 +44,22 @@ public sealed class PosCheckoutService : IPosCheckoutService
         "pos_checkout.customer_not_found",
         "The selected customer could not be found.");
 
+    private static readonly ApplicationError CustomerInactive = new(
+        "pos_checkout.customer_inactive",
+        "Inactive customers cannot be used at checkout.");
+
+    private static readonly ApplicationError CustomerBlocked = new(
+        "pos_checkout.customer_blocked",
+        "Blocked customers cannot be used at checkout.");
+
+    private static readonly ApplicationError CustomerDeleted = new(
+        "pos_checkout.customer_deleted",
+        "Deleted customers cannot be used at checkout.");
+
+    private static readonly ApplicationError CustomerNotEligible = new(
+        "pos_checkout.customer_not_eligible",
+        "The selected customer is not eligible for checkout.");
+
     private readonly IPosCheckoutRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
@@ -123,6 +139,10 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.till_session_not_open" => TillSessionNotOpen,
                     "pos_checkout.variant_not_found" => VariantNotFound,
                     "pos_checkout.customer_not_found" => CustomerNotFound,
+                    "pos_checkout.customer_inactive" => CustomerInactive,
+                    "pos_checkout.customer_blocked" => CustomerBlocked,
+                    "pos_checkout.customer_deleted" => CustomerDeleted,
+                    "pos_checkout.customer_not_eligible" => CustomerNotEligible,
                     "pos_checkout.invalid_lines" => InvalidLines,
                     "pos_checkout.invalid_sale_type" => InvalidSaleType,
                     _ => new ApplicationError(
@@ -195,6 +215,10 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.till_session_not_open" => TillSessionNotOpen,
                     "pos_checkout.variant_not_found" => VariantNotFound,
                     "pos_checkout.customer_not_found" => CustomerNotFound,
+                    "pos_checkout.customer_inactive" => CustomerInactive,
+                    "pos_checkout.customer_blocked" => CustomerBlocked,
+                    "pos_checkout.customer_deleted" => CustomerDeleted,
+                    "pos_checkout.customer_not_eligible" => CustomerNotEligible,
                     "pos_checkout.invalid_lines" => InvalidLines,
                     "pos_checkout.invalid_sale_type" => InvalidSaleType,
                     "pos_checkout.invalid_payment_method" => new ApplicationError(

@@ -1,3 +1,4 @@
+﻿using E_POS.Application.Common.Contracts;
 using System.Reflection;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
@@ -17,17 +18,17 @@ public sealed class StorefrontServiceTests
     [Fact]
     public async Task GetActiveBannersAsync_MapsBannersToReadModels()
     {
-        var banner = StorefrontBanner.Create(
-            TenantId,
-            null,
-            "HERO",
-            "Summer Sale",
-            "Fresh deals",
-            "/images/hero.jpg",
-            "Shop now",
-            "/shop",
-            1,
-            "ACTIVE");
+        var banner = new StorefrontBannerReadModel
+        {
+            Id = Guid.NewGuid(),
+            BannerType = "HERO",
+            Title = "Summer Sale",
+            Subtitle = "Fresh deals",
+            ImageUrl = "/images/hero.jpg",
+            ActionText = "Shop now",
+            ActionUrl = "/shop",
+            SortOrder = 1
+        };
         var repository = new FakeStorefrontRepository { Banners = [banner] };
         var service = new StorefrontService(
             new StorefrontBannerService(repository),
@@ -50,34 +51,18 @@ public sealed class StorefrontServiceTests
     [Fact]
     public async Task GetFeaturedCategoriesAsync_MapsImageUrlAndEmptyFallback()
     {
-        var categoryWithImage = Category.Create(
-            Guid.NewGuid(),
-            TenantId,
-            Guid.NewGuid(),
-            null,
-            "FRUIT",
-            "Fruit",
-            "fruit",
-            null,
-            "/images/fruit.jpg",
-            1,
-            CategoryConstants.ActiveStatus,
-            null,
-            Now);
-        var categoryWithoutImage = Category.Create(
-            Guid.NewGuid(),
-            TenantId,
-            Guid.NewGuid(),
-            null,
-            "BAKERY",
-            "Bakery",
-            "bakery",
-            null,
-            null,
-            2,
-            CategoryConstants.ActiveStatus,
-            null,
-            Now);
+        var categoryWithImage = new StorefrontCategoryReadModel
+        {
+            Id = Guid.NewGuid(),
+            Name = "Fruit",
+            ImageUrl = "/images/fruit.jpg"
+        };
+        var categoryWithoutImage = new StorefrontCategoryReadModel
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bakery",
+            ImageUrl = string.Empty
+        };
         var repository = new FakeStorefrontRepository { Categories = [categoryWithImage, categoryWithoutImage] };
         var service = new StorefrontService(
             new StorefrontBannerService(repository),
@@ -269,8 +254,8 @@ public sealed class StorefrontServiceTests
         {
             BestSellers =
             [
-                (productWithDetails, rating, 9.99m, "/images/apple.jpg"),
-                (productWithFallbacks, null, null, null)
+                (productWithDetails, rating, 9.99m, "LKR", "/images/apple.jpg"),
+                (productWithFallbacks, null, null, "LKR", null)
             ]
         };
         var service = new StorefrontService(
@@ -289,6 +274,7 @@ public sealed class StorefrontServiceTests
                 Assert.Equal(productWithDetails.Id, first.Id);
                 Assert.Equal("Apple", first.Name);
                 Assert.Equal(9.99m, first.Price);
+                Assert.Equal("LKR", first.CurrencyCode);
                 Assert.Equal("/images/apple.jpg", first.ImageUrl);
                 Assert.Equal(4.5m, first.Rating);
                 Assert.Equal(12, first.ReviewCount);
@@ -298,6 +284,7 @@ public sealed class StorefrontServiceTests
                 Assert.Equal(productWithFallbacks.Id, second.Id);
                 Assert.Equal("Bread", second.Name);
                 Assert.Equal(0m, second.Price);
+                Assert.Equal("LKR", second.CurrencyCode);
                 Assert.Empty(second.ImageUrl);
                 Assert.Equal(0m, second.Rating);
                 Assert.Equal(0, second.ReviewCount);
@@ -324,7 +311,159 @@ public sealed class StorefrontServiceTests
     }
 
     [Fact]
-    public async Task ResolveTenantIdAsync_ReturnsRepositoryTenantId()
+    public async Task GetCollectionOptionsAsync_AppliesLeadTimeWindowsAndClosedDays()
+    {
+        var outletId = Guid.NewGuid();
+        var repository = new FakeStorefrontRepository
+        {
+            CollectionConfiguration = new StorefrontCollectionConfigurationReadModel
+            {
+                OutletId = outletId,
+                OutletName = "Main Store",
+                Timezone = "UTC",
+                PreparationLeadMinutes = 90,
+                PickupWindowMinutes = 30,
+                BusinessHours =
+                [
+                    new() { DayOfWeek = 1, OpeningTime = new TimeOnly(8, 0), ClosingTime = new TimeOnly(12, 0) },
+                    new() { DayOfWeek = 2, IsClosed = true },
+                    new() { DayOfWeek = 3, OpeningTime = new TimeOnly(9, 0), ClosingTime = new TimeOnly(10, 0) }
+                ]
+            }
+        };
+        var service = new StorefrontFulfillmentService(repository, new FakeClock(Now));
+
+        var result = await service.GetCollectionOptionsAsync(TenantId, outletId, 3, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var options = Assert.IsType<StorefrontCollectionOptionsReadModel>(result.Value);
+        Assert.Equal(Now.AddMinutes(90), options.EarliestCollectionAt);
+        Assert.Collection(
+            options.Dates,
+            monday =>
+            {
+                Assert.Equal(new DateOnly(2026, 7, 13), monday.Date);
+                Assert.Equal(new DateTimeOffset(2026, 7, 13, 9, 30, 0, TimeSpan.Zero), monday.Windows[0].StartAt);
+                Assert.Equal(5, monday.Windows.Count);
+            },
+            wednesday =>
+            {
+                Assert.Equal(new DateOnly(2026, 7, 15), wednesday.Date);
+                Assert.Equal(2, wednesday.Windows.Count);
+            });
+        Assert.Equal(TenantId, repository.CollectionConfigurationTenantId);
+        Assert.Equal(outletId, repository.CollectionConfigurationOutletId);
+    }
+
+    [Fact]
+    public async Task GetCollectionOptionsAsync_WhenTodayCutoffReached_OmitsToday()
+    {
+        var outletId = Guid.NewGuid();
+        var repository = new FakeStorefrontRepository
+        {
+            CollectionConfiguration = new StorefrontCollectionConfigurationReadModel
+            {
+                OutletId = outletId,
+                OutletName = "Main Store",
+                Timezone = "UTC",
+                PreparationLeadMinutes = 0,
+                PickupWindowMinutes = 30,
+                CutoffTime = new TimeOnly(8, 0),
+                BusinessHours =
+                [
+                    new() { DayOfWeek = 1, OpeningTime = new TimeOnly(8, 0), ClosingTime = new TimeOnly(9, 0) },
+                    new() { DayOfWeek = 2, OpeningTime = new TimeOnly(8, 0), ClosingTime = new TimeOnly(9, 0) }
+                ]
+            }
+        };
+        var service = new StorefrontFulfillmentService(repository, new FakeClock(Now));
+
+        var result = await service.GetCollectionOptionsAsync(TenantId, outletId, 2, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var date = Assert.Single(result.Value!.Dates);
+        Assert.Equal(new DateOnly(2026, 7, 14), date.Date);
+    }
+
+    [Fact]
+    public async Task GetCollectionOptionsAsync_DateSpecificClosureOverridesWeeklyHours()
+    {
+        var outletId = Guid.NewGuid();
+        var repository = new FakeStorefrontRepository
+        {
+            CollectionConfiguration = new StorefrontCollectionConfigurationReadModel
+            {
+                OutletId = outletId,
+                OutletName = "Main Store",
+                Timezone = "UTC",
+                PreparationLeadMinutes = 0,
+                PickupWindowMinutes = 30,
+                BusinessHours =
+                [
+                    new() { DayOfWeek = 1, OpeningTime = new TimeOnly(8, 0), ClosingTime = new TimeOnly(10, 0) },
+                    new()
+                    {
+                        DayOfWeek = 1,
+                        IsClosed = true,
+                        ValidFrom = new DateOnly(2026, 7, 13),
+                        ValidUntil = new DateOnly(2026, 7, 13)
+                    },
+                    new() { DayOfWeek = 2, OpeningTime = new TimeOnly(8, 0), ClosingTime = new TimeOnly(9, 0) }
+                ]
+            }
+        };
+        var service = new StorefrontFulfillmentService(repository, new FakeClock(Now));
+
+        var result = await service.GetCollectionOptionsAsync(
+            TenantId,
+            outletId,
+            2,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var date = Assert.Single(result.Value!.Dates);
+        Assert.Equal(new DateOnly(2026, 7, 14), date.Date);
+    }
+
+    [Fact]
+    public async Task GetCollectionOptionsAsync_DstAmbiguousWindows_AreNotOffered()
+    {
+        var outletId = Guid.NewGuid();
+        var repository = new FakeStorefrontRepository
+        {
+            CollectionConfiguration = new StorefrontCollectionConfigurationReadModel
+            {
+                OutletId = outletId,
+                OutletName = "New York Store",
+                Timezone = "America/New_York",
+                PreparationLeadMinutes = 0,
+                PickupWindowMinutes = 30,
+                BusinessHours =
+                [
+                    new()
+                    {
+                        DayOfWeek = 0,
+                        OpeningTime = new TimeOnly(1, 0),
+                        ClosingTime = new TimeOnly(2, 0)
+                    }
+                ]
+            }
+        };
+        var beforeFallback = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
+        var service = new StorefrontFulfillmentService(repository, new FakeClock(beforeFallback));
+
+        var result = await service.GetCollectionOptionsAsync(
+            TenantId,
+            outletId,
+            2,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Dates);
+    }
+
+    [Fact]
+    public async Task ResolveTenantAsync_ReturnsRepositoryTenantId()
     {
         var resolvedTenantId = Guid.NewGuid();
         var repository = new FakeStorefrontRepository { ResolvedTenantId = resolvedTenantId };
@@ -335,9 +474,10 @@ public sealed class StorefrontServiceTests
             new StorefrontFulfillmentService(repository),
             new StorefrontTenantService(repository));
 
-        var result = await service.ResolveTenantIdAsync("demo-store", CancellationToken.None);
+        var result = await service.ResolveTenantAsync("demo-store", CancellationToken.None);
 
-        Assert.Equal(resolvedTenantId, result);
+        Assert.Equal(resolvedTenantId, result.TenantId);
+        Assert.Equal("USD", result.BaseCurrencyCode);
         Assert.Equal("demo-store", repository.ResolvedSlug);
     }
 
@@ -347,16 +487,22 @@ public sealed class StorefrontServiceTests
         property?.SetValue(entity, value);
     }
 
+    private sealed class FakeClock(DateTimeOffset utcNow) : IDateTimeProvider
+    {
+        public DateTimeOffset UtcNow { get; } = utcNow;
+    }
+
     private sealed class FakeStorefrontRepository : IStorefrontRepository
     {
-        public IEnumerable<StorefrontBanner> Banners { get; init; } = [];
-        public IEnumerable<Category> Categories { get; init; } = [];
+        public IEnumerable<StorefrontBannerReadModel> Banners { get; init; } = [];
+        public IEnumerable<StorefrontCategoryReadModel> Categories { get; init; } = [];
         public IEnumerable<StorefrontCategoryListReadModel> RootCategories { get; init; } = [];
         public IEnumerable<StorefrontCategoryListReadModel> ChildCategories { get; init; } = [];
         public StorefrontPagedReadModel<StorefrontProductListReadModel> ProductListingPage { get; init; } = new();
         public StorefrontProductDetailReadModel? ProductDetail { get; init; }
-        public IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string? PrimaryImageUrl)> BestSellers { get; init; } = [];
+        public IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)> BestSellers { get; init; } = [];
         public IEnumerable<StorefrontStoreReadModel> Stores { get; init; } = [];
+        public StorefrontCollectionConfigurationReadModel? CollectionConfiguration { get; init; }
         public Guid? ResolvedTenantId { get; init; }
         public Guid? BannersTenantId { get; private set; }
         public string? BannerType { get; private set; }
@@ -373,16 +519,18 @@ public sealed class StorefrontServiceTests
         public string? ProductDetailSlug { get; private set; }
         public Guid? BestSellersTenantId { get; private set; }
         public Guid? StoresTenantId { get; private set; }
+        public Guid? CollectionConfigurationTenantId { get; private set; }
+        public Guid? CollectionConfigurationOutletId { get; private set; }
         public string? ResolvedSlug { get; private set; }
 
-        public Task<IEnumerable<StorefrontBanner>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
+        public Task<IEnumerable<StorefrontBannerReadModel>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
         {
             BannersTenantId = tenantId;
             BannerType = bannerType;
             return Task.FromResult(Banners);
         }
 
-        public Task<IEnumerable<Category>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        public Task<IEnumerable<StorefrontCategoryReadModel>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
         {
             FeaturedCategoriesTenantId = tenantId;
             return Task.FromResult(Categories);
@@ -422,7 +570,7 @@ public sealed class StorefrontServiceTests
             ProductDetailTenantId = tenantId;
             ProductDetailSlug = slug;
             return Task.FromResult(ProductDetail);
-        }        public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        }        public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
         {
             BestSellersTenantId = tenantId;
             return Task.FromResult(BestSellers);
@@ -439,10 +587,21 @@ public sealed class StorefrontServiceTests
             return Task.FromResult(Stores);
         }
 
-        public Task<Guid?> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
+        public Task<StorefrontCollectionConfigurationReadModel?> GetCollectionConfigurationAsync(
+            Guid tenantId,
+            Guid outletId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            CollectionConfigurationTenantId = tenantId;
+            CollectionConfigurationOutletId = outletId;
+            return Task.FromResult(CollectionConfiguration);
+        }
+
+        public Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
         {
             ResolvedSlug = slug;
-            return Task.FromResult(ResolvedTenantId);
+            return Task.FromResult<(Guid?, string?)>((ResolvedTenantId, "USD"));
         }
     }
 }

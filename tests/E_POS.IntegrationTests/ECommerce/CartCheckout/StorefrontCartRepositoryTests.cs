@@ -42,6 +42,49 @@ public sealed class StorefrontCartRepositoryTests
     }
 
     [Fact]
+    public async Task AddItemAsync_UsesTenantBaseCurrencyPriceList()
+    {
+        var tenantId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        await SeedProductAsync(dbContext, tenantId, productId, 74.99m, 5m, currencyCode: "USD");
+        var lkrPriceListId = Guid.NewGuid();
+        dbContext.PriceLists.Add(PriceList.Create(
+            lkrPriceListId,
+            tenantId,
+            $"PL-{lkrPriceListId:N}"[..20],
+            "LKR Price List",
+            "STANDARD",
+            "LKR",
+            false,
+            false,
+            100,
+            null,
+            null,
+            "ACTIVE",
+            null,
+            Now));
+        dbContext.PriceListItems.Add(PriceListItem.Create(
+            Guid.NewGuid(), tenantId, lkrPriceListId, productId, null, null,
+            20900m, null, 1m, null, null, "ACTIVE", null, Now));
+        await dbContext.SaveChangesAsync();
+        var repository = new StorefrontCartRepository(dbContext);
+
+        var result = await repository.AddItemAsync(
+            tenantId,
+            "guest-usd",
+            new AddStorefrontCartItemRequest { ProductId = productId, Quantity = 1m },
+            Now,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("USD", result.Cart!.CurrencyCode);
+        var line = Assert.Single(result.Cart.Items);
+        Assert.Equal(74.99m, line.UnitPrice);
+        Assert.Equal(74.99m, result.Cart.GrandTotal);
+    }
+
+    [Fact]
     public async Task UpdateItemAsync_QuantityAboveAvailableStock_IsRejectedWithoutChangingLine()
     {
         var tenantId = Guid.NewGuid();
@@ -113,17 +156,33 @@ public sealed class StorefrontCartRepositoryTests
     }
 
     private static async Task SeedProductAsync(
-        EPosDbContext dbContext, Guid tenantId, Guid productId, decimal price, decimal stock)
+        EPosDbContext dbContext, Guid tenantId, Guid productId, decimal price, decimal stock, string currencyCode = "LKR")
     {
         dbContext.Tenants.Add(TenantEntity.Create(
             tenantId, $"T{tenantId:N}"[..12], $"tenant-{tenantId:N}", "Tenant",
-            TenantStatusConstants.Active, "LKR", "Asia/Colombo", null, null, Now));
+            TenantStatusConstants.Active, currencyCode, "Asia/Colombo", null, null, Now));
         dbContext.Products.Add(Product.Create(
             productId, tenantId, $"P{productId:N}", "Test Product", $"product-{productId:N}",
             "STANDARD", "SIMPLE", null, null, null, "Test", "Test product",
             true, true, "ACTIVE", null, Now));
+        var priceListId = Guid.NewGuid();
+        dbContext.PriceLists.Add(PriceList.Create(
+            priceListId,
+            tenantId,
+            $"PL-{priceListId:N}"[..20],
+            $"Default {currencyCode} Price List",
+            "STANDARD",
+            currencyCode,
+            false,
+            true,
+            0,
+            null,
+            null,
+            "ACTIVE",
+            null,
+            Now));
         dbContext.PriceListItems.Add(PriceListItem.Create(
-            Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null,
+            Guid.NewGuid(), tenantId, priceListId, productId, null, null,
             price, null, 1m, null, null, "ACTIVE", null, Now));
         var balance = InventoryBalance.Create(
             Guid.NewGuid(), tenantId, Guid.NewGuid(), productId, null, null, Now);

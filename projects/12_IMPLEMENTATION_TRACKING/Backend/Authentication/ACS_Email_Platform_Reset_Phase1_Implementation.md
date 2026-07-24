@@ -44,9 +44,8 @@ Real Azure ACS delivery was verified for the admin-initiated platform password-r
 | Package | Project | Version |
 |---|---|---|
 | `Azure.Communication.Email` | `E_POS.Infrastructure` | 1.1.0 |
-| `Azure.Identity` | `E_POS.Infrastructure` | 1.14.2 |
 
-`Azure.Identity` is included for production `Endpoint` + `DefaultAzureCredential`.
+`DefaultAzureCredential` for Endpoint auth is provided by the Azure.Core identity types pulled in with current Azure SDK packages (including `Azure.Storage.Blobs`). A separate `Azure.Identity` package reference is not required and conflicts with Azure.Core 1.55+.
 
 ## Configuration keys (non-secret)
 

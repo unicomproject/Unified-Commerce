@@ -3,11 +3,13 @@ using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
-using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +19,11 @@ namespace E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
 public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
 {
     private const string Active = "ACTIVE";
+    private static readonly string[] RequiredCheckoutFeatures =
+    [
+        PlatformTenantFeatureCodes.OnlineStore,
+        PlatformTenantFeatureCodes.ClickCollect
+    ];
     private static readonly TimeSpan CheckoutLifetime = TimeSpan.FromMinutes(15);
     private readonly EPosDbContext _dbContext;
 
@@ -33,6 +40,9 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        var accessError = await GetAccessErrorAsync(tenantId, now, cancellationToken);
+        if (accessError is not null) return Failure(accessError);
+
         var customer = await _dbContext.Customers.AsNoTracking()
             .FirstOrDefaultAsync(x =>
                 x.TenantId == tenantId && x.Id == customerId && x.Status == Active,
@@ -45,23 +55,15 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
                 cancellationToken);
         if (outlet is null) return Failure("storefront_checkout.outlet_not_found");
 
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
         var cart = await _dbContext.ShoppingCarts.FirstOrDefaultAsync(x =>
             x.TenantId == tenantId &&
             x.AnonymousSessionId == cartSessionId &&
+            x.CurrencyCode == currencyCode &&
             x.CartStatus == Active &&
             (!x.ExpiresAt.HasValue || x.ExpiresAt > now),
             cancellationToken);
         if (cart is null) return Failure("storefront_checkout.cart_not_found");
-
-        var existingSession = await _dbContext.CheckoutSessions.AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId && x.CustomerId == customerId && x.CartId == cart.Id &&
-                (x.CheckoutStatus == "STARTED" || x.CheckoutStatus == "PENDING") &&
-                (!x.ExpiredAt.HasValue || x.ExpiredAt > now))
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (existingSession is not null)
-            return Success(await BuildReadModelAsync(existingSession, cancellationToken));
 
         var items = await _dbContext.ShoppingCartItems
             .Where(x => x.TenantId == tenantId && x.ShoppingCartId == cart.Id && x.LineStatus == Active)
@@ -69,26 +71,39 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             .ToListAsync(cancellationToken);
         if (items.Count == 0) return Failure("storefront_checkout.cart_empty");
 
+        var existingSession = await _dbContext.CheckoutSessions
+            .Where(x =>
+                x.TenantId == tenantId && x.CustomerId == customerId && x.CartId == cart.Id &&
+                (x.CheckoutStatus == "STARTED" || x.CheckoutStatus == "PENDING") &&
+                (!x.ExpiredAt.HasValue || x.ExpiredAt > now))
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingSession is not null)
+        {
+            var existingLines = await _dbContext.CheckoutSessionLines.AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.CheckoutSessionId == existingSession.Id)
+                .ToListAsync(cancellationToken);
+
+            var isStale = existingSession.SelectedOutletId != request.SelectedOutletId ||
+                          existingLines.Count != items.Count ||
+                          existingLines.Any(el =>
+                          {
+                              var match = items.FirstOrDefault(i => i.ProductId == el.ProductId && i.ProductVariantId == el.ProductVariantId);
+                              return match is null || match.Quantity != el.Quantity;
+                          });
+
+            if (!isStale)
+            {
+                return Success(await BuildReadModelAsync(existingSession, cancellationToken));
+            }
+
+            await ExpireSessionInternalAsync(tenantId, existingSession, now, cancellationToken);
+        }
+
         var onlineSalesChannelId = await ResolveOnlineSalesChannelIdAsync(tenantId, cancellationToken);
         if (!onlineSalesChannelId.HasValue)
             return Failure("storefront_checkout.sales_channel_not_configured");
-
-        PickupSlot? pickupSlot = null;
-        if (request.SelectedPickupSlotId.HasValue)
-        {
-            pickupSlot = await (
-                    from slot in _dbContext.PickupSlots
-                    join methodOutlet in _dbContext.FulfillmentMethodOutlets
-                        on new { slot.TenantId, Id = slot.FulfillmentMethodOutletId }
-                        equals new { methodOutlet.TenantId, methodOutlet.Id }
-                    where slot.TenantId == tenantId &&
-                          slot.Id == request.SelectedPickupSlotId.Value &&
-                          methodOutlet.OutletId == request.SelectedOutletId
-                    select slot)
-                .FirstOrDefaultAsync(cancellationToken);
-            if (pickupSlot is null || pickupSlot.SlotStatus != "OPEN" || pickupSlot.ReservedCount >= pickupSlot.Capacity)
-                return Failure("storefront_checkout.pickup_slot_unavailable");
-        }
 
         var selections = new List<CheckoutLineSelection>(items.Count);
         foreach (var item in items)
@@ -105,7 +120,7 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
 
         foreach (var selection in selections)
             selection.Item.UpdateQuantityAndPrice(
-                selection.Item.Quantity, selection.UnitPrice, selection.TaxPercent, now);
+                selection.Item.Quantity, selection.UnitPrice, selection.TaxPercent, cart.IsTaxInclusive, now);
         cart.UpdateTotals(
             items.Sum(x => x.LineSubtotalAmount),
             items.Sum(x => x.LineDiscountAmount),
@@ -124,11 +139,11 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             cartSessionId,
             $"CHK-{Guid.NewGuid():N}",
             request.SelectedOutletId,
-            request.SelectedPickupSlotId,
             FirstNonEmpty(request.PickupContactName, customer.Name),
             FirstNonEmpty(request.PickupContactPhone, customer.Phone),
             FirstNonEmpty(request.PickupContactEmail, customer.Email),
             cart.CurrencyCode,
+            cart.IsTaxInclusive,
             cart.SubtotalAmount,
             cart.DiscountAmount,
             cart.TaxAmount,
@@ -183,14 +198,6 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
         }
 
         checkout.AttachInventoryReservation(reservationId, now);
-        if (pickupSlot is not null)
-        {
-            pickupSlot.Reserve(1, now);
-            _dbContext.PickupSlotReservations.Add(
-                PickupSlotReservation.CreatePending(
-                    Guid.NewGuid(), tenantId, pickupSlot.Id, checkoutId, 1, expiresAt, now));
-        }
-
         _dbContext.CheckoutEvents.Add(CheckoutEvent.Record(
             Guid.NewGuid(), tenantId, checkoutId, "CHECKOUT_STARTED", "SUCCEEDED",
             JsonSerializer.Serialize(new { cartId = cart.Id, outletId = outlet.Id }), now));
@@ -204,15 +211,183 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
         Guid tenantId,
         Guid customerId,
         Guid checkoutSessionId,
+        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         var checkout = await _dbContext.CheckoutSessions.AsNoTracking()
             .FirstOrDefaultAsync(x =>
                 x.TenantId == tenantId && x.CustomerId == customerId && x.Id == checkoutSessionId,
                 cancellationToken);
-        return checkout is null
-            ? Failure("storefront_checkout.session_not_found")
-            : Success(await BuildReadModelAsync(checkout, cancellationToken));
+        if (checkout is null)
+            return Failure("storefront_checkout.session_not_found");
+
+        var accessError = await GetAccessErrorAsync(tenantId, now, cancellationToken);
+        return accessError is null
+            ? Success(await BuildReadModelAsync(checkout, cancellationToken))
+            : Failure(accessError);
+    }
+
+    public async Task<StorefrontCheckoutRepositoryResult> UpdateCollectionAsync(
+        Guid tenantId,
+        Guid customerId,
+        Guid checkoutSessionId,
+        UpdateStorefrontCheckoutCollectionRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = _dbContext.Database.IsRelational()
+            ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        var checkout = await _dbContext.CheckoutSessions.FirstOrDefaultAsync(x =>
+            x.TenantId == tenantId && x.CustomerId == customerId && x.Id == checkoutSessionId,
+            cancellationToken);
+        if (checkout is null) return Failure("storefront_checkout.session_not_found");
+        var accessError = await GetAccessErrorAsync(tenantId, now, cancellationToken);
+        if (accessError is not null) return Failure(accessError);
+        if (checkout.ExpiredAt.HasValue && checkout.ExpiredAt <= now)
+        {
+            await ExpireCheckoutAsync(checkout, now, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+            return Failure("storefront_checkout.session_expired");
+        }
+        if (checkout.CheckoutStatus is not ("STARTED" or "PENDING"))
+            return Failure("storefront_checkout.invalid_state");
+
+        var outlet = await _dbContext.Outlets.AsNoTracking().FirstOrDefaultAsync(x =>
+            x.TenantId == tenantId && x.Id == request.SelectedOutletId && x.Status == Active,
+            cancellationToken);
+        if (outlet is null) return Failure("storefront_checkout.outlet_not_found");
+
+        var requestedAtUtc = request.RequestedCollectionAt.ToUniversalTime();
+        var sameOutlet = checkout.SelectedOutletId == outlet.Id;
+        var sameTime = checkout.RequestedCollectionAt?.ToUniversalTime() == requestedAtUtc;
+        if (sameOutlet && sameTime &&
+            checkout.RequestedCollectionEndAt.HasValue &&
+            !string.IsNullOrWhiteSpace(checkout.CollectionTimezoneSnapshot))
+            return Success(await BuildReadModelAsync(checkout, cancellationToken));
+
+        var collection = await ValidateCollectionAsync(
+            tenantId, outlet.Id, outlet.Timezone, request.RequestedCollectionAt, now, cancellationToken);
+        if (collection.ErrorCode is not null) return Failure(collection.ErrorCode);
+
+        var currentReservation = checkout.InventoryReservationId.HasValue
+            ? await _dbContext.InventoryReservations.FirstOrDefaultAsync(x =>
+                x.TenantId == tenantId && x.Id == checkout.InventoryReservationId.Value,
+                cancellationToken)
+            : null;
+        if (currentReservation is null ||
+            currentReservation.ReservationStatus is "RELEASED" or "EXPIRED" or "CANCELLED" ||
+            (currentReservation.ExpiresAt.HasValue && currentReservation.ExpiresAt <= now))
+        {
+            await ExpireCheckoutAsync(checkout, now, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+            return Failure("storefront_checkout.session_expired");
+        }
+
+        if (!sameOutlet)
+        {
+            var checkoutLines = await _dbContext.CheckoutSessionLines.AsNoTracking()
+                .Where(x => x.TenantId == tenantId &&
+                            x.CheckoutSessionId == checkoutSessionId && x.LineStatus == Active)
+                .OrderBy(x => x.LineNumber)
+                .ToListAsync(cancellationToken);
+            if (checkoutLines.Count == 0) return Failure("storefront_checkout.cart_empty");
+
+            var selections = new List<CheckoutReservationSelection>(checkoutLines.Count);
+            foreach (var line in checkoutLines)
+            {
+                var balances = await (
+                        from balance in _dbContext.InventoryBalances
+                        join location in _dbContext.InventoryLocations
+                            on new { balance.TenantId, Id = balance.InventoryLocationId }
+                            equals new { location.TenantId, location.Id }
+                        where balance.TenantId == tenantId &&
+                              location.OutletId == outlet.Id && location.Status == Active &&
+                              location.IsSellableLocation && balance.ProductId == line.ProductId &&
+                              (line.ProductVariantId.HasValue
+                                  ? balance.ProductVariantId == line.ProductVariantId
+                                  : !balance.ProductVariantId.HasValue)
+                        orderby balance.ProductBatchId, balance.Id
+                        select balance)
+                    .ToListAsync(cancellationToken);
+                if (balances.Sum(x => x.AvailableQuantity) < line.Quantity)
+                    return Failure("storefront_checkout.insufficient_stock");
+                selections.Add(new CheckoutReservationSelection(line, balances));
+            }
+
+            var onlineSalesChannelId = await ResolveOnlineSalesChannelIdAsync(tenantId, cancellationToken);
+            if (!onlineSalesChannelId.HasValue)
+                return Failure("storefront_checkout.sales_channel_not_configured");
+
+            await ReleaseInventoryReservationAsync(
+                currentReservation, "COLLECTION_OUTLET_CHANGED", now, cancellationToken);
+
+            var reservationId = Guid.NewGuid();
+            var reservation = InventoryReservation.Create(
+                reservationId,
+                tenantId,
+                $"RES-{Guid.NewGuid():N}",
+                "CHECKOUT",
+                checkout.Id,
+                checkout.CheckoutNumber,
+                onlineSalesChannelId,
+                outlet.Id,
+                customerId,
+                "PENDING",
+                now,
+                checkout.ExpiredAt,
+                null,
+                now);
+            _dbContext.InventoryReservations.Add(reservation);
+
+            foreach (var selection in selections)
+            {
+                var reservationLine = InventoryReservationLine.Create(
+                    Guid.NewGuid(), tenantId, reservationId, selection.Line.LineNumber,
+                    selection.Line.ProductId, selection.Line.ProductVariantId,
+                    selection.Line.Quantity, "RESERVED", now);
+                reservationLine.UpdateQuantities(selection.Line.Quantity, 0m, 0m, now);
+                _dbContext.InventoryReservationLines.Add(reservationLine);
+
+                var remaining = selection.Line.Quantity;
+                foreach (var balance in selection.Balances.Where(x => x.AvailableQuantity > 0m))
+                {
+                    if (remaining <= 0m) break;
+                    var allocated = Math.Min(remaining, balance.AvailableQuantity);
+                    balance.AdjustQuantities(0m, allocated, 0m, 0m, now);
+                    _dbContext.InventoryReservationAllocations.Add(
+                        InventoryReservationAllocation.Create(
+                            Guid.NewGuid(), tenantId, reservationLine.Id, balance.Id, null,
+                            allocated, "ALLOCATED", now, now));
+                    remaining -= allocated;
+                }
+            }
+
+            checkout.AttachInventoryReservation(reservationId, now);
+        }
+
+        checkout.SelectCollection(
+            outlet.Id,
+            requestedAtUtc,
+            collection.RequestedCollectionEndAt!.Value,
+            outlet.Timezone,
+            now);
+        _dbContext.CheckoutEvents.Add(CheckoutEvent.Record(
+            Guid.NewGuid(), tenantId, checkout.Id, "COLLECTION_SELECTION_UPDATED", "SUCCEEDED",
+            JsonSerializer.Serialize(new
+            {
+                outletId = outlet.Id,
+                requestedCollectionAt = requestedAtUtc,
+                requestedCollectionEndAt = collection.RequestedCollectionEndAt
+            }),
+            now));
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        return Success(await BuildReadModelAsync(checkout, cancellationToken));
     }
 
     public async Task<StorefrontCheckoutRepositoryResult> ConfirmAsync(
@@ -231,6 +406,8 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             x.TenantId == tenantId && x.CustomerId == customerId && x.Id == checkoutSessionId,
             cancellationToken);
         if (checkout is null) return Failure("storefront_checkout.session_not_found");
+        var accessError = await GetAccessErrorAsync(tenantId, now, cancellationToken);
+        if (accessError is not null) return Failure(accessError);
 
         if (checkout.CheckoutStatus == "COMPLETED" && checkout.ConvertedOrderId.HasValue)
             return Success(await BuildReadModelAsync(checkout, cancellationToken));
@@ -274,17 +451,29 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             return Failure("storefront_checkout.session_expired");
         }
 
-        var fulfillmentMethodOutletId = await (
-                from methodOutlet in _dbContext.FulfillmentMethodOutlets.AsNoTracking()
-                join method in _dbContext.FulfillmentMethods.AsNoTracking()
-                    on new { methodOutlet.TenantId, Id = methodOutlet.FulfillmentMethodId }
-                    equals new { method.TenantId, method.Id }
-                where methodOutlet.TenantId == tenantId &&
-                      methodOutlet.OutletId == checkout.SelectedOutletId &&
-                      methodOutlet.Status == Active && method.Status == Active &&
-                      method.MethodType == "PICKUP"
-                select (Guid?)methodOutlet.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        if (!checkout.RequestedCollectionAt.HasValue ||
+            !checkout.RequestedCollectionEndAt.HasValue ||
+            string.IsNullOrWhiteSpace(checkout.CollectionTimezoneSnapshot))
+            return Failure("storefront_checkout.collection_required");
+
+        var collectionTimezone = checkout.CollectionTimezoneSnapshot.Trim();
+        if (!string.Equals(outlet.Timezone.Trim(), collectionTimezone, StringComparison.OrdinalIgnoreCase))
+            return Failure("storefront_checkout.collection_time_unavailable");
+
+        var collection = await ValidateCollectionAsync(
+            tenantId,
+            outlet.Id,
+            collectionTimezone,
+            checkout.RequestedCollectionAt.Value,
+            now,
+            cancellationToken);
+        if (collection.ErrorCode is not null) return Failure(collection.ErrorCode);
+        checkout.SelectCollection(
+            outlet.Id,
+            checkout.RequestedCollectionAt.Value,
+            collection.RequestedCollectionEndAt!.Value,
+            collectionTimezone,
+            now);
 
         var lines = await _dbContext.CheckoutSessionLines.AsNoTracking()
             .Where(x => x.TenantId == tenantId &&
@@ -325,13 +514,14 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
         }
 
         var orderId = Guid.NewGuid();
+        var orderNumber = await GenerateOrderSequenceAsync(tenantId, cancellationToken);
         var order = SalesOrder.CreateClickAndCollect(
             orderId,
             tenantId,
-            $"SO-WEB-{Guid.NewGuid():N}",
+            orderNumber,
             $"CHECKOUT:{checkoutSessionId:N}:{idempotencyKey}",
             onlineSalesChannelId.Value,
-            fulfillmentMethodOutletId,
+            collection.FulfillmentMethodOutletId,
             checkout.FulfillmentMethodCode ?? "CLICK_AND_COLLECT",
             outlet.Id,
             outlet.OutletCode,
@@ -341,11 +531,15 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             checkout.PickupContactEmail ?? customer.Email,
             checkout.PickupContactPhone ?? customer.Phone,
             checkout.CurrencyCode,
+            checkout.IsTaxInclusive,
             checkout.SubtotalAmount,
             checkout.DiscountAmount,
             checkout.TaxAmount,
             checkout.ChargeAmount,
             checkout.TotalAmount,
+            checkout.RequestedCollectionAt.Value,
+            checkout.RequestedCollectionEndAt.Value,
+            checkout.CollectionTimezoneSnapshot!,
             now);
         _dbContext.SalesOrders.Add(order);
 
@@ -362,7 +556,7 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
                 variant?.VariantName, uom.UomCode, uom.UomName,
                 product.ProductType, product.ProductStructure,
                 line.Quantity, line.UnitPrice, line.LineSubtotalAmount,
-                line.LineDiscountAmount, line.LineTaxAmount, now));
+                line.LineDiscountAmount, line.LineTaxAmount, checkout.IsTaxInclusive, now));
         }
 
         reservation.UpdateStatus("CONFIRMED", null, now);
@@ -371,12 +565,6 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             x.TenantId == tenantId && x.Id == checkout.CartId,
             cancellationToken);
         cart.MarkConverted(checkout.Id, orderId, customerId, now);
-
-        var slotReservation = await _dbContext.PickupSlotReservations.FirstOrDefaultAsync(x =>
-            x.TenantId == tenantId && x.CheckoutSessionId == checkoutSessionId &&
-            x.ReservationStatus == "PENDING",
-            cancellationToken);
-        slotReservation?.Confirm(orderId, now);
 
         _dbContext.CheckoutEvents.Add(CheckoutEvent.Record(
             Guid.NewGuid(), tenantId, checkoutSessionId, "CHECKOUT_CONFIRMED", "SUCCEEDED",
@@ -440,22 +628,204 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             }
         }
 
-        var slotReservation = await _dbContext.PickupSlotReservations.FirstOrDefaultAsync(x =>
-            x.TenantId == checkout.TenantId && x.CheckoutSessionId == checkout.Id &&
-            x.ReservationStatus == "PENDING",
-            cancellationToken);
-        if (slotReservation is not null)
-        {
-            var slot = await _dbContext.PickupSlots.FirstAsync(x =>
-                x.TenantId == checkout.TenantId && x.Id == slotReservation.PickupSlotId,
-                cancellationToken);
-            slot.Release(slotReservation.ReservedCapacity, now);
-            slotReservation.Release("CHECKOUT_EXPIRED", now);
-        }
-
         _dbContext.CheckoutEvents.Add(CheckoutEvent.Record(
             Guid.NewGuid(), checkout.TenantId, checkout.Id,
             "CHECKOUT_EXPIRED", "SUCCEEDED", null, now));
+    }
+
+    private async Task<CollectionValidationResult> ValidateCollectionAsync(
+        Guid tenantId,
+        Guid outletId,
+        string timezoneId,
+        DateTimeOffset requestedCollectionAt,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var configuration = await (
+                from methodOutlet in _dbContext.FulfillmentMethodOutlets.AsNoTracking()
+                join method in _dbContext.FulfillmentMethods.AsNoTracking()
+                    on new { methodOutlet.TenantId, Id = methodOutlet.FulfillmentMethodId }
+                    equals new { method.TenantId, method.Id }
+                where methodOutlet.TenantId == tenantId &&
+                      methodOutlet.OutletId == outletId &&
+                      methodOutlet.Status == Active && method.Status == Active &&
+                      method.MethodType == "PICKUP"
+                orderby method.IsDefault descending,
+                    method.MethodCode,
+                    method.Id,
+                    methodOutlet.Id
+                select new
+                {
+                    methodOutlet.Id,
+                    methodOutlet.PreparationLeadMinutes,
+                    methodOutlet.PickupWindowMinutes,
+                    methodOutlet.CutoffTime
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (configuration is null ||
+            !configuration.PreparationLeadMinutes.HasValue ||
+            !configuration.PickupWindowMinutes.HasValue ||
+            configuration.PreparationLeadMinutes.Value < 0 ||
+            configuration.PreparationLeadMinutes.Value > 10080 ||
+            configuration.PickupWindowMinutes.Value <= 0 ||
+            configuration.PickupWindowMinutes.Value > 1440)
+            return CollectionValidationResult.Failure(
+                "storefront_checkout.collection_configuration_missing");
+
+        TimeZoneInfo timezone;
+        try
+        {
+            timezone = TimeZoneInfo.FindSystemTimeZoneById(timezoneId.Trim());
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return CollectionValidationResult.Failure("storefront_checkout.invalid_outlet_timezone");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return CollectionValidationResult.Failure("storefront_checkout.invalid_outlet_timezone");
+        }
+
+        var requestedUtc = requestedCollectionAt.ToUniversalTime();
+        if (requestedUtc < now.ToUniversalTime().AddMinutes(configuration.PreparationLeadMinutes.Value))
+            return CollectionValidationResult.Failure("storefront_checkout.collection_time_unavailable");
+
+        var localNow = TimeZoneInfo.ConvertTime(now, timezone);
+        var localRequested = TimeZoneInfo.ConvertTime(requestedUtc, timezone);
+        var localDate = DateOnly.FromDateTime(localRequested.DateTime);
+        var localTime = TimeOnly.FromDateTime(localRequested.DateTime);
+        var localToday = DateOnly.FromDateTime(localNow.DateTime);
+        if (localDate < localToday || localDate >= localToday.AddDays(14) ||
+            timezone.IsInvalidTime(localRequested.DateTime) ||
+            timezone.IsAmbiguousTime(localRequested.DateTime))
+            return CollectionValidationResult.Failure("storefront_checkout.collection_time_unavailable");
+        if (localDate == DateOnly.FromDateTime(localNow.DateTime) &&
+            configuration.CutoffTime.HasValue &&
+            TimeOnly.FromDateTime(localNow.DateTime) >= configuration.CutoffTime.Value)
+            return CollectionValidationResult.Failure("storefront_checkout.collection_time_unavailable");
+
+        var dayOfWeek = (short)localRequested.DayOfWeek;
+        var businessHour = await _dbContext.OutletBusinessHours.AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId && x.OutletId == outletId &&
+                x.DayOfWeek == dayOfWeek &&
+                (!x.ValidFrom.HasValue || x.ValidFrom <= localDate) &&
+                (!x.ValidUntil.HasValue || x.ValidUntil >= localDate))
+            .OrderByDescending(x => x.ValidFrom.HasValue || x.ValidUntil.HasValue)
+            .ThenByDescending(x => x.IsClosed)
+            .ThenByDescending(x => x.ValidFrom)
+            .ThenBy(x => x.ValidUntil)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (businessHour is null || businessHour.IsClosed ||
+            !businessHour.OpeningTime.HasValue || !businessHour.ClosingTime.HasValue)
+            return CollectionValidationResult.Failure("storefront_checkout.collection_time_unavailable");
+
+        var windowMinutes = configuration.PickupWindowMinutes.Value;
+        var localEndDateTime = DateTime.SpecifyKind(
+            localRequested.DateTime.AddMinutes(windowMinutes), DateTimeKind.Unspecified);
+        if (timezone.IsInvalidTime(localEndDateTime) || timezone.IsAmbiguousTime(localEndDateTime))
+            return CollectionValidationResult.Failure("storefront_checkout.collection_time_unavailable");
+
+        var localEndTime = TimeOnly.FromDateTime(localEndDateTime);
+        var openingTime = businessHour.OpeningTime.Value;
+        if (localTime < openingTime || localEndTime > businessHour.ClosingTime.Value ||
+            localEndDateTime.Date != localRequested.Date)
+            return CollectionValidationResult.Failure("storefront_checkout.collection_time_unavailable");
+
+        var offsetFromOpening = localTime.ToTimeSpan() - openingTime.ToTimeSpan();
+        if (offsetFromOpening.Ticks < 0 ||
+            offsetFromOpening.Ticks % TimeSpan.FromMinutes(windowMinutes).Ticks != 0)
+            return CollectionValidationResult.Failure("storefront_checkout.collection_time_unavailable");
+
+        var endOffset = timezone.GetUtcOffset(localEndDateTime);
+        var requestedEndUtc = new DateTimeOffset(localEndDateTime, endOffset).ToUniversalTime();
+        return CollectionValidationResult.Success(configuration.Id, requestedEndUtc);
+    }
+
+    private async Task<string?> GetAccessErrorAsync(
+        Guid tenantId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var tenantAvailable = await _dbContext.Tenants.AsNoTracking().AnyAsync(
+            x => x.Id == tenantId && x.Status == TenantStatusConstants.Active,
+            cancellationToken);
+        if (!tenantAvailable)
+            return "storefront_checkout.tenant_unavailable";
+
+        var entitlements = await (
+                from entitlement in _dbContext.TenantFeatureEntitlements.AsNoTracking()
+                join feature in _dbContext.PlatformFeatures.AsNoTracking()
+                    on entitlement.PlatformFeatureId equals feature.Id
+                where entitlement.TenantId == tenantId &&
+                      RequiredCheckoutFeatures.Contains(feature.FeatureCode) &&
+                      feature.Status == SubscriptionCatalogConstants.RecordStatus.Active
+                select new
+                {
+                    feature.FeatureCode,
+                    entitlement.EntitlementStatus,
+                    entitlement.IsEnabled,
+                    entitlement.RevokedAt,
+                    entitlement.EffectiveFrom,
+                    entitlement.EffectiveUntil
+                })
+            .ToListAsync(cancellationToken);
+
+        return RequiredCheckoutFeatures.All(requiredFeature =>
+            entitlements.Any(x =>
+                string.Equals(x.FeatureCode, requiredFeature, StringComparison.OrdinalIgnoreCase) &&
+                TenantEntitlementEffectivePredicate.IsEnabled(
+                    x.EntitlementStatus,
+                    x.IsEnabled,
+                    x.RevokedAt,
+                    x.EffectiveFrom,
+                    x.EffectiveUntil,
+                    now)))
+            ? null
+            : "storefront_checkout.feature_disabled";
+    }
+
+    private async Task ReleaseInventoryReservationAsync(
+        InventoryReservation reservation,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var lines = await _dbContext.InventoryReservationLines
+            .Where(x => x.TenantId == reservation.TenantId &&
+                        x.InventoryReservationId == reservation.Id)
+            .ToListAsync(cancellationToken);
+        var lineIds = lines.Select(x => x.Id).ToList();
+        var allocations = await _dbContext.InventoryReservationAllocations
+            .Where(x => x.TenantId == reservation.TenantId &&
+                        lineIds.Contains(x.InventoryReservationLineId))
+            .ToListAsync(cancellationToken);
+        var balanceIds = allocations.Select(x => x.InventoryBalanceId).Distinct().ToList();
+        var balances = await _dbContext.InventoryBalances
+            .Where(x => x.TenantId == reservation.TenantId && balanceIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        foreach (var allocation in allocations)
+        {
+            var releasable = allocation.AllocatedQuantity -
+                             allocation.ReleasedQuantity - allocation.FulfilledQuantity;
+            if (releasable <= 0m) continue;
+            if (balances.TryGetValue(allocation.InventoryBalanceId, out var balance))
+                balance.AdjustQuantities(0m, -releasable, 0m, 0m, now);
+            allocation.UpdateQuantities(releasable, 0m, now);
+            allocation.Release(now, now);
+            allocation.UpdateStatus("RELEASED", now);
+        }
+
+        foreach (var line in lines)
+        {
+            var releasable = line.ReservedQuantity - line.ReleasedQuantity - line.FulfilledQuantity;
+            if (releasable > 0m) line.UpdateQuantities(0m, releasable, 0m, now);
+            line.UpdateStatus("RELEASED", now);
+        }
+
+        reservation.Release(reason, now, null);
+        reservation.UpdateStatus("RELEASED", null, now);
     }
 
     private async Task<CheckoutLineSelection> ResolveLineSelectionAsync(
@@ -518,19 +888,29 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
         Guid? variantId,
         decimal quantity,
         DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        await _dbContext.PriceListItems.AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId && x.ProductId == productId &&
-                x.Status == Active && x.MinQuantity <= quantity &&
-                (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                (!x.ValidUntil.HasValue || x.ValidUntil >= now) &&
-                (!x.ProductVariantId.HasValue || x.ProductVariantId == variantId))
-            .OrderByDescending(x => x.ProductVariantId.HasValue)
-            .ThenByDescending(x => x.ValidFrom)
-            .ThenByDescending(x => x.MinQuantity)
-            .Select(x => (decimal?)x.SellingPrice)
+        CancellationToken cancellationToken)
+    {
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
+        return await (from item in _dbContext.PriceListItems.AsNoTracking()
+                join priceList in _dbContext.PriceLists.AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == tenantId && item.ProductId == productId &&
+                      item.Status == Active && item.MinQuantity <= quantity &&
+                      priceList.Status == Active &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now) &&
+                      (!item.ProductVariantId.HasValue || item.ProductVariantId == variantId)
+                orderby item.ProductVariantId.HasValue descending,
+                        priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select (decimal?)item.SellingPrice)
             .FirstOrDefaultAsync(cancellationToken);
+    }
 
     private async Task<decimal> ResolveTaxPercentAsync(
         Guid tenantId,
@@ -581,6 +961,29 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
+    private async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await _dbContext.Tenants.AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => x.BaseCurrencyCode)
+            .FirstOrDefaultAsync(cancellationToken) ?? "LKR";
+
+    private async Task<string> GenerateOrderSequenceAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var sequence = await _dbContext.DocumentNumberSequences
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.DocumentType == "SALES_ORDER", cancellationToken);
+
+        if (sequence == null)
+        {
+            return $"SO-WEB-{DateTime.UtcNow:yyMMdd}-{new Random().Next(1000, 9999)}";
+        }
+
+        sequence.Increment(DateTimeOffset.UtcNow);
+
+        return $"{sequence.Prefix}{sequence.CurrentValue.ToString().PadLeft(sequence.PaddingLength, '0')}";
+    }
+
     private async Task<StorefrontCheckoutReadModel> BuildReadModelAsync(
         CheckoutSession checkout,
         CancellationToken cancellationToken)
@@ -594,22 +997,6 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             .Select(x => x.OutletName)
             .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
 
-        StorefrontCheckoutPickupSlotReadModel? slotModel = null;
-        if (checkout.SelectedPickupSlotId.HasValue)
-        {
-            slotModel = await _dbContext.PickupSlots.AsNoTracking()
-                .Where(x => x.TenantId == checkout.TenantId &&
-                            x.Id == checkout.SelectedPickupSlotId.Value)
-                .Select(x => new StorefrontCheckoutPickupSlotReadModel
-                {
-                    SlotCode = x.SlotCode,
-                    SlotDate = x.SlotDate,
-                    WindowStart = x.WindowStart,
-                    WindowEnd = x.WindowEnd
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-
         StorefrontCheckoutOrderReadModel? orderModel = null;
         if (checkout.ConvertedOrderId.HasValue)
         {
@@ -622,7 +1009,10 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
                     OrderNumber = x.OrderNumber,
                     Status = x.Status,
                     PaymentStatus = x.PaymentStatus,
-                    FulfillmentStatus = x.FulfillmentStatus
+                    FulfillmentStatus = x.FulfillmentStatus,
+                    RequestedCollectionAt = x.RequestedCollectionAt,
+                    RequestedCollectionEndAt = x.RequestedCollectionEndAt,
+                    CollectionTimezone = x.CollectionTimezoneSnapshot
                 })
                 .FirstOrDefaultAsync(cancellationToken);
         }
@@ -636,8 +1026,9 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             FulfillmentMethodCode = checkout.FulfillmentMethodCode ?? "CLICK_AND_COLLECT",
             SelectedOutletId = checkout.SelectedOutletId ?? Guid.Empty,
             SelectedOutletName = outletName,
-            SelectedPickupSlotId = checkout.SelectedPickupSlotId,
-            PickupSlot = slotModel,
+            RequestedCollectionAt = checkout.RequestedCollectionAt,
+            RequestedCollectionEndAt = checkout.RequestedCollectionEndAt,
+            CollectionTimezone = checkout.CollectionTimezoneSnapshot,
             PickupContactName = checkout.PickupContactName,
             PickupContactPhone = checkout.PickupContactPhone,
             PickupContactEmail = checkout.PickupContactEmail,
@@ -648,6 +1039,7 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             ChargeTotal = checkout.ChargeAmount,
             GrandTotal = checkout.TotalAmount,
             TotalQuantity = lines.Sum(x => x.Quantity),
+            IsTaxInclusive = checkout.IsTaxInclusive,
             ExpiresAt = checkout.ExpiredAt,
             Items = lines.Select(x => new StorefrontCheckoutLineReadModel
             {
@@ -666,6 +1058,57 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             }).ToList(),
             Order = orderModel
         };
+    }
+
+    private async Task ExpireSessionInternalAsync(
+        Guid tenantId,
+        CheckoutSession session,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        session.Expire(now);
+
+        if (session.InventoryReservationId.HasValue)
+        {
+            var reservation = await _dbContext.InventoryReservations
+                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == session.InventoryReservationId.Value, cancellationToken);
+
+            if (reservation is not null)
+            {
+                reservation.Release("STALE_CHECKOUT_REPLACED", now, null);
+                reservation.UpdateStatus("CANCELLED", null, now);
+
+                var reservationLines = await _dbContext.InventoryReservationLines
+                    .Where(x => x.TenantId == tenantId && x.InventoryReservationId == reservation.Id)
+                    .ToListAsync(cancellationToken);
+
+                var lineIds = reservationLines.Select(x => x.Id).ToList();
+
+                var allocations = await _dbContext.InventoryReservationAllocations
+                    .Where(x => x.TenantId == tenantId && lineIds.Contains(x.InventoryReservationLineId))
+                    .ToListAsync(cancellationToken);
+
+                var balanceIds = allocations.Select(x => x.InventoryBalanceId).Distinct().ToList();
+                var balances = await _dbContext.InventoryBalances
+                    .Where(x => x.TenantId == tenantId && balanceIds.Contains(x.Id))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var allocation in allocations)
+                {
+                    if (allocation.AllocatedQuantity > allocation.ReleasedQuantity)
+                    {
+                        var unreleased = allocation.AllocatedQuantity - allocation.ReleasedQuantity;
+                        var balance = balances.FirstOrDefault(b => b.Id == allocation.InventoryBalanceId);
+                        balance?.AdjustQuantities(0m, -unreleased, 0m, 0m, now);
+                        allocation.UpdateQuantities(unreleased, 0m, now);
+                    }
+                    allocation.Release(now, now);
+                    allocation.UpdateStatus("CANCELLED", now);
+                }
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static string? FirstNonEmpty(string? preferred, string? fallback) =>
@@ -699,5 +1142,23 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             decimal taxPercent,
             IReadOnlyList<InventoryBalance> balances) =>
             new(item, null, product, variant, unitPrice, taxPercent, balances);
+    }
+
+    private sealed record CheckoutReservationSelection(
+        CheckoutSessionLine Line,
+        IReadOnlyList<InventoryBalance> Balances);
+
+    private sealed record CollectionValidationResult(
+        string? ErrorCode,
+        Guid? FulfillmentMethodOutletId,
+        DateTimeOffset? RequestedCollectionEndAt)
+    {
+        public static CollectionValidationResult Failure(string errorCode) =>
+            new(errorCode, null, null);
+
+        public static CollectionValidationResult Success(
+            Guid fulfillmentMethodOutletId,
+            DateTimeOffset requestedCollectionEndAt) =>
+            new(null, fulfillmentMethodOutletId, requestedCollectionEndAt);
     }
 }

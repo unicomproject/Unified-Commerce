@@ -295,6 +295,15 @@ public sealed class PosCheckoutRepositoryTests
         Assert.Equal(1, await dbContext.StockMovementReferences.CountAsync());
         Assert.Equal(3, (await dbContext.InventoryBalances.SingleAsync()).OnHandQuantity);
 
+        var payment = await dbContext.SalesPayments.SingleAsync();
+        Assert.Null(payment.ExternalReference);
+        var txn = await dbContext.SalesPaymentTransactions.SingleAsync();
+        Assert.Equal("CASH", txn.ProviderName);
+        Assert.Null(txn.ExternalTransactionReference);
+        Assert.Null(txn.ProviderResponseJson);
+        Assert.DoesNotContain("cardBrand", txn.ProviderResponseJson ?? string.Empty);
+        Assert.DoesNotContain("cardLast4", txn.ProviderResponseJson ?? string.Empty);
+
         var replay = await repository.StartPaymentAsync(
             tenantId, userId, [PaymentPermissions.AcceptCash], request, Now.AddSeconds(1),
             CancellationToken.None);
@@ -303,6 +312,49 @@ public sealed class PosCheckoutRepositoryTests
         Assert.Equal(1, await dbContext.SalesOrders.CountAsync());
         Assert.Equal(1, await dbContext.SalesPayments.CountAsync());
         Assert.Equal(1, await dbContext.StockMovements.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartPaymentAsync_WithCard_ReturnsProviderRequired_WithoutPersistingPayment()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        SeedDeviceContext(dbContext, tenantId, outletId, tillId, deviceId, userId, Now, isTrusted: true);
+        SeedTenantUser(dbContext, tenantId, userId, "Cashier 001");
+        SeedOpenTillSession(dbContext, tenantId, outletId, tillId, deviceId, userId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 1250m);
+        SeedSellableProduct(dbContext, tenantId, productId, variantId);
+        await dbContext.SaveChangesAsync();
+
+        var repository = CreateRepository(dbContext);
+        var result = await repository.StartPaymentAsync(
+            tenantId,
+            userId,
+            [PaymentPermissions.AcceptCard],
+            new PosCheckoutStartPaymentRequestDto(
+                deviceId,
+                "NewSale",
+                null,
+                [new PosCheckoutLineRequestDto(variantId, 1)],
+                "card",
+                null,
+                null,
+                "card-blocked-key"),
+            Now,
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_checkout.payment_provider_required", result.ErrorCode);
+        Assert.Equal(0, await dbContext.SalesPayments.CountAsync());
+        Assert.Equal(0, await dbContext.SalesPaymentTransactions.CountAsync());
+        Assert.Equal(0, await dbContext.SalesOrders.CountAsync());
     }
 
     [Fact]

@@ -7,6 +7,7 @@ using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
+using E_POS.Domain.Modules.Tenant.Orders.Constants;
 using Xunit;
 
 namespace E_POS.UnitTests.Customer;
@@ -24,6 +25,8 @@ public sealed class PosCustomerServiceTests
         var result = await service.ListAsync(
             context,
             Guid.NewGuid(),
+            null,
+            null,
             null,
             1,
             20,
@@ -54,6 +57,8 @@ public sealed class PosCustomerServiceTests
             context,
             Guid.NewGuid(),
             "kamal",
+            null,
+            null,
             0,
             500,
             CancellationToken.None);
@@ -86,6 +91,8 @@ public sealed class PosCustomerServiceTests
             context,
             Guid.NewGuid(),
             null,
+            null,
+            null,
             1,
             20,
             CancellationToken.None);
@@ -93,6 +100,204 @@ public sealed class PosCustomerServiceTests
         Assert.False(result.IsSuccess);
         Assert.Equal("pos_customers.open_till_required", result.Error.Code);
         Assert.Equal(0, repository.ListCallCount);
+    }
+
+    [Fact]
+    public async Task AttachToSaleAsync_WithoutCartManage_ReturnsPermissionDenied()
+    {
+        var service = CreateService(new FakeCustomerRepository(), new FakeTillSessionRepository());
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [CustomerPermissions.View]);
+
+        var result = await service.AttachToSaleAsync(
+            context,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new PosCustomerAttachToSaleRequestDto(null),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_customers.attach_permission_denied", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task AttachToSaleAsync_WhenBlocked_ReturnsCustomerBlocked()
+    {
+        var repository = new FakeCustomerRepository { CustomerStatus = "BLOCKED" };
+        var tillRepository = new FakeTillSessionRepository { ResolveResult = OpenTillResult() };
+        var service = CreateService(repository, tillRepository);
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [CustomerPermissions.View, SalesPermissions.Cart.Manage]);
+
+        var result = await service.AttachToSaleAsync(
+            context,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new PosCustomerAttachToSaleRequestDto(null),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_customers.customer_blocked", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithValidRequest_UpdatesProfile()
+    {
+        var customerId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var tracked = CustomerEntity.CreatePosCustomer(
+            customerId,
+            tenantId,
+            "CUS000001",
+            "Old Name",
+            "+94770000000",
+            null,
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow);
+        var repository = new FakeCustomerRepository
+        {
+            TrackedCustomer = tracked,
+            GetByIdResult = new PosCustomerListItemResponseDto(
+                customerId,
+                "New Name",
+                "+94771234567",
+                "new@example.com",
+                "INACTIVE",
+                "CUS000001",
+                "POS")
+        };
+        var tillRepository = new FakeTillSessionRepository { ResolveResult = OpenTillResult() };
+        var service = CreateService(repository, tillRepository);
+        var context = new TenantRequestContext(
+            tenantId,
+            Guid.NewGuid(),
+            [CustomerPermissions.Update]);
+
+        var result = await service.UpdateAsync(
+            context,
+            Guid.NewGuid(),
+            customerId,
+            new PosCustomerUpdateRequestDto(
+                " New Name ",
+                "+94 77-123-4567",
+                " New@Example.com ",
+                "INACTIVE"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.UpdatedCustomer);
+        Assert.Equal("New Name", repository.UpdatedCustomer!.Name);
+        Assert.Equal("+94771234567", repository.UpdatedCustomer.NormalizedPhone);
+        Assert.Equal("NEW@EXAMPLE.COM", repository.UpdatedCustomer.NormalizedEmail);
+        Assert.Equal("INACTIVE", repository.UpdatedCustomer.Status);
+        Assert.Equal("CUS000001", repository.UpdatedCustomer.CustomerCode);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithoutUpdatePermission_ReturnsForbidden()
+    {
+        var service = CreateService(new FakeCustomerRepository(), new FakeTillSessionRepository());
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [CustomerPermissions.View, CustomerPermissions.Create]);
+
+        var result = await service.UpdateAsync(
+            context,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new PosCustomerUpdateRequestDto("Name", "+94771234567", null, "ACTIVE"),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_customers.update_permission_denied", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_UsesTenantTimezoneMonthBounds()
+    {
+        var repository = new FakeCustomerRepository
+        {
+            TenantTimezone = "Asia/Colombo"
+        };
+        var tillRepository = new FakeTillSessionRepository { ResolveResult = OpenTillResult() };
+        var service = CreateService(repository, tillRepository);
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [CustomerPermissions.View]);
+
+        var result = await service.GetSummaryAsync(context, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Asia/Colombo", repository.SummaryTimeZoneId);
+        Assert.NotNull(repository.SummaryMonthStartUtc);
+        Assert.NotNull(repository.SummaryMonthEndUtc);
+        Assert.True(repository.SummaryMonthEndUtc > repository.SummaryMonthStartUtc);
+    }
+
+    [Fact]
+    public void ResolveTenantLocalMonthBounds_UsesUtcWhenConfigured()
+    {
+        var utcNow = new DateTimeOffset(2026, 7, 15, 10, 0, 0, TimeSpan.Zero);
+        var (start, end, resolved) = PosCustomerService.ResolveTenantLocalMonthBounds(utcNow, "UTC");
+
+        Assert.Equal("UTC", resolved);
+        Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero), start);
+        Assert.Equal(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero), end);
+    }
+
+    [Fact]
+    public void ResolveTenantLocalMonthBounds_InvalidTimezone_FallsBackToUtc()
+    {
+        var utcNow = new DateTimeOffset(2026, 7, 15, 10, 0, 0, TimeSpan.Zero);
+        var (start, end, resolved) = PosCustomerService.ResolveTenantLocalMonthBounds(
+            utcNow,
+            "Not/ARealZone");
+
+        Assert.Equal("UTC", resolved);
+        Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero), start);
+        Assert.Equal(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero), end);
+    }
+
+    [Fact]
+    public void ResolveTenantLocalMonthBounds_TenantOffset_ConvertsLocalMonthToUtc()
+    {
+        TimeZoneInfo tz;
+        try
+        {
+            tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Colombo");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                tz = TimeZoneInfo.FindSystemTimeZoneById("Sri Lanka Standard Time");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return;
+            }
+        }
+
+        var utcNow = new DateTimeOffset(2026, 7, 15, 10, 0, 0, TimeSpan.Zero);
+        var (start, end, resolved) = PosCustomerService.ResolveTenantLocalMonthBounds(
+            utcNow,
+            tz.Id);
+
+        Assert.Equal(tz.Id, resolved);
+        var localStart = TimeZoneInfo.ConvertTime(start, tz);
+        Assert.Equal(2026, localStart.Year);
+        Assert.Equal(7, localStart.Month);
+        Assert.Equal(1, localStart.Day);
+        Assert.Equal(0, localStart.Hour);
+        var localEnd = TimeZoneInfo.ConvertTime(end, tz);
+        Assert.Equal(8, localEnd.Month);
+        Assert.Equal(1, localEnd.Day);
     }
 
     [Fact]
@@ -202,9 +407,21 @@ public sealed class PosCustomerServiceTests
             string normalizedPhone,
             CancellationToken cancellationToken) => Task.FromResult(PhoneExists);
 
+        public Task<bool> NormalizedPhoneExistsAsync(
+            Guid tenantId,
+            string normalizedPhone,
+            Guid excludingCustomerId,
+            CancellationToken cancellationToken) => Task.FromResult(PhoneExists);
+
         public Task<bool> NormalizedEmailExistsAsync(
             Guid tenantId,
             string normalizedEmail,
+            CancellationToken cancellationToken) => Task.FromResult(EmailExists);
+
+        public Task<bool> NormalizedEmailExistsAsync(
+            Guid tenantId,
+            string normalizedEmail,
+            Guid excludingCustomerId,
             CancellationToken cancellationToken) => Task.FromResult(EmailExists);
 
         public Task<bool> AddAsync(CustomerEntity customer, CancellationToken cancellationToken)
@@ -213,9 +430,34 @@ public sealed class PosCustomerServiceTests
             return Task.FromResult(AddResult);
         }
 
+        public Task<CustomerEntity?> GetTrackedByIdAsync(
+            Guid tenantId,
+            Guid customerId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(TrackedCustomer);
+
+        public Task<string?> GetCustomerStatusAsync(
+            Guid tenantId,
+            Guid customerId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(CustomerStatus);
+
+        public Task<bool> UpdateAsync(CustomerEntity customer, CancellationToken cancellationToken)
+        {
+            UpdatedCustomer = customer;
+            return Task.FromResult(UpdateResult);
+        }
+
+        public Task<string?> GetTenantDefaultTimezoneAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(TenantTimezone);
+
         public Task<PosCustomerListResponseDto> ListAsync(
             Guid tenantId,
             string? search,
+            string? status,
+            string? source,
             int page,
             int pageSize,
             CancellationToken cancellationToken)
@@ -227,6 +469,57 @@ public sealed class PosCustomerServiceTests
             PageSize = pageSize;
             return Task.FromResult(new PosCustomerListResponseDto([], page, pageSize, 0, 0));
         }
+
+        public Task<PosCustomerSummaryResponseDto> GetSummaryAsync(
+            Guid tenantId,
+            DateTimeOffset monthStartUtc,
+            DateTimeOffset monthEndUtc,
+            string timeZoneId,
+            CancellationToken cancellationToken)
+        {
+            SummaryMonthStartUtc = monthStartUtc;
+            SummaryMonthEndUtc = monthEndUtc;
+            SummaryTimeZoneId = timeZoneId;
+            return Task.FromResult(new PosCustomerSummaryResponseDto(0, 0, 0, 0, timeZoneId));
+        }
+
+        public Task<PosCustomerListItemResponseDto?> GetByIdAsync(
+            Guid tenantId,
+            Guid customerId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(GetByIdResult);
+
+        public Task<PosCustomerOrdersResponseDto> GetOrdersAsync(
+            Guid tenantId,
+            Guid customerId,
+            int page,
+            int pageSize,
+            DateTimeOffset? fromDate,
+            DateTimeOffset? toDate,
+            string? status,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new PosCustomerOrdersResponseDto([], page, pageSize, 0, 0));
+
+        public Task<bool> TryAssignCustomerToEditableSaleAsync(
+            Guid tenantId,
+            Guid saleId,
+            Guid customerId,
+            string? customerNameSnapshot,
+            Guid? tillSessionId,
+            Guid updatedByTenantUserId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public CustomerEntity? TrackedCustomer { get; set; }
+        public CustomerEntity? UpdatedCustomer { get; private set; }
+        public bool UpdateResult { get; init; } = true;
+        public string? CustomerStatus { get; set; }
+        public string? TenantTimezone { get; set; } = "UTC";
+        public PosCustomerListItemResponseDto? GetByIdResult { get; set; }
+        public DateTimeOffset? SummaryMonthStartUtc { get; private set; }
+        public DateTimeOffset? SummaryMonthEndUtc { get; private set; }
+        public string? SummaryTimeZoneId { get; private set; }
     }
 
     private sealed class FakeCodeSequenceRepository : ICodeSequenceRepository

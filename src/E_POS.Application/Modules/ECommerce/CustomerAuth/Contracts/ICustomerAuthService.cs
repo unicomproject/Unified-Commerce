@@ -23,4 +23,15 @@ public interface ICustomerAuthService
         Guid customerId,
         Guid sessionId,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<CustomerProfileResponse>> GetProfileAsync(
+        Guid tenantId,
+        Guid customerId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult> UpdateProfileAsync(
+        Guid tenantId,
+        Guid customerId,
+        CustomerProfileUpdateRequest request,
+        CancellationToken cancellationToken);
 }

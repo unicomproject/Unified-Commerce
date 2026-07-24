@@ -11,7 +11,7 @@ public sealed class StorefrontTenantService : IStorefrontTenantService
         _repository = repository;
     }
 
-    public async Task<Guid?> ResolveTenantIdAsync(string slug, CancellationToken cancellationToken = default)
+    public async Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
     {
         return await _repository.GetTenantIdBySlugAsync(slug, cancellationToken);
     }

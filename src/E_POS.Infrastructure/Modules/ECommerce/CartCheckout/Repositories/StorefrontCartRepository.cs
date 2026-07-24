@@ -1,6 +1,8 @@
-using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -26,7 +28,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
     {
         var cart = await FindActiveCartAsync(tenantId, sessionId, now, false, cancellationToken);
         return cart is null
-            ? StorefrontCartRepositoryResult.Success(await CreateEmptyReadModelAsync(tenantId, cancellationToken))
+            ? StorefrontCartRepositoryResult.Success(await CreateEmptyReadModelAsync(tenantId, now, cancellationToken))
             : StorefrontCartRepositoryResult.Success(await BuildReadModelAsync(cart, cancellationToken));
     }
 
@@ -67,12 +69,12 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
             item = ShoppingCartItem.Create(
                 tenantId, cart.Id, nextLine + 1, selection.Product!.Id, selection.Variant?.Id,
                 selection.Variant?.Sku, selection.Product.ProductName, selection.Product.ProductStructure,
-                request.Quantity, selection.UnitPrice, selection.TaxPercent, now);
+                request.Quantity, selection.UnitPrice, selection.TaxPercent, cart.IsTaxInclusive, now);
             _dbContext.Set<ShoppingCartItem>().Add(item);
         }
         else
         {
-            item.UpdateQuantityAndPrice(newQuantity, selection.UnitPrice, selection.TaxPercent, now);
+            item.UpdateQuantityAndPrice(newQuantity, selection.UnitPrice, selection.TaxPercent, cart.IsTaxInclusive, now);
         }
 
         await RecalculateCartAsync(cart, now, cancellationToken);
@@ -105,7 +107,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         if (selection.HasInventory && selection.AvailableQuantity < quantity)
             return StorefrontCartRepositoryResult.Failure("storefront_cart.insufficient_stock");
 
-        item.UpdateQuantityAndPrice(quantity, selection.UnitPrice, selection.TaxPercent, now);
+        item.UpdateQuantityAndPrice(quantity, selection.UnitPrice, selection.TaxPercent, cart.IsTaxInclusive, now);
         await RecalculateCartAsync(cart, now, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return StorefrontCartRepositoryResult.Success(await BuildReadModelAsync(cart, cancellationToken));
@@ -139,7 +141,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
     {
         var cart = await FindActiveCartAsync(tenantId, sessionId, now, true, cancellationToken);
         if (cart is null)
-            return StorefrontCartRepositoryResult.Success(await CreateEmptyReadModelAsync(tenantId, cancellationToken));
+            return StorefrontCartRepositoryResult.Success(await CreateEmptyReadModelAsync(tenantId, now, cancellationToken));
 
         var items = await _dbContext.Set<ShoppingCartItem>()
             .Where(x => x.TenantId == tenantId && x.ShoppingCartId == cart.Id && x.LineStatus == Active)
@@ -159,9 +161,11 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         bool tracking,
         CancellationToken cancellationToken)
     {
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
         var query = _dbContext.Set<ShoppingCart>().Where(x =>
             x.TenantId == tenantId &&
             x.AnonymousSessionId == sessionId &&
+            x.CurrencyCode == currencyCode &&
             x.CartStatus == Active &&
             (!x.ExpiresAt.HasValue || x.ExpiresAt > now));
         if (!tracking) query = query.AsNoTracking();
@@ -172,6 +176,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         Guid tenantId, string sessionId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var currency = await ResolveCurrencyAsync(tenantId, cancellationToken);
+        var isTaxInclusive = await ResolveTaxInclusiveAsync(tenantId, currency, now, cancellationToken);
         var cart = ShoppingCart.Create(
             tenantId,
             PlatformSalesChannelSeedConstants.OnlineChannelId,
@@ -179,6 +184,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
             sessionId,
             $"CART-{Guid.NewGuid():N}",
             currency,
+            isTaxInclusive,
             now.AddDays(30),
             now);
         _dbContext.Set<ShoppingCart>().Add(cart);
@@ -270,16 +276,25 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var rows = await _dbContext.Set<PriceListItem>().AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.ProductId == productId &&
-                        x.Status == Active && x.MinQuantity <= quantity &&
-                        (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
-                        (!x.ValidUntil.HasValue || x.ValidUntil >= now) &&
-                        (!x.ProductVariantId.HasValue || x.ProductVariantId == variantId))
-            .OrderByDescending(x => x.ProductVariantId.HasValue)
-            .ThenByDescending(x => x.ValidFrom)
-            .ThenByDescending(x => x.MinQuantity)
-            .Select(x => (decimal?)x.SellingPrice)
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
+        var rows = await (from item in _dbContext.Set<PriceListItem>().AsNoTracking()
+                join priceList in _dbContext.Set<PriceList>().AsNoTracking()
+                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                where item.TenantId == tenantId && item.ProductId == productId &&
+                      item.Status == Active && item.MinQuantity <= quantity &&
+                      priceList.Status == Active &&
+                      priceList.CurrencyCode == currencyCode &&
+                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                      (!item.ValidUntil.HasValue || item.ValidUntil >= now) &&
+                      (!item.ProductVariantId.HasValue || item.ProductVariantId == variantId)
+                orderby item.ProductVariantId.HasValue descending,
+                        priceList.IsDefaultPriceList descending,
+                        priceList.Priority descending,
+                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                        item.MinQuantity descending
+                select (decimal?)item.SellingPrice)
             .FirstOrDefaultAsync(cancellationToken);
         return rows;
     }
@@ -340,11 +355,25 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
         var variants = await _dbContext.Set<ProductVariant>().AsNoTracking()
             .Where(x => x.TenantId == cart.TenantId && variantIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
-        var images = await _dbContext.Set<ProductImage>().AsNoTracking()
-            .Where(x => x.TenantId == cart.TenantId && productIds.Contains(x.ProductId) &&
-                        x.Status == Active && x.IsPrimaryImage &&
-                        (!x.ProductVariantId.HasValue || variantIds.Contains(x.ProductVariantId.Value)))
-            .OrderBy(x => x.SortOrder)
+        var images = await (from image in _dbContext.Set<ProductImage>().AsNoTracking()
+                            join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                            from mediaAsset in mediaAssets.DefaultIfEmpty()
+                            where image.TenantId == cart.TenantId &&
+                                  productIds.Contains(image.ProductId) &&
+                                  image.Status == Active &&
+                                  image.IsPrimaryImage &&
+                                  (!image.ProductVariantId.HasValue || variantIds.Contains(image.ProductVariantId.Value))
+                            orderby image.SortOrder
+                            select new
+                            {
+                                image.ProductId,
+                                image.ProductVariantId,
+                                image.ImageUrl,
+                                image.ImageStorageKey,
+                                MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                            })
             .ToListAsync(cancellationToken);
         var balances = await _dbContext.Set<InventoryBalance>().AsNoTracking()
             .Where(x => x.TenantId == cart.TenantId && productIds.Contains(x.ProductId))
@@ -396,7 +425,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
                 Name = item.ProductNameSnapshot,
                 VariantName = variant?.VariantName,
                 Sku = item.SkuSnapshot,
-                ImageUrl = image?.ImageUrl,
+                ImageUrl = image is null ? null : MediaUrlResolver.PreferMediaAsset(image.MediaPublicUrl, image.ImageUrl, image.ImageStorageKey),
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
                 Subtotal = item.LineSubtotalAmount,
@@ -421,24 +450,45 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
             ChargeTotal = cart.ChargeAmount,
             GrandTotal = cart.TotalAmount,
             TotalQuantity = readItems.Sum(x => x.Quantity),
+            IsTaxInclusive = cart.IsTaxInclusive,
             ExpiresAt = cart.ExpiresAt
         };
     }
 
     private async Task<StorefrontCartReadModel> CreateEmptyReadModelAsync(
-        Guid tenantId, CancellationToken cancellationToken) =>
-        new()
+        Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var currencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken);
+        return new StorefrontCartReadModel
         {
-            CurrencyCode = await ResolveCurrencyAsync(tenantId, cancellationToken),
+            CurrencyCode = currencyCode,
             Status = Active,
-            Items = []
+            Items = [],
+            IsTaxInclusive = await ResolveTaxInclusiveAsync(tenantId, currencyCode, now, cancellationToken)
         };
+    }
 
     private async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>
         await _dbContext.Set<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().AsNoTracking()
             .Where(x => x.Id == tenantId)
             .Select(x => x.BaseCurrencyCode)
             .FirstOrDefaultAsync(cancellationToken) ?? "LKR";
+
+    private async Task<bool> ResolveTaxInclusiveAsync(
+        Guid tenantId,
+        string currencyCode,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        await _dbContext.Set<PriceList>().AsNoTracking()
+            .Where(x => x.TenantId == tenantId &&
+                        x.Status == Active &&
+                        x.CurrencyCode == currencyCode &&
+                        (!x.ValidFrom.HasValue || x.ValidFrom <= now) &&
+                        (!x.ValidUntil.HasValue || x.ValidUntil >= now))
+            .OrderByDescending(x => x.IsDefaultPriceList)
+            .ThenByDescending(x => x.Priority)
+            .Select(x => x.PriceIncludesTax)
+            .FirstOrDefaultAsync(cancellationToken);
 
     private sealed record CartSelection(
         string? ErrorCode,

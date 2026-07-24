@@ -8,7 +8,30 @@ public sealed class SalesReturnLineConfiguration : IEntityTypeConfiguration<Sale
 {
     public void Configure(EntityTypeBuilder<SalesReturnLine> builder)
     {
-        builder.ToTable("sales_return_lines");
+        builder.ToTable("sales_return_lines", t =>
+        {
+            t.HasCheckConstraint(
+                "ck_sales_return_lines_quantity_requested",
+                "quantity_requested > 0");
+            t.HasCheckConstraint(
+                "ck_sales_return_lines_quantity_received",
+                "quantity_received IS NULL OR quantity_received >= 0");
+            t.HasCheckConstraint(
+                "ck_sales_return_lines_quantity_received_lte_requested",
+                "quantity_received IS NULL OR quantity_received <= quantity_requested");
+            t.HasCheckConstraint(
+                "ck_sales_return_lines_unit_price_snapshot",
+                "unit_price_snapshot >= 0");
+            t.HasCheckConstraint(
+                "ck_sales_return_lines_unit_tax_amount_snapshot",
+                "unit_tax_amount_snapshot >= 0");
+            t.HasCheckConstraint(
+                "ck_sales_return_lines_line_subtotal_amount",
+                "line_subtotal_amount >= 0");
+            t.HasCheckConstraint(
+                "ck_sales_return_lines_line_tax_amount",
+                "line_tax_amount >= 0");
+        });
 
         builder.HasKey(x => x.Id).HasName("pk_sales_return_lines");
 
@@ -103,6 +126,14 @@ public sealed class SalesReturnLineConfiguration : IEntityTypeConfiguration<Sale
             .IsRequired(false);
 
         // <second-brain-constraints>
+        builder.HasIndex(x => new { x.TenantId, x.Id })
+            .IsUnique()
+            .HasDatabaseName("uq_sales_return_lines_tenant_id_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.SalesReturnId, x.SalesOrderLineId })
+            .IsUnique()
+            .HasDatabaseName("uq_sales_return_lines_tenant_return_order_line");
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -111,22 +142,24 @@ public sealed class SalesReturnLineConfiguration : IEntityTypeConfiguration<Sale
 
         builder.HasOne<E_POS.Domain.Modules.Shared.ReturnExchange.Entities.SalesReturn>()
             .WithMany()
-            .HasForeignKey(x => x.SalesReturnId)
+            .HasForeignKey(x => new { x.TenantId, x.SalesReturnId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_return_lines_6cf63e7f");
+            .HasConstraintName("fk_sales_return_lines_return_tenant");
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine>()
             .WithMany()
-            .HasForeignKey(x => x.SalesOrderLineId)
+            .HasForeignKey(x => new { x.TenantId, x.SalesOrderLineId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_return_lines_1e6282f1");
+            .HasConstraintName("fk_sales_return_lines_order_line_tenant");
 
         builder.HasOne<E_POS.Domain.Modules.Shared.ReturnExchange.Entities.ReturnReason>()
             .WithMany()
-            .HasForeignKey(x => x.ReturnReasonId)
+            .HasForeignKey(x => new { x.TenantId, x.ReturnReasonId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sales_return_lines_4427f485");
+            .HasConstraintName("fk_sales_return_lines_return_reason_tenant");
         // </second-brain-constraints>
     }
 }
-

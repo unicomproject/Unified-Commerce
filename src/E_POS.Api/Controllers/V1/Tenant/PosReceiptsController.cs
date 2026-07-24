@@ -60,6 +60,7 @@ public sealed class PosReceiptsController : ControllerBase
         {
             "pos_receipts.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "pos_receipts.receipt_not_found" => NotFound(CreateError(error)),
+            "pos_receipts.receipt_not_completed" => UnprocessableEntity(CreateError(error)),
             "pos_receipts.invalid_sale_id" or
             "pos_receipts.invalid_copies" or
             "pos_receipts.invalid_print_status"

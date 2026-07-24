@@ -10,4 +10,7 @@ public sealed record OutletSummaryResponse(
     bool IsDefaultOutlet,
     string? Phone,
     string? Email,
-    bool CollectionEnabled);
+    bool CollectionEnabled,
+    int? PreparationLeadMinutes,
+    int? PickupWindowMinutes,
+    TimeOnly? CollectionCutoffTime);

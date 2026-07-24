@@ -37,5 +37,44 @@ public class SalesPaymentTransaction : AuditableEntity
             CreatedAt = now,
             UpdatedAt = now
         };
+
+    /// <summary>
+    /// Successful provider/terminal capture. Persists only safe card tip metadata in
+    /// <see cref="ProviderResponseJson"/> (brand + last4). Never stores PAN/CVV/PIN/raw payloads.
+    /// </summary>
+    public static SalesPaymentTransaction CreateCompletedProviderCapture(
+        Guid id,
+        Guid tenantId,
+        Guid salesPaymentId,
+        decimal amount,
+        string currencyCode,
+        string providerName,
+        string? externalTransactionReference,
+        string? cardBrand,
+        string? cardLast4,
+        string idempotencyKey,
+        Guid? processedByTenantUserId,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesPaymentId = salesPaymentId,
+            TransactionType = "CAPTURE",
+            TransactionStatus = "SUCCEEDED",
+            Amount = amount,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            ExternalTransactionReference = string.IsNullOrWhiteSpace(externalTransactionReference)
+                ? null
+                : externalTransactionReference.Trim(),
+            ProviderName = string.IsNullOrWhiteSpace(providerName)
+                ? null
+                : providerName.Trim(),
+            ProviderResponseJson = SafePaymentDisplay.ToSanitizedCardMetadataJson(cardBrand, cardLast4),
+            IdempotencyKey = idempotencyKey.Trim(),
+            ProcessedByTenantUserId = processedByTenantUserId,
+            ProcessedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }
 
