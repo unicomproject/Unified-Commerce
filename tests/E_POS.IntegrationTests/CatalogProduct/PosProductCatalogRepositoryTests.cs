@@ -1,4 +1,5 @@
 using System.Reflection;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -66,27 +67,7 @@ public sealed class PosProductCatalogRepositoryTests
             ProductConstants.ActiveStatus,
             null,
             Now));
-
-        dbContext.ProductImages.Add(ProductImage.Create(
-            Guid.NewGuid(),
-            tenantId,
-            productId,
-            null,
-            null,
-            "https://example.com/jersey.png",
-            "https://example.com/jersey.png",
-            "Team Jersey",
-            "PRIMARY",
-            "image/png",
-            1024,
-            400,
-            400,
-            null,
-            0,
-            true,
-            "ACTIVE",
-            null,
-            Now));
+        AddProductImage(dbContext, tenantId, productId, "https://example.com/jersey.png");
 
         await dbContext.SaveChangesAsync();
 
@@ -1006,6 +987,43 @@ public sealed class PosProductCatalogRepositoryTests
         await dbContext.SaveChangesAsync();
     }
 
+    private static void AddProductImage(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        Guid productId,
+        string publicUrl)
+    {
+        var mediaAssetId = Guid.NewGuid();
+        dbContext.MediaAssets.Add(CreateMediaAsset(tenantId, mediaAssetId, publicUrl, "PRODUCT"));
+        dbContext.ProductImages.Add(ProductImage.Create(
+            Guid.NewGuid(), tenantId, productId, null, null,
+            "jersey-main", publicUrl, "Jersey", "MAIN", "image/jpeg",
+            null, null, null, null, 0, true, "ACTIVE", null, Now, mediaAssetId));
+    }
+
+    private static MediaAsset CreateMediaAsset(
+        Guid tenantId,
+        Guid mediaAssetId,
+        string publicUrl,
+        string purpose) =>
+        MediaAsset.Create(
+            mediaAssetId,
+            tenantId,
+            "images",
+            $"tests/{mediaAssetId:D}.jpg",
+            publicUrl,
+            "test.jpg",
+            "image/jpeg",
+            ".jpg",
+            1,
+            null,
+            null,
+            mediaAssetId.ToString("N"),
+            "IMAGE",
+            purpose,
+            "ACTIVE",
+            null,
+            Now);
     private static void Set<T>(object entity, string propertyName, T value)
     {
         var prop = entity.GetType().GetProperty(

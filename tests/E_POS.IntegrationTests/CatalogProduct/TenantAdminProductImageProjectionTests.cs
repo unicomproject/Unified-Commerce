@@ -13,7 +13,7 @@ public sealed class TenantAdminProductImageProjectionTests
     private static readonly DateTimeOffset Now = new(2026, 7, 24, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task GetPrimaryImageUrlsAsync_PrefersProductImage_AndFallsBackToVariantAndLegacy()
+    public async Task GetPrimaryImageUrlsAsync_PrefersProductImage_AndExcludesRowsWithoutActiveMedia()
     {
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
@@ -117,7 +117,7 @@ public sealed class TenantAdminProductImageProjectionTests
 
         Assert.Equal("https://cdn.example.test/product-primary.png", result[productId]);
         Assert.Equal("https://cdn.example.test/variant-only.png", result[variantOnlyProductId]);
-        Assert.Equal("https://legacy.example.test/legacy-product.png", result[legacyProductId]);
+        Assert.DoesNotContain(legacyProductId, result.Keys);
         Assert.DoesNotContain(noImageProductId, result.Keys);
     }
 
@@ -215,20 +215,11 @@ public sealed class TenantAdminProductImageProjectionTests
 
         Assert.NotNull(result);
         Assert.Equal("https://cdn.example.test/detail-primary.png", result.ImageUrl);
-        Assert.Collection(
-            result.Images,
-            image =>
-            {
-                Assert.Equal(primaryImage.Id, image.ProductImageId);
-                Assert.Equal(primaryAsset.Id, image.MediaAssetId);
-                Assert.Null(image.ProductVariantId);
-                Assert.True(image.IsPrimaryImage);
-            },
-            image =>
-            {
-                Assert.Equal(secondaryImage.Id, image.ProductImageId);
-                Assert.Equal("https://legacy.example.test/detail-secondary.png", image.ImageUrl);
-            });
+        var detailProductImage = Assert.Single(result.Images);
+        Assert.Equal(primaryImage.Id, detailProductImage.ProductImageId);
+        Assert.Equal(primaryAsset.Id, detailProductImage.MediaAssetId);
+        Assert.Null(detailProductImage.ProductVariantId);
+        Assert.True(detailProductImage.IsPrimaryImage);
 
         var variant = Assert.Single(result.Variants);
         var groupedVariantImage = Assert.Single(variant.Images);

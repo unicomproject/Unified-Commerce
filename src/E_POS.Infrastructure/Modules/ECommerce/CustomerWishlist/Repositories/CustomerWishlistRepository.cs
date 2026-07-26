@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Dtos;
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
@@ -232,19 +232,13 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
             .GroupBy(x => x.Image.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => MediaUrlResolver.PreferMediaAsset(
-                    x.First().MediaPublicUrl,
-                    x.First().Image.ImageUrl,
-                    x.First().Image.ImageStorageKey));
+                x => x.First().MediaPublicUrl);
         var variantImages = imageRows
             .Where(x => x.Image.ProductVariantId.HasValue)
             .GroupBy(x => x.Image.ProductVariantId!.Value)
             .ToDictionary(
                 x => x.Key,
-                x => MediaUrlResolver.PreferMediaAsset(
-                    x.First().MediaPublicUrl,
-                    x.First().Image.ImageUrl,
-                    x.First().Image.ImageStorageKey));
+                x => x.First().MediaPublicUrl);
         var inventoryRows = await _dbContext.Set<InventoryBalance>()
             .AsNoTracking()
             .Where(x => x.TenantId == wishlist.TenantId && productIds.Contains(x.ProductId))

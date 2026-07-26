@@ -132,11 +132,7 @@ public sealed class CategoryRepository : ICategoryRepository
                     x.Category.Id,
                     x.Category.CategoryCode,
                     x.Category.CategoryName,
-                    ResolveImageUrl(
-                        x.Category.ImageMediaAssetId,
-                        hasActiveMedia,
-                        x.MediaPublicUrl,
-                        x.Category.ImageUrl),
+                    ResolveImageUrl(x.Category.ImageMediaAssetId, hasActiveMedia, x.MediaPublicUrl),
                     hasActiveMedia ? x.JoinedMediaAssetId : null,
                     x.Category.Status,
                     x.Category.ParentCategoryId,
@@ -190,11 +186,7 @@ public sealed class CategoryRepository : ICategoryRepository
             row.Category.Id,
             row.Category.CategoryCode,
             row.Category.CategoryName,
-            ResolveImageUrl(
-                row.Category.ImageMediaAssetId,
-                hasActiveMedia,
-                row.MediaPublicUrl,
-                row.Category.ImageUrl),
+            ResolveImageUrl(row.Category.ImageMediaAssetId, hasActiveMedia, row.MediaPublicUrl),
             hasActiveMedia ? row.JoinedMediaAssetId : null,
             row.Category.Status,
             row.Category.ParentCategoryId,
@@ -254,16 +246,8 @@ public sealed class CategoryRepository : ICategoryRepository
     private static string? ResolveImageUrl(
         Guid? linkedMediaAssetId,
         bool hasActiveMedia,
-        string? mediaPublicUrl,
-        string? legacyImageUrl)
+        string? mediaPublicUrl)
     {
-        if (!linkedMediaAssetId.HasValue)
-        {
-            return MediaUrlResolver.PreferMediaAsset(null, legacyImageUrl);
-        }
-
-        return hasActiveMedia
-            ? MediaUrlResolver.PreferMediaAsset(mediaPublicUrl, legacyImageUrl)
-            : null;
+        return linkedMediaAssetId.HasValue && hasActiveMedia ? mediaPublicUrl?.Trim() : null;
     }
 }

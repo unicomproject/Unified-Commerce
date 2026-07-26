@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
@@ -9,21 +9,19 @@ public class Brand : AuditableEntity
     public string BrandName { get; protected set; } = string.Empty;
     public string BrandSlug { get; protected set; } = string.Empty;
     public string? Description { get; protected set; }
-    public string? LogoUrl { get; protected set; }
     public Guid? LogoMediaAssetId { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
     public static Brand Create(
-        Guid id, 
-        Guid tenantId, 
-        string brandCode, 
-        string brandName, 
+        Guid id,
+        Guid tenantId,
+        string brandCode,
+        string brandName,
         string brandSlug,
         string? description,
-        string? logoUrl,
-        string status, 
+        string status,
         Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
@@ -35,7 +33,6 @@ public class Brand : AuditableEntity
             BrandName = brandName.Trim(),
             BrandSlug = brandSlug.Trim().ToLowerInvariant(),
             Description = description?.Trim(),
-            LogoUrl = logoUrl?.Trim(),
             Status = status.Trim().ToUpperInvariant(),
             CreatedByTenantUserId = createdByTenantUserId,
             UpdatedByTenantUserId = createdByTenantUserId,
@@ -45,12 +42,11 @@ public class Brand : AuditableEntity
     }
 
     public void UpdateProfile(
-        string brandCode, 
-        string brandName, 
+        string brandCode,
+        string brandName,
         string brandSlug,
         string? description,
-        string? logoUrl,
-        string status, 
+        string status,
         Guid? updatedByTenantUserId,
         DateTimeOffset now)
     {
@@ -58,7 +54,6 @@ public class Brand : AuditableEntity
         BrandName = brandName.Trim();
         BrandSlug = brandSlug.Trim().ToLowerInvariant();
         Description = description?.Trim();
-        LogoUrl = logoUrl?.Trim();
         Status = status.Trim().ToUpperInvariant();
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
@@ -72,14 +67,35 @@ public class Brand : AuditableEntity
     }
 
     public void UpdateLogo(
+        Guid? logoMediaAssetId,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        LogoMediaAssetId = logoMediaAssetId;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+    public static Brand Create(
+        Guid id,
+        Guid tenantId,
+        string brandCode,
+        string brandName,
+        string brandSlug,
+        string? description,
+        string? logoUrl,
+        string status,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        return Create(id, tenantId, brandCode, brandName, brandSlug, description, status, createdByTenantUserId, now);
+    }
+
+    public void UpdateLogo(
         string? logoUrl,
         Guid? logoMediaAssetId,
         Guid? updatedByTenantUserId,
         DateTimeOffset now)
     {
-        LogoUrl = logoUrl?.Trim();
-        LogoMediaAssetId = logoMediaAssetId;
-        UpdatedByTenantUserId = updatedByTenantUserId;
-        UpdatedAt = now;
+        UpdateLogo(logoMediaAssetId, updatedByTenantUserId, now);
     }
 }

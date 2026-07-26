@@ -106,8 +106,6 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 image.ProductId,
                 image.ProductVariantId,
                 image.MediaAssetId,
-                image.ImageUrl,
-                image.ImageStorageKey,
                 image.SortOrder,
                 image.IsPrimaryImage,
                 JoinedMediaAssetId = mediaAsset == null ? null : (Guid?)mediaAsset.Id,
@@ -127,10 +125,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 row.ProductVariantId,
                 row.SortOrder,
                 row.IsPrimaryImage,
-                ImageUrl = MediaUrlResolver.PreferMediaAsset(
-                    row.MediaPublicUrl,
-                    row.ImageUrl,
-                    row.ImageStorageKey),
+                ImageUrl = row.MediaPublicUrl,
             })
             .Where(row => !string.IsNullOrWhiteSpace(row.ImageUrl))
             .GroupBy(row => row.ProductId)
@@ -448,8 +443,6 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 image.Id,
                 image.ProductVariantId,
                 image.MediaAssetId,
-                image.ImageUrl,
-                image.ImageStorageKey,
                 image.AltText,
                 image.ImagePurpose,
                 image.SortOrder,
@@ -467,10 +460,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .Select(row => new
             {
                 Row = row,
-                ImageUrl = MediaUrlResolver.PreferMediaAsset(
-                    row.MediaPublicUrl,
-                    row.ImageUrl,
-                    row.ImageStorageKey),
+                ImageUrl = row.MediaPublicUrl,
             })
             .Where(item => !string.IsNullOrWhiteSpace(item.ImageUrl))
             .OrderBy(item => item.Row.ProductVariantId.HasValue ? 1 : 0)

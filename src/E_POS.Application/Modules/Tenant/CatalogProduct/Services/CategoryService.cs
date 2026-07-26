@@ -65,7 +65,6 @@ public sealed class CategoryService : ICategoryService
             request.Name, 
             slug,
             request.Description,
-            requestedImageUrl,
             request.SortOrder,
             request.Status, 
             context.UserId,
@@ -73,7 +72,7 @@ public sealed class CategoryService : ICategoryService
 
         if (mediaAsset is not null)
         {
-            category.UpdateImage(mediaAsset.PublicUrl, mediaAsset.Id, context.UserId, now);
+            category.UpdateImage(mediaAsset.Id, context.UserId, now);
             await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
         }
 
@@ -130,10 +129,7 @@ public sealed class CategoryService : ICategoryService
         var requestedImageUrl = NormalizeLegacyMediaUrl(request.ImageUrl);
         var previousMediaAssetId = category.ImageMediaAssetId;
         var shouldClearMedia = request.ImageUrl is not null && string.IsNullOrWhiteSpace(request.ImageUrl);
-        var shouldReplaceMedia = !shouldClearMedia &&
-            requestedImageUrl is not null &&
-            (!previousMediaAssetId.HasValue ||
-             !string.Equals(category.ImageUrl?.Trim(), requestedImageUrl, StringComparison.Ordinal));
+        var shouldReplaceMedia = !shouldClearMedia && requestedImageUrl is not null;
 
         category.UpdateProfile(
             request.DepartmentId,
@@ -142,7 +138,6 @@ public sealed class CategoryService : ICategoryService
             request.Name, 
             slug,
             request.Description,
-            shouldClearMedia ? null : requestedImageUrl ?? category.ImageUrl,
             request.SortOrder,
             request.Status, 
             context.UserId,
@@ -150,7 +145,7 @@ public sealed class CategoryService : ICategoryService
 
         if (shouldClearMedia)
         {
-            category.UpdateImage(null, null, context.UserId, now);
+            category.UpdateImage(null, context.UserId, now);
 
             if (previousMediaAssetId.HasValue)
             {
@@ -175,7 +170,7 @@ public sealed class CategoryService : ICategoryService
 
             if (mediaAsset is not null)
             {
-                category.UpdateImage(mediaAsset.PublicUrl, mediaAsset.Id, context.UserId, now);
+                category.UpdateImage(mediaAsset.Id, context.UserId, now);
                 await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
 
                 if (previousMediaAssetId.HasValue)

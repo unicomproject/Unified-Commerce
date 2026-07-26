@@ -478,21 +478,14 @@ public sealed class ProductService : IProductService
                 productId: productId,
                 productVariantId: null,
                 salesChannelId: null,
-                imageStorageKey: normalizedImageUrl,
-                imageUrl: normalizedImageUrl,
+                mediaAssetId: mediaAsset?.Id,
                 altText: null,
                 imagePurpose: "PRODUCT",
-                mimeType: mediaAsset?.MimeType,
-                fileSizeBytes: mediaAsset?.FileSizeBytes,
-                widthPx: null,
-                heightPx: null,
-                checksumHash: mediaAsset?.ChecksumHash,
                 sortOrder: sortOrder,
                 isPrimaryImage: sortOrder == 0,
                 status: "ACTIVE",
                 createdByTenantUserId: createdByTenantUserId,
-                now: now,
-                mediaAssetId: mediaAsset?.Id));
+                now: now));
 
             sortOrder++;
         }

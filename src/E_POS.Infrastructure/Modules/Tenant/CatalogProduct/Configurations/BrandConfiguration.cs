@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
@@ -56,12 +56,6 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
         builder.Property(x => x.Description)
             .HasColumnName("description")
             .HasColumnType("text")
-            .IsRequired(false);
-
-        builder.Property(x => x.LogoUrl)
-            .HasColumnName("logo_url")
-            .HasColumnType("varchar(500)")
-            .HasMaxLength(500)
             .IsRequired(false);
 
         builder.Property(x => x.LogoMediaAssetId)

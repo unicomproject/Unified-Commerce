@@ -80,11 +80,7 @@ public sealed class BrandRepository : IBrandRepository
                     x.Brand.Id,
                     x.Brand.BrandCode,
                     x.Brand.BrandName,
-                    ResolveLogoUrl(
-                        x.Brand.LogoMediaAssetId,
-                        hasActiveMedia,
-                        x.MediaPublicUrl,
-                        x.Brand.LogoUrl),
+                    ResolveLogoUrl(x.Brand.LogoMediaAssetId, hasActiveMedia, x.MediaPublicUrl),
                     hasActiveMedia ? x.JoinedMediaAssetId : null,
                     x.Brand.Status,
                     x.Brand.CreatedAt,
@@ -132,11 +128,7 @@ public sealed class BrandRepository : IBrandRepository
             row.Brand.Id,
             row.Brand.BrandCode,
             row.Brand.BrandName,
-            ResolveLogoUrl(
-                row.Brand.LogoMediaAssetId,
-                hasActiveMedia,
-                row.MediaPublicUrl,
-                row.Brand.LogoUrl),
+            ResolveLogoUrl(row.Brand.LogoMediaAssetId, hasActiveMedia, row.MediaPublicUrl),
             hasActiveMedia ? row.JoinedMediaAssetId : null,
             row.Brand.Status,
             row.Brand.CreatedAt,
@@ -192,16 +184,8 @@ public sealed class BrandRepository : IBrandRepository
     private static string? ResolveLogoUrl(
         Guid? linkedMediaAssetId,
         bool hasActiveMedia,
-        string? mediaPublicUrl,
-        string? legacyLogoUrl)
+        string? mediaPublicUrl)
     {
-        if (!linkedMediaAssetId.HasValue)
-        {
-            return MediaUrlResolver.PreferMediaAsset(null, legacyLogoUrl);
-        }
-
-        return hasActiveMedia
-            ? MediaUrlResolver.PreferMediaAsset(mediaPublicUrl, legacyLogoUrl)
-            : null;
+        return linkedMediaAssetId.HasValue && hasActiveMedia ? mediaPublicUrl?.Trim() : null;
     }
 }

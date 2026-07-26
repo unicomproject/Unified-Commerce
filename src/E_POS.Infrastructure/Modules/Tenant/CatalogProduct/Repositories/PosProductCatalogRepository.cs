@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Domain.Modules.Shared.Media.Entities;
@@ -185,8 +185,6 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                                select new
                                {
                                    image.ProductId,
-                                   image.ImageStorageKey,
-                                   image.ImageUrl,
                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                })
             .ToListAsync(cancellationToken);
@@ -195,7 +193,7 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
             .GroupBy(x => x.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => ResolveImageValue(x.First().MediaPublicUrl, x.First().ImageUrl, x.First().ImageStorageKey));
+                x => x.First().MediaPublicUrl);
         var hiddenProductIds = await ResolveHiddenProductIdsAsync(
             tenantId,
             productIds,
@@ -638,15 +636,13 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
                                      orderby image.IsPrimaryImage ? 0 : 1, image.SortOrder
                                      select new
                                      {
-                                         image.ImageStorageKey,
-                                         image.ImageUrl,
                                          MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                      })
             .FirstOrDefaultAsync(cancellationToken);
 
         var imageStorageKey = imageStorageRow is null
             ? null
-            : ResolveImageValue(imageStorageRow.MediaPublicUrl, imageStorageRow.ImageUrl, imageStorageRow.ImageStorageKey);
+            : imageStorageRow.MediaPublicUrl;
         var productOptions = await _dbContext.ProductOptions
             .AsNoTracking()
             .Where(x =>
@@ -907,10 +903,5 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
         }
 
         return ResolveStockStatus(totalAvailableQuantity, minStockQuantity);
-    }
-
-    private static string? ResolveImageValue(string? mediaPublicUrl, string? imageUrl, string imageStorageKey)
-    {
-        return MediaUrlResolver.PreferMediaAsset(mediaPublicUrl, imageUrl, imageStorageKey);
     }
 }

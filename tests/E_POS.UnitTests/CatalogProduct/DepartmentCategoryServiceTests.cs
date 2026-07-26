@@ -144,7 +144,6 @@ public sealed class DepartmentCategoryServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Null(category.ImageUrl);
         Assert.Null(category.ImageMediaAssetId);
         Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
     }
@@ -286,7 +285,7 @@ public sealed class DepartmentCategoryServiceTests
         public Task<CategoryResponse?> GetByIdAsync(Guid tenantId, Guid categoryId, bool includeDeleted, CancellationToken cancellationToken)
         {
             var category = AddedCategory ?? EditableCategory;
-            return Task.FromResult<CategoryResponse?>(new CategoryResponse(categoryId, category!.CategoryCode, category.CategoryName, category.ImageUrl, category.ImageMediaAssetId, category.Status, category.ParentCategoryId, null, null, category.SortOrder, category.CreatedAt, category.UpdatedAt));
+            return Task.FromResult<CategoryResponse?>(new CategoryResponse(categoryId, category!.CategoryCode, category.CategoryName, null, category.ImageMediaAssetId, category.Status, category.ParentCategoryId, null, null, category.SortOrder, category.CreatedAt, category.UpdatedAt));
         }
 
         public Task<Category?> GetEditableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken)
