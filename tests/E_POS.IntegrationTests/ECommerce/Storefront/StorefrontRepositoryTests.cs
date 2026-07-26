@@ -1,5 +1,6 @@
-using System.Reflection;
+﻿using System.Reflection;
 using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -594,6 +595,111 @@ public sealed class StorefrontRepositoryTests
         Assert.Equal(7, item.Rating?.TotalReviews);
     }
 
+    [Fact]
+    public async Task GetActiveBannersAsync_PrefersMediaAssetPublicUrlWhenAvailable()
+    {
+        var tenantId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var banner = StorefrontBanner.Create(
+            tenantId,
+            null,
+            "HERO",
+            "Media Hero",
+            null,
+            "/legacy/banner.jpg",
+            null,
+            null,
+            1,
+            "ACTIVE");
+        Set(banner, "ImageMediaAssetId", mediaAssetId);
+
+        await using var dbContext = CreateDbContext();
+        dbContext.MediaAssets.Add(CreateMediaAsset(tenantId, mediaAssetId, "https://cdn.example.test/banner.jpg", "STOREFRONT_BANNER"));
+        dbContext.StorefrontBanners.Add(banner);
+        await dbContext.SaveChangesAsync();
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
+
+        var result = Assert.Single(await repository.GetActiveBannersAsync(tenantId, "HERO", CancellationToken.None));
+
+        Assert.Equal("https://cdn.example.test/banner.jpg", result.ImageUrl);
+    }
+
+    [Fact]
+    public async Task GetRootCategoriesAsync_PrefersMediaAssetPublicUrlWhenAvailable()
+    {
+        var tenantId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var category = CreateCategory(tenantId, "MEDIA", "Media", 1, CategoryConstants.ActiveStatus);
+        category.UpdateImage("/legacy/category.jpg", mediaAssetId, null, Now);
+
+        await using var dbContext = CreateDbContext();
+        dbContext.MediaAssets.Add(CreateMediaAsset(tenantId, mediaAssetId, "https://cdn.example.test/category.jpg", "CATEGORY"));
+        dbContext.Categories.Add(category);
+        await dbContext.SaveChangesAsync();
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
+
+        var result = Assert.Single(await repository.GetRootCategoriesAsync(tenantId, CancellationToken.None));
+
+        Assert.Equal("https://cdn.example.test/category.jpg", result.ImageUrl);
+    }
+
+    [Fact]
+    public async Task GetProductsAsync_PrefersMediaAssetPublicUrlForPrimaryImageWhenAvailable()
+    {
+        var tenantId = Guid.NewGuid();
+        var category = CreateCategory(tenantId, "MEDIA", "Media", 1, CategoryConstants.ActiveStatus);
+        var productId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        dbContext.Categories.Add(category);
+        dbContext.Products.Add(CreateProduct(tenantId, productId, "MEDIA_PRODUCT", "Media Product", true, ProductConstants.ActiveStatus));
+        dbContext.ProductCategories.Add(ProductCategory.Create(Guid.NewGuid(), tenantId, productId, category.Id, true, 1, null, Now));
+        dbContext.MediaAssets.Add(CreateMediaAsset(tenantId, mediaAssetId, "https://cdn.example.test/product.jpg", "PRODUCT"));
+        dbContext.ProductImages.Add(ProductImage.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            null,
+            null,
+            "legacy/product.jpg",
+            "/legacy/product.jpg",
+            null,
+            "MAIN",
+            "image/jpeg",
+            null,
+            null,
+            null,
+            null,
+            1,
+            true,
+            "ACTIVE",
+            null,
+            Now,
+            mediaAssetId));
+        await dbContext.SaveChangesAsync();
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
+
+        var result = await repository.GetProductsAsync(tenantId, category.Id, "popular", 1, 20, CancellationToken.None);
+        var item = Assert.Single(result.Items);
+
+        Assert.Equal("https://cdn.example.test/product.jpg", item.ImageUrl);
+    }
     private static Category CreateCategory(
         Guid tenantId,
         string code,
@@ -655,6 +761,31 @@ public sealed class StorefrontRepositoryTests
             null,
             Now);
 
+    private static MediaAsset CreateMediaAsset(
+        Guid tenantId,
+        Guid mediaAssetId,
+        string publicUrl,
+        string purpose)
+    {
+        return MediaAsset.Create(
+            mediaAssetId,
+            tenantId,
+            "images",
+            $"tests/{mediaAssetId:D}.jpg",
+            publicUrl,
+            "test.jpg",
+            "image/jpeg",
+            ".jpg",
+            1,
+            null,
+            null,
+            mediaAssetId.ToString("N"),
+            "IMAGE",
+            purpose,
+            "ACTIVE",
+            null,
+            Now);
+    }
     private static void Set<T>(object entity, string propertyName, T value)
     {
         var property = entity.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);

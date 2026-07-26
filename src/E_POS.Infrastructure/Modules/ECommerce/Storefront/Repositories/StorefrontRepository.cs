@@ -1,6 +1,5 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
-using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Infrastructure.Persistence;
 
@@ -28,12 +27,12 @@ public sealed class StorefrontRepository : IStorefrontRepository
         _tenantRepository = tenantRepository;
     }
 
-    public Task<IEnumerable<StorefrontBanner>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
+    public Task<IEnumerable<StorefrontBannerReadModel>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
     {
         return _bannerRepository.GetActiveBannersAsync(tenantId, bannerType, cancellationToken);
     }
 
-    public Task<IEnumerable<Category>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public Task<IEnumerable<StorefrontCategoryReadModel>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return _categoryRepository.GetFeaturedCategoriesAsync(tenantId, cancellationToken);
     }

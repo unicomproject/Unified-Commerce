@@ -1,4 +1,5 @@
-using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+﻿using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
@@ -14,6 +15,8 @@ public interface ICategoryRepository
     Task<CategoryResponse?> GetByIdAsync(Guid tenantId, Guid categoryId, bool includeDeleted, CancellationToken cancellationToken);
     Task<Category?> GetEditableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
     Task AddAsync(Category category, CancellationToken cancellationToken);
+    Task AddMediaAssetAsync(MediaAsset mediaAsset, CancellationToken cancellationToken);
+    Task MarkMediaAssetInactiveAsync(Guid tenantId, Guid mediaAssetId, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 

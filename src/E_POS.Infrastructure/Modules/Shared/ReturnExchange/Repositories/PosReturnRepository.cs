@@ -1,9 +1,11 @@
-using System.Data;
+﻿using System.Data;
 using System.Text.Json;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Domain.Modules.Shared.Refund.Entities;
 using E_POS.Domain.Modules.Shared.ReturnExchange.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
@@ -1748,19 +1750,16 @@ public sealed class PosReturnRepository : IPosReturnRepository
                 StringComparer.OrdinalIgnoreCase);
 
         var productIds = orderLines.Values.Select(x => x.ProductId).Distinct().ToArray();
-        var imageByProduct = productIds.Length == 0
-            ? new Dictionary<Guid, string?>()
-            : (await _dbContext.ProductImages.AsNoTracking()
-                .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId))
-                .OrderByDescending(x => x.IsPrimaryImage)
-                .ThenBy(x => x.Id)
-                .Select(x => new { x.ProductId, x.ImageUrl, x.ImageStorageKey })
-                .ToListAsync(cancellationToken))
+        var productImageRows = await BuildProductImageRowsAsync(
+            tenantId,
+            productIds,
+            activeOnly: false,
+            cancellationToken);
+        var imageByProduct = productImageRows
             .GroupBy(x => x.ProductId)
             .ToDictionary(
                 g => g.Key,
-                g => ResolveImageValue(g.First().ImageUrl, g.First().ImageStorageKey));
-
+                g => g.First().ImageUrl);
         var returnedItems = returnLines.Select(line =>
         {
             orderLines.TryGetValue(line.SalesOrderLineId, out var orderLine);
@@ -1846,20 +1845,16 @@ public sealed class PosReturnRepository : IPosReturnRepository
                 .OrderBy(x => x.LineNumber)
                 .ToListAsync(cancellationToken);
             var replacementProductIds = replacementLines.Select(x => x.ProductId).Distinct().ToArray();
-            var replacementImages = replacementProductIds.Length == 0
-                ? new Dictionary<Guid, string?>()
-                : (await _dbContext.ProductImages.AsNoTracking()
-                    .Where(x => x.TenantId == tenantId &&
-                                replacementProductIds.Contains(x.ProductId))
-                    .OrderByDescending(x => x.IsPrimaryImage)
-                    .ThenBy(x => x.Id)
-                    .Select(x => new { x.ProductId, x.ImageUrl, x.ImageStorageKey })
-                    .ToListAsync(cancellationToken))
+            var replacementImageRows = await BuildProductImageRowsAsync(
+                tenantId,
+                replacementProductIds,
+                activeOnly: false,
+                cancellationToken);
+            var replacementImages = replacementImageRows
                 .GroupBy(x => x.ProductId)
                 .ToDictionary(
                     g => g.Key,
-                    g => ResolveImageValue(g.First().ImageUrl, g.First().ImageStorageKey));
-
+                    g => g.First().ImageUrl);
             replacementItems = replacementLines
                 .Select(line =>
                 {
@@ -2312,23 +2307,16 @@ public sealed class PosReturnRepository : IPosReturnRepository
             .ToDictionaryAsync(x => x.SaleLineId, x => x.Quantity, cancellationToken);
 
         var productIds = lineRows.Select(x => x.ProductId).Distinct().ToArray();
-        var imageRows = await _dbContext.ProductImages
-            .AsNoTracking()
-            .Where(x => x.TenantId == tenantId &&
-                        productIds.Contains(x.ProductId) &&
-                        x.Status == "ACTIVE")
-            .OrderByDescending(x => x.IsPrimaryImage)
-            .ThenBy(x => x.SortOrder)
-            .Select(x => new { x.ProductId, x.ImageUrl, x.ImageStorageKey })
-            .ToListAsync(cancellationToken);
+        var imageRows = await BuildProductImageRowsAsync(
+            tenantId,
+            productIds,
+            activeOnly: true,
+            cancellationToken);
         var images = imageRows
             .GroupBy(x => x.ProductId)
             .ToDictionary(
                 group => group.Key,
-                group => ResolveImageValue(
-                    group.First().ImageUrl,
-                    group.First().ImageStorageKey));
-
+                group => group.First().ImageUrl);
         var requestedQuantities = lines.ToDictionary(x => x.SaleLineId, x => x.ReturnQty);
         var items = new List<PosReturnCreditPreviewItemDto>(lineRows.Count);
         decimal itemValue = 0;
@@ -2509,22 +2497,11 @@ public sealed class PosReturnRepository : IPosReturnRepository
             .Select(x => x.VariantId!.Value)
             .Distinct()
             .ToArray();
-        var imageRows = await _dbContext.ProductImages
-            .AsNoTracking()
-            .Where(x => x.TenantId == tenantId &&
-                        productIds.Contains(x.ProductId) &&
-                        x.Status == "ACTIVE")
-            .OrderByDescending(x => x.IsPrimaryImage)
-            .ThenBy(x => x.SortOrder)
-            .Select(x => new
-            {
-                x.ProductId,
-                x.ProductVariantId,
-                x.ImageUrl,
-                x.ImageStorageKey
-            })
-            .ToListAsync(cancellationToken);
-
+        var imageRows = await BuildProductImageRowsAsync(
+            tenantId,
+            productIds,
+            activeOnly: true,
+            cancellationToken);
         var barcodeRows = await _dbContext.ProductBarcodes
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId &&
@@ -2557,18 +2534,18 @@ public sealed class PosReturnRepository : IPosReturnRepository
             .GroupBy(x => x.ProductVariantId!.Value)
             .ToDictionary(
                 group => group.Key,
-                group => ResolveImageValue(group.First().ImageUrl, group.First().ImageStorageKey));
+                group => group.First().ImageUrl);
         var imageByProduct = imageRows
             .Where(x => !x.ProductVariantId.HasValue)
             .GroupBy(x => x.ProductId)
             .ToDictionary(
                 group => group.Key,
-                group => ResolveImageValue(group.First().ImageUrl, group.First().ImageStorageKey));
+                group => group.First().ImageUrl);
         var imageByProductAny = imageRows
             .GroupBy(x => x.ProductId)
             .ToDictionary(
                 group => group.Key,
-                group => ResolveImageValue(group.First().ImageUrl, group.First().ImageStorageKey));
+                group => group.First().ImageUrl);
 
         var policyIds = lineRows
             .Where(x => x.ReturnPolicyId.HasValue)
@@ -2823,7 +2800,7 @@ public sealed class PosReturnRepository : IPosReturnRepository
             resolvedPolicies.Add(policy);
         }
 
-        // Hierarchy: product.ReturnPolicyId (ACTIVE) → tenant default ACTIVE policy.
+        // Hierarchy: product.ReturnPolicyId (ACTIVE) â†’ tenant default ACTIVE policy.
         // Categories have no return-policy attribute in the current schema.
         var requiresReceipt = resolvedPolicies.Any(policy => policy?.RequiresReceipt == true);
         var requiresManagerApproval = resolvedPolicies.Any(policy =>
@@ -4075,16 +4052,14 @@ public sealed class PosReturnRepository : IPosReturnRepository
             variantIds,
             cancellationToken);
 
-        var imageRows = await _dbContext.ProductImages.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId) && x.Status == "ACTIVE")
-            .OrderBy(x => x.IsPrimaryImage ? 0 : 1)
-            .ThenBy(x => x.SortOrder)
-            .Select(x => new { x.ProductId, x.ImageStorageKey, x.ImageUrl })
-            .ToListAsync(cancellationToken);
+        var imageRows = await BuildProductImageRowsAsync(
+            tenantId,
+            productIds,
+            activeOnly: true,
+            cancellationToken);
         var imageByProduct = imageRows
             .GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => x.First().ImageUrl ?? x.First().ImageStorageKey);
-
+            .ToDictionary(x => x.Key, x => x.First().ImageUrl);
         var items = new List<PosExchangeReplacementItemDto>(lines.Count);
         foreach (var line in lines)
         {
@@ -4830,7 +4805,7 @@ public sealed class PosReturnRepository : IPosReturnRepository
             })
             .ToListAsync(cancellationToken);
 
-        // Successful final settlement states only — do not use display PaymentMethod text.
+        // Successful final settlement states only â€” do not use display PaymentMethod text.
         var successful = payments
             .Where(x => x.PaymentStatus is "PAID" or "PARTIALLY_REFUNDED")
             .ToList();
@@ -5060,7 +5035,7 @@ public sealed class PosReturnRepository : IPosReturnRepository
         }
         else if (windowDays > 0)
         {
-            // Neutral technical summary — never invent packaging/business rules.
+            // Neutral technical summary â€” never invent packaging/business rules.
             policyNote = $"Return window: {windowDays} days";
         }
 
@@ -5073,13 +5048,48 @@ public sealed class PosReturnRepository : IPosReturnRepository
             policyNote);
     }
 
-    private static string? ResolveImageValue(string? imageUrl, string imageStorageKey) =>
-        !string.IsNullOrWhiteSpace(imageUrl)
-            ? imageUrl.Trim()
-            : string.IsNullOrWhiteSpace(imageStorageKey)
-                ? null
-                : imageStorageKey.Trim();
+    private async Task<IReadOnlyList<ProductImageLookupRow>> BuildProductImageRowsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> productIds,
+        bool activeOnly,
+        CancellationToken cancellationToken)
+    {
+        if (productIds.Count == 0)
+        {
+            return [];
+        }
 
+        var rows = await (from image in _dbContext.ProductImages.AsNoTracking()
+                          join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                              on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                              equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                          from mediaAsset in mediaAssets.DefaultIfEmpty()
+                          where image.TenantId == tenantId &&
+                                productIds.Contains(image.ProductId) &&
+                                (!activeOnly || image.Status == "ACTIVE")
+                          orderby image.IsPrimaryImage descending, image.SortOrder, image.Id
+                          select new
+                          {
+                              image.ProductId,
+                              image.ProductVariantId,
+                              image.ImageUrl,
+                              image.ImageStorageKey,
+                              MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                          })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(x => new ProductImageLookupRow(
+                x.ProductId,
+                x.ProductVariantId,
+                MediaUrlResolver.PreferMediaAsset(x.MediaPublicUrl, x.ImageUrl, x.ImageStorageKey)))
+            .ToList();
+    }
+
+    private sealed record ProductImageLookupRow(
+        Guid ProductId,
+        Guid? ProductVariantId,
+        string? ImageUrl);
     /// <summary>
     /// Rejects values that look like PAN or CVV. Safe payment numbers / short refs are allowed.
     /// </summary>

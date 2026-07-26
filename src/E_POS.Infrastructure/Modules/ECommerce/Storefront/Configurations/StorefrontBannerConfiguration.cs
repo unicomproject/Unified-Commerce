@@ -1,4 +1,5 @@
-using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
+﻿using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -40,6 +41,10 @@ public class StorefrontBannerConfiguration : IEntityTypeConfiguration<Storefront
             .HasMaxLength(500)
             .IsRequired();
 
+        builder.Property(x => x.ImageMediaAssetId)
+            .HasColumnName("image_media_asset_id")
+            .IsRequired(false);
+
         builder.Property(x => x.ActionText)
             .HasColumnName("action_text")
             .HasMaxLength(50);
@@ -66,12 +71,21 @@ public class StorefrontBannerConfiguration : IEntityTypeConfiguration<Storefront
         // Constraints and indexes
         builder.HasIndex(x => x.TenantId).HasDatabaseName("ix_storefront_banners_tenant_id");
         builder.HasIndex(x => x.SalesChannelId).HasDatabaseName("ix_storefront_banners_sales_channel_id");
+        builder.HasIndex(x => new { x.TenantId, x.ImageMediaAssetId })
+            .HasDatabaseName("ix_storefront_banners_tenant_id_image_media_asset_id");
         
         // Tenant FK
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
             .HasConstraintName("fk_storefront_banners_tenant_id_tenants")
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<MediaAsset>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.ImageMediaAssetId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .HasConstraintName("fk_storefront_banners_image_media_asset_tenant")
             .OnDelete(DeleteBehavior.Restrict);
 
         // SalesChannel FK
