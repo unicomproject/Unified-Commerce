@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerOrders.Repositories;
@@ -21,10 +22,7 @@ public sealed class CustomerOrderRepositoryTests
         var ownOrder = AddOrderWithLine(dbContext, tenantId, customerId, productId, "SO-WEB-OWN", 2m);
         AddOrderWithLine(dbContext, tenantId, Guid.NewGuid(), Guid.NewGuid(), "SO-WEB-OTHER-CUSTOMER", 1m);
         AddOrderWithLine(dbContext, Guid.NewGuid(), customerId, Guid.NewGuid(), "SO-WEB-OTHER-TENANT", 1m);
-        dbContext.ProductImages.Add(ProductImage.Create(
-            Guid.NewGuid(), tenantId, productId, null, null,
-            "jersey-main", "/images/jersey.jpg", "Jersey", "MAIN", "image/jpeg",
-            null, null, null, null, 0, true, "ACTIVE", null, Now));
+        AddProductImage(dbContext, tenantId, productId, "/images/jersey.jpg");
         await dbContext.SaveChangesAsync();
         var repository = new CustomerOrderRepository(dbContext);
 
@@ -78,10 +76,7 @@ public sealed class CustomerOrderRepositoryTests
         var productId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         var order = AddOrderWithLine(dbContext, tenantId, customerId, productId, "SO-WEB-PENDING", 2m);
-        dbContext.ProductImages.Add(ProductImage.Create(
-            Guid.NewGuid(), tenantId, productId, null, null,
-            "jersey-main", "/images/jersey.jpg", "Jersey", "MAIN", "image/jpeg",
-            null, null, null, null, 0, true, "ACTIVE", null, Now));
+        AddProductImage(dbContext, tenantId, productId, "/images/jersey.jpg");
         await dbContext.SaveChangesAsync();
         var repository = new CustomerOrderRepository(dbContext);
 
@@ -298,6 +293,43 @@ public sealed class CustomerOrderRepositoryTests
         return order;
     }
 
+    private static void AddProductImage(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        Guid productId,
+        string publicUrl)
+    {
+        var mediaAssetId = Guid.NewGuid();
+        dbContext.MediaAssets.Add(CreateMediaAsset(tenantId, mediaAssetId, publicUrl, "PRODUCT"));
+        dbContext.ProductImages.Add(ProductImage.Create(
+            Guid.NewGuid(), tenantId, productId, null, null,
+            "jersey-main", publicUrl, "Jersey", "MAIN", "image/jpeg",
+            null, null, null, null, 0, true, "ACTIVE", null, Now, mediaAssetId));
+    }
+
+    private static MediaAsset CreateMediaAsset(
+        Guid tenantId,
+        Guid mediaAssetId,
+        string publicUrl,
+        string purpose) =>
+        MediaAsset.Create(
+            mediaAssetId,
+            tenantId,
+            "images",
+            $"tests/{mediaAssetId:D}.jpg",
+            publicUrl,
+            "test.jpg",
+            "image/jpeg",
+            ".jpg",
+            1,
+            null,
+            null,
+            mediaAssetId.ToString("N"),
+            "IMAGE",
+            purpose,
+            "ACTIVE",
+            null,
+            Now);
     private static EPosDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<EPosDbContext>()

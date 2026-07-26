@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
+using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -35,11 +35,6 @@ public class StorefrontBannerConfiguration : IEntityTypeConfiguration<Storefront
 
         builder.Property(x => x.Subtitle)
             .HasColumnName("subtitle");
-
-        builder.Property(x => x.ImageUrl)
-            .HasColumnName("image_url")
-            .HasMaxLength(500)
-            .IsRequired();
 
         builder.Property(x => x.ImageMediaAssetId)
             .HasColumnName("image_media_asset_id")

@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -69,12 +69,6 @@ public sealed class TenantProfileConfiguration : IEntityTypeConfiguration<Tenant
 
         builder.Property(x => x.WebsiteUrl)
             .HasColumnName("website_url")
-            .HasColumnType("varchar(500)")
-            .HasMaxLength(500)
-            .IsRequired(false);
-
-        builder.Property(x => x.LogoUrl)
-            .HasColumnName("logo_url")
             .HasColumnType("varchar(500)")
             .HasMaxLength(500)
             .IsRequired(false);

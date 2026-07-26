@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
@@ -11,7 +11,6 @@ public class Category : AuditableEntity
     public string CategoryName { get; protected set; } = string.Empty;
     public string CategorySlug { get; protected set; } = string.Empty;
     public string? Description { get; protected set; }
-    public string? ImageUrl { get; protected set; }
     public Guid? ImageMediaAssetId { get; protected set; }
     public int SortOrder { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
@@ -19,17 +18,16 @@ public class Category : AuditableEntity
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
     public static Category Create(
-        Guid id, 
-        Guid tenantId, 
+        Guid id,
+        Guid tenantId,
         Guid departmentId,
         Guid? parentCategoryId,
-        string categoryCode, 
-        string categoryName, 
+        string categoryCode,
+        string categoryName,
         string categorySlug,
         string? description,
-        string? imageUrl,
         int sortOrder,
-        string status, 
+        string status,
         Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
@@ -43,7 +41,6 @@ public class Category : AuditableEntity
             CategoryName = categoryName.Trim(),
             CategorySlug = categorySlug.Trim().ToLowerInvariant(),
             Description = description?.Trim(),
-            ImageUrl = imageUrl?.Trim(),
             SortOrder = sortOrder,
             Status = status.Trim().ToUpperInvariant(),
             CreatedByTenantUserId = createdByTenantUserId,
@@ -56,13 +53,12 @@ public class Category : AuditableEntity
     public void UpdateProfile(
         Guid departmentId,
         Guid? parentCategoryId,
-        string categoryCode, 
-        string categoryName, 
+        string categoryCode,
+        string categoryName,
         string categorySlug,
         string? description,
-        string? imageUrl,
         int sortOrder,
-        string status, 
+        string status,
         Guid? updatedByTenantUserId,
         DateTimeOffset now)
     {
@@ -72,7 +68,6 @@ public class Category : AuditableEntity
         CategoryName = categoryName.Trim();
         CategorySlug = categorySlug.Trim().ToLowerInvariant();
         Description = description?.Trim();
-        ImageUrl = imageUrl?.Trim();
         SortOrder = sortOrder;
         Status = status.Trim().ToUpperInvariant();
         UpdatedByTenantUserId = updatedByTenantUserId;
@@ -87,14 +82,38 @@ public class Category : AuditableEntity
     }
 
     public void UpdateImage(
+        Guid? imageMediaAssetId,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        ImageMediaAssetId = imageMediaAssetId;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+    public static Category Create(
+        Guid id,
+        Guid tenantId,
+        Guid departmentId,
+        Guid? parentCategoryId,
+        string categoryCode,
+        string categoryName,
+        string categorySlug,
+        string? description,
+        string? imageUrl,
+        int sortOrder,
+        string status,
+        Guid? createdByTenantUserId,
+        DateTimeOffset now)
+    {
+        return Create(id, tenantId, departmentId, parentCategoryId, categoryCode, categoryName, categorySlug, description, sortOrder, status, createdByTenantUserId, now);
+    }
+
+    public void UpdateImage(
         string? imageUrl,
         Guid? imageMediaAssetId,
         Guid? updatedByTenantUserId,
         DateTimeOffset now)
     {
-        ImageUrl = imageUrl?.Trim();
-        ImageMediaAssetId = imageMediaAssetId;
-        UpdatedByTenantUserId = updatedByTenantUserId;
-        UpdatedAt = now;
+        UpdateImage(imageMediaAssetId, updatedByTenantUserId, now);
     }
 }

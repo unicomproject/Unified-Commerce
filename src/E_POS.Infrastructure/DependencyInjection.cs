@@ -59,7 +59,6 @@ using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Services;
-using E_POS.Infrastructure.Modules.Shared.Storage.Options;
 using E_POS.Application.Modules.Shared.Storage.Contracts;
 using E_POS.Infrastructure.Modules.Shared.Storage.Services;
 using E_POS.Infrastructure.Modules.Shared.Media.Options;

@@ -679,7 +679,6 @@ public sealed partial class PlatformTenantService
             contactEmail,
             contactPhone,
             null, // websiteUrl
-            null, // logoUrl
             null, // description
             platformUserId,
             now);

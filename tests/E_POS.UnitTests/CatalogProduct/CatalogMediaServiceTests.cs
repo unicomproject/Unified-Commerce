@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Media.Dtos;
@@ -53,13 +53,13 @@ public sealed class CatalogMediaServiceTests
         Assert.Equal(result.Value.MediaAssetId, productImage.MediaAssetId);
         Assert.Equal(ProductId, productImage.ProductId);
         Assert.Equal("PRODUCT", productImage.ImagePurpose);
-        Assert.Equal("image/png", productImage.MimeType);
-        Assert.Equal(1, productImage.WidthPx);
-        Assert.Equal(1, productImage.HeightPx);
+        Assert.Equal("image/png", mediaAsset.MimeType);
+        Assert.Equal(1, mediaAsset.WidthPx);
+        Assert.Equal(1, mediaAsset.HeightPx);
         Assert.True(productImage.IsPrimaryImage);
         Assert.Equal(2, productImage.SortOrder);
-        Assert.Equal(storage.Uploads.Single().StorageKey, productImage.ImageStorageKey);
-        Assert.Equal(storage.Uploads.Single().PublicUrl, productImage.ImageUrl);
+        Assert.Equal(storage.Uploads.Single().StorageKey, mediaAsset.StorageKey);
+        Assert.Equal(storage.Uploads.Single().PublicUrl, mediaAsset.PublicUrl);
     }
 
     [Fact]

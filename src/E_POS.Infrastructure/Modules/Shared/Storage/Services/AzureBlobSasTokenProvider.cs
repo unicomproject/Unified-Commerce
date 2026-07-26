@@ -2,7 +2,7 @@ using System;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
 using E_POS.Application.Modules.Shared.Storage.Contracts;
-using E_POS.Infrastructure.Modules.Shared.Storage.Options;
+using E_POS.Infrastructure.Modules.Shared.Media.Options;
 using Microsoft.Extensions.Options;
 
 namespace E_POS.Infrastructure.Modules.Shared.Storage.Services;
@@ -35,14 +35,20 @@ public sealed class AzureBlobSasTokenProvider : IAzureSasTokenProvider
 
         try
         {
+            var publicBaseUrl = _options.PublicBaseUrl;
+            if (string.IsNullOrWhiteSpace(publicBaseUrl))
+            {
+                return blobUrl;
+            }
+
             // Extract blob name from URL based on the configured public base URL
-            if (!blobUrl.StartsWith(_options.PublicBaseUrl, StringComparison.OrdinalIgnoreCase))
+            if (!blobUrl.StartsWith(publicBaseUrl, StringComparison.OrdinalIgnoreCase))
             {
                 // If it doesn't match the expected base URL, just return it as is
                 return blobUrl;
             }
 
-            string relativePath = blobUrl.Substring(_options.PublicBaseUrl.Length).TrimStart('/');
+            string relativePath = blobUrl.Substring(publicBaseUrl.Length).TrimStart('/');
             
             // Expected format: containerName/blobName
             string[] parts = relativePath.Split('/', 2);

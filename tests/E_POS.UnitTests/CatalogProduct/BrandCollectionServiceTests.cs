@@ -90,7 +90,6 @@ public sealed class BrandCollectionServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Null(brand.LogoUrl);
         Assert.Null(brand.LogoMediaAssetId);
         Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
     }
@@ -187,7 +186,7 @@ public sealed class BrandCollectionServiceTests
         public Task<BrandResponse?> GetByIdAsync(Guid tenantId, Guid brandId, bool includeDeleted, CancellationToken cancellationToken)
         {
             var brand = AddedBrand ?? EditableBrand;
-            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, brand!.BrandCode, brand.BrandName, brand.LogoUrl, brand.LogoMediaAssetId, brand.Status, brand.CreatedAt, brand.UpdatedAt));
+            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, brand!.BrandCode, brand.BrandName, null, brand.LogoMediaAssetId, brand.Status, brand.CreatedAt, brand.UpdatedAt));
         }
 
         public Task<Brand?> GetEditableAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)

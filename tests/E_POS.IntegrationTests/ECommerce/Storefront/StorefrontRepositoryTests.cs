@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -66,6 +66,7 @@ public sealed class StorefrontRepositoryTests
 
         await using var dbContext = CreateDbContext();
         dbContext.Categories.AddRange(rootTwo, rootOne, child, inactiveRoot, otherTenantRoot);
+        AddCategoryImage(dbContext, rootOne, "/images/clothing.jpg");
         dbContext.Products.AddRange(
             CreateProduct(tenantId, activeProductId, "JERSEY", "Jersey", true, ProductConstants.ActiveStatus),
             CreateProduct(tenantId, secondActiveProductId, "CAP", "Cap", true, ProductConstants.ActiveStatus),
@@ -133,6 +134,7 @@ public sealed class StorefrontRepositoryTests
 
         await using var dbContext = CreateDbContext();
         dbContext.Categories.AddRange(parent, otherParent, expectedSecond, expectedFirst, inactiveChild, otherParentChild, otherTenantChild);
+        AddCategoryImage(dbContext, expectedFirst, "/images/jerseys.jpg");
         dbContext.Products.AddRange(
             CreateProduct(tenantId, jerseysProductId, "JERSEY", "Jersey", true, ProductConstants.ActiveStatus),
             CreateProduct(tenantId, tshirtsProductId, "TEE", "Tee", true, ProductConstants.ActiveStatus),
@@ -320,8 +322,7 @@ public sealed class StorefrontRepositoryTests
         dbContext.PriceListItems.AddRange(
             PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, homeProductId, null, null, 74.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now),
             PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, kidsProductId, null, null, 54.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now));
-        dbContext.ProductImages.Add(
-            ProductImage.Create(Guid.NewGuid(), tenantId, homeProductId, null, null, "home-main", "/images/home.jpg", null, "MAIN", "image/jpeg", null, null, null, null, 1, true, "ACTIVE", null, Now));
+        AddProductImage(dbContext, tenantId, homeProductId, "/images/home.jpg", null, 1, true);
         dbContext.ProductRatingSummaries.Add(homeRating);
         dbContext.InventoryBalances.AddRange(homeInventory, kidsInventory);
         await dbContext.SaveChangesAsync();
@@ -443,9 +444,8 @@ public sealed class StorefrontRepositoryTests
         dbContext.PriceListItems.AddRange(
             PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, productId, null, null, 74.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now),
             PriceListItem.Create(Guid.NewGuid(), tenantId, priceListId, productId, mediumVariantId, null, 79.99m, null, 1m, Now.AddDays(-2), null, "ACTIVE", null, Now));
-        dbContext.ProductImages.AddRange(
-            ProductImage.Create(Guid.NewGuid(), tenantId, productId, null, null, "home-alt", "/images/home-alt.jpg", "Side", "MAIN", "image/jpeg", null, null, null, null, 1, false, "ACTIVE", null, Now),
-            ProductImage.Create(Guid.NewGuid(), tenantId, productId, null, null, "home-main", "/images/home-main.jpg", "Front", "MAIN", "image/jpeg", null, null, null, null, 2, true, "ACTIVE", null, Now));
+        AddProductImage(dbContext, tenantId, productId, "/images/home-alt.jpg", "Side", 1, false);
+        AddProductImage(dbContext, tenantId, productId, "/images/home-main.jpg", "Front", 2, true);
         dbContext.ProductRatingSummaries.Add(rating);
         dbContext.ProductOptions.AddRange(
             ProductOption.Create(colourOptionId, tenantId, productId, null, "COLOUR", "Colour", "VARIANT", "SWATCH", true, 1, ProductConstants.ActiveStatus, null, Now),
@@ -572,9 +572,8 @@ public sealed class StorefrontRepositoryTests
             CreateProduct(otherTenantId, Guid.NewGuid(), "OTHER", "Other", true, ProductConstants.ActiveStatus));
         dbContext.PriceLists.Add(CreatePriceList(tenantId, priceListId));
         dbContext.PriceListItems.AddRange(olderPrice, latestPrice);
-        dbContext.ProductImages.AddRange(
-            ProductImage.Create(Guid.NewGuid(), tenantId, productId, null, null, "apple-main", "/images/apple-main.jpg", null, "MAIN", "image/jpeg", null, null, null, null, 2, true, "ACTIVE", null, Now),
-            ProductImage.Create(Guid.NewGuid(), tenantId, productId, null, null, "apple-alt", "/images/apple-alt.jpg", null, "MAIN", "image/jpeg", null, null, null, null, 1, false, "ACTIVE", null, Now));
+        AddProductImage(dbContext, tenantId, productId, "/images/apple-main.jpg", null, 2, true);
+        AddProductImage(dbContext, tenantId, productId, "/images/apple-alt.jpg", null, 1, false);
         dbContext.ProductRatingSummaries.Add(rating);
         await dbContext.SaveChangesAsync();
         var repository = new StorefrontRepository(
@@ -761,6 +760,42 @@ public sealed class StorefrontRepositoryTests
             null,
             Now);
 
+    private static void AddCategoryImage(
+        EPosDbContext dbContext,
+        Category category,
+        string publicUrl)
+    {
+        var mediaAssetId = Guid.NewGuid();
+        category.UpdateImage(mediaAssetId, updatedByTenantUserId: null, Now);
+        dbContext.MediaAssets.Add(CreateMediaAsset(category.TenantId, mediaAssetId, publicUrl, "CATEGORY"));
+    }
+
+    private static void AddProductImage(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        Guid productId,
+        string publicUrl,
+        string? altText,
+        int sortOrder,
+        bool isPrimary)
+    {
+        var mediaAssetId = Guid.NewGuid();
+        dbContext.MediaAssets.Add(CreateMediaAsset(tenantId, mediaAssetId, publicUrl, "PRODUCT"));
+        dbContext.ProductImages.Add(ProductImage.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            productVariantId: null,
+            salesChannelId: null,
+            mediaAssetId,
+            altText,
+            "MAIN",
+            sortOrder,
+            isPrimary,
+            "ACTIVE",
+            createdByTenantUserId: null,
+            Now));
+    }
     private static MediaAsset CreateMediaAsset(
         Guid tenantId,
         Guid mediaAssetId,

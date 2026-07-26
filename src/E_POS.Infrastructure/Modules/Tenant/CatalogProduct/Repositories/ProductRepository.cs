@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -158,14 +158,12 @@ public sealed class ProductRepository : IProductRepository
                                orderby image.SortOrder
                                select new
                                {
-                                   image.ImageUrl,
-                                   image.ImageStorageKey,
                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                })
             .ToListAsync(cancellationToken);
 
         var imageUrls = imageRows
-            .Select(x => MediaUrlResolver.PreferMediaAssetOrEmpty(x.MediaPublicUrl, x.ImageUrl, x.ImageStorageKey))
+            .Select(x => x.MediaPublicUrl ?? string.Empty)
             .ToArray();
 
         var salesChannelIds = await _dbContext.ProductChannelVisibilities

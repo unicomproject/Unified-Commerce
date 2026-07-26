@@ -13,7 +13,7 @@ public sealed class CategoryBrandMediaProjectionTests
     private static readonly DateTimeOffset Now = new(2026, 7, 24, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task CategoryListAndDetail_UseActiveMedia_FallbackLegacy_AndRejectInactiveOrCrossTenantMedia()
+    public async Task CategoryListAndDetail_UseActiveMedia_AndRejectUnlinkedInactiveOrCrossTenantMedia()
     {
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
@@ -92,7 +92,7 @@ public sealed class CategoryBrandMediaProjectionTests
         Assert.Equal(activeMedia.Id, activeItem.ImageMediaAssetId);
 
         var legacyItem = Assert.Single(list.Items, item => item.Id == legacyCategory.Id);
-        Assert.Equal("https://legacy.example.test/category-legacy.png", legacyItem.ImageUrl);
+        Assert.Null(legacyItem.ImageUrl);
         Assert.Null(legacyItem.ImageMediaAssetId);
 
         var inactiveItem = Assert.Single(list.Items, item => item.Id == inactiveCategory.Id);
@@ -116,7 +116,7 @@ public sealed class CategoryBrandMediaProjectionTests
     }
 
     [Fact]
-    public async Task BrandListAndDetail_UseActiveMedia_FallbackLegacy_AndRejectInactiveOrCrossTenantMedia()
+    public async Task BrandListAndDetail_UseActiveMedia_AndRejectUnlinkedInactiveOrCrossTenantMedia()
     {
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
@@ -195,7 +195,7 @@ public sealed class CategoryBrandMediaProjectionTests
         Assert.Equal(activeMedia.Id, activeItem.LogoMediaAssetId);
 
         var legacyItem = Assert.Single(list.Items, item => item.Id == legacyBrand.Id);
-        Assert.Equal("https://legacy.example.test/brand-legacy.png", legacyItem.LogoUrl);
+        Assert.Null(legacyItem.LogoUrl);
         Assert.Null(legacyItem.LogoMediaAssetId);
 
         var inactiveItem = Assert.Single(list.Items, item => item.Id == inactiveBrand.Id);
