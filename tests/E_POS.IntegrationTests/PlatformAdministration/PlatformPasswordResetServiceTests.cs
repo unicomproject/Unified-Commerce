@@ -1,7 +1,10 @@
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Infrastructure.Common.Security;
@@ -220,11 +223,19 @@ public sealed class PlatformPasswordResetServiceTests
         EPosDbContext dbContext,
         DateTimeOffset? utcNow = null)
     {
+        var dateTime = new FixedDateTimeProvider(utcNow ?? Now);
         return new PlatformPasswordResetService(
             new PlatformPasswordResetRepository(dbContext),
-            new RefreshTokenGenerator(new FixedDateTimeProvider(utcNow ?? Now)),
+            new PlatformUserRepository(dbContext),
+            new PlatformAuthRepository(dbContext, new PlatformPermissionRepository(dbContext)),
+            new AllowAllPermissionChecker(),
+            new RefreshTokenGenerator(dateTime),
             new TokenHashService(),
-            new FixedDateTimeProvider(utcNow ?? Now),
+            new PasswordHashService(),
+            new PlatformPasswordPolicyValidator(),
+            new FixedLinkBuilder(),
+            new PassthroughDeliveryService(),
+            dateTime,
             JwtSettings);
     }
 
@@ -240,5 +251,28 @@ public sealed class PlatformPasswordResetServiceTests
     private sealed class FixedDateTimeProvider(DateTimeOffset utcNow) : IDateTimeProvider
     {
         public DateTimeOffset UtcNow { get; } = utcNow;
+    }
+
+    private sealed class AllowAllPermissionChecker : IPlatformPermissionChecker
+    {
+        public Task<bool> HasPermissionAsync(Guid platformUserId, string permissionCode, CancellationToken cancellationToken)
+            => Task.FromResult(true);
+    }
+
+    private sealed class FixedLinkBuilder : IPlatformPasswordResetLinkBuilder
+    {
+        public string BuildResetUrl(string rawToken) => $"https://admin.test/reset-password?token={rawToken}";
+    }
+
+    private sealed class PassthroughDeliveryService : IPlatformPasswordResetDeliveryService
+    {
+        public Task<ApplicationResult<PlatformPasswordResetDeliveryResult>> DeliverAsync(
+            PlatformPasswordResetDeliveryRequest request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(ApplicationResult<PlatformPasswordResetDeliveryResult>.Success(
+                new PlatformPasswordResetDeliveryResult(
+                    PlatformPasswordResetConstants.DeliveryModeAdminSecureLink,
+                    request.ResetUrl,
+                    "ok")));
     }
 }

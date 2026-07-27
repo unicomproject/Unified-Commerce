@@ -25,6 +25,8 @@ using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
+using E_POS.Application.Common.Email;
+using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
@@ -116,6 +118,21 @@ public static class DependencyInjection
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();
         services.AddScoped<IPlatformPasswordResetRepository, PlatformPasswordResetRepository>();
+        services.AddScoped<IPlatformPasswordResetLinkBuilder, PlatformPasswordResetLinkBuilder>();
+        services.AddSingleton<IValidateOptions<AzureCommunicationEmailOptions>, AzureCommunicationEmailOptionsValidator>();
+        services.AddOptions<AzureCommunicationEmailOptions>()
+            .Bind(configuration.GetSection(AzureCommunicationEmailOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IApplicationEmailSender, AzureCommunicationEmailSender>();
+        services.AddScoped<IPlatformPasswordResetDeliveryService, AcsPlatformPasswordResetDeliveryService>();
+        services.AddScoped(static provider =>
+        {
+            var configuration = provider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var section = configuration.GetSection("PlatformPasswordReset");
+            return new PlatformPasswordResetSettings(
+                section["PublicAppBaseUrl"] ?? "http://localhost:4200",
+                section["ResetPath"] ?? "/reset-password");
+        });
         services.AddScoped<IPlatformSubscriptionPlanRepository, PlatformSubscriptionPlanRepository>();
         services.AddScoped<ITenantUsageCounterRepository, TenantUsageCounterRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();

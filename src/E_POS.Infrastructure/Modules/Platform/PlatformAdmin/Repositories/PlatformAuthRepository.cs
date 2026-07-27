@@ -129,6 +129,46 @@ public sealed class PlatformAuthRepository : IPlatformAuthRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<int> RevokeAllSessionsForUserAsync(
+        Guid platformUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken,
+        Guid? revokedByPlatformUserId = null,
+        string? revokeReason = null)
+    {
+        var sessions = await _dbContext.PlatformAuthSessions
+            .Where(x => x.PlatformUserId == platformUserId && x.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        if (sessions.Count == 0)
+        {
+            return 0;
+        }
+
+        var sessionIds = sessions.Select(x => x.Id).ToList();
+
+        foreach (var session in sessions)
+        {
+            session.Revoke(now, revokedByPlatformUserId, revokeReason);
+        }
+
+        var activeRefreshTokens = await _dbContext.PlatformRefreshTokens
+            .Where(x => x.PlatformUserId == platformUserId &&
+                        sessionIds.Contains(x.PlatformAuthSessionId) &&
+                        x.UsedAt == null &&
+                        x.RevokedAt == null &&
+                        x.Status == PlatformAuthConstants.ActiveTokenStatus)
+            .ToListAsync(cancellationToken);
+
+        foreach (var refreshToken in activeRefreshTokens)
+        {
+            refreshToken.Revoke(now, revokedByPlatformUserId, revokeReason);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return sessions.Count;
+    }
+
     public async Task<PlatformAuthRefreshContext?> FindRefreshContextByTokenHashAsync(
         string refreshTokenHash,
         CancellationToken cancellationToken)
