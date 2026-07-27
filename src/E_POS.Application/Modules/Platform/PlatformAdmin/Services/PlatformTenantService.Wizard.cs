@@ -195,6 +195,13 @@ public sealed partial class PlatformTenantService
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(businessTypeResolution.Error);
         }
 
+        var subscriptionRequest = request.Subscription;
+        var createMode = TenantCreateModeResolver.Resolve(
+            subscriptionRequest?.SubscriptionStatus,
+            subscriptionRequest?.BillingCycle,
+            isLegacyMinimalCreate: false);
+        var initialLifecycleStatus = TenantCreateModeResolver.InitialLifecycleStatus(createMode);
+
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
@@ -202,7 +209,7 @@ public sealed partial class PlatformTenantService
             code,
             code.ToLowerInvariant(),
             name,
-            billingStatus,
+            initialLifecycleStatus,
             NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
             NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
             null, // dataRegion
@@ -210,6 +217,12 @@ public sealed partial class PlatformTenantService
             now,
             NormalizeOptionalText(request.DefaultLocale),
             NormalizeOptionalText(request.OperatingMode));
+
+        // Trial/Demo: create (DRAFT) then activate separately in the same orchestration → ACTIVE.
+        if (createMode is TenantCreateMode.Trial or TenantCreateMode.Demo)
+        {
+            tenant.Activate(platformUserId, now);
+        }
 
         var profile = CreateTenantProfileOrNull(
             tenantId,
@@ -219,7 +232,6 @@ public sealed partial class PlatformTenantService
             businessTypeResolution.Value);
         var address = CreateTenantAddressOrNull(tenantId, request, now);
 
-        var subscriptionRequest = request.Subscription;
         var billingCycle = NormalizeBillingCycle(subscriptionRequest?.BillingCycle);
         var subscriptionStatus = NormalizeSubscriptionStatus(subscriptionRequest?.SubscriptionStatus);
 
@@ -251,6 +263,11 @@ public sealed partial class PlatformTenantService
             currentPeriodEnd: null,
             assignedByPlatformUserId: platformUserId,
             now);
+
+        if (createMode is TenantCreateMode.Trial or TenantCreateMode.Demo)
+        {
+            subscription.Activate(now);
+        }
 
         var entitlements = resolvedFeatureIds
             .Distinct()
@@ -512,12 +529,13 @@ public sealed partial class PlatformTenantService
 
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
+        // Legacy minimal create always provisions a TRIAL subscription → auto-activate to ACTIVE.
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
             tenantId,
             code,
             code.ToLowerInvariant(),
             name,
-            billingStatus,
+            TenantStatusConstants.Draft,
             NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
             NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
             null, // dataRegion
@@ -525,6 +543,7 @@ public sealed partial class PlatformTenantService
             now,
             NormalizeOptionalText(request.DefaultLocale),
             NormalizeOptionalText(request.OperatingMode));
+        tenant.Activate(platformUserId, now);
 
         var subscription = TenantSubscription.Create(
             Guid.NewGuid(),
@@ -553,6 +572,7 @@ public sealed partial class PlatformTenantService
             currentPeriodEnd: null,
             assignedByPlatformUserId: platformUserId,
             now);
+        subscription.Activate(now);
 
         await _repository.AddTenantWithSubscriptionAndEntitlementsAsync(
             tenant,
@@ -746,6 +766,7 @@ public sealed partial class PlatformTenantService
         {
             TenantSubscriptionBillingConstants.BillingCycleMonthly => TenantSubscriptionBillingConstants.BillingCycleMonthly,
             TenantSubscriptionBillingConstants.BillingCycleYearly => TenantSubscriptionBillingConstants.BillingCycleYearly,
+            TenantCreateModeResolver.DemoBillingCycle => TenantCreateModeResolver.DemoBillingCycle,
             _ => TenantSubscriptionBillingConstants.BillingCycleMonthly
         };
     }

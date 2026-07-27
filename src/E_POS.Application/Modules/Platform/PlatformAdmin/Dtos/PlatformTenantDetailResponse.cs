@@ -5,6 +5,10 @@ public sealed record PlatformTenantDetailResponse(
     string Code,
     string Name,
     string Status,
+    /// <summary>
+    /// Temporary compatibility field. Historically sourced from subscription status for filters.
+    /// Not the canonical tenant lifecycle; prefer <see cref="LifecycleStatus"/>.
+    /// </summary>
     string BillingStatus,
     string OperatingMode,
     string BaseCurrency,
@@ -28,5 +32,9 @@ public sealed record PlatformTenantDetailResponse(
     bool CanUpdate,
     bool CanActivate,
     bool CanSuspend,
-    bool CanManageEntitlements);
+    bool CanManageEntitlements,
+    /// <summary>
+    /// Authoritative tenant lifecycle status from <c>tenants.status</c>.
+    /// </summary>
+    string LifecycleStatus = "");
 

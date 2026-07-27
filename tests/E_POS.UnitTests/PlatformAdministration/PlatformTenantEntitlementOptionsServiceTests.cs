@@ -236,6 +236,9 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             return Task.CompletedTask;
         }
 
+        public Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,
             CancellationToken cancellationToken) =>

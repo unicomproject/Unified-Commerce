@@ -19,13 +19,14 @@ public static partial class PlatformTenantCreateRequestValidator
     ];
 
     private static readonly HashSet<string> AllowedSubscriptionStatuses =
-    [
-        TenantSubscriptionStatusConstants.Trial,
-        TenantSubscriptionStatusConstants.Active,
-        TenantSubscriptionStatusConstants.PastDue,
-        TenantSubscriptionStatusConstants.Cancelled,
-        TenantSubscriptionStatusConstants.Expired
-    ];
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            TenantSubscriptionStatusConstants.Trial,
+            TenantSubscriptionStatusConstants.Active,
+            TenantSubscriptionStatusConstants.PastDue,
+            TenantSubscriptionStatusConstants.Cancelled,
+            TenantSubscriptionStatusConstants.Expired
+        };
 
     private static readonly HashSet<string> AllowedPaymentMethods =
         TenantSubscriptionBillingConstants.PaymentMethods

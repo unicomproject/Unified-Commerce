@@ -166,7 +166,7 @@ public sealed class SubscriptionBillingDomainPrimitivesPersistenceTests
             "TEN-BILL-6BC",
             "ten-bill-6bc",
             "Billing Primitive Tenant",
-            "pending",
+            "pending_payment",
             "LKR",
             "Asia/Colombo",
             null,

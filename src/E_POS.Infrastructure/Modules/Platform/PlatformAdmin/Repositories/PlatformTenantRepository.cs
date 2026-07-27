@@ -49,11 +49,11 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
 
         return new PlatformTenantSummaryResponse(
             TotalTenants: rows.Count,
-            ActiveTenants: rows.Count(x => IsStatus(x.Status, "active")),
-            SuspendedTenants: rows.Count(x => IsStatus(x.Status, "suspended")),
+            ActiveTenants: rows.Count(x => IsStatus(x.Status, TenantStatusConstants.Active)),
+            SuspendedTenants: rows.Count(x => IsStatus(x.Status, TenantStatusConstants.Suspended)),
             TrialTenants: rows.Count(x => x.HasTrialSubscription),
             PendingActivationTenants: rows.Count(x =>
-                IsStatus(x.Status, "setup_pending") || IsStatus(x.Status, "pending_payment")),
+                IsStatus(x.Status, TenantStatusConstants.PendingActivation)),
             PendingBillingCount: rows.Count(x =>
                 IsStatus(x.BillingStatus, "PAST_DUE")),
             TotalOutlets: rows.Sum(x => x.OutletCount),
@@ -250,7 +250,8 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             CanUpdate: false,
             CanActivate: false,
             CanSuspend: false,
-            CanManageEntitlements: false);
+            CanManageEntitlements: false,
+            LifecycleStatus: tenant.Status);
     }
 
     public Task<bool> TenantCodeExistsAsync(string tenantCode, CancellationToken cancellationToken)
@@ -305,6 +306,17 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
     public Task UpdateTenantAsync(E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant tenant, CancellationToken cancellationToken)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.SubscriptionInvoices
+            .AsNoTracking()
+            .AnyAsync(
+                invoice => invoice.TenantId == tenantId &&
+                           invoice.InvoiceStatus == TenantSubscriptionBillingConstants.InvoiceStatusPaid &&
+                           invoice.PaidAt != null,
+                cancellationToken);
     }
 
     public async Task<TenantSubscription?> GetCurrentTenantSubscriptionEntityAsync(
@@ -702,7 +714,8 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             row.ClickCollectEnabled,
             row.OfflineEnabled,
             row.CreatedAt,
-            row.UpdatedAt);
+            row.UpdatedAt,
+            LifecycleStatus: row.Status);
     }
 
     private static bool HasFeature(IReadOnlySet<string> featureCodes, string featureCode) =>

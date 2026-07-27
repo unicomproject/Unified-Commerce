@@ -74,6 +74,12 @@ public interface IPlatformTenantRepository
     Task<TenantProfile?> GetTenantProfileEntityByTenantIdAsync(Guid tenantId, CancellationToken cancellationToken);
 
     Task UpsertTenantProfileAsync(TenantProfile profile, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// True when the tenant has at least one subscription invoice with authoritative PAID status.
+    /// Used as Release 1 payment-verification evidence for paid activation.
+    /// </summary>
+    Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken);
 }
 
 public interface IPlatformTenantService

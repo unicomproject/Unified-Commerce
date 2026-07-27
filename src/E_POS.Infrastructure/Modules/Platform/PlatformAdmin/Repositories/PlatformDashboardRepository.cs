@@ -39,8 +39,8 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
             .ToHashSet();
 
         var suspendedTenants = tenants.Count(x => IsStatus(x.Status, "suspended"));
-        var setupPendingTenants = tenants.Count(x =>
-            IsStatus(x.Status, "setup_pending") || IsStatus(x.Status, "pending_payment"));
+        var pendingActivationTenants = tenants.Count(x =>
+            IsStatus(x.Status, "pending_activation"));
         var pastDueSubscriptions = subscriptions.Count(x => IsStatus(x.SubscriptionStatus, "PAST_DUE"));
         var pendingBilling = await _dbContext.SubscriptionInvoices.AsNoTracking()
             .CountAsync(x => x.InvoiceStatus == "PENDING" && x.BalanceDue > 0m, cancellationToken);
@@ -55,9 +55,9 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
                 "critical"),
             Attention(
                 "setup_pending",
-                "Setup Pending",
-                "Tenants awaiting payment or initial setup.",
-                setupPendingTenants,
+                "Pending Activation",
+                "Tenants in PENDING_ACTIVATION awaiting Super Admin activation.",
+                pendingActivationTenants,
                 "warning"),
             Attention(
                 "past_due_subscriptions",

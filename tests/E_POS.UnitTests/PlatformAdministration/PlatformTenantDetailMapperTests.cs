@@ -40,7 +40,28 @@ public sealed class PlatformTenantDetailMapperTests
     }
 
     [Fact]
-    public void ApplyActionFlags_WithTrialSubscription_EnablesSuspendWhenPermitted()
+    public void ApplyActionFlags_WithActiveTenant_EnablesSuspendWhenPermitted()
+    {
+        var permissions = new HashSet<string>(StringComparer.Ordinal)
+        {
+            PlatformPermissionCodes.TenantsSuspend
+        };
+
+        var mapped = PlatformTenantDetailMapper.ApplyActionFlags(
+            CreateDetail("active", new PlatformTenantDetailSubscriptionDto(
+                Guid.NewGuid(),
+                "Starter",
+                "ACTIVE",
+                null,
+                null,
+                null)),
+            permissions);
+
+        Assert.True(mapped.CanSuspend);
+    }
+
+    [Fact]
+    public void ApplyActionFlags_WithInactiveLifecycle_DoesNotEnableSuspend()
     {
         var permissions = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -57,7 +78,7 @@ public sealed class PlatformTenantDetailMapperTests
                 null)),
             permissions);
 
-        Assert.True(mapped.CanSuspend);
+        Assert.False(mapped.CanSuspend);
     }
 
     [Fact]

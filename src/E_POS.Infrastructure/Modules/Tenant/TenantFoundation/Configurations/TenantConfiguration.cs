@@ -8,7 +8,12 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<E_POS.Domain.
 {
     public void Configure(EntityTypeBuilder<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant> builder)
     {
-        builder.ToTable("tenants");
+        builder.ToTable("tenants", table =>
+        {
+            table.HasCheckConstraint(
+                "ck_tenants_status",
+                "status IN ('draft', 'pending_payment', 'pending_activation', 'active', 'suspended', 'cancelled')");
+        });
 
         builder.HasKey(x => x.Id).HasName("pk_tenants");
 

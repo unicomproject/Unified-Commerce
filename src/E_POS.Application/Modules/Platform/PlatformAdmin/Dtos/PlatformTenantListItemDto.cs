@@ -5,6 +5,9 @@ public sealed record PlatformTenantListItemDto(
     string Code,
     string Name,
     string Status,
+    /// <summary>
+    /// Temporary compatibility field (subscription status for list filters). Prefer <see cref="LifecycleStatus"/>.
+    /// </summary>
     string BillingStatus,
     string OperatingMode,
     string BaseCurrency,
@@ -19,5 +22,9 @@ public sealed record PlatformTenantListItemDto(
     bool ClickCollectEnabled,
     bool OfflineEnabled,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+    /// <summary>
+    /// Authoritative tenant lifecycle status from <c>tenants.status</c>.
+    /// </summary>
+    string LifecycleStatus = "");
 

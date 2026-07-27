@@ -22418,7 +22418,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_tenants_tenant_slug");
 
-                    b.ToTable("tenants", (string)null);
+                    b.ToTable("tenants", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenants_status", "status IN ('draft', 'pending_payment', 'pending_activation', 'active', 'suspended', 'cancelled')");
+                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantAddress", b =>
