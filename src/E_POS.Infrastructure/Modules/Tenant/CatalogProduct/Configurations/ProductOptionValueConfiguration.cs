@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -63,12 +63,6 @@ public sealed class ProductOptionValueConfiguration : IEntityTypeConfiguration<P
             .HasColumnName("color_hex")
             .HasColumnType("varchar(30)")
             .HasMaxLength(30)
-            .IsRequired(false);
-
-        builder.Property(x => x.ImageUrl)
-            .HasColumnName("image_url")
-            .HasColumnType("varchar(500)")
-            .HasMaxLength(500)
             .IsRequired(false);
 
         builder.Property(x => x.ImageMediaAssetId)

@@ -1,5 +1,5 @@
-﻿using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
-using E_POS.Domain.Modules.Shared.Media.Entities;
+﻿using E_POS.Domain.Modules.Shared.Media.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -49,18 +49,6 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
             .HasColumnName("media_asset_id")
             .IsRequired(false);
 
-        builder.Property(x => x.ImageStorageKey)
-            .HasColumnName("image_storage_key")
-            .HasColumnType("varchar(500)")
-            .HasMaxLength(500)
-            .IsRequired();
-
-        builder.Property(x => x.ImageUrl)
-            .HasColumnName("image_url")
-            .HasColumnType("varchar(500)")
-            .HasMaxLength(500)
-            .IsRequired(false);
-
         builder.Property(x => x.AltText)
             .HasColumnName("alt_text")
             .HasColumnType("varchar(255)")
@@ -72,30 +60,6 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
             .HasColumnType("varchar(40)")
             .HasMaxLength(40)
             .IsRequired();
-
-        builder.Property(x => x.MimeType)
-            .HasColumnName("mime_type")
-            .HasColumnType("varchar(100)")
-            .HasMaxLength(100)
-            .IsRequired(false);
-
-        builder.Property(x => x.FileSizeBytes)
-            .HasColumnName("file_size_bytes")
-            .IsRequired(false);
-
-        builder.Property(x => x.WidthPx)
-            .HasColumnName("width_px")
-            .IsRequired(false);
-
-        builder.Property(x => x.HeightPx)
-            .HasColumnName("height_px")
-            .IsRequired(false);
-
-        builder.Property(x => x.ChecksumHash)
-            .HasColumnName("checksum_hash")
-            .HasColumnType("varchar(128)")
-            .HasMaxLength(128)
-            .IsRequired(false);
 
         builder.Property(x => x.SortOrder)
             .HasColumnName("sort_order")
@@ -153,5 +117,3 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
         builder.ToTable(t => t.HasCheckConstraint("ck_product_images_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }
-
-

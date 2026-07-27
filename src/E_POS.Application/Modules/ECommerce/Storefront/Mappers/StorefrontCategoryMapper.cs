@@ -1,5 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
-using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Mappers;
@@ -12,7 +11,7 @@ public static class StorefrontCategoryMapper
         {
             Id = category.Id,
             Name = category.CategoryName,
-            ImageUrl = MediaUrlResolver.PreferMediaAssetOrEmpty(mediaPublicUrl, category.ImageUrl)
+            ImageUrl = mediaPublicUrl ?? string.Empty
         };
     }
 
@@ -29,7 +28,7 @@ public static class StorefrontCategoryMapper
             Name = category.CategoryName,
             Slug = category.CategorySlug,
             Description = category.Description ?? string.Empty,
-            ImageUrl = MediaUrlResolver.PreferMediaAssetOrEmpty(mediaPublicUrl, category.ImageUrl),
+            ImageUrl = mediaPublicUrl ?? string.Empty,
             ItemCount = itemCount,
             SortOrder = category.SortOrder
         };

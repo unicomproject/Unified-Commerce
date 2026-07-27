@@ -61,6 +61,8 @@ using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Repositories;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
 using E_POS.Infrastructure.Modules.Shared.ReturnExchange.Services;
+using E_POS.Application.Modules.Shared.Storage.Contracts;
+using E_POS.Infrastructure.Modules.Shared.Storage.Services;
 using E_POS.Infrastructure.Modules.Shared.Media.Options;
 using E_POS.Infrastructure.Modules.Shared.Media.Services;
 
@@ -80,6 +82,8 @@ public static class DependencyInjection
         services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
+        services.Configure<AzureBlobStorageOptions>(
+            configuration.GetSection(AzureBlobStorageOptions.SectionName));
         services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
@@ -96,6 +100,7 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+        services.AddSingleton<IAzureSasTokenProvider, AzureBlobSasTokenProvider>();
         services.AddScoped<IPasswordHashService, PasswordHashService>();
         services.AddScoped<IJwtTokenFactory, JwtTokenFactory>();
         services.AddScoped<IRefreshTokenGenerator, RefreshTokenGenerator>();
@@ -169,6 +174,7 @@ public static class DependencyInjection
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
         services.AddScoped<IPosReturnRepository, PosReturnRepository>();
         services.AddScoped<IMediaObjectStorage, AzureBlobMediaObjectStorage>();
+        services.AddScoped<IAzureSasTokenProvider, AzureBlobSasTokenProvider>();
         services.AddScoped<IReturnInspectionMediaStorage, LocalReturnInspectionMediaStorage>();
         services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();

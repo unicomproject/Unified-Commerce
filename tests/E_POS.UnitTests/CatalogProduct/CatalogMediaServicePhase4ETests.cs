@@ -124,7 +124,7 @@ public sealed class CatalogMediaServicePhase4ETests
         Assert.True(result.IsSuccess);
         Assert.Equal(CategoryId, result.Value!.CategoryId);
         Assert.Equal(result.Value.MediaAssetId, category.ImageMediaAssetId);
-        Assert.Equal(result.Value.PublicUrl, category.ImageUrl);
+        Assert.Equal(result.Value.PublicUrl, repository.MediaAssets.Single().PublicUrl);
         Assert.Equal([previousMediaAssetId], repository.InactivatedMediaAssetIds);
         Assert.Single(repository.MediaAssets);
         Assert.Single(storage.Uploads);
@@ -149,7 +149,7 @@ public sealed class CatalogMediaServicePhase4ETests
         Assert.True(result.IsSuccess);
         Assert.Equal(BrandId, result.Value!.BrandId);
         Assert.Equal(result.Value.MediaAssetId, brand.LogoMediaAssetId);
-        Assert.Equal(result.Value.PublicUrl, brand.LogoUrl);
+        Assert.Equal(result.Value.PublicUrl, repository.MediaAssets.Single().PublicUrl);
         Assert.Equal([previousMediaAssetId], repository.InactivatedMediaAssetIds);
         Assert.Single(repository.MediaAssets);
         Assert.Single(storage.Uploads);

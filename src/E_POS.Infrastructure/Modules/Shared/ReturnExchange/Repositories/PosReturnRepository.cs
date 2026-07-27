@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Text.Json;
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
@@ -5072,8 +5072,6 @@ public sealed class PosReturnRepository : IPosReturnRepository
                           {
                               image.ProductId,
                               image.ProductVariantId,
-                              image.ImageUrl,
-                              image.ImageStorageKey,
                               MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                           })
             .ToListAsync(cancellationToken);
@@ -5082,7 +5080,7 @@ public sealed class PosReturnRepository : IPosReturnRepository
             .Select(x => new ProductImageLookupRow(
                 x.ProductId,
                 x.ProductVariantId,
-                MediaUrlResolver.PreferMediaAsset(x.MediaPublicUrl, x.ImageUrl, x.ImageStorageKey)))
+                x.MediaPublicUrl))
             .ToList();
     }
 

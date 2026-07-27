@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
@@ -370,8 +370,6 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
                             {
                                 image.ProductId,
                                 image.ProductVariantId,
-                                image.ImageUrl,
-                                image.ImageStorageKey,
                                 MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                             })
             .ToListAsync(cancellationToken);
@@ -425,7 +423,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
                 Name = item.ProductNameSnapshot,
                 VariantName = variant?.VariantName,
                 Sku = item.SkuSnapshot,
-                ImageUrl = image is null ? null : MediaUrlResolver.PreferMediaAsset(image.MediaPublicUrl, image.ImageUrl, image.ImageStorageKey),
+                ImageUrl = image is null ? null : image.MediaPublicUrl,
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
                 Subtotal = item.LineSubtotalAmount,

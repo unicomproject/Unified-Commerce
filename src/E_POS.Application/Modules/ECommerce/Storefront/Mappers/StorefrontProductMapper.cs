@@ -1,5 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
-using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Mappers;
@@ -65,7 +64,7 @@ public static class StorefrontProductMapper
         return new StorefrontProductImageReadModel
         {
             Id = image.Id,
-            Url = MediaUrlResolver.PreferMediaAssetOrEmpty(mediaPublicUrl, image.ImageUrl, image.ImageStorageKey),
+            Url = mediaPublicUrl ?? string.Empty,
             AltText = image.AltText ?? fallbackAltText,
             SortOrder = image.SortOrder,
             IsPrimary = image.IsPrimaryImage
@@ -82,7 +81,7 @@ public static class StorefrontProductMapper
             Name = optionValue.ValueName,
             DisplayName = GetOptionDisplayName(optionValue),
             ColorHex = optionValue.ColorHex,
-            ImageUrl = MediaUrlResolver.PreferMediaAsset(mediaPublicUrl, optionValue.ImageUrl),
+            ImageUrl = mediaPublicUrl,
             SortOrder = optionValue.SortOrder
         };
     }
