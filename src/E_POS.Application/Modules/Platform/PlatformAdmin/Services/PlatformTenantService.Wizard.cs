@@ -195,11 +195,20 @@ public sealed partial class PlatformTenantService
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(businessTypeResolution.Error);
         }
 
-        var subscriptionRequest = request.Subscription;
-        var createMode = TenantCreateModeResolver.Resolve(
-            subscriptionRequest?.SubscriptionStatus,
-            subscriptionRequest?.BillingCycle,
-            isLegacyMinimalCreate: false);
+        var subscriptionRequest = request.Subscription!;
+        var createModeResolution = TenantCreateModeResolver.ResolveWizard(subscriptionRequest.SubscriptionType);
+        if (!createModeResolution.IsSuccess)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = createModeResolution.Failure == TenantCreateModeResolver.ResolutionFailure.MissingSubscriptionType
+                        ? "Subscription type is required for wizard create."
+                        : "Subscription type must be PAID, TRIAL, or DEMO."
+                });
+        }
+
+        var createMode = createModeResolution.Mode;
         var initialLifecycleStatus = TenantCreateModeResolver.InitialLifecycleStatus(createMode);
 
         var now = _dateTimeProvider.UtcNow;
@@ -232,8 +241,9 @@ public sealed partial class PlatformTenantService
             businessTypeResolution.Value);
         var address = CreateTenantAddressOrNull(tenantId, request, now);
 
-        var billingCycle = NormalizeBillingCycle(subscriptionRequest?.BillingCycle);
-        var subscriptionStatus = NormalizeSubscriptionStatus(subscriptionRequest?.SubscriptionStatus);
+        var billingCycle = PlatformTenantCreateRequestValidator.TryNormalizeBillingCycle(subscriptionRequest.BillingCycle)
+            ?? TenantSubscriptionBillingConstants.BillingCycleMonthly;
+        var subscriptionStatus = NormalizeSubscriptionStatus(subscriptionRequest.SubscriptionStatus);
 
         var subscriptionId = Guid.NewGuid();
         var subscription = TenantSubscription.Create(
@@ -529,7 +539,8 @@ public sealed partial class PlatformTenantService
 
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
-        // Legacy minimal create always provisions a TRIAL subscription → auto-activate to ACTIVE.
+        // Legacy minimal create (code + name + plan): deprecated TRIAL compatibility path.
+        var legacyCreateMode = TenantCreateModeResolver.ResolveLegacyMinimalCompatibility();
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
             tenantId,
             code,
@@ -544,6 +555,7 @@ public sealed partial class PlatformTenantService
             NormalizeOptionalText(request.DefaultLocale),
             NormalizeOptionalText(request.OperatingMode));
         tenant.Activate(platformUserId, now);
+        _ = legacyCreateMode;
 
         var subscription = TenantSubscription.Create(
             Guid.NewGuid(),
@@ -756,19 +768,8 @@ public sealed partial class PlatformTenantService
 
     private static string NormalizeBillingCycle(string? billingCycle)
     {
-        if (string.IsNullOrWhiteSpace(billingCycle))
-        {
-            return TenantSubscriptionBillingConstants.BillingCycleMonthly;
-        }
-
-        var normalized = billingCycle.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            TenantSubscriptionBillingConstants.BillingCycleMonthly => TenantSubscriptionBillingConstants.BillingCycleMonthly,
-            TenantSubscriptionBillingConstants.BillingCycleYearly => TenantSubscriptionBillingConstants.BillingCycleYearly,
-            TenantCreateModeResolver.DemoBillingCycle => TenantCreateModeResolver.DemoBillingCycle,
-            _ => TenantSubscriptionBillingConstants.BillingCycleMonthly
-        };
+        return PlatformTenantCreateRequestValidator.TryNormalizeBillingCycle(billingCycle)
+            ?? TenantSubscriptionBillingConstants.BillingCycleMonthly;
     }
 
     private static string GenerateDraftInvoiceNumber(DateTimeOffset now) =>

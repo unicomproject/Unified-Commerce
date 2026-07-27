@@ -117,19 +117,4 @@ public sealed class TenantLifecycleDomainTests
 
         Assert.True(result.IsUnknown);
     }
-
-    [Theory]
-    [InlineData(null, null, TenantCreateMode.Trial)]
-    [InlineData("trial", "monthly", TenantCreateMode.Trial)]
-    [InlineData("active", "monthly", TenantCreateMode.Paid)]
-    [InlineData("trial", "demo", TenantCreateMode.Demo)]
-    public void CreateModeResolver_ResolvesExpectedMode(
-        string? subscriptionStatus,
-        string? billingCycle,
-        TenantCreateMode expected)
-    {
-        Assert.Equal(
-            expected,
-            TenantCreateModeResolver.Resolve(subscriptionStatus, billingCycle));
-    }
 }

@@ -560,13 +560,19 @@ Worktree: `Unified-Commerce-tenant-lifecycle` only (original dirty `Unified-Comm
 
 Wizard and legacy create no longer pass `NormalizeBillingStatus(...)` into `Tenant.Create` as lifecycle status.
 
-| Mode | Detection | Create lifecycle outcome |
+| Mode | Authoritative field | Create lifecycle outcome |
 |---|---|---|
-| Paid | subscription status not trial/demo | `pending_payment` |
-| Trial | subscription status trial / blank / legacy minimal | create as `draft` then `Activate()` → `active` |
-| Demo | billing cycle `demo` | create as `draft` then `Activate()` → `active` |
+| Paid | `subscription.subscriptionType = PAID` | `pending_payment` |
+| Trial | `subscription.subscriptionType = TRIAL` | create as `draft` then `Activate()` → `active` |
+| Demo | `subscription.subscriptionType = DEMO` | create as `draft` then `Activate()` → `active` |
+| Legacy minimal | deprecated compatibility (no `subscriptionType` on wire) | TRIAL subscription entity + auto-activate → `active` |
 
-### Domain changes
+Billing cycle (`monthly` / `yearly`) and subscription lifecycle status (`TRIAL` / `ACTIVE` / …) do **not** determine create mode. Missing or unknown `subscriptionType` on wizard create fails validation.
+
+### Create mode classification correction (same branch)
+
+Authoritative wizard field: `subscription.subscriptionType` with values `PAID`, `TRIAL`, `DEMO` (see `TenantSubscriptionTypeConstants`). Billing cycle and subscription lifecycle status are validated separately and do not determine create mode.
+
 
 - `TenantStatusConstants`: six approved lowercase values only (`draft` … `cancelled`)
 - `TenantLifecycleRules`: activate = `pending_activation`/`draft`; suspend = `active` only; login = `active` only

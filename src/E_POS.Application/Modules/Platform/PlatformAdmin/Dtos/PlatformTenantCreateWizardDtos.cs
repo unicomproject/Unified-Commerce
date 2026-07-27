@@ -57,6 +57,8 @@ public sealed record CreatePlatformTenantAdminRequest
 
 public sealed record CreatePlatformTenantSubscriptionDetailsRequest
 {
+    public string? SubscriptionType { get; init; }
+
     public string? BillingCycle { get; init; }
 
     public string? SubscriptionStatus { get; init; }

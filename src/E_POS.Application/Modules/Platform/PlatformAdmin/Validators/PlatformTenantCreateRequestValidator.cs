@@ -67,8 +67,16 @@ public static partial class PlatformTenantCreateRequestValidator
 
         ValidateBillingStatus(fieldErrors, request.BillingStatus);
 
-        if (request.Subscription is not null)
+        if (request.Subscription is null)
         {
+            fieldErrors.Add(new ApplicationFieldError(
+                "subscription",
+                "Subscription details are required for wizard create."));
+        }
+        else
+        {
+            ValidateSubscriptionType(fieldErrors, request.Subscription.SubscriptionType, required: true);
+            ValidateBillingCycle(fieldErrors, request.Subscription.BillingCycle, required: true);
             ValidateSubscriptionStatus(fieldErrors, request.Subscription.SubscriptionStatus);
             ValidatePaymentMethod(fieldErrors, request.Subscription.PaymentMethod);
         }
@@ -268,6 +276,79 @@ public static partial class PlatformTenantCreateRequestValidator
                 "subscription.subscriptionStatus",
                 "Subscription status is invalid."));
         }
+    }
+
+    private static void ValidateSubscriptionType(
+        ICollection<ApplicationFieldError> fieldErrors,
+        string? value,
+        bool required)
+    {
+        var normalized = NormalizeOptionalText(value);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            if (required)
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    "subscription.subscriptionType",
+                    "Subscription type is required (PAID, TRIAL, or DEMO)."));
+            }
+
+            return;
+        }
+
+        if (!TenantSubscriptionTypeConstants.IsValid(normalized))
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "subscription.subscriptionType",
+                "Subscription type must be PAID, TRIAL, or DEMO."));
+        }
+    }
+
+    private static void ValidateBillingCycle(
+        ICollection<ApplicationFieldError> fieldErrors,
+        string? value,
+        bool required)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (required)
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    "subscription.billingCycle",
+                    "Billing cycle is required."));
+            }
+
+            return;
+        }
+
+        if (TryNormalizeBillingCycle(value) is null)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "subscription.billingCycle",
+                "Billing cycle must be monthly or yearly."));
+        }
+    }
+
+    internal static string? TryNormalizeBillingCycle(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        if (normalized == "annual")
+        {
+            normalized = TenantSubscriptionBillingConstants.BillingCycleYearly;
+        }
+
+        if (normalized is TenantSubscriptionBillingConstants.BillingCycleMonthly
+            or TenantSubscriptionBillingConstants.BillingCycleYearly)
+        {
+            return normalized;
+        }
+
+        return null;
     }
 
     private static void ValidatePaymentMethod(ICollection<ApplicationFieldError> fieldErrors, string? value)
