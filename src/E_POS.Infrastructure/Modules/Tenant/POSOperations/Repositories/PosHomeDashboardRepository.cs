@@ -299,13 +299,18 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             .Select(o => o.OutletName)
             .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
 
-        var outletTimezone = await _dbContext.Tenants
+        var tenantBranding = await _dbContext.Tenants
             .AsNoTracking()
             .Where(t => t.Id == context.TenantId)
-            .Select(t => t.DefaultTimezone)
+            .Select(t => new
+            {
+                t.DisplayName,
+                t.DefaultTimezone
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(outletTimezone))
+        if (tenantBranding is null ||
+            string.IsNullOrWhiteSpace(tenantBranding.DefaultTimezone))
         {
             _logger.LogDebug(
                 "POS home context unresolved: outlet timezone missing for tenant {TenantId}.",
@@ -316,6 +321,24 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 "Outlet timezone is not configured.",
                 "Ask your administrator to configure the tenant timezone.");
         }
+
+        var businessLogoUrl = await (
+                from profile in _dbContext.TenantProfiles.AsNoTracking()
+                join media in _dbContext.MediaAssets.AsNoTracking()
+                    on new
+                    {
+                        profile.TenantId,
+                        MediaAssetId = profile.LogoMediaAssetId
+                    }
+                    equals new
+                    {
+                        media.TenantId,
+                        MediaAssetId = (Guid?)media.Id
+                    }
+                where profile.TenantId == context.TenantId &&
+                      media.Status == "ACTIVE"
+                select media.PublicUrl)
+            .FirstOrDefaultAsync(cancellationToken);
 
         var unreadNotificationCount = await _dbContext.NotificationInboxItems
             .AsNoTracking()
@@ -387,7 +410,11 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 CurrencyCode: tillSession.CurrencyCode,
                 OutletId: resolvedOutletId,
                 OutletName: outletName,
-                OutletTimezone: outletTimezone.Trim(),
+                OutletTimezone: tenantBranding.DefaultTimezone.Trim(),
+                BusinessDisplayName: tenantBranding.DisplayName.Trim(),
+                BusinessLogoUrl: string.IsNullOrWhiteSpace(businessLogoUrl)
+                    ? null
+                    : businessLogoUrl.Trim(),
                 UnreadNotificationCount: unreadNotificationCount,
                 ReturnsRefundsCount: returnsRefundsCount,
                 CustomersCount: customersCount,

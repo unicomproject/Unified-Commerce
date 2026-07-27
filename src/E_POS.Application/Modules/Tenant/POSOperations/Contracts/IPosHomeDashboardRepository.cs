@@ -40,6 +40,8 @@ public sealed record PosHomeDashboardDbSnapshot(
     Guid OutletId,
     string OutletName,
     string OutletTimezone,
+    string BusinessDisplayName,
+    string? BusinessLogoUrl,
     int UnreadNotificationCount,
     int ReturnsRefundsCount,
     int CustomersCount,
