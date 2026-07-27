@@ -1,4 +1,5 @@
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Dtos;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -83,10 +84,7 @@ public sealed class CustomerWishlistRepositoryTests
         dbContext.PriceListItems.Add(PriceListItem.Create(
             Guid.NewGuid(), tenantId, usdPriceListId, productId, null, null,
             1.99m, null, 1m, null, null, "ACTIVE", null, Now));
-        dbContext.ProductImages.Add(ProductImage.Create(
-            Guid.NewGuid(), tenantId, productId, null, null,
-            "jersey-main", "/images/jersey.jpg", "Jersey", "MAIN", "image/jpeg",
-            null, null, null, null, 0, true, "ACTIVE", null, Now));
+        AddProductImage(dbContext, tenantId, productId, "/images/jersey.jpg");
         await dbContext.SaveChangesAsync();
         var repository = new CustomerWishlistRepository(dbContext);
         var request = new AddCustomerWishlistItemRequest { ProductId = productId };
@@ -229,6 +227,43 @@ public sealed class CustomerWishlistRepositoryTests
             null,
             Now);
 
+    private static void AddProductImage(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        Guid productId,
+        string publicUrl)
+    {
+        var mediaAssetId = Guid.NewGuid();
+        dbContext.MediaAssets.Add(CreateMediaAsset(tenantId, mediaAssetId, publicUrl, "PRODUCT"));
+        dbContext.ProductImages.Add(ProductImage.Create(
+            Guid.NewGuid(), tenantId, productId, null, null,
+            "jersey-main", publicUrl, "Jersey", "MAIN", "image/jpeg",
+            null, null, null, null, 0, true, "ACTIVE", null, Now, mediaAssetId));
+    }
+
+    private static MediaAsset CreateMediaAsset(
+        Guid tenantId,
+        Guid mediaAssetId,
+        string publicUrl,
+        string purpose) =>
+        MediaAsset.Create(
+            mediaAssetId,
+            tenantId,
+            "images",
+            $"tests/{mediaAssetId:D}.jpg",
+            publicUrl,
+            "test.jpg",
+            "image/jpeg",
+            ".jpg",
+            1,
+            null,
+            null,
+            mediaAssetId.ToString("N"),
+            "IMAGE",
+            purpose,
+            "ACTIVE",
+            null,
+            Now);
     private static EPosDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<EPosDbContext>()

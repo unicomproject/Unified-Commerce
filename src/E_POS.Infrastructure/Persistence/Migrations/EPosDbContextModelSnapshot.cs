@@ -2439,12 +2439,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("image_media_asset_id");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("image_url");
-
                     b.Property<Guid?>("SalesChannelId")
                         .HasColumnType("uuid")
                         .HasColumnName("sales_channel_id");
@@ -9401,11 +9395,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("logo_media_asset_id");
 
-                    b.Property<string>("LogoUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("logo_url");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -9562,11 +9551,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ImageMediaAssetId")
                         .HasColumnType("uuid")
                         .HasColumnName("image_media_asset_id");
-
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("image_url");
 
                     b.Property<Guid?>("ParentCategoryId")
                         .HasColumnType("uuid")
@@ -11384,11 +11368,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(255)")
                         .HasColumnName("alt_text");
 
-                    b.Property<string>("ChecksumHash")
-                        .HasMaxLength(128)
-                        .HasColumnType("varchar(128)")
-                        .HasColumnName("checksum_hash");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -11397,30 +11376,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_tenant_user_id");
 
-                    b.Property<long?>("FileSizeBytes")
-                        .HasColumnType("bigint")
-                        .HasColumnName("file_size_bytes");
-
-                    b.Property<int?>("HeightPx")
-                        .HasColumnType("integer")
-                        .HasColumnName("height_px");
-
                     b.Property<string>("ImagePurpose")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)")
                         .HasColumnName("image_purpose");
-
-                    b.Property<string>("ImageStorageKey")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("image_storage_key");
-
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("image_url");
 
                     b.Property<bool>("IsPrimaryImage")
                         .ValueGeneratedOnAdd()
@@ -11431,11 +11391,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("MediaAssetId")
                         .HasColumnType("uuid")
                         .HasColumnName("media_asset_id");
-
-                    b.Property<string>("MimeType")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("mime_type");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid")
@@ -11472,10 +11427,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("UpdatedByTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("updated_by_tenant_user_id");
-
-                    b.Property<int?>("WidthPx")
-                        .HasColumnType("integer")
-                        .HasColumnName("width_px");
 
                     b.HasKey("Id")
                         .HasName("pk_product_images");
@@ -11790,11 +11741,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ImageMediaAssetId")
                         .HasColumnType("uuid")
                         .HasColumnName("image_media_asset_id");
-
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("image_url");
 
                     b.Property<Guid>("ProductOptionId")
                         .HasColumnType("uuid")
@@ -22695,11 +22641,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("LogoMediaAssetId")
                         .HasColumnType("uuid")
                         .HasColumnName("logo_media_asset_id");
-
-                    b.Property<string>("LogoUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("logo_url");
 
                     b.Property<string>("PrimaryContactName")
                         .HasMaxLength(200)

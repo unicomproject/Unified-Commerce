@@ -208,7 +208,6 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                     null,
                     null,
                     null,
-                    null,
                     platformUserId,
                     now);
                 await _repository.UpsertTenantProfileAsync(profile, cancellationToken);

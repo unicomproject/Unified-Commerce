@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using E_POS.Api.Common.Auth;
 using E_POS.Api.Models;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
@@ -14,10 +15,14 @@ namespace E_POS.Api.Controllers;
 public sealed class PlatformAdminUsersController : ControllerBase
 {
     private readonly IPlatformUserService _userService;
+    private readonly IPlatformPasswordResetService _passwordResetService;
 
-    public PlatformAdminUsersController(IPlatformUserService userService)
+    public PlatformAdminUsersController(
+        IPlatformUserService userService,
+        IPlatformPasswordResetService passwordResetService)
     {
         _userService = userService;
+        _passwordResetService = passwordResetService;
     }
 
     [HttpGet]
@@ -122,6 +127,40 @@ public sealed class PlatformAdminUsersController : ControllerBase
         return ToActionResult(result, "Platform user roles updated successfully.");
     }
 
+    [HttpPost("{userId:guid}/password-reset")]
+    [ProducesResponseType(typeof(LegacyApiResponse<InitiatePlatformPasswordResetResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> InitiatePasswordReset(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(
+                "platform_auth.invalid_session",
+                "Invalid platform session."));
+        }
+
+        var result = await _passwordResetService.InitiateAdminPasswordResetAsync(
+            userId,
+            platformUserId,
+            PlatformAuthClientContextFactory.FromHttpContext(HttpContext),
+            cancellationToken);
+
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Ok(LegacyApiResponse<InitiatePlatformPasswordResetResponse>.Ok(
+                "Password reset initiated successfully.",
+                result.Value));
+        }
+
+        return MapPasswordResetError(result.Error);
+    }
+
     private IActionResult ToActionResult<T>(ApplicationResult<T> result, string successMessage)
     {
         if (result.IsSuccess && result.Value is not null)
@@ -146,6 +185,22 @@ public sealed class PlatformAdminUsersController : ControllerBase
         };
     }
 
+    private IActionResult MapPasswordResetError(ApplicationError error)
+    {
+        return error.Code switch
+        {
+            "platform_users.not_found" or "platform_password_reset.user_not_found" =>
+                NotFound(CreateLegacyError("platform_users.not_found", error.Message)),
+            "platform_password_reset.invalid_user_state" =>
+                StatusCode(StatusCodes.Status409Conflict, CreateLegacyError(error.Code, error.Message)),
+            "platform_users.access_denied" =>
+                StatusCode(StatusCodes.Status403Forbidden, CreateLegacyError(error.Code, error.Message)),
+            "platform_password_reset.email_not_configured" or "email.not_configured" or "email.provider_failed" =>
+                StatusCode(StatusCodes.Status502BadGateway, CreateLegacyError(error.Code, error.Message)),
+            _ => BadRequest(CreateLegacyError(error.Code, error.Message))
+        };
+    }
+
     private bool TryGetPlatformUserId(out Guid platformUserId)
     {
         var platformUserIdValue = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -164,5 +219,3 @@ public sealed class PlatformAdminUsersController : ControllerBase
         };
     }
 }
-
-

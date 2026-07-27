@@ -216,6 +216,14 @@ public sealed class PlatformAuthRefreshServiceTests
             return Task.CompletedTask;
         }
 
+        public Task<int> RevokeAllSessionsForUserAsync(
+            Guid platformUserId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken,
+            Guid? revokedByPlatformUserId = null,
+            string? revokeReason = null)
+            => Task.FromResult(0);
+
         public Task<PlatformAuthRefreshContext?> FindRefreshContextByTokenHashAsync(
             string refreshTokenHash,
             CancellationToken cancellationToken)

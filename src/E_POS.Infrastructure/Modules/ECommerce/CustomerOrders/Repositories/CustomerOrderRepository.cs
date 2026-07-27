@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Domain.Modules.Shared.Media.Entities;
@@ -234,18 +234,17 @@ public sealed class CustomerOrderRepository : ICustomerOrderRepository
                             select new
                             {
                                 Image = image,
+                                MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
                                 MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                             })
             .ToListAsync(cancellationToken);
 
         return images
+            .Where(x => x.MediaStatus == ActiveStatus && !string.IsNullOrWhiteSpace(x.MediaPublicUrl))
             .GroupBy(x => x.Image.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => MediaUrlResolver.PreferMediaAsset(
-                    x.First().MediaPublicUrl,
-                    x.First().Image.ImageUrl,
-                    x.First().Image.ImageStorageKey));
+                x => (string?)x.First().MediaPublicUrl);
     }
 
     private static CustomerOrderSummaryReadModel BuildSummary(

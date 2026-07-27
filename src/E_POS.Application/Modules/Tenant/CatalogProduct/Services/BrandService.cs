@@ -60,14 +60,13 @@ public sealed class BrandService : IBrandService
             request.Name, 
             slug,
             request.Description,
-            requestedLogoUrl,
             request.Status,
             context.UserId,
             now);
 
         if (mediaAsset is not null)
         {
-            brand.UpdateLogo(mediaAsset.PublicUrl, mediaAsset.Id, context.UserId, now);
+            brand.UpdateLogo(mediaAsset.Id, context.UserId, now);
             await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
         }
 
@@ -121,24 +120,20 @@ public sealed class BrandService : IBrandService
         var requestedLogoUrl = NormalizeLegacyMediaUrl(request.LogoUrl);
         var previousMediaAssetId = brand.LogoMediaAssetId;
         var shouldClearMedia = request.LogoUrl is not null && string.IsNullOrWhiteSpace(request.LogoUrl);
-        var shouldReplaceMedia = !shouldClearMedia &&
-            requestedLogoUrl is not null &&
-            (!previousMediaAssetId.HasValue ||
-             !string.Equals(brand.LogoUrl?.Trim(), requestedLogoUrl, StringComparison.Ordinal));
+        var shouldReplaceMedia = !shouldClearMedia && requestedLogoUrl is not null;
 
         brand.UpdateProfile(
             normalizedCode, 
             request.Name, 
             slug,
             request.Description,
-            shouldClearMedia ? null : requestedLogoUrl ?? brand.LogoUrl,
             request.Status,
             context.UserId,
             now);
 
         if (shouldClearMedia)
         {
-            brand.UpdateLogo(null, null, context.UserId, now);
+            brand.UpdateLogo(null, context.UserId, now);
 
             if (previousMediaAssetId.HasValue)
             {
@@ -163,7 +158,7 @@ public sealed class BrandService : IBrandService
 
             if (mediaAsset is not null)
             {
-                brand.UpdateLogo(mediaAsset.PublicUrl, mediaAsset.Id, context.UserId, now);
+                brand.UpdateLogo(mediaAsset.Id, context.UserId, now);
                 await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
 
                 if (previousMediaAssetId.HasValue)

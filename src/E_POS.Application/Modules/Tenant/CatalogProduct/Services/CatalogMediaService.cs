@@ -1,4 +1,4 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
@@ -116,21 +116,14 @@ public sealed class CatalogMediaService : ICatalogMediaService
             productId: productId,
             productVariantId: request.ProductVariantId,
             salesChannelId: request.SalesChannelId,
-            imageStorageKey: uploadResult.StorageKey,
-            imageUrl: uploadResult.PublicUrl,
+            mediaAssetId: mediaAssetId,
             altText: request.AltText,
             imagePurpose: purpose,
-            mimeType: preparedResult.Image.MimeType,
-            fileSizeBytes: preparedResult.Image.FileSizeBytes,
-            widthPx: preparedResult.Image.WidthPx,
-            heightPx: preparedResult.Image.HeightPx,
-            checksumHash: preparedResult.Image.ChecksumHash,
             sortOrder: Math.Max(0, request.SortOrder ?? 0),
             isPrimaryImage: request.IsPrimaryImage ?? false,
             status: ActiveStatus,
             createdByTenantUserId: context.UserId,
-            now: now,
-            mediaAssetId: mediaAssetId);
+            now: now);
 
         try
         {
@@ -229,7 +222,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             purpose,
             now);
 
-        category.UpdateImage(uploadResult.PublicUrl, mediaAssetId, context.UserId, now);
+        category.UpdateImage(mediaAssetId, context.UserId, now);
 
         try
         {
@@ -337,7 +330,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             purpose,
             now);
 
-        brand.UpdateLogo(uploadResult.PublicUrl, mediaAssetId, context.UserId, now);
+        brand.UpdateLogo(mediaAssetId, context.UserId, now);
 
         try
         {

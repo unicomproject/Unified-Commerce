@@ -30,6 +30,13 @@ public interface IPlatformAuthRepository
         Guid? revokedByPlatformUserId = null,
         string? revokeReason = null);
 
+    Task<int> RevokeAllSessionsForUserAsync(
+        Guid platformUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken,
+        Guid? revokedByPlatformUserId = null,
+        string? revokeReason = null);
+
     Task<PlatformAuthRefreshContext?> FindRefreshContextByTokenHashAsync(
         string refreshTokenHash,
         CancellationToken cancellationToken);
@@ -41,4 +48,3 @@ public interface IPlatformAuthRepository
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
-

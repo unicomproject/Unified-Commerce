@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 
@@ -12,11 +12,46 @@ public class TenantProfile : AuditableEntity
     public string? PrimaryEmail { get; protected set; }
     public string? PrimaryPhone { get; protected set; }
     public string? WebsiteUrl { get; protected set; }
-    public string? LogoUrl { get; protected set; }
     public Guid? LogoMediaAssetId { get; protected set; }
     public string? Description { get; protected set; }
     public Guid? CreatedByPlatformUserId { get; protected set; }
     public Guid? UpdatedByPlatformUserId { get; protected set; }
+
+    public static TenantProfile Create(
+        Guid id,
+        Guid tenantId,
+        Guid? businessTypeId,
+        string legalName,
+        string? tradingName,
+        string? primaryContactName,
+        string? primaryEmail,
+        string? primaryPhone,
+        string? websiteUrl,
+        string? description,
+        Guid? createdByPlatformUserId,
+        DateTimeOffset now,
+        Guid? logoMediaAssetId = null)
+    {
+        return new TenantProfile
+        {
+            Id = id,
+            TenantId = tenantId,
+            BusinessTypeId = businessTypeId,
+            LegalName = legalName.Trim(),
+            TradingName = tradingName?.Trim(),
+            PrimaryContactName = primaryContactName?.Trim(),
+            PrimaryEmail = primaryEmail?.Trim(),
+            PrimaryPhone = primaryPhone?.Trim(),
+            WebsiteUrl = websiteUrl?.Trim(),
+            LogoMediaAssetId = logoMediaAssetId,
+            Description = description?.Trim(),
+            CreatedByPlatformUserId = createdByPlatformUserId,
+            UpdatedByPlatformUserId = createdByPlatformUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
 
     public static TenantProfile Create(
         Guid id,
@@ -33,27 +68,20 @@ public class TenantProfile : AuditableEntity
         Guid? createdByPlatformUserId,
         DateTimeOffset now)
     {
-        return new TenantProfile
-        {
-            Id = id,
-            TenantId = tenantId,
-            BusinessTypeId = businessTypeId,
-            LegalName = legalName.Trim(),
-            TradingName = tradingName?.Trim(),
-            PrimaryContactName = primaryContactName?.Trim(),
-            PrimaryEmail = primaryEmail?.Trim(),
-            PrimaryPhone = primaryPhone?.Trim(),
-            WebsiteUrl = websiteUrl?.Trim(),
-            LogoUrl = logoUrl?.Trim(),
-            Description = description?.Trim(),
-            CreatedByPlatformUserId = createdByPlatformUserId,
-            UpdatedByPlatformUserId = createdByPlatformUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-    }
-
-    public void UpdateBusinessType(Guid? businessTypeId, Guid? updatedBy, DateTimeOffset now)
+        return Create(
+            id,
+            tenantId,
+            businessTypeId,
+            legalName,
+            tradingName,
+            primaryContactName,
+            primaryEmail,
+            primaryPhone,
+            websiteUrl,
+            description,
+            createdByPlatformUserId,
+            now);
+    }    public void UpdateBusinessType(Guid? businessTypeId, Guid? updatedBy, DateTimeOffset now)
     {
         BusinessTypeId = businessTypeId;
         UpdatedByPlatformUserId = updatedBy;

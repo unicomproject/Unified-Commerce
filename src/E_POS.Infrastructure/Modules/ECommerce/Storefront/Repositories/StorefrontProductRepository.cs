@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
@@ -271,7 +271,8 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
                                   select new
                                   {
                                       Category = category,
-                                      MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                      MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                   })
             .ToListAsync(cancellationToken);
         var collections = await _dbContext.Set<Collection>().AsNoTracking()
@@ -306,7 +307,7 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
                 Name = x.Category.CategoryName,
                 Slug = x.Category.CategorySlug,
                 Description = x.Category.Description,
-                ImageUrl = MediaUrlResolver.PreferMediaAsset(x.MediaPublicUrl, x.Category.ImageUrl)
+                ImageUrl = x.MediaPublicUrl
             }).ToList(),
             Collections = collections.Select(x => new StorefrontSearchMatchReadModel
             {
@@ -491,19 +492,17 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
                                select new
                                {
                                    Image = image,
-                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                   MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                })
             .ToListAsync(cancellationToken);
 
         return imageRows
+            .Where(x => x.MediaStatus == ActiveStatus && !string.IsNullOrWhiteSpace(x.MediaPublicUrl))
             .GroupBy(x => x.Image.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x =>
-                {
-                    var first = x.First();
-                    return MediaUrlResolver.PreferMediaAsset(first.MediaPublicUrl, first.Image.ImageUrl, first.Image.ImageStorageKey);
-                });
+                x => (string?)x.First().MediaPublicUrl);
     }
 
     private async Task<IReadOnlyList<StorefrontProductImageReadModel>> GetProductImagesAsync(Guid tenantId, Product product, CancellationToken cancellationToken)
@@ -520,7 +519,8 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
                                select new
                                {
                                    Image = image,
-                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                   MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                })
             .ToListAsync(cancellationToken);
 
@@ -600,7 +600,8 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
                                          select new
                                          {
                                              OptionValue = optionValue,
-                                             MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                             MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                          })
                 .ToListAsync(cancellationToken);
 

@@ -130,7 +130,7 @@ public sealed class ProductServiceTests
         var productImage = Assert.Single(repository.AddedImages);
         Assert.Equal(mediaAsset.Id, productImage.MediaAssetId);
         Assert.Equal("https://cdn.example.test/product.png", mediaAsset.PublicUrl);
-        Assert.Equal("https://cdn.example.test/product.png", productImage.ImageUrl);
+        Assert.Equal("https://cdn.example.test/product.png", mediaAsset.PublicUrl);
     }
     [Fact]
     public async Task DeleteAsync_WithLinkedMediaAssets_MarksMediaAssetsInactive()
