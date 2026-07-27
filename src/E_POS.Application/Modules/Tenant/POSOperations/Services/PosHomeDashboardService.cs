@@ -62,6 +62,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     Cashier: null,
                     Device: null,
                     Till: null,
+                    Branding: null,
                     Time: null,
                     Notifications: null,
                     Metrics: null,
@@ -149,6 +150,9 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     snapshot.BusinessDate,
                     snapshot.CurrencyCode,
                     tillDisplayLabel),
+                Branding: new PosHomeBrandingDto(
+                    snapshot.BusinessDisplayName,
+                    snapshot.BusinessLogoUrl),
                 Time: new PosHomeTimeDto(
                     serverNowUtc,
                     snapshot.OutletTimezone,

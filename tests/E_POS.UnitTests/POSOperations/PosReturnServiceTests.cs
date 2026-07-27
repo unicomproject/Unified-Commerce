@@ -2567,6 +2567,12 @@ public sealed class PosReturnServiceTests
 
     private sealed class FakeProductCatalogRepository : IPosProductCatalogRepository
     {
+        public Task<PosBarcodeProductRepositoryResult> GetProductByBarcodeAsync(
+            Guid tenantId,
+            Guid deviceId,
+            string barcode,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new PosBarcodeProductRepositoryResult("pos_barcode.not_found", null));
         public IReadOnlyList<PosProductSummaryResponseDto> Products { get; init; } = [];
 
         public Task<PosProductCatalogRepositoryResult> ListProductsAsync(
@@ -2591,12 +2597,6 @@ public sealed class PosReturnServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(new PosProductDetailRepositoryResult("not_supported", null));
 
-        public Task<PosBarcodeProductRepositoryResult> GetProductByBarcodeAsync(
-            Guid tenantId,
-            Guid deviceId,
-            string barcode,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new PosBarcodeProductRepositoryResult("not_supported", null));
     }
 
     private sealed class FakeReturnInspectionMediaStorage : IReturnInspectionMediaStorage

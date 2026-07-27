@@ -17,6 +17,7 @@ public sealed record PosHomeDashboardResponseDto(
     PosHomeCashierDto? Cashier,
     PosHomeDeviceDto? Device,
     PosHomeTillDto? Till,
+    PosHomeBrandingDto? Branding,
     PosHomeTimeDto? Time,
     PosHomeNotificationsDto? Notifications,
     PosHomeMetricsDto? Metrics,
@@ -67,6 +68,10 @@ public sealed record PosHomeTillDto(
     DateOnly? BusinessDate,
     string CurrencyCode,
     string DisplayLabel);
+
+public sealed record PosHomeBrandingDto(
+    string DisplayName,
+    string? LogoUrl);
 
 public sealed record PosHomeNotificationsDto(
     int UnreadCount);

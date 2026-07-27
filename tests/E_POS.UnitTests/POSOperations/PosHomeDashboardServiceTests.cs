@@ -30,6 +30,7 @@ public sealed class PosHomeDashboardServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.True(result.Value!.ContextResolved);
+        Assert.Equal("OneVerz POS", result.Value.Branding!.DisplayName);
     }
 
     [Fact]
@@ -160,6 +161,8 @@ public sealed class PosHomeDashboardServiceTests
                 OutletId: Guid.NewGuid(),
                 OutletName: "Main Outlet",
                 OutletTimezone: "Asia/Colombo",
+                BusinessDisplayName: "OneVerz POS",
+                BusinessLogoUrl: null,
                 UnreadNotificationCount: 0,
                 ReturnsRefundsCount: 0,
                 CustomersCount: 0,
