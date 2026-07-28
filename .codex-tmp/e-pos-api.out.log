@@ -1,0 +1,78 @@
+Using launch settings from src\E_POS.Api\Properties\launchSettings.json...
+Building...
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-23rf-6693-g89p [C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-8q5v-6pqq-x66h [C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-cvvh-rhrc-wg4q [C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-g8r8-53c2-pm3f [C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-mmjf-rqrv-855v [C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-23rf-6693-g89p
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-8q5v-6pqq-x66h
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-cvvh-rhrc-wg4q
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-g8r8-53c2-pm3f
+C:\Users\User\Desktop\pos final wep\Unified-Commerce\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-mmjf-rqrv-855v
+Nytroz POS API launcher
+  Source: C:\Users\User\Desktop\pos final wep\Unified-Commerce
+  Run at: C:\Users\User\source\nytroz-pos-api-run
+
+Stopping any existing API process...
+Syncing project files...
+Building API...
+  Determining projects to restore...
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-23rf-6693-g89p [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-8q5v-6pqq-x66h [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-cvvh-rhrc-wg4q [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-g8r8-53c2-pm3f [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-mmjf-rqrv-855v [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+  All projects are up-to-date for restore.
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-23rf-6693-g89p
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-8q5v-6pqq-x66h
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-cvvh-rhrc-wg4q
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-g8r8-53c2-pm3f
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-mmjf-rqrv-855v
+  E_POS.Domain -> C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Domain\bin\Debug\net10.0\E_POS.Domain.dll
+  E_POS.Application -> C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Application\bin\Debug\net10.0\E_POS.Application.dll
+  E_POS.Infrastructure -> C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\bin\Debug\net10.0\E_POS.Infrastructure.dll
+  E_POS.Api -> C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\bin\Debug\net10.0\E_POS.Api.dll
+
+Build succeeded.
+
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-23rf-6693-g89p [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-8q5v-6pqq-x66h [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-cvvh-rhrc-wg4q [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-g8r8-53c2-pm3f [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-mmjf-rqrv-855v [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-23rf-6693-g89p
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-8q5v-6pqq-x66h
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-cvvh-rhrc-wg4q
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-g8r8-53c2-pm3f
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj : warning NU1903: Package 'System.Security.Cryptography.Xml' 10.0.9 has a known high severity vulnerability, https://github.com/advisories/GHSA-mmjf-rqrv-855v
+    10 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.55
+
+Starting API at http://0.0.0.0:5150
+Press Ctrl+C to stop.
+
+warn: E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services.DevelopmentPlatformAdminTestAccountSeeder[0]
+      Development Platform Admin seed profile BillingViewer skipped: email and password must both be configured under DevelopmentSeed:PlatformAdmin.
+warn: E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services.DevelopmentPlatformAdminTestAccountSeeder[0]
+      Development Platform Admin seed profile NoBilling skipped: email and password must both be configured under DevelopmentSeed:PlatformAdmin.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://0.0.0.0:5150
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (42ms) [Parameters=[@now='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      SELECT r.id, r.created_at, r.created_by_tenant_user_id, r.expires_at, r.outlet_id, r.refund_method_code, r.refund_method_selected_at, r.refund_method_selected_by_tenant_user_id, r.requires_inspection, r.requires_manager_approval, r.resolution_selected_at, r.resolution_selected_by_tenant_user_id, r.resolution_type, r.sale_id, r.status, r.tenant_id, r.validated_at, r.validated_by_tenant_user_id, r.version
+      FROM return_inspection_drafts AS r
+      WHERE r.status NOT IN ('CONSUMED', 'CANCELLED') AND r.expires_at < @now
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@now='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      SELECT r.id, r.consumed_at, r.content_type, r.created_at, r.deleted_at, r.expires_at, r.file_name, r.inspection_draft_id, r.inspection_draft_line_id, r.outlet_id, r.sale_id, r.sale_line_id, r.size_bytes, r.status, r.storage_key, r.tenant_id, r.uploaded_by_tenant_user_id
+      FROM return_inspection_media_staging AS r
+      WHERE r.status = 'STAGED' AND r.expires_at < @now

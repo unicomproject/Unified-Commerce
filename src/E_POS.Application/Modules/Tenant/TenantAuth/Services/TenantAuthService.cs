@@ -163,7 +163,8 @@ public sealed class TenantAuthService : ITenantAuthService
                 account.TenantId,
                 account.Email,
                 account.UserStatus,
-                account.TenantStatus),
+                account.TenantStatus,
+                account.UserType),
             effectivePermissions);
 
         return ApplicationResult<TenantLoginResponse>.Success(response);
@@ -217,7 +218,8 @@ public sealed class TenantAuthService : ITenantAuthService
                 account.TenantId,
                 account.Email,
                 account.UserStatus,
-                account.TenantStatus),
+                account.TenantStatus,
+                account.UserType),
             effectivePermissions));
     }
 
@@ -259,6 +261,7 @@ public sealed class TenantAuthService : ITenantAuthService
                 ["tenant_id"] = account.TenantId.ToString(),
                 ["email"] = account.Email,
                 ["identity_type"] = TenantAuthConstants.IdentityType,
+                ["user_type"] = account.UserType,
                 ["session_id"] = sessionId.ToString(),
                 ["jti"] = jwtId,
                 ["permissions"] = permissions

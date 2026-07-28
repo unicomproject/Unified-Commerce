@@ -51,6 +51,7 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                 on userRole.TenantRoleId equals role.Id
             where userRole.TenantUserId == tenantUserId
                   && role.TenantId == tenantId
+                  && userRole.RevokedAt == null
                   && role.IsActive
             select new TenantAdminContextRoleDto(role.Id, role.RoleName))
             .ToListAsync(cancellationToken);
@@ -93,6 +94,8 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             join pd in _dbContext.PermissionDefinitions.AsNoTracking()
                 on up.PermissionDefinitionId equals pd.Id
             where up.TenantUserId == tenantUserId
+                  && up.TenantId == tenantId
+                  && up.RevokedAt == null
                   && pd.IsActive
             select pd.PermissionCode;
 
@@ -105,8 +108,12 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             join pd in _dbContext.PermissionDefinitions.AsNoTracking()
                 on rp.PermissionDefinitionId equals pd.Id
             where ur.TenantUserId == tenantUserId
+                  && ur.TenantId == tenantId
+                  && ur.RevokedAt == null
                   && role.TenantId == tenantId
                   && role.IsActive
+                  && rp.TenantId == tenantId
+                  && rp.RevokedAt == null
                   && pd.IsActive
             select pd.PermissionCode;
 

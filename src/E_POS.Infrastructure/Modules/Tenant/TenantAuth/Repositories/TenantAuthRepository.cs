@@ -31,7 +31,8 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
                 user.Email,
                 user.EncryptedPassword, // it was PasswordHash, assuming it's EncryptedPassword in new ERD
                 user.AccountStatus,
-                tenant.Status))
+                tenant.Status,
+                user.UserType))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -49,6 +50,8 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
                 on userPermission.PermissionDefinitionId equals permission.Id
             where user.Id == tenantUserId &&
                   user.TenantId == tenantId &&
+                  userPermission.TenantId == tenantId &&
+                  userPermission.RevokedAt == null &&
                   permission.IsActive
             select permission.PermissionCode;
 
@@ -61,8 +64,12 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
             join permission in _dbContext.PermissionDefinitions.AsNoTracking()
                 on rolePermission.PermissionDefinitionId equals permission.Id
             where userRole.TenantUserId == tenantUserId &&
+                  userRole.TenantId == tenantId &&
+                  userRole.RevokedAt == null &&
                   role.TenantId == tenantId &&
                   role.IsActive &&
+                  rolePermission.TenantId == tenantId &&
+                  rolePermission.RevokedAt == null &&
                   permission.IsActive
             select permission.PermissionCode;
 
@@ -229,7 +236,8 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
                 user.Email,
                 user.EncryptedPassword,
                 user.AccountStatus,
-                tenant.Status))
+                tenant.Status,
+                user.UserType))
             .SingleOrDefaultAsync(cancellationToken);
     }
     public async Task RevokeCurrentSessionAsync(

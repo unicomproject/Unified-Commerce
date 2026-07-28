@@ -6,4 +6,5 @@ public sealed record TenantLoginAccount(
     string Email,
     string? PasswordHash,
     string UserStatus,
-    string TenantStatus);
+    string TenantStatus,
+    string UserType = "");

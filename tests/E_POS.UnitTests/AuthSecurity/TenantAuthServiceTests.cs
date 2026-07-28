@@ -34,6 +34,8 @@ public sealed class TenantAuthServiceTests
         Assert.Equal("tenant-jwt-access-token", result.Value!.AccessToken);
         Assert.Equal("tenant-refresh-token", result.Value.RefreshToken);
         Assert.Equal(account.TenantId, result.Value.User.TenantId);
+        Assert.Equal(account.UserType, result.Value.User.UserType);
+        Assert.Equal(account.UserType, jwtFactory.UserType);
         Assert.Contains("tenant.dashboard.view", result.Value.Permissions);
         Assert.NotNull(repository.SavedSession);
         Assert.NotNull(repository.SavedRefreshToken);
@@ -144,6 +146,8 @@ public sealed class TenantAuthServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.Equal("tenant-refresh-token", result.Value!.RefreshToken);
+        Assert.Equal(account.UserType, result.Value.User.UserType);
+        Assert.Equal(account.UserType, jwtFactory.UserType);
         Assert.Contains("pos.home.view", result.Value.Permissions);
         Assert.Equal("hash:current-refresh-token", repository.RotatedCurrentTokenHash);
         Assert.Equal("hash:tenant-refresh-token", repository.RotatedReplacementTokenHash);
@@ -189,7 +193,8 @@ public sealed class TenantAuthServiceTests
     private static TenantLoginAccount CreateAccount(
         string? passwordHash,
         string userStatus = TenantAuthConstants.ActiveUserStatus,
-        string tenantStatus = TenantAuthConstants.ActiveTenantStatus)
+        string tenantStatus = TenantAuthConstants.ActiveTenantStatus,
+        string userType = "cashier")
     {
         return new TenantLoginAccount(
             Guid.NewGuid(),
@@ -197,7 +202,8 @@ public sealed class TenantAuthServiceTests
             "USER@TENANT.TEST",
             passwordHash,
             userStatus,
-            tenantStatus);
+            tenantStatus,
+            userType);
     }
 
     private static TenantAuthService CreateService(
@@ -334,11 +340,13 @@ public sealed class TenantAuthServiceTests
         public string? JwtId { get; private set; }
         public IReadOnlyList<string>? PermissionClaims { get; private set; }
         public string? SessionId { get; private set; }
+        public string? UserType { get; private set; }
 
         public JwtTokenResult CreateAccessToken(JwtTokenDescriptor descriptor)
         {
             JwtId = descriptor.Claims["jti"].ToString();
             SessionId = descriptor.Claims["session_id"].ToString();
+            UserType = descriptor.Claims["user_type"].ToString();
             PermissionClaims = descriptor.Claims.TryGetValue("permissions", out var value) &&
                                value is IEnumerable<string> permissions
                 ? permissions.ToList()

@@ -28,11 +28,19 @@ public static class DevelopmentPlatformAdminTestAccountSeedHost
         }
         catch (Exception ex)
         {
-            var logger = app.Services.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(nameof(DevelopmentPlatformAdminTestAccountSeedHost));
-            logger.LogError(
-                ex,
-                "Development Platform Admin test-account seeding failed. Application startup continues; configure secrets and required roles, then restart.");
+            try
+            {
+                var logger = app.Services.GetRequiredService<ILoggerFactory>()
+                    .CreateLogger(nameof(DevelopmentPlatformAdminTestAccountSeedHost));
+                logger.LogError(
+                    ex,
+                    "Development Platform Admin test-account seeding failed. Application startup continues; configure secrets and required roles, then restart.");
+            }
+            catch
+            {
+                Console.Error.WriteLine(
+                    "Development Platform Admin test-account seeding failed. Application startup continues; configure secrets and required roles, then restart.");
+            }
         }
     }
 }

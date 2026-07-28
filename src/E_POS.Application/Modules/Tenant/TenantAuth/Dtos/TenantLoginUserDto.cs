@@ -5,4 +5,5 @@ public sealed record TenantLoginUserDto(
     Guid TenantId,
     string Email,
     string Status,
-    string TenantStatus);
+    string TenantStatus,
+    string UserType = "");
