@@ -156,6 +156,24 @@ public sealed class PlatformTenantLifecycleRepositoryTests
         Assert.Single(secondPassEntitlements, x => x.PlatformFeatureId == clickCollectFeatureId);
     }
 
+    [Fact]
+    public async Task GetSummaryAsync_PendingActivationTenants_CountsOnlyPendingActivationStatus()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.Tenants.AddRange(
+            Tenant.Create(Guid.Parse("11111111-1111-4111-8111-111111111401"), "TEN-PA", "ten-pa", "Pending Activation", TenantStatusConstants.PendingActivation, "LKR", "Asia/Colombo", null, null, Now),
+            Tenant.Create(Guid.Parse("11111111-1111-4111-8111-111111111402"), "TEN-PP", "ten-pp", "Pending Payment", TenantStatusConstants.PendingPayment, "LKR", "Asia/Colombo", null, null, Now),
+            Tenant.Create(Guid.Parse("11111111-1111-4111-8111-111111111403"), "TEN-AC", "ten-ac", "Active", TenantStatusConstants.Active, "LKR", "Asia/Colombo", null, null, Now));
+        await dbContext.SaveChangesAsync();
+
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+        var summary = await repository.GetSummaryAsync(CancellationToken.None);
+
+        Assert.Equal(1, summary.PendingActivationTenants);
+        Assert.Equal(1, summary.ActiveTenants);
+        Assert.Equal(3, summary.TotalTenants);
+    }
+
     private static async Task SeedPlanWithFeatureAsync(
         EPosDbContext dbContext,
         Guid planId,

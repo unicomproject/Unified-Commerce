@@ -54,7 +54,7 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
                 suspendedTenants,
                 "critical"),
             Attention(
-                "setup_pending",
+                "pending_activation",
                 "Pending Activation",
                 "Tenants in PENDING_ACTIVATION awaiting Super Admin activation.",
                 pendingActivationTenants,
