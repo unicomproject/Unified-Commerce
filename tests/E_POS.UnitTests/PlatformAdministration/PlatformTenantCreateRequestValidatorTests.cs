@@ -153,11 +153,67 @@ public sealed class PlatformTenantCreateRequestValidatorTests
         Assert.All(error.FieldErrors!, item => Assert.False(string.IsNullOrWhiteSpace(item.Message)));
     }
 
+    [Fact]
+    public void ValidateWizard_InvalidBillingCycle_FailsValidation()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(
+            billingCycle: "demo"));
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, item => item.Field == "subscription.billingCycle");
+    }
+
+    [Fact]
+    public void ValidateWizard_MissingSubscriptionType_FailsValidation()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(new CreatePlatformTenantRequest
+        {
+            Code = "TEN-001",
+            Name = "Tenant",
+            BillingStatus = TenantBillingStatusConstants.Pending,
+            SubscriptionPlanId = Guid.Parse("81111111-1111-4111-8111-111111111111"),
+            TenantAdmin = new CreatePlatformTenantAdminRequest
+            {
+                FirstName = "Ada",
+                Email = "admin@tenant.com",
+                SendInvite = true
+            },
+            Subscription = new CreatePlatformTenantSubscriptionDetailsRequest
+            {
+                BillingCycle = TenantSubscriptionBillingConstants.BillingCycleMonthly,
+                SubscriptionStatus = TenantSubscriptionStatusConstants.Trial,
+                PaymentMethod = "manual"
+            }
+        });
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, item => item.Field == "subscription.subscriptionType");
+    }
+
+    [Fact]
+    public void ValidateWizard_InvalidSubscriptionType_FailsValidation()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(subscriptionType: "mystery"));
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, item => item.Field == "subscription.subscriptionType");
+    }
+
+    [Fact]
+    public void ValidateWizard_AnnualBillingCycle_NormalizesToYearly()
+    {
+        var error = PlatformTenantCreateRequestValidator.ValidateWizard(CreateRequest(billingCycle: "annual"));
+
+        Assert.Null(error);
+    }
+
     private static CreatePlatformTenantRequest CreateRequest(
         string? countryCode = "LK",
         string? baseCurrency = "LKR",
         string? billingStatus = TenantBillingStatusConstants.Pending,
+        string? subscriptionType = TenantSubscriptionTypeConstants.Trial,
         string? subscriptionStatus = TenantSubscriptionStatusConstants.Trial,
+        string? billingCycle = TenantSubscriptionBillingConstants.BillingCycleMonthly,
         string? paymentMethod = "manual",
         string? tenantAdminEmail = "admin@tenant.com",
         string? defaultLocale = null,
@@ -183,7 +239,8 @@ public sealed class PlatformTenantCreateRequestValidatorTests
             },
             Subscription = new CreatePlatformTenantSubscriptionDetailsRequest
             {
-                BillingCycle = TenantSubscriptionBillingConstants.BillingCycleMonthly,
+                SubscriptionType = subscriptionType,
+                BillingCycle = billingCycle,
                 SubscriptionStatus = subscriptionStatus,
                 PaymentMethod = paymentMethod
             }

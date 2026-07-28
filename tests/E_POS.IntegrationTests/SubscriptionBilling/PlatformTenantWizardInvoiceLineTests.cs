@@ -46,7 +46,7 @@ public sealed class PlatformTenantWizardInvoiceLineTests
             "TEN-WIZ-INV",
             "ten-wiz-inv",
             "Wizard Invoice Tenant",
-            TenantBillingStatusConstants.Pending,
+            TenantStatusConstants.PendingPayment,
             "LKR",
             "Asia/Colombo",
             null,

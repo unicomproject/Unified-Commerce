@@ -238,6 +238,27 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(NotFound);
         }
 
+        if (string.Equals(tenant.Status, TenantStatusConstants.Active, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                InvalidTransition with { Message = "Tenant is already active." });
+        }
+
+        if (string.Equals(tenant.Status, TenantStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                InvalidTransition with { Message = "Cancelled tenants cannot be activated." });
+        }
+
+        if (string.Equals(tenant.Status, TenantStatusConstants.PendingPayment, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                InvalidTransition with
+                {
+                    Message = "Paid tenants cannot be activated before payment verification."
+                });
+        }
+
         if (!TenantLifecycleRules.CanActivate(tenant.Status))
         {
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(
@@ -255,6 +276,21 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         {
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(
                 ValidationFailed with { Message = "Tenant subscription is required before activation." });
+        }
+
+        // Paid path: PENDING_ACTIVATION requires authoritative PAID invoice evidence (Mark Paid).
+        // Draft remains activatable without payment for legacy/data-repair recovery only.
+        if (string.Equals(tenant.Status, TenantStatusConstants.PendingActivation, StringComparison.OrdinalIgnoreCase))
+        {
+            var hasVerifiedPayment = await _repository.HasVerifiedPaidInvoiceAsync(tenantId, cancellationToken);
+            if (!hasVerifiedPayment)
+            {
+                return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                    InvalidTransition with
+                    {
+                        Message = "Paid tenants cannot be activated before payment verification."
+                    });
+            }
         }
 
         var now = _dateTimeProvider.UtcNow;

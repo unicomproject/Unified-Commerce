@@ -73,6 +73,7 @@ public sealed class PlatformTenantWizardServiceTests
                 Code = "TEN-WIZ-001",
                 Name = "Wizard Tenant",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Ada",
@@ -90,6 +91,8 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.Single(repository.LastWriteModel!.Entitlements);
         Assert.Equal(FeatureId, repository.LastWriteModel.Entitlements[0].PlatformFeatureId);
         Assert.NotNull(repository.LastWriteModel.TenantAdminInvite);
+        Assert.Equal(TenantStatusConstants.Active, repository.LastWriteModel.Tenant.Status);
+        Assert.NotNull(repository.LastWriteModel.Tenant.ActivatedAt);
     }
 
     [Fact]
@@ -110,6 +113,7 @@ public sealed class PlatformTenantWizardServiceTests
                 Code = "TEN-WIZ-ROLE",
                 Name = "Wizard Tenant",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Ada",
@@ -150,6 +154,7 @@ public sealed class PlatformTenantWizardServiceTests
                 Code = "TEN-WIZ-002",
                 Name = "Wizard Tenant",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Grace",
@@ -183,6 +188,7 @@ public sealed class PlatformTenantWizardServiceTests
                 CountryCode = "Sri Lanka",
                 BaseCurrency = "LKR",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Nimal",
@@ -272,6 +278,7 @@ public sealed class PlatformTenantWizardServiceTests
                 Code = "TEN-WIZ-005",
                 Name = "Wizard Tenant",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Tim",
@@ -305,6 +312,13 @@ public sealed class PlatformTenantWizardServiceTests
                 Name = "Wizard Tenant",
                 BillingStatus = TenantBillingStatusConstants.Pending,
                 SubscriptionPlanId = PlanId,
+                Subscription = new CreatePlatformTenantSubscriptionDetailsRequest
+                {
+                    SubscriptionType = TenantSubscriptionTypeConstants.Paid,
+                    SubscriptionStatus = TenantSubscriptionStatusConstants.Active,
+                    BillingCycle = "yearly",
+                    CreateDraftInvoice = true
+                },
                 Addons = [new CreatePlatformTenantAddonSelectionRequest { AddonId = AddonId, Quantity = 2 }],
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
@@ -359,6 +373,11 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.Equal(
             repository.LastWriteModel.DraftInvoice.BalanceDue,
             lines.Sum(line => line.LineTotalAmount));
+        Assert.Equal(TenantStatusConstants.PendingPayment, repository.LastWriteModel.Tenant.Status);
+        Assert.DoesNotContain(
+            repository.LastWriteModel.Tenant.Status,
+            new[] { "pending", "paid", "monthly", "trial" },
+            StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -380,6 +399,12 @@ public sealed class PlatformTenantWizardServiceTests
                 Name = "Wizard Tenant",
                 BillingStatus = TenantBillingStatusConstants.Paid,
                 SubscriptionPlanId = PlanId,
+                Subscription = new CreatePlatformTenantSubscriptionDetailsRequest
+                {
+                    SubscriptionType = TenantSubscriptionTypeConstants.Paid,
+                    SubscriptionStatus = TenantSubscriptionStatusConstants.Active,
+                    BillingCycle = "monthly"
+                },
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "No",
@@ -394,6 +419,51 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.NotNull(repository.LastWriteModel);
         Assert.Null(repository.LastWriteModel!.DraftInvoice);
         Assert.Empty(repository.LastWriteModel.DraftInvoiceLines);
+        Assert.Equal(TenantStatusConstants.PendingPayment, repository.LastWriteModel.Tenant.Status);
+        Assert.Null(repository.LastWriteModel.Tenant.ActivatedAt);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardDemo_AutoActivatesToActive()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId)
+        };
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-DEMO",
+                Name = "Demo Tenant",
+                BillingStatus = TenantBillingStatusConstants.Pending,
+                SubscriptionPlanId = PlanId,
+                Subscription = new CreatePlatformTenantSubscriptionDetailsRequest
+                {
+                    SubscriptionType = TenantSubscriptionTypeConstants.Demo,
+                    SubscriptionStatus = TenantSubscriptionStatusConstants.Trial,
+                    BillingCycle = TenantSubscriptionBillingConstants.BillingCycleMonthly
+                },
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Demo",
+                    Email = "demo@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TenantStatusConstants.Active, repository.LastWriteModel!.Tenant.Status);
+        Assert.NotNull(repository.LastWriteModel.Tenant.ActivatedAt);
+        Assert.Equal(
+            TenantSubscriptionBillingConstants.BillingCycleMonthly,
+            repository.LastWriteModel.Subscription.BillingCycle);
     }
 
     [Fact]
@@ -415,6 +485,7 @@ public sealed class PlatformTenantWizardServiceTests
                 Name = "Country Only Tenant",
                 CountryCode = "GB",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Ada",
@@ -452,6 +523,7 @@ public sealed class PlatformTenantWizardServiceTests
                     CountryCode = "LK"
                 },
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Ada",
@@ -497,6 +569,7 @@ public sealed class PlatformTenantWizardServiceTests
                     CountryCode = "GB"
                 },
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Ada",
@@ -538,6 +611,7 @@ public sealed class PlatformTenantWizardServiceTests
                 Code = "TEN-WIZ-COUNTERS",
                 Name = "Wizard Tenant",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Ada",
@@ -583,6 +657,7 @@ public sealed class PlatformTenantWizardServiceTests
                 Code = "TEN-WIZ-ADDON-COUNTERS",
                 Name = "Wizard Tenant",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 Addons = [new CreatePlatformTenantAddonSelectionRequest { AddonId = AddonId, Quantity = 2 }],
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
@@ -622,6 +697,7 @@ public sealed class PlatformTenantWizardServiceTests
                 Code = "TEN-WIZ-MISSING-LIMITS",
                 Name = "Wizard Tenant",
                 SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
                 TenantAdmin = new CreatePlatformTenantAdminRequest
                 {
                     FirstName = "Ada",
@@ -638,6 +714,47 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.False(repository.CreateWizardCalled);
         Assert.False(usageCounterService.SeedCalled);
     }
+
+    [Fact]
+    public async Task CreateTenantAsync_WizardWithoutSubscription_ReturnsValidationFailure()
+    {
+        var repository = new FakeWizardTenantRepository();
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-NO-SUB",
+                Name = "No Subscription Tenant",
+                SubscriptionPlanId = PlanId,
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    Email = "ada-nosub@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_tenants.validation_failed", result.Error.Code);
+        Assert.False(repository.CreateWizardCalled);
+    }
+
+    private static CreatePlatformTenantSubscriptionDetailsRequest DefaultWizardSubscription(
+        string subscriptionType = TenantSubscriptionTypeConstants.Trial,
+        string billingCycle = TenantSubscriptionBillingConstants.BillingCycleMonthly,
+        string subscriptionStatus = TenantSubscriptionStatusConstants.Trial) =>
+        new()
+        {
+            SubscriptionType = subscriptionType,
+            BillingCycle = billingCycle,
+            SubscriptionStatus = subscriptionStatus,
+            PaymentMethod = "manual"
+        };
 
     private static PlatformTenantService CreateService(
         FakeWizardTenantRepository repository,
@@ -731,6 +848,9 @@ public sealed class PlatformTenantWizardServiceTests
             ProfileEntity = profile;
             return Task.CompletedTask;
         }
+
+        public Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
 
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,

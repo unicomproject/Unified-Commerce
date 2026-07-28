@@ -195,6 +195,22 @@ public sealed partial class PlatformTenantService
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(businessTypeResolution.Error);
         }
 
+        var subscriptionRequest = request.Subscription!;
+        var createModeResolution = TenantCreateModeResolver.ResolveWizard(subscriptionRequest.SubscriptionType);
+        if (!createModeResolution.IsSuccess)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = createModeResolution.Failure == TenantCreateModeResolver.ResolutionFailure.MissingSubscriptionType
+                        ? "Subscription type is required for wizard create."
+                        : "Subscription type must be PAID, TRIAL, or DEMO."
+                });
+        }
+
+        var createMode = createModeResolution.Mode;
+        var initialLifecycleStatus = TenantCreateModeResolver.InitialLifecycleStatus(createMode);
+
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
@@ -202,7 +218,7 @@ public sealed partial class PlatformTenantService
             code,
             code.ToLowerInvariant(),
             name,
-            billingStatus,
+            initialLifecycleStatus,
             NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
             NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
             null, // dataRegion
@@ -210,6 +226,12 @@ public sealed partial class PlatformTenantService
             now,
             NormalizeOptionalText(request.DefaultLocale),
             NormalizeOptionalText(request.OperatingMode));
+
+        // Trial/Demo: create (DRAFT) then activate separately in the same orchestration → ACTIVE.
+        if (createMode is TenantCreateMode.Trial or TenantCreateMode.Demo)
+        {
+            tenant.Activate(platformUserId, now);
+        }
 
         var profile = CreateTenantProfileOrNull(
             tenantId,
@@ -219,9 +241,9 @@ public sealed partial class PlatformTenantService
             businessTypeResolution.Value);
         var address = CreateTenantAddressOrNull(tenantId, request, now);
 
-        var subscriptionRequest = request.Subscription;
-        var billingCycle = NormalizeBillingCycle(subscriptionRequest?.BillingCycle);
-        var subscriptionStatus = NormalizeSubscriptionStatus(subscriptionRequest?.SubscriptionStatus);
+        var billingCycle = PlatformTenantCreateRequestValidator.TryNormalizeBillingCycle(subscriptionRequest.BillingCycle)
+            ?? TenantSubscriptionBillingConstants.BillingCycleMonthly;
+        var subscriptionStatus = NormalizeSubscriptionStatus(subscriptionRequest.SubscriptionStatus);
 
         var subscriptionId = Guid.NewGuid();
         var subscription = TenantSubscription.Create(
@@ -251,6 +273,11 @@ public sealed partial class PlatformTenantService
             currentPeriodEnd: null,
             assignedByPlatformUserId: platformUserId,
             now);
+
+        if (createMode is TenantCreateMode.Trial or TenantCreateMode.Demo)
+        {
+            subscription.Activate(now);
+        }
 
         var entitlements = resolvedFeatureIds
             .Distinct()
@@ -512,12 +539,14 @@ public sealed partial class PlatformTenantService
 
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
+        // Legacy minimal create (code + name + plan): deprecated TRIAL compatibility path.
+        var legacyCreateMode = TenantCreateModeResolver.ResolveLegacyMinimalCompatibility();
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
             tenantId,
             code,
             code.ToLowerInvariant(),
             name,
-            billingStatus,
+            TenantStatusConstants.Draft,
             NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
             NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
             null, // dataRegion
@@ -525,6 +554,8 @@ public sealed partial class PlatformTenantService
             now,
             NormalizeOptionalText(request.DefaultLocale),
             NormalizeOptionalText(request.OperatingMode));
+        tenant.Activate(platformUserId, now);
+        _ = legacyCreateMode;
 
         var subscription = TenantSubscription.Create(
             Guid.NewGuid(),
@@ -553,6 +584,7 @@ public sealed partial class PlatformTenantService
             currentPeriodEnd: null,
             assignedByPlatformUserId: platformUserId,
             now);
+        subscription.Activate(now);
 
         await _repository.AddTenantWithSubscriptionAndEntitlementsAsync(
             tenant,
@@ -736,18 +768,8 @@ public sealed partial class PlatformTenantService
 
     private static string NormalizeBillingCycle(string? billingCycle)
     {
-        if (string.IsNullOrWhiteSpace(billingCycle))
-        {
-            return TenantSubscriptionBillingConstants.BillingCycleMonthly;
-        }
-
-        var normalized = billingCycle.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            TenantSubscriptionBillingConstants.BillingCycleMonthly => TenantSubscriptionBillingConstants.BillingCycleMonthly,
-            TenantSubscriptionBillingConstants.BillingCycleYearly => TenantSubscriptionBillingConstants.BillingCycleYearly,
-            _ => TenantSubscriptionBillingConstants.BillingCycleMonthly
-        };
+        return PlatformTenantCreateRequestValidator.TryNormalizeBillingCycle(billingCycle)
+            ?? TenantSubscriptionBillingConstants.BillingCycleMonthly;
     }
 
     private static string GenerateDraftInvoiceNumber(DateTimeOffset now) =>

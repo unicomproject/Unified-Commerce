@@ -40,7 +40,7 @@ public class Tenant : AuditableEntity
             TenantCode = tenantCode.Trim(),
             TenantSlug = tenantSlug.Trim(),
             DisplayName = displayName.Trim(),
-            Status = status,
+            Status = TenantStatusConstants.Normalize(status),
             BaseCurrencyCode = baseCurrencyCode.Trim(),
             DefaultTimezone = defaultTimezone.Trim(),
             DefaultLocale = NormalizeOptional(defaultLocale),
@@ -87,18 +87,51 @@ public class Tenant : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void MarkPendingActivation(Guid? updatedBy, DateTimeOffset now)
+    {
+        if (!string.Equals(Status, TenantStatusConstants.PendingPayment, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Tenant can only move to pending_activation from pending_payment.");
+        }
+
+        Status = TenantStatusConstants.PendingActivation;
+        UpdatedByPlatformUserId = updatedBy;
+        UpdatedAt = now;
+    }
+
     public void Activate(Guid? updatedBy, DateTimeOffset now)
     {
+        if (!TenantLifecycleRules.CanActivate(Status))
+        {
+            throw new InvalidOperationException(
+                $"Tenant cannot be activated from status '{Status}'.");
+        }
+
         Status = TenantStatusConstants.Active;
         ActivatedAt = now;
+        SuspendedAt = null;
         UpdatedByPlatformUserId = updatedBy;
         UpdatedAt = now;
     }
 
     public void Suspend(Guid? updatedBy, DateTimeOffset now)
     {
+        if (!TenantLifecycleRules.CanSuspend(Status))
+        {
+            throw new InvalidOperationException(
+                $"Tenant cannot be suspended from status '{Status}'.");
+        }
+
         Status = TenantStatusConstants.Suspended;
         SuspendedAt = now;
+        UpdatedByPlatformUserId = updatedBy;
+        UpdatedAt = now;
+    }
+
+    public void Cancel(Guid? updatedBy, DateTimeOffset now)
+    {
+        Status = TenantStatusConstants.Cancelled;
         UpdatedByPlatformUserId = updatedBy;
         UpdatedAt = now;
     }

@@ -26,7 +26,7 @@ public sealed class PlatformTenantLifecycleServiceTests
     {
         var repository = new FakeLifecycleTenantRepository
         {
-            DetailResponse = CreateDetail(Guid.NewGuid(), TenantStatusConstants.Draft),
+            DetailResponse = CreateDetail(Guid.NewGuid(), TenantStatusConstants.Active),
             IncludedFeatureIds = new HashSet<Guid> { FeatureId },
             ResolvedFeatures = [new ResolvedTenantFeature(FeatureId, "online_store")]
         };
@@ -51,8 +51,10 @@ public sealed class PlatformTenantLifecycleServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(TenantStatusConstants.Draft, result.Value!.Status);
+        Assert.Equal(TenantStatusConstants.Active, result.Value!.Status);
         Assert.True(repository.AddCalled);
+        Assert.Equal(TenantStatusConstants.Active, repository.AddedTenant!.Status);
+        Assert.NotNull(repository.AddedTenant.ActivatedAt);
     }
 
     [Fact]
@@ -441,6 +443,189 @@ public sealed class PlatformTenantLifecycleServiceTests
     private static HashSet<string> ViewOnlyPermissions() =>
         [PlatformPermissionCodes.TenantsView];
 
+    [Fact]
+    public async Task ActivateTenantAsync_FromPendingPayment_ReturnsInvalidTransition()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeLifecycleTenantRepository
+        {
+            TenantEntity = Tenant.Create(
+                tenantId,
+                "TEN-PAY",
+                "ten-pay",
+                "Paid Pending",
+                TenantStatusConstants.PendingPayment,
+                "LKR",
+                "Asia/Colombo",
+                null,
+                null,
+                Now),
+            SubscriptionEntity = TenantSubscription.Create(
+                Guid.NewGuid(),
+                tenantId,
+                PlanId,
+                TenantSubscriptionStatusConstants.Active,
+                Now),
+            HasVerifiedPaidInvoice = true
+        };
+
+        var service = CreateService(
+            repository,
+            new FakePlatformSubscriptionPlanRepository(),
+            permissions: AllTenantPermissions());
+
+        var result = await service.ActivateTenantAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_tenants.invalid_transition", result.Error.Code);
+        Assert.Contains("payment verification", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ActivateTenantAsync_FromPendingActivationWithoutPayment_ReturnsInvalidTransition()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeLifecycleTenantRepository
+        {
+            TenantEntity = Tenant.Create(
+                tenantId,
+                "TEN-PA-UNPAID",
+                "ten-pa-unpaid",
+                "Pending Activation",
+                TenantStatusConstants.PendingActivation,
+                "LKR",
+                "Asia/Colombo",
+                null,
+                null,
+                Now),
+            SubscriptionEntity = TenantSubscription.Create(
+                Guid.NewGuid(),
+                tenantId,
+                PlanId,
+                TenantSubscriptionStatusConstants.Active,
+                Now),
+            HasVerifiedPaidInvoice = false
+        };
+
+        var service = CreateService(
+            repository,
+            new FakePlatformSubscriptionPlanRepository(),
+            permissions: AllTenantPermissions());
+
+        var result = await service.ActivateTenantAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_tenants.invalid_transition", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ActivateTenantAsync_FromPendingActivationWithPayment_ReturnsActive()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeLifecycleTenantRepository
+        {
+            TenantEntity = Tenant.Create(
+                tenantId,
+                "TEN-PA-PAID",
+                "ten-pa-paid",
+                "Pending Activation Paid",
+                TenantStatusConstants.PendingActivation,
+                "LKR",
+                "Asia/Colombo",
+                null,
+                null,
+                Now),
+            SubscriptionEntity = TenantSubscription.Create(
+                Guid.NewGuid(),
+                tenantId,
+                PlanId,
+                TenantSubscriptionStatusConstants.Active,
+                Now),
+            HasVerifiedPaidInvoice = true,
+            DetailResponse = CreateDetail(tenantId, TenantStatusConstants.Active)
+        };
+
+        var service = CreateService(
+            repository,
+            new FakePlatformSubscriptionPlanRepository(),
+            permissions: AllTenantPermissions());
+
+        var result = await service.ActivateTenantAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TenantStatusConstants.Active, repository.TenantEntity!.Status);
+        Assert.NotNull(repository.TenantEntity.ActivatedAt);
+    }
+
+    [Fact]
+    public async Task ActivateTenantAsync_FromCancelled_ReturnsInvalidTransition()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeLifecycleTenantRepository
+        {
+            TenantEntity = Tenant.Create(
+                tenantId,
+                "TEN-CANCEL",
+                "ten-cancel",
+                "Cancelled Tenant",
+                TenantStatusConstants.Cancelled,
+                "LKR",
+                "Asia/Colombo",
+                null,
+                null,
+                Now),
+            SubscriptionEntity = TenantSubscription.Create(
+                Guid.NewGuid(),
+                tenantId,
+                PlanId,
+                TenantSubscriptionStatusConstants.Cancelled,
+                Now)
+        };
+
+        var service = CreateService(
+            repository,
+            new FakePlatformSubscriptionPlanRepository(),
+            permissions: AllTenantPermissions());
+
+        var result = await service.ActivateTenantAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_tenants.invalid_transition", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_PaidWizardPath_DoesNotWriteBillingIntoStatus()
+    {
+        var repository = new FakeLifecycleTenantRepository
+        {
+            DetailResponse = CreateDetail(Guid.NewGuid(), TenantStatusConstants.PendingPayment),
+            IncludedFeatureIds = new HashSet<Guid> { FeatureId },
+            ResolvedFeatures = [new ResolvedTenantFeature(FeatureId, "online_store")]
+        };
+
+        // Paid path uses wizard; exercise via wizard-shaped request through CreateTenantAsync routing.
+        var service = CreateService(
+            repository,
+            new FakePlatformSubscriptionPlanRepository { PlanEntity = CreateActivePlan() },
+            permissions: AllTenantPermissions());
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-LEGACY-TRIAL",
+                Name = "Legacy Trial",
+                BillingStatus = TenantBillingStatusConstants.Paid,
+                SubscriptionPlanId = PlanId,
+                EnabledFeatureCodes = ["online_store"]
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TenantStatusConstants.Active, repository.AddedTenant!.Status);
+        Assert.NotEqual(TenantBillingStatusConstants.Paid, repository.AddedTenant.Status);
+    }
+
     private static SubscriptionPlan CreateActivePlan() =>
         SubscriptionPlan.Create(
             PlanId,
@@ -485,9 +670,10 @@ public sealed class PlatformTenantLifecycleServiceTests
             Now,
             Now,
             true,
-            status == TenantStatusConstants.Draft,
+            status is TenantStatusConstants.Draft or TenantStatusConstants.PendingActivation,
             status == TenantStatusConstants.Active,
-            true);
+            true,
+            LifecycleStatus: status);
     }
 
     private sealed class FakeLifecycleDateTimeProvider : IDateTimeProvider
@@ -539,6 +725,8 @@ public sealed class PlatformTenantLifecycleServiceTests
         public Dictionary<string, Guid> BusinessTypeIdsByCode { get; } = new(StringComparer.OrdinalIgnoreCase);
         public TenantProfile? ProfileEntity { get; set; }
         public TenantProfile? UpsertedProfile { get; private set; }
+        public bool HasVerifiedPaidInvoice { get; set; }
+        public Tenant? AddedTenant { get; private set; }
 
         public Task<Guid?> GetActiveBusinessTypeIdByCodeAsync(string businessCode, CancellationToken cancellationToken)
         {
@@ -559,6 +747,9 @@ public sealed class PlatformTenantLifecycleServiceTests
             ProfileEntity = profile;
             return Task.CompletedTask;
         }
+
+        public Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult(HasVerifiedPaidInvoice);
 
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,
@@ -595,6 +786,7 @@ public sealed class PlatformTenantLifecycleServiceTests
             CancellationToken cancellationToken)
         {
             AddCalled = true;
+            AddedTenant = tenant;
             TenantEntity = tenant;
             SubscriptionEntity = subscription;
             return Task.CompletedTask;

@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -73,15 +74,32 @@ public sealed class PlatformBillingRepository : IPlatformBillingRepository
         => MutateAsync(id, expected, invoice => invoice.Issue(now), now, ct);
 
     public Task<PlatformBillingMutationResult> MarkPaidAsync(Guid id, DateTimeOffset expected, DateTimeOffset paidAt, DateTimeOffset now, CancellationToken ct)
-        => MutateAsync(id, expected, invoice => invoice.MarkPaid(paidAt, now), now, ct);
+        => MutateAsync(id, expected, invoice => invoice.MarkPaid(paidAt, now), now, ct, promoteTenantLifecycle: true);
 
-    private async Task<PlatformBillingMutationResult> MutateAsync(Guid id, DateTimeOffset expected, Action<E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice> action, DateTimeOffset now, CancellationToken ct)
+    private async Task<PlatformBillingMutationResult> MutateAsync(
+        Guid id,
+        DateTimeOffset expected,
+        Action<E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice> action,
+        DateTimeOffset now,
+        CancellationToken ct,
+        bool promoteTenantLifecycle = false)
     {
         var invoice = await _db.SubscriptionInvoices.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (invoice is null) return new(PlatformBillingMutationOutcome.NotFound);
         if (invoice.UpdatedAt != expected) return new(PlatformBillingMutationOutcome.ConcurrencyConflict);
         try { action(invoice); }
         catch (InvalidOperationException) { return new(PlatformBillingMutationOutcome.InvalidTransition); }
+
+        if (promoteTenantLifecycle)
+        {
+            var tenant = await _db.Tenants.SingleOrDefaultAsync(x => x.Id == invoice.TenantId, ct);
+            if (tenant is not null &&
+                string.Equals(tenant.Status, TenantStatusConstants.PendingPayment, StringComparison.OrdinalIgnoreCase))
+            {
+                tenant.MarkPendingActivation(updatedBy: null, now);
+            }
+        }
+
         try { await _db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return new(PlatformBillingMutationOutcome.ConcurrencyConflict); }
         var row = await BaseQuery().SingleAsync(x => x.Id == id, ct);

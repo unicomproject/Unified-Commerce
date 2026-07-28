@@ -153,7 +153,8 @@ public sealed class PlatformDashboardRepositoryTests
         Assert.Contains(dashboard.AttentionItems, x => x.Type == "suspended_tenants" && x.Count == 1);
         Assert.Contains(dashboard.AttentionItems, x => x.Type == "past_due_subscriptions" && x.Count == 1);
         Assert.Contains(dashboard.AttentionItems, x => x.Type == "pending_billing" && x.Count == 1);
-        Assert.Contains(dashboard.AttentionItems, x => x.Type == "setup_pending" && x.Count == 0);
+        Assert.Contains(dashboard.AttentionItems, x => x.Type == "pending_activation" && x.Count == 0);
+        Assert.DoesNotContain(dashboard.AttentionItems, x => x.Type == "setup_pending");
         Assert.Equal(Now, dashboard.GeneratedAt);
     }
 
@@ -197,6 +198,34 @@ public sealed class PlatformDashboardRepositoryTests
         Assert.Equal(2, pastDue.Count);
         Assert.Equal(1, pendingBilling.Count);
         Assert.Equal(1, dashboard.PendingBillingCount);
+    }
+
+    [Fact]
+    public async Task GetDashboardAsync_PendingActivationAttention_UsesCanonicalTypeAndExcludesOtherStatuses()
+    {
+        await using var dbContext = CreateDbContext();
+        var pendingActivationId = Guid.Parse("11111111-1111-4111-8111-111111111301");
+        var pendingPaymentId = Guid.Parse("11111111-1111-4111-8111-111111111302");
+        var activeId = Guid.Parse("11111111-1111-4111-8111-111111111303");
+        var secondPendingActivationId = Guid.Parse("11111111-1111-4111-8111-111111111304");
+
+        dbContext.Tenants.AddRange(
+            Tenant.Create(pendingActivationId, "TEN-PA1", "ten-pa1", "Pending Activation One", "pending_activation", "LKR", "Asia/Colombo", null, null, Now),
+            Tenant.Create(pendingPaymentId, "TEN-PP1", "ten-pp1", "Pending Payment", "pending_payment", "LKR", "Asia/Colombo", null, null, Now),
+            Tenant.Create(activeId, "TEN-ACT2", "ten-act2", "Active Tenant", "active", "LKR", "Asia/Colombo", null, null, Now),
+            Tenant.Create(secondPendingActivationId, "TEN-PA2", "ten-pa2", "Pending Activation Two", "pending_activation", "LKR", "Asia/Colombo", null, null, Now));
+
+        await dbContext.SaveChangesAsync();
+
+        IPlatformDashboardRepository repository = new PlatformDashboardRepository(dbContext);
+        var dashboard = await repository.GetDashboardAsync(Now, CancellationToken.None);
+
+        var pendingActivation = Assert.Single(dashboard.AttentionItems, x => x.Type == "pending_activation");
+        Assert.Equal(2, pendingActivation.Count);
+        Assert.Equal("Pending Activation", pendingActivation.Title);
+        Assert.DoesNotContain(dashboard.AttentionItems, x => x.Type == "setup_pending");
+        Assert.Equal(1, dashboard.ActiveTenants);
+        Assert.Equal(4, dashboard.TotalTenants);
     }
 
     [Fact]
