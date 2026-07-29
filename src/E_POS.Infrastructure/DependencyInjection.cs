@@ -10,6 +10,7 @@ using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Tenant.Payment.Contracts;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
@@ -25,6 +26,7 @@ using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Application.Common.Email;
 using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
@@ -65,6 +67,8 @@ using E_POS.Application.Modules.Shared.Storage.Contracts;
 using E_POS.Infrastructure.Modules.Shared.Storage.Services;
 using E_POS.Infrastructure.Modules.Shared.Media.Options;
 using E_POS.Infrastructure.Modules.Shared.Media.Services;
+using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
+using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 
 
 namespace E_POS.Infrastructure;
@@ -170,6 +174,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
+        services.AddScoped<ICardPaymentGateway, UnavailableCardPaymentGateway>();
         services.AddScoped<IPosSaleLinePricingCalculator, PosSaleLinePricingCalculator>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
         services.AddScoped<IPosReturnRepository, PosReturnRepository>();
@@ -179,6 +184,7 @@ public static class DependencyInjection
         services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
+        services.AddScoped<IPosHardwareRepository, PosHardwareRepository>();
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
         services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
         services.AddScoped(static provider =>

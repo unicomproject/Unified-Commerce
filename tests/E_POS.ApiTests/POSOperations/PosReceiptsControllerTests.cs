@@ -120,6 +120,28 @@ public sealed class PosReceiptsControllerTests
 
     private sealed class FakePosReceiptService : IPosReceiptService
     {
+        public Task<ApplicationResult<PosReceiptSearchResponseDto>> SearchAsync(
+            TenantRequestContext context,
+            PosReceiptSearchRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReceiptSearchResponseDto>.Failure(
+                new ApplicationError("pos_receipts.not_configured", "Not configured.")));
+
+        public Task<ApplicationResult<PosReceiptDetailDto>> GetDetailAsync(
+            TenantRequestContext context,
+            Guid receiptId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReceiptDetailDto>.Failure(
+                new ApplicationError("pos_receipts.not_configured", "Not configured.")));
+
+        public Task<ApplicationResult<PosReceiptReprintAuthorizationResponseDto>> AuthorizeReprintAsync(
+            TenantRequestContext context,
+            Guid receiptId,
+            PosReceiptReprintAuthorizationRequestDto request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosReceiptReprintAuthorizationResponseDto>.Failure(
+                new ApplicationError("pos_receipts.not_configured", "Not configured.")));
+
         public ApplicationResult<PosReceiptPrintResponseDto> RecordPrintResult { get; init; } =
             ApplicationResult<PosReceiptPrintResponseDto>.Failure(
                 new ApplicationError("pos_receipts.print_failed", "Receipt print audit could not be recorded."));

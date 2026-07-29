@@ -17,6 +17,7 @@ public class HardwareDevice : AuditableEntity
     public string? AssetTag { get; protected set; }
     public string? FirmwareVersion { get; protected set; }
     public string? ConfigJson { get; protected set; }
+    public int ConfigurationVersion { get; protected set; } = 1;
     public DateTimeOffset? LastSeenAt { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
@@ -57,12 +58,34 @@ public class HardwareDevice : AuditableEntity
             AssetTag = assetTag?.Trim(),
             FirmwareVersion = firmwareVersion?.Trim(),
             ConfigJson = configJson,
+            ConfigurationVersion = 1,
             Status = status.Trim().ToUpperInvariant(),
             CreatedByTenantUserId = createdByTenantUserId,
             UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public void UpdateConfiguration(
+        string hardwareDeviceName,
+        string connectionType,
+        string? configJson,
+        string status,
+        int expectedVersion,
+        Guid updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        if (expectedVersion != ConfigurationVersion)
+            throw new InvalidOperationException("Hardware configuration version is stale.");
+
+        HardwareDeviceName = hardwareDeviceName.Trim();
+        ConnectionType = connectionType.Trim().ToUpperInvariant();
+        ConfigJson = configJson;
+        Status = status.Trim().ToUpperInvariant();
+        ConfigurationVersion++;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
     }
 
     public void UpdateProfile(

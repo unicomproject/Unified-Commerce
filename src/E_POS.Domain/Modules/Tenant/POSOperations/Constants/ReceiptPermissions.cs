@@ -4,4 +4,5 @@ public static class ReceiptPermissions
 {
     public const string View = "receipts.view";
     public const string Print = "receipts.print";
+    public const string Reprint = "receipts.reprint";
 }

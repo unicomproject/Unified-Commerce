@@ -300,4 +300,23 @@ public sealed class PosPermissionSeedTests
             downSql,
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void HardwareSettingsPermission_IsSeededAndGrantedToCashier()
+    {
+        Assert.Equal(
+            "pos.hardware.settings",
+            DevelopmentPosHardwareSettingsPermissionSeedData.PermissionCode);
+        Assert.Contains(
+            DevelopmentPosHardwareSettingsPermissionSeedData.PermissionCode,
+            DevelopmentPosCashierPermissionAssignmentSeedData.PermissionCodes);
+        Assert.Contains(
+            "pos.hardware.settings",
+            DevelopmentPosHardwareSettingsPermissionSeedData.UpSql,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            DevelopmentTenantSeedConstants.CashierRoleId.ToString(),
+            DevelopmentPosHardwareSettingsPermissionSeedData.CashierAssignmentUpSql,
+            StringComparison.OrdinalIgnoreCase);
+    }
 }

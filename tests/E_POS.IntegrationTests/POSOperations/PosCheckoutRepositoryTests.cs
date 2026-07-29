@@ -1,6 +1,7 @@
 using System.Reflection;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Application.Modules.Tenant.Payment.Contracts;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
@@ -315,7 +316,7 @@ public sealed class PosCheckoutRepositoryTests
     }
 
     [Fact]
-    public async Task StartPaymentAsync_WithCard_ReturnsProviderRequired_WithoutPersistingPayment()
+    public async Task StartPaymentAsync_WithCardProviderUnavailable_DoesNotPersistAsCash()
     {
         var tenantId = Guid.NewGuid();
         var outletId = Guid.NewGuid();
@@ -346,15 +347,72 @@ public sealed class PosCheckoutRepositoryTests
                 "card",
                 null,
                 null,
-                "card-blocked-key"),
+                "card-blocked-key",
+                Guid.NewGuid()),
             Now,
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal("pos_checkout.payment_provider_required", result.ErrorCode);
+        Assert.Equal("pos_checkout.card_provider_not_configured", result.ErrorCode);
         Assert.Equal(0, await dbContext.SalesPayments.CountAsync());
         Assert.Equal(0, await dbContext.SalesPaymentTransactions.CountAsync());
         Assert.Equal(0, await dbContext.SalesOrders.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartPaymentAsync_WithCompletedCardCapture_PersistsProviderPayment_NotCash()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        SeedDeviceContext(dbContext, tenantId, outletId, tillId, deviceId, userId, Now, isTrusted: true);
+        SeedTenantUser(dbContext, tenantId, userId, "Cashier 001");
+        SeedOpenTillSession(dbContext, tenantId, outletId, tillId, deviceId, userId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 1250m);
+        SeedSellableProduct(dbContext, tenantId, productId, variantId);
+        var location = InventoryLocation.Create(Guid.NewGuid(), tenantId, outletId, null,
+            "CARD-POS-FLOOR", "Card POS Floor", "STORE", true, false, false, false,
+            "ACTIVE", userId, Now);
+        var balance = InventoryBalance.Create(Guid.NewGuid(), tenantId, location.Id,
+            productId, variantId, null, Now);
+        balance.AdjustQuantities(5, 0, 0, 0, Now);
+        dbContext.InventoryLocations.Add(location);
+        dbContext.InventoryBalances.Add(balance);
+        await dbContext.SaveChangesAsync();
+
+        var repository = CreateRepository(
+            dbContext,
+            new StubCardGateway(new CardPaymentCaptureResult(
+                CardPaymentOutcome.Completed,
+                "TEST_TERMINAL",
+                "provider-txn-1",
+                "VISA",
+                "4242",
+                "AUTH-1",
+                "TERM-1")));
+        var result = await repository.StartPaymentAsync(
+            tenantId,
+            userId,
+            [PaymentPermissions.AcceptCard],
+            new PosCheckoutStartPaymentRequestDto(
+                deviceId, "NewSale", null,
+                [new PosCheckoutLineRequestDto(variantId, 1)],
+                "card", null, null, "card-success-key", Guid.NewGuid()),
+            Now,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.ErrorCode);
+        var transaction = await dbContext.SalesPaymentTransactions.SingleAsync();
+        Assert.Equal("TEST_TERMINAL", transaction.ProviderName);
+        Assert.NotEqual("CASH", transaction.ProviderName);
+        Assert.Contains("\"cardLast4\":\"4242\"", transaction.ProviderResponseJson);
+        Assert.Equal("4242", result.Payment!.Tenders!.Single().MaskedCardLast4);
     }
 
     [Fact]
@@ -465,14 +523,23 @@ public sealed class PosCheckoutRepositoryTests
         Assert.Contains(await dbContext.PosDiscountApplicationEvents.ToListAsync(), x => x.EventType == "APPLIED");
     }
 
-    private static PosCheckoutRepository CreateRepository(EPosDbContext dbContext)
+    private static PosCheckoutRepository CreateRepository(
+        EPosDbContext dbContext,
+        ICardPaymentGateway? cardGateway = null)
     {
         var tillSessionRepository = new PosTillSessionRepository(
             dbContext,
             new CodeSequenceRepository(dbContext),
             NullLogger<PosTillSessionRepository>.Instance);
 
-        return new PosCheckoutRepository(dbContext, tillSessionRepository);
+        return new PosCheckoutRepository(dbContext, tillSessionRepository, cardGateway);
+    }
+
+    private sealed class StubCardGateway(CardPaymentCaptureResult result) : ICardPaymentGateway
+    {
+        public Task<CardPaymentCaptureResult> CaptureAsync(
+            CardPaymentCaptureRequest request,
+            CancellationToken cancellationToken) => Task.FromResult(result);
     }
 
     private static void SeedDeviceContext(

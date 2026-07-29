@@ -124,7 +124,10 @@ public sealed class PosHomeDashboardServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        Assert.False(result.Value!.Cards!.CashDrawer.Enabled);
+        Assert.Equal(
+            "https://cdn.example.test/cashier-001.jpg",
+            result.Value!.Cashier!.ProfileImageUrl);
+        Assert.False(result.Value.Cards!.CashDrawer.Enabled);
         Assert.False(result.Value.QuickActions!.CanViewCashDrawer);
     }
 
@@ -144,6 +147,7 @@ public sealed class PosHomeDashboardServiceTests
             var snapshot = new PosHomeDashboardDbSnapshot(
                 CashierTenantUserId: context.UserId,
                 CashierDisplayName: "Cashier 001",
+                CashierProfileImageUrl: "https://cdn.example.test/cashier-001.jpg",
                 DeviceId: Guid.NewGuid(),
                 DeviceCode: "POS-01",
                 DeviceName: "Front POS",

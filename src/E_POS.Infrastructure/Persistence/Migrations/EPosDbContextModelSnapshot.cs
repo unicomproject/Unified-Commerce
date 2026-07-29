@@ -13945,6 +13945,96 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareConfigurationChangeAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ChangeReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("change_reason");
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("change_type");
+
+                    b.Property<Guid>("ChangedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_tenant_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("HardwareDeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("hardware_device_id");
+
+                    b.Property<int>("NewVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("new_version");
+
+                    b.Property<int>("OldVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("old_version");
+
+                    b.Property<Guid>("OutletId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("outlet_id");
+
+                    b.Property<Guid>("PosDeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pos_device_id");
+
+                    b.Property<string>("SafeAfterJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("safe_after_json");
+
+                    b.Property<string>("SafeBeforeJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("safe_before_json");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_id");
+
+                    b.Property<Guid?>("TillSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_session_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_hardware_configuration_change_audits");
+
+                    b.HasIndex("ChangedByTenantUserId");
+
+                    b.HasIndex("HardwareDeviceId");
+
+                    b.HasIndex("TillSessionId");
+
+                    b.HasIndex("TenantId", "OutletId");
+
+                    b.HasIndex("TenantId", "PosDeviceId");
+
+                    b.HasIndex("TenantId", "TillId");
+
+                    b.HasIndex("TenantId", "HardwareDeviceId", "NewVersion")
+                        .IsUnique()
+                        .HasDatabaseName("uq_hardware_configuration_audit_version");
+
+                    b.ToTable("hardware_configuration_change_audits", (string)null);
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDevice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -13960,6 +14050,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<string>("ConfigJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("config_json");
+
+                    b.Property<int>("ConfigurationVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("configuration_version");
 
                     b.Property<string>("ConnectionType")
                         .IsRequired()
@@ -14152,13 +14249,27 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int>("ConfigurationVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("configuration_version");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<Guid>("HardwareDeviceId")
+                    b.Property<Guid?>("HardwareDeviceId")
                         .HasColumnType("uuid")
                         .HasColumnName("hardware_device_id");
+
+                    b.Property<string>("HardwareType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("hardware_type");
 
                     b.Property<Guid?>("InitiatedFromPosDeviceId")
                         .HasColumnType("uuid")
@@ -14167,6 +14278,25 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OutletId")
                         .HasColumnType("uuid")
                         .HasColumnName("outlet_id");
+
+                    b.Property<bool?>("PhysicalConfirmation")
+                        .HasColumnType("boolean")
+                        .HasColumnName("physical_confirmation");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("RequestPayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("request_payload_hash");
+
+                    b.Property<string>("ResultCategory")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("result_category");
 
                     b.Property<string>("ResultMessage")
                         .HasColumnType("text")
@@ -14200,6 +14330,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tested_by_tenant_user_id");
 
+                    b.Property<Guid?>("TillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_id");
+
+                    b.Property<Guid?>("TillSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_session_id");
+
                     b.HasKey("Id")
                         .HasName("pk_hardware_test_logs");
 
@@ -14207,9 +14345,18 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TestedByTenantUserId");
 
-                    b.HasIndex("TenantId", "InitiatedFromPosDeviceId");
+                    b.HasIndex("TillSessionId");
 
                     b.HasIndex("TenantId", "OutletId");
+
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_hardware_test_logs_tenant_id_request_id");
+
+                    b.HasIndex("TenantId", "TillId");
+
+                    b.HasIndex("TenantId", "InitiatedFromPosDeviceId", "TestedAt")
+                        .HasDatabaseName("ix_hardware_test_logs_device_history");
 
                     b.ToTable("hardware_test_logs", null, t =>
                         {
@@ -19560,9 +19707,27 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AgentResult")
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)")
+                        .HasColumnName("agent_result");
+
                     b.Property<int>("AttemptNumber")
                         .HasColumnType("integer")
                         .HasColumnName("attempt_number");
+
+                    b.Property<string>("ClientCorrelationId")
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)")
+                        .HasColumnName("client_correlation_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int>("CopyIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("copy_index");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -19577,9 +19742,26 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("error_message");
 
+                    b.Property<string>("FailureCategory")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("failure_category");
+
+                    b.Property<bool>("IsReprint")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_reprint");
+
                     b.Property<Guid?>("OperatorTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("operator_tenant_user_id");
+
+                    b.Property<Guid?>("PosDeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pos_device_id");
+
+                    b.Property<Guid?>("PrintRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("print_request_id");
 
                     b.Property<string>("PrintResultJson")
                         .HasColumnType("jsonb")
@@ -19601,38 +19783,110 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(40)")
                         .HasColumnName("printed_copy_type");
 
+                    b.Property<Guid?>("PrinterConfigurationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("printer_configuration_id");
+
+                    b.Property<int?>("PrinterConfigurationVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("printer_configuration_version");
+
                     b.Property<Guid?>("PrinterDeviceId")
                         .HasColumnType("uuid")
                         .HasColumnName("printer_device_id");
+
+                    b.Property<string>("PrinterName")
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)")
+                        .HasColumnName("printer_name");
+
+                    b.Property<string>("PrinterTransport")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("printer_transport");
 
                     b.Property<Guid>("ReceiptId")
                         .HasColumnType("uuid")
                         .HasColumnName("receipt_id");
 
+                    b.Property<string>("ReceiptPurpose")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("receipt_purpose");
+
+                    b.Property<Guid?>("RecoveryPrintRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recovery_print_request_id");
+
+                    b.Property<Guid?>("ReprintOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reprint_operation_id");
+
+                    b.Property<string>("RoutingPurpose")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("routing_purpose");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_id");
+
+                    b.Property<Guid?>("TillSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_session_id");
+
+                    b.Property<bool>("UnknownOutcome")
+                        .HasColumnType("boolean")
+                        .HasColumnName("unknown_outcome");
 
                     b.HasKey("Id")
                         .HasName("pk_receipt_print_logs");
 
                     b.HasIndex("OperatorTenantUserId");
 
+                    b.HasIndex("TenantId", "ClientCorrelationId")
+                        .HasDatabaseName("ix_receipt_print_logs_client_correlation_id")
+                        .HasFilter("client_correlation_id IS NOT NULL");
+
                     b.HasIndex("TenantId", "Id")
                         .IsUnique()
                         .HasDatabaseName("uq_receipt_print_logs_tenant_id_id");
+
+                    b.HasIndex("TenantId", "PrintStatus")
+                        .HasDatabaseName("ix_receipt_print_logs_print_status");
+
+                    b.HasIndex("TenantId", "ReprintOperationId")
+                        .HasDatabaseName("ix_receipt_print_logs_reprint_operation_id")
+                        .HasFilter("reprint_operation_id IS NOT NULL");
+
+                    b.HasIndex("TenantId", "PrinterConfigurationId", "PrinterConfigurationVersion")
+                        .HasDatabaseName("ix_receipt_print_logs_printer_configuration");
 
                     b.HasIndex("TenantId", "ReceiptId", "AttemptNumber")
                         .IsUnique()
                         .HasDatabaseName("uq_receipt_print_logs_receipt_id_attempt_number");
 
+                    b.HasIndex("TenantId", "ReceiptId", "PrintRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_receipt_print_logs_print_request_id")
+                        .HasFilter("print_request_id IS NOT NULL");
+
                     b.ToTable("receipt_print_logs", null, t =>
                         {
                             t.HasCheckConstraint("ck_receipt_print_logs_attempt_number", "attempt_number > 0");
 
+                            t.HasCheckConstraint("ck_receipt_print_logs_copy_index", "copy_index BETWEEN 1 AND 5");
+
                             t.HasCheckConstraint("ck_receipt_print_logs_print_status", "print_status IN ('PENDING', 'PRINTED', 'FAILED', 'CANCELLED')");
 
-                            t.HasCheckConstraint("ck_receipt_print_logs_printed_copy_type", "printed_copy_type IN ('CUSTOMER_COPY', 'MERCHANT_COPY', 'DUPLICATE_COPY')");
+                            t.HasCheckConstraint("ck_receipt_print_logs_printed_copy_type", "printed_copy_type IN ('CUSTOMER_COPY', 'MERCHANT_COPY', 'DUPLICATE_COPY', 'DUPLICATE_CUSTOMER_COPY', 'DUPLICATE_MERCHANT_COPY')");
+
+                            t.HasCheckConstraint("ck_receipt_print_logs_receipt_purpose", "receipt_purpose IN ('SALE_ORIGINAL', 'SALE_REPRINT', 'RETURN', 'EXCHANGE', 'REFUND')");
                         });
                 });
 
@@ -26733,6 +26987,52 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_cash_reconciliations_till_session_id_till_sessions");
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareConfigurationChangeAudit", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDevice", null)
+                        .WithMany()
+                        .HasForeignKey("HardwareDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
+                        .WithMany()
+                        .HasForeignKey("TillSessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Outlet", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "OutletId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PosDeviceId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TillId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.HardwareDevice", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
@@ -26827,7 +27127,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("HardwareDeviceId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_hardware_test_logs_hardware_device_id_hardware_devices");
 
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
@@ -26843,6 +27142,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_hardware_test_logs_tested_by_tenant_user_id_tenant_users");
 
+                    b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
+                        .WithMany()
+                        .HasForeignKey("TillSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_hardware_test_logs_till_session_id_till_sessions");
+
                     b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "InitiatedFromPosDeviceId")
@@ -26857,6 +27162,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_hardware_test_logs_outlet_id_outlets");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TillId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_hardware_test_logs_till_id_tills");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", b =>

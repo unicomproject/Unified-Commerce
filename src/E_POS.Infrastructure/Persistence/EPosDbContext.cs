@@ -124,6 +124,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<HardwareDevice> HardwareDevices => Set<HardwareDevice>();
     public DbSet<HardwareDeviceAssignment> HardwareDeviceAssignments => Set<HardwareDeviceAssignment>();
     public DbSet<HardwareTestLog> HardwareTestLogs => Set<HardwareTestLog>();
+    public DbSet<HardwareConfigurationChangeAudit> HardwareConfigurationChangeAudits => Set<HardwareConfigurationChangeAudit>();
     public DbSet<TillSession> TillSessions => Set<TillSession>();
 
     // Catalog and Product

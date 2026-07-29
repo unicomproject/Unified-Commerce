@@ -25,19 +25,30 @@ public sealed class HardwareTestLogConfiguration : IEntityTypeConfiguration<Hard
 
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.OutletId).HasColumnName("outlet_id").IsRequired();
-        builder.Property(x => x.HardwareDeviceId).HasColumnName("hardware_device_id").IsRequired();
+        builder.Property(x => x.HardwareDeviceId).HasColumnName("hardware_device_id").IsRequired(false);
         builder.Property(x => x.InitiatedFromPosDeviceId).HasColumnName("initiated_from_pos_device_id").IsRequired(false);
+        builder.Property(x => x.TillId).HasColumnName("till_id").IsRequired(false);
+        builder.Property(x => x.TillSessionId).HasColumnName("till_session_id").IsRequired(false);
         builder.Property(x => x.TestedByTenantUserId).HasColumnName("tested_by_tenant_user_id").IsRequired(false);
+        builder.Property(x => x.RequestId).HasColumnName("request_id").IsRequired();
+        builder.Property(x => x.RequestPayloadHash).HasColumnName("request_payload_hash").HasColumnType("varchar(64)").HasMaxLength(64).IsRequired();
+        builder.Property(x => x.ConfigurationVersion).HasColumnName("configuration_version").IsRequired();
+        builder.Property(x => x.HardwareType).HasColumnName("hardware_type").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
         builder.Property(x => x.TestType).HasColumnName("test_type").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
         builder.Property(x => x.TestStatus).HasColumnName("test_status").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
+        builder.Property(x => x.ResultCategory).HasColumnName("result_category").HasColumnType("varchar(80)").HasMaxLength(80).IsRequired(false);
         builder.Property(x => x.ResultMessage).HasColumnName("result_message").HasColumnType("text").IsRequired(false);
         builder.Property(x => x.ResultPayloadJson).HasColumnName("result_payload_json").HasColumnType("jsonb").IsRequired(false);
         builder.Property(x => x.TestedAt).HasColumnName("tested_at").HasColumnType("timestamp with time zone").IsRequired();
+        builder.Property(x => x.CompletedAt).HasColumnName("completed_at").HasColumnType("timestamp with time zone").IsRequired(false);
+        builder.Property(x => x.PhysicalConfirmation).HasColumnName("physical_confirmation").IsRequired(false);
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_hardware_test_logs_tenant_id_tenants");
         builder.HasOne<Outlet>().WithMany().HasForeignKey(x => new { x.TenantId, x.OutletId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_hardware_test_logs_outlet_id_outlets");
         builder.HasOne<HardwareDevice>().WithMany().HasForeignKey(x => x.HardwareDeviceId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_hardware_test_logs_hardware_device_id_hardware_devices");
         builder.HasOne<PosDevice>().WithMany().HasForeignKey(x => new { x.TenantId, x.InitiatedFromPosDeviceId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_hardware_test_logs_initiated_from_pos_device_id_pos_devices");
+        builder.HasOne<Till>().WithMany().HasForeignKey(x => new { x.TenantId, x.TillId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_hardware_test_logs_till_id_tills");
+        builder.HasOne<TillSession>().WithMany().HasForeignKey(x => x.TillSessionId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_hardware_test_logs_till_session_id_till_sessions");
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.TestedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_hardware_test_logs_tested_by_tenant_user_id_tenant_users");
 
         builder.ToTable(t =>
@@ -45,6 +56,12 @@ public sealed class HardwareTestLogConfiguration : IEntityTypeConfiguration<Hard
             t.HasCheckConstraint("ck_hardware_test_logs_test_type", "test_type <> ''");
             t.HasCheckConstraint("ck_hardware_test_logs_test_status", "test_status <> ''");
         });
+
+        builder.HasIndex(x => new { x.TenantId, x.RequestId })
+            .IsUnique()
+            .HasDatabaseName("uq_hardware_test_logs_tenant_id_request_id");
+        builder.HasIndex(x => new { x.TenantId, x.InitiatedFromPosDeviceId, x.TestedAt })
+            .HasDatabaseName("ix_hardware_test_logs_device_history");
     }
 }
 
