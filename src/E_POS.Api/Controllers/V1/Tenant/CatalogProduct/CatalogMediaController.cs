@@ -14,13 +14,16 @@ namespace E_POS.Api.Controllers;
 public sealed class CatalogMediaController : ControllerBase
 {
     private readonly ICatalogMediaService _catalogMediaService;
+    private readonly IBrandService _brandService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
     public CatalogMediaController(
         ICatalogMediaService catalogMediaService,
+        IBrandService brandService,
         ITenantRequestContextFactory tenantRequestContextFactory)
     {
         _catalogMediaService = catalogMediaService;
+        _brandService = brandService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }
 
@@ -121,9 +124,13 @@ public sealed class CatalogMediaController : ControllerBase
             : ToErrorResult(result.Error);
     }
 
+    /// <summary>
+    /// Uploads/replaces Brand logo and returns the refreshed Brand contract
+    /// expected by Tenant Admin Flutter (<c>BrandDto</c>).
+    /// </summary>
     [HttpPost("brands/{brandId:guid}/logo")]
     [Consumes("multipart/form-data")]
-    [ProducesResponseType(typeof(MediaAssetUploadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(BrandResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -148,7 +155,7 @@ public sealed class CatalogMediaController : ControllerBase
         }
 
         await using var stream = file!.OpenReadStream();
-        var result = await _catalogMediaService.UploadBrandLogoAsync(
+        var uploadResult = await _catalogMediaService.UploadBrandLogoAsync(
             context,
             brandId,
             new MediaUploadFile(
@@ -158,9 +165,16 @@ public sealed class CatalogMediaController : ControllerBase
                 file.Length),
             cancellationToken);
 
-        return result.IsSuccess && result.Value is not null
-            ? Ok(new { data = result.Value })
-            : ToErrorResult(result.Error);
+        if (!uploadResult.IsSuccess)
+        {
+            return ToErrorResult(uploadResult.Error);
+        }
+
+        // Flutter Brand datasource parses the upload response as BrandDto.
+        var brandResult = await _brandService.GetByIdAsync(context, brandId, cancellationToken);
+        return brandResult.IsSuccess && brandResult.Value is not null
+            ? Ok(new { data = brandResult.Value })
+            : ToErrorResult(brandResult.Error ?? uploadResult.Error);
     }
 
     private static ApplicationError? ValidateFile(IFormFile? file)
@@ -180,13 +194,17 @@ public sealed class CatalogMediaController : ControllerBase
     {
         return error.Code switch
         {
-            "media.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
-            "media.invalid_tenant_context" => Unauthorized(CreateError(error)),
+            "media.permission_denied" or "brand.permission_denied" =>
+                StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+            "media.invalid_tenant_context" or "brand.invalid_tenant_context" =>
+                Unauthorized(CreateError(error)),
             "media.product_not_found" or
                 "media.variant_not_found" or
                 "media.category_not_found" or
-                "media.brand_not_found" => NotFound(CreateError(error)),
-            "media.storage_not_configured" => StatusCode(StatusCodes.Status500InternalServerError, CreateError(error)),
+                "media.brand_not_found" or
+                "brand.not_found" => NotFound(CreateError(error)),
+            "media.storage_not_configured" or "media.storage_unavailable" =>
+                StatusCode(StatusCodes.Status503ServiceUnavailable, CreateError(error)),
             _ => BadRequest(CreateError(error))
         };
     }
