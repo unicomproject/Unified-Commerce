@@ -6,6 +6,7 @@ public static class DevelopmentPosCashierPermissionAssignmentSeedData
         DevelopmentPosNewSalePermissionsSeedData.CashierPermissionCodes
             .Concat(DevelopmentPosPaymentReceiptPermissionsSeedData.CashierPermissionCodes)
             .Concat(DevelopmentPosReturnsExchangePermissionsSeedData.CashierPermissionCodes)
+            .Append(DevelopmentPosHardwareSettingsPermissionSeedData.PermissionCode)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static code => code, StringComparer.Ordinal)
             .ToList();

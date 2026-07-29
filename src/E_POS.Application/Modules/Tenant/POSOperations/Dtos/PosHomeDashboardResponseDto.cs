@@ -48,7 +48,8 @@ public sealed record PosHomeCardDto(
 
 public sealed record PosHomeCashierDto(
     Guid Id,
-    string DisplayName);
+    string DisplayName,
+    string? ProfileImageUrl);
 
 public sealed record PosHomeDeviceDto(
     Guid Id,

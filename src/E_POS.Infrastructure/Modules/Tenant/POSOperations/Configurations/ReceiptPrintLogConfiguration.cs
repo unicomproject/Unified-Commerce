@@ -73,6 +73,41 @@ public sealed class ReceiptPrintLogConfiguration : IEntityTypeConfiguration<Rece
             .HasColumnName("print_result_json")
             .HasColumnType("jsonb");
 
+        builder.Property(x => x.PrintRequestId)
+            .HasColumnName("print_request_id");
+
+        builder.Property(x => x.ReprintOperationId)
+            .HasColumnName("reprint_operation_id");
+
+        builder.Property(x => x.ClientCorrelationId)
+            .HasColumnName("client_correlation_id")
+            .HasColumnType("varchar(160)")
+            .HasMaxLength(160);
+
+        builder.Property(x => x.ReceiptPurpose).HasColumnName("receipt_purpose")
+            .HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
+        builder.Property(x => x.CopyIndex).HasColumnName("copy_index").IsRequired();
+        builder.Property(x => x.PrinterConfigurationId).HasColumnName("printer_configuration_id");
+        builder.Property(x => x.PrinterConfigurationVersion).HasColumnName("printer_configuration_version");
+        builder.Property(x => x.PrinterName).HasColumnName("printer_name")
+            .HasColumnType("varchar(160)").HasMaxLength(160);
+        builder.Property(x => x.PrinterTransport).HasColumnName("printer_transport")
+            .HasColumnType("varchar(40)").HasMaxLength(40);
+        builder.Property(x => x.RoutingPurpose).HasColumnName("routing_purpose")
+            .HasColumnType("varchar(40)").HasMaxLength(40);
+        builder.Property(x => x.PosDeviceId).HasColumnName("pos_device_id");
+        builder.Property(x => x.TillId).HasColumnName("till_id");
+        builder.Property(x => x.TillSessionId).HasColumnName("till_session_id");
+        builder.Property(x => x.AgentResult).HasColumnName("agent_result")
+            .HasColumnType("varchar(160)").HasMaxLength(160);
+        builder.Property(x => x.FailureCategory).HasColumnName("failure_category")
+            .HasColumnType("varchar(80)").HasMaxLength(80);
+        builder.Property(x => x.IsReprint).HasColumnName("is_reprint").IsRequired();
+        builder.Property(x => x.UnknownOutcome).HasColumnName("unknown_outcome").IsRequired();
+        builder.Property(x => x.CompletedAt).HasColumnName("completed_at")
+            .HasColumnType("timestamp with time zone");
+        builder.Property(x => x.RecoveryPrintRequestId).HasColumnName("recovery_print_request_id");
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -100,10 +135,32 @@ public sealed class ReceiptPrintLogConfiguration : IEntityTypeConfiguration<Rece
             .IsUnique()
             .HasDatabaseName("uq_receipt_print_logs_tenant_id_id");
 
+        builder.HasIndex(x => new { x.TenantId, x.ReceiptId, x.PrintRequestId })
+            .IsUnique()
+            .HasFilter("print_request_id IS NOT NULL")
+            .HasDatabaseName("uq_receipt_print_logs_print_request_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.ReprintOperationId })
+            .HasFilter("reprint_operation_id IS NOT NULL")
+            .HasDatabaseName("ix_receipt_print_logs_reprint_operation_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.ClientCorrelationId })
+            .HasFilter("client_correlation_id IS NOT NULL")
+            .HasDatabaseName("ix_receipt_print_logs_client_correlation_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.PrintStatus })
+            .HasDatabaseName("ix_receipt_print_logs_print_status");
+        builder.HasIndex(x => new { x.TenantId, x.PrinterConfigurationId, x.PrinterConfigurationVersion })
+            .HasDatabaseName("ix_receipt_print_logs_printer_configuration");
+
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_receipt_print_logs_attempt_number", "attempt_number > 0");
-            t.HasCheckConstraint("ck_receipt_print_logs_printed_copy_type", "printed_copy_type IN ('CUSTOMER_COPY', 'MERCHANT_COPY', 'DUPLICATE_COPY')");
+            t.HasCheckConstraint("ck_receipt_print_logs_copy_index", "copy_index BETWEEN 1 AND 5");
+            t.HasCheckConstraint(
+                "ck_receipt_print_logs_receipt_purpose",
+                "receipt_purpose IN ('SALE_ORIGINAL', 'SALE_REPRINT', 'RETURN', 'EXCHANGE', 'REFUND')");
+            t.HasCheckConstraint("ck_receipt_print_logs_printed_copy_type", "printed_copy_type IN ('CUSTOMER_COPY', 'MERCHANT_COPY', 'DUPLICATE_COPY', 'DUPLICATE_CUSTOMER_COPY', 'DUPLICATE_MERCHANT_COPY')");
             t.HasCheckConstraint("ck_receipt_print_logs_print_status", "print_status IN ('PENDING', 'PRINTED', 'FAILED', 'CANCELLED')");
         });
     }

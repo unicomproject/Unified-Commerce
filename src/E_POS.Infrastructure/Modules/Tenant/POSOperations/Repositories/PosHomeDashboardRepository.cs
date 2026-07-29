@@ -53,6 +53,17 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             "POS home context: tenant user resolved {UserId}.",
             context.UserId);
 
+        var cashierProfileImageUrl = cashier.ProfileImageUrl is { } profileImageAssetId
+            ? await _dbContext.MediaAssets
+                .AsNoTracking()
+                .Where(x =>
+                    x.TenantId == context.TenantId &&
+                    x.Id == profileImageAssetId &&
+                    x.Status == "ACTIVE")
+                .Select(x => x.PublicUrl)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+
         var requestedFingerprint = deviceFingerprint?.Trim() ?? string.Empty;
         if (requestedFingerprint.Length == 0)
         {
@@ -394,6 +405,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             Snapshot: new PosHomeDashboardDbSnapshot(
                 CashierTenantUserId: context.UserId,
                 CashierDisplayName: cashier.DisplayName ?? cashier.FullName,
+                CashierProfileImageUrl: cashierProfileImageUrl,
                 DeviceId: device.Id,
                 DeviceCode: deviceCode,
                 DeviceName: deviceName,
