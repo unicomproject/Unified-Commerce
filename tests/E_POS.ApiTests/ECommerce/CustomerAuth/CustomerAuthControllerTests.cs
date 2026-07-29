@@ -177,7 +177,7 @@ public sealed class CustomerAuthControllerTests
     private static CustomerAuthTokenResult CreateTokenResult(
         CustomerLoginResponse response,
         string refreshToken = "refresh-token") =>
-        new(response, refreshToken, DateTimeOffset.UtcNow.AddDays(30));
+        new(response, refreshToken, DateTimeOffset.UtcNow.AddDays(30), false);
 
     private static CustomerAuthController CreateController(FakeService service)
     {
@@ -213,6 +213,42 @@ public sealed class CustomerAuthControllerTests
         public Guid? LogoutTenantId { get; private set; }
         public Guid? LogoutCustomerId { get; private set; }
         public Guid? LogoutSessionId { get; private set; }
+
+        public Task<ApplicationResult> RegisterAsync(
+            Guid tenantId,
+            CustomerRegisterRequest request,
+            IPAddress? ipAddress,
+            string? userAgent,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult.Success());
+
+        public Task<ApplicationResult> VerifyEmailAsync(
+            Guid tenantId,
+            CustomerVerifyEmailRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult.Success());
+
+        public Task<ApplicationResult> ResendEmailVerificationAsync(
+            Guid tenantId,
+            CustomerResendEmailVerificationRequest request,
+            IPAddress? ipAddress,
+            string? userAgent,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult.Success());
+
+        public Task<ApplicationResult> ForgotPasswordAsync(
+            Guid tenantId,
+            CustomerForgotPasswordRequest request,
+            IPAddress? ipAddress,
+            string? userAgent,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult.Success());
+
+        public Task<ApplicationResult> ResetPasswordAsync(
+            Guid tenantId,
+            CustomerResetPasswordRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult.Success());
 
         public Task<ApplicationResult<CustomerAuthTokenResult>> LoginAsync(
             Guid tenantId,

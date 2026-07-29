@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.ECommerce.Customer.Entities;
@@ -16,4 +16,36 @@ public class CustomerConsent : AuditableEntity
     public DateTimeOffset? WithdrawnAt { get; protected set; }
     public IPAddress? IpAddress { get; protected set; }
     public string? UserAgent { get; protected set; }
+
+    protected CustomerConsent() { }
+
+    public static CustomerConsent Grant(
+        Guid id,
+        Guid tenantId,
+        Guid customerId,
+        string consentType,
+        Guid? salesChannelId,
+        string? policyVersion,
+        string consentSource,
+        IPAddress? ipAddress,
+        string? userAgent,
+        DateTimeOffset now)
+    {
+        return new CustomerConsent
+        {
+            Id = id,
+            TenantId = tenantId,
+            CustomerId = customerId,
+            ConsentType = consentType.Trim().ToUpperInvariant(),
+            SalesChannelId = salesChannelId,
+            PolicyVersion = string.IsNullOrWhiteSpace(policyVersion) ? null : policyVersion.Trim(),
+            ConsentStatus = "GRANTED",
+            ConsentSource = consentSource.Trim().ToUpperInvariant(),
+            RecordedAt = now,
+            IpAddress = ipAddress,
+            UserAgent = string.IsNullOrWhiteSpace(userAgent) ? null : userAgent.Trim(),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
 }

@@ -1,4 +1,4 @@
-using E_POS.Application.Common.Contracts;
+﻿using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
@@ -52,6 +52,7 @@ using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Options;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Repositories;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Services;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerOrders.Repositories;
@@ -124,6 +125,15 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(AzureCommunicationEmailOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<IApplicationEmailSender, AzureCommunicationEmailSender>();
+        services.AddScoped<ICustomerPasswordResetLinkBuilder, CustomerPasswordResetLinkBuilder>();
+        services.AddScoped(static provider =>
+        {
+            var configuration = provider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var section = configuration.GetSection("CustomerPasswordReset");
+            return new CustomerPasswordResetSettings(
+                section["PublicStorefrontBaseUrl"] ?? "http://localhost:4200",
+                section["ResetPath"] ?? "/reset-password");
+        });
         services.AddScoped<IPlatformPasswordResetDeliveryService, AcsPlatformPasswordResetDeliveryService>();
         services.AddScoped(static provider =>
         {

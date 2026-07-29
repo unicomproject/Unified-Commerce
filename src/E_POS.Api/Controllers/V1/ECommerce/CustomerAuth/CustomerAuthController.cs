@@ -26,6 +26,102 @@ public sealed class CustomerAuthController : ControllerBase
     }
 
     [AllowAnonymous]
+    [HttpPost("register")]
+    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
+    public async Task<IActionResult> Register(
+        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
+        [FromBody] CustomerRegisterRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _service.RegisterAsync(
+            tenantId,
+            request ?? new CustomerRegisterRequest(),
+            HttpContext.Connection.RemoteIpAddress,
+            Request.Headers.UserAgent.FirstOrDefault(),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? Ok(CreateSuccess("Registration successful. Please check your email for the verification code."))
+            : CreateErrorResult(result.Error);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("verify-email")]
+    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
+    public async Task<IActionResult> VerifyEmail(
+        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
+        [FromBody] CustomerVerifyEmailRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _service.VerifyEmailAsync(
+            tenantId,
+            request ?? new CustomerVerifyEmailRequest(),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? Ok(CreateSuccess("Email verified successfully."))
+            : CreateErrorResult(result.Error);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("resend-email-verification")]
+    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
+    public async Task<IActionResult> ResendEmailVerification(
+        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
+        [FromBody] CustomerResendEmailVerificationRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _service.ResendEmailVerificationAsync(
+            tenantId,
+            request ?? new CustomerResendEmailVerificationRequest(),
+            HttpContext.Connection.RemoteIpAddress,
+            Request.Headers.UserAgent.FirstOrDefault(),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? Ok(CreateSuccess("Verification code sent."))
+            : CreateErrorResult(result.Error);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
+    public async Task<IActionResult> ForgotPassword(
+        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
+        [FromBody] CustomerForgotPasswordRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _service.ForgotPasswordAsync(
+            tenantId,
+            request ?? new CustomerForgotPasswordRequest(),
+            HttpContext.Connection.RemoteIpAddress,
+            Request.Headers.UserAgent.FirstOrDefault(),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? Ok(CreateSuccess("If an account exists for this email, a password reset link has been sent."))
+            : CreateErrorResult(result.Error);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
+    public async Task<IActionResult> ResetPassword(
+        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
+        [FromBody] CustomerResetPasswordRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _service.ResetPasswordAsync(
+            tenantId,
+            request ?? new CustomerResetPasswordRequest(),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? Ok(CreateSuccess("Password reset successful."))
+            : CreateErrorResult(result.Error);
+    }
+
+    [AllowAnonymous]
     [HttpPost("login")]
     [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
     public async Task<IActionResult> Login(
@@ -55,10 +151,10 @@ public sealed class CustomerAuthController : ControllerBase
         {
             "customer_auth.validation_failed" => BadRequest(error),
             "customer_auth.tenant_access_denied" => StatusCode(StatusCodes.Status403Forbidden, error),
+            "customer_auth.email_not_verified" => StatusCode(StatusCodes.Status403Forbidden, error),
             _ => Unauthorized(error)
         };
     }
-
     [AllowAnonymous]
     [HttpPost("refresh")]
     [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
@@ -118,6 +214,29 @@ public sealed class CustomerAuthController : ControllerBase
                Guid.TryParse(User.FindFirstValue("session_id"), out sessionId);
     }
 
+    private IActionResult CreateErrorResult(ApplicationError error)
+    {
+        var body = CreateError(error);
+        return error.Code switch
+        {
+            "customer_auth.validation_failed" => BadRequest(body),
+            "customer_auth.terms_required" => BadRequest(body),
+            "customer_auth.invalid_verification_code" => BadRequest(body),
+            "customer_auth.invalid_reset_token" => BadRequest(body),
+            "customer_auth.email_already_registered" => Conflict(body),
+            "customer_auth.tenant_access_denied" => StatusCode(StatusCodes.Status403Forbidden, body),
+            "customer_auth.email_not_verified" => StatusCode(StatusCodes.Status403Forbidden, body),
+            "customer_auth.email_delivery_unavailable" => StatusCode(StatusCodes.Status500InternalServerError, body),
+            _ => BadRequest(body)
+        };
+    }
+
+    private object CreateSuccess(string message) => new
+    {
+        success = true,
+        message
+    };
+
     private object CreateError(ApplicationError error) => new
     {
         success = false,
@@ -129,17 +248,23 @@ public sealed class CustomerAuthController : ControllerBase
 
     private void AppendRefreshTokenCookie(CustomerAuthTokenResult result)
     {
+        var options = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = ShouldUseSecureRefreshCookie(),
+            SameSite = SameSiteMode.Strict,
+            Path = RefreshTokenCookiePath
+        };
+
+        if (result.RememberMe)
+        {
+            options.Expires = result.RefreshTokenExpiresAt;
+        }
+
         Response.Cookies.Append(
             RefreshTokenCookieName,
             result.RefreshToken,
-            new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = ShouldUseSecureRefreshCookie(),
-                SameSite = SameSiteMode.Strict,
-                Expires = result.RefreshTokenExpiresAt,
-                Path = RefreshTokenCookiePath
-            });
+            options);
     }
 
     private void ClearRefreshTokenCookie()
