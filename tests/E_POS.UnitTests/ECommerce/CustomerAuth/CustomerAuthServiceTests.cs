@@ -1,9 +1,12 @@
-using System.Net;
+﻿using System.Net;
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Email;
+using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using Xunit;
 
@@ -206,6 +209,7 @@ public sealed class CustomerAuthServiceTests
     {
         var account = CustomerAuthAccount.Create(
             Guid.NewGuid(), TenantId, CustomerId, "valid-hash", Now.AddDays(-1));
+        account.MarkEmailVerified(Now.AddDays(-1));
         return new CustomerLoginAccount(
             account,
             CustomerId,
@@ -228,6 +232,9 @@ public sealed class CustomerAuthServiceTests
             new FakeRefreshTokenGenerator(),
             new FakeTokenHashService(),
             new FakeClock(),
+            new FakeApplicationEmailSender(),
+            new FakePasswordResetLinkBuilder(),
+            new FakeCodeSequenceRepository(),
             JwtSettings);
     }
 
@@ -259,6 +266,69 @@ public sealed class CustomerAuthServiceTests
         public Guid? RevokedSessionId { get; private set; }
         public DateTimeOffset? RevokedAt { get; private set; }
 
+        public Task<bool> TenantIsActiveAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(tenantId == TenantId);
+
+        public Task<bool> NormalizedEmailExistsAsync(
+            Guid tenantId,
+            string normalizedEmail,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<CustomerLoginAccount?> FindAccountByEmailAsync(
+            Guid tenantId,
+            string normalizedEmail,
+            bool trackAccount,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(tenantId == TenantId ? _loginAccount : null);
+
+        public Task<bool> RegisterCustomerAsync(
+            E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer customer,
+            CustomerAuthAccount account,
+            CustomerVerificationOtp verificationOtp,
+            IReadOnlyCollection<CustomerConsent> consents,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(true);
+
+        public Task SaveEmailVerificationOtpAsync(
+            CustomerVerificationOtp verificationOtp,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<CustomerEmailVerificationContext?> FindPendingEmailVerificationAsync(
+            Guid tenantId,
+            string normalizedEmail,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<CustomerEmailVerificationContext?>(null);
+
+        public Task SaveEmailVerificationAsync(
+            CustomerVerificationOtp verificationOtp,
+            CustomerAuthAccount account,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task SavePasswordResetTokenAsync(
+            CustomerPasswordResetToken resetToken,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<CustomerPasswordResetContext?> FindActivePasswordResetAsync(
+            Guid tenantId,
+            string normalizedEmail,
+            string tokenHash,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<CustomerPasswordResetContext?>(null);
+
+        public Task SavePasswordResetAsync(
+            CustomerPasswordResetToken resetToken,
+            CustomerAuthAccount account,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
         public Task<CustomerLoginAccount?> FindLoginAccountAsync(
             Guid tenantId,
             string normalizedEmail,
@@ -333,6 +403,34 @@ public sealed class CustomerAuthServiceTests
         }
     }
 
+    private sealed class FakeApplicationEmailSender : IApplicationEmailSender
+    {
+        public bool IsConfigured => true;
+
+        public Task<ApplicationResult<ApplicationEmailSendResult>> SendAsync(
+            ApplicationEmailMessage message,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<ApplicationEmailSendResult>.Success(
+                new ApplicationEmailSendResult("email-operation", "Accepted")));
+    }
+
+    private sealed class FakePasswordResetLinkBuilder : ICustomerPasswordResetLinkBuilder
+    {
+        public string BuildResetUrl(string email, string rawToken) =>
+            $"https://store.example/reset-password?email={email}&token={rawToken}";
+    }
+
+    private sealed class FakeCodeSequenceRepository : ICodeSequenceRepository
+    {
+        public Task<string> GetNextCodeAsync(
+            Guid tenantId,
+            string sequenceKey,
+            string prefix,
+            int paddingLength,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult("CUS000001");
+    }
     private sealed class FakePasswordHashService : IPasswordHashService
     {
         public string HashPassword(string password) => "valid-hash";

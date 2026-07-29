@@ -1,4 +1,4 @@
-using E_POS.Domain.Common.Entities;
+﻿using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.ECommerce.Customer.Entities;
 
@@ -38,6 +38,31 @@ public class CustomerAuthAccount : AuditableEntity
         };
     }
 
+    public void MarkEmailVerified(DateTimeOffset now)
+    {
+        EmailVerifiedAt ??= now;
+        if (string.Equals(Status, "DISABLED", StringComparison.OrdinalIgnoreCase))
+        {
+            Status = "ACTIVE";
+        }
+
+        UpdatedAt = now;
+    }
+
+    public void SetPasswordHash(string passwordHash, DateTimeOffset now)
+    {
+        PasswordHash = passwordHash;
+        FailedLoginCount = 0;
+        LastFailedLoginAt = null;
+        LockedUntil = null;
+        LastPasswordChangedAt = now;
+        if (!string.Equals(Status, "DELETED", StringComparison.OrdinalIgnoreCase))
+        {
+            Status = "ACTIVE";
+        }
+
+        UpdatedAt = now;
+    }
     public bool IsLocked(DateTimeOffset now) =>
         string.Equals(Status, "LOCKED", StringComparison.OrdinalIgnoreCase) &&
         (!LockedUntil.HasValue || LockedUntil > now);
