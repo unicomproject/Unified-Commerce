@@ -18,13 +18,11 @@ public static class TenantStatusConstants
     public static readonly IReadOnlyList<string> All =
     [
         Draft,
-        SetupPending,
         PendingPayment,
         PendingActivation,
         Active,
         Suspended,
-        Cancelled,
-        Inactive
+        Cancelled
     ];
 
     public static bool IsApproved(string? status) =>

@@ -109,7 +109,7 @@ public sealed class PlatformDashboardService : IPlatformDashboardService
         {
             var active = CountStatus(snapshot.Tenants, TenantStatusConstants.Active);
             var suspended = CountStatus(snapshot.Tenants, TenantStatusConstants.Suspended);
-            var inactive = CountStatus(snapshot.Tenants, TenantStatusConstants.Cancelled) + CountStatus(snapshot.Tenants, TenantStatusConstants.Inactive);
+            var inactive = CountStatus(snapshot.Tenants, TenantStatusConstants.Inactive);
             var setupPending = snapshot.Tenants.Count(t => IsSetupPending(t.Status));
             var lifecycle = new List<PlatformDashboardLifecycleBucketDto>
             {

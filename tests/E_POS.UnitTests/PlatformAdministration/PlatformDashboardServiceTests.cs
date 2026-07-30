@@ -192,6 +192,36 @@ public sealed class PlatformDashboardServiceTests
         Assert.Equal(2, result.Value.TenantSummary.Data!.SetupPendingTenants);
     }
 
+    [Fact]
+    public async Task GetDashboardAsync_TenantLifecycleBucketsAlignWithApprovedContract()
+    {
+        var tenants = new List<PlatformDashboardTenantRow>
+        {
+            new(Guid.NewGuid(), "T1", "Draft", "draft", Now),
+            new(Guid.NewGuid(), "T2", "Pending Payment", "pending_payment", Now),
+            new(Guid.NewGuid(), "T3", "Pending Act", "pending_activation", Now),
+            new(Guid.NewGuid(), "T4", "Setup Pending", "setup_pending", Now),
+            new(Guid.NewGuid(), "T5", "Active", "active", Now),
+            new(Guid.NewGuid(), "T6", "Suspended", "suspended", Now),
+            new(Guid.NewGuid(), "T7", "Inactive", "inactive", Now),
+            new(Guid.NewGuid(), "T8", "Cancelled", "cancelled", Now)
+        };
+        var snapshot = CreateSnapshot() with { Tenants = tenants, TenantCreatedEvents = tenants.Select(t => (t.CreatedAt, t.Id)).ToList() };
+        var service = CreateService(
+            new FakePlatformDashboardRepository(snapshot),
+            new FakePlatformPermissionChecker(allGranted: true),
+            new FakeHealthProbe());
+
+        var result = await service.GetDashboardAsync(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var data = result.Value!.TenantSummary.Data!;
+        Assert.Equal(4, data.SetupPendingTenants);
+        Assert.Equal(1, data.ActiveTenants);
+        Assert.Equal(1, data.SuspendedTenants);
+        Assert.Equal(1, data.InactiveTenants);
+    }
+
     private static PlatformDashboardService CreateService(
         IPlatformDashboardRepository repository,
         IPlatformPermissionChecker permissionChecker,
