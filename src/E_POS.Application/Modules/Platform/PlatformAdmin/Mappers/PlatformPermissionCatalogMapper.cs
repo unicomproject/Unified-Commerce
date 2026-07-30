@@ -13,6 +13,7 @@ public static class PlatformPermissionCatalogMapper
     [
         "dashboard",
         "tenants",
+        "tenant_subscriptions",
         "subscription_plans",
         "return_policy_templates",
         "modules",
@@ -30,6 +31,7 @@ public static class PlatformPermissionCatalogMapper
     {
         ["dashboard"] = "Dashboard",
         ["tenants"] = "Tenants",
+        ["tenant_subscriptions"] = "Tenant Subscriptions",
         ["subscription_plans"] = "Subscription Plans",
         ["return_policy_templates"] = "Return Policy Templates",
         ["modules"] = "Modules Catalog",
@@ -211,6 +213,7 @@ public static class PlatformPermissionCatalogMapper
         {
             "dashboard" => "Platform dashboard visibility.",
             "tenants" => "Platform tenant lifecycle and entitlements.",
+            "tenant_subscriptions" => "Tenant subscription visibility and lifecycle summaries.",
             "subscription_plans" => "Subscription plan catalog management.",
             "return_policy_templates" => "Platform return policy template administration.",
             "modules" => "Platform module catalog visibility.",

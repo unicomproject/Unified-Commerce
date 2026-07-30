@@ -30,7 +30,7 @@ public sealed class PlatformAdminSettingsControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<LegacyApiResponse<PlatformSettingsResponse>>(ok.Value);
         Assert.True(payload.Success);
-        Assert.Equal("SCS-TIX", payload.Data.PlatformDisplayName);
+        Assert.Equal("OneVerz", payload.Data.PlatformDisplayName);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public sealed class PlatformAdminSettingsControllerTests
             PlatformUserId);
 
         var result = await controller.UpdateSettings(
-            new UpdatePlatformSettingsRequest { PlatformDisplayName = "SCS-TIX" },
+            new UpdatePlatformSettingsRequest { PlatformDisplayName = "OneVerz" },
             CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
@@ -136,7 +136,7 @@ public sealed class PlatformAdminSettingsControllerTests
     {
         return new PlatformSettingsResponse
         {
-            PlatformDisplayName = "SCS-TIX",
+            PlatformDisplayName = "OneVerz",
             DefaultCountryCode = "LK",
             DefaultCurrencyCode = "LKR",
             DefaultTimezone = "Asia/Colombo",

@@ -16,7 +16,7 @@ public sealed class PlatformDashboardRepositoryTests
     private static readonly DateTimeOffset Now = new(2026, 7, 2, 14, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task GetDashboardAsync_WithSeededData_ReturnsRepositoryCounts()
+    public async Task GetComputationSnapshotAsync_WithSeededData_ReturnsRepositoryCounts()
     {
         await using var dbContext = CreateDbContext();
         var tenantOneId = Guid.Parse("11111111-1111-4111-8111-111111111101");
@@ -29,24 +29,9 @@ public sealed class PlatformDashboardRepositoryTests
             Tenant.Create(tenantThreeId, "TEN-003", "ten-003", "Trial Tenant", "active", "LKR", "Asia/Colombo", null, null, Now.AddDays(-1)));
 
         dbContext.TenantSubscriptions.AddRange(
-            TenantSubscription.Create(
-                Guid.Parse("22222222-2222-4222-8222-222222222201"),
-                tenantOneId,
-                Guid.NewGuid(),
-                "ACTIVE",
-                Now),
-            TenantSubscription.Create(
-                Guid.Parse("22222222-2222-4222-8222-222222222202"),
-                tenantThreeId,
-                Guid.NewGuid(),
-                "TRIAL",
-                Now),
-            TenantSubscription.Create(
-                Guid.Parse("22222222-2222-4222-8222-222222222203"),
-                tenantTwoId,
-                Guid.NewGuid(),
-                "PAST_DUE",
-                Now));
+            TenantSubscription.Create(Guid.Parse("22222222-2222-4222-8222-222222222201"), tenantOneId, Guid.NewGuid(), "ACTIVE", Now),
+            TenantSubscription.Create(Guid.Parse("22222222-2222-4222-8222-222222222202"), tenantThreeId, Guid.NewGuid(), "TRIAL", Now),
+            TenantSubscription.Create(Guid.Parse("22222222-2222-4222-8222-222222222203"), tenantTwoId, Guid.NewGuid(), "PAST_DUE", Now));
 
         var pendingInvoice = SubscriptionInvoice.CreateDraft(
             Guid.Parse("66666666-6666-4666-8666-666666666601"),
@@ -135,31 +120,22 @@ public sealed class PlatformDashboardRepositoryTests
         await dbContext.SaveChangesAsync();
 
         IPlatformDashboardRepository repository = new PlatformDashboardRepository(dbContext);
+        var snapshot = await repository.GetComputationSnapshotAsync(Now, CancellationToken.None);
 
-        var dashboard = await repository.GetDashboardAsync(Now, CancellationToken.None);
-
-        Assert.Equal(3, dashboard.TotalTenants);
-        Assert.Equal(2, dashboard.ActiveTenants);
-        Assert.Equal(1, dashboard.SuspendedTenants);
-        Assert.Equal(1, dashboard.TrialTenants);
-        Assert.Equal(3, dashboard.TotalSubscriptions);
-        Assert.Equal(1, dashboard.ActiveSubscriptions);
-        Assert.Equal(1, dashboard.PendingBillingCount);
-        Assert.Equal(1, dashboard.TotalOutlets);
-        Assert.Equal(1, dashboard.TotalTills);
-        Assert.Equal(1, dashboard.TotalUsers);
-        Assert.Equal(3, dashboard.RecentTenants.Count);
-        Assert.Equal("TEN-003", dashboard.RecentTenants[0].Code);
-        Assert.Contains(dashboard.AttentionItems, x => x.Type == "suspended_tenants" && x.Count == 1);
-        Assert.Contains(dashboard.AttentionItems, x => x.Type == "past_due_subscriptions" && x.Count == 1);
-        Assert.Contains(dashboard.AttentionItems, x => x.Type == "pending_billing" && x.Count == 1);
-        Assert.Contains(dashboard.AttentionItems, x => x.Type == "pending_activation" && x.Count == 0);
-        Assert.DoesNotContain(dashboard.AttentionItems, x => x.Type == "setup_pending");
-        Assert.Equal(Now, dashboard.GeneratedAt);
+        Assert.Equal(3, snapshot.Tenants.Count);
+        Assert.Equal(2, snapshot.Tenants.Count(x => string.Equals(x.Status, "active", StringComparison.OrdinalIgnoreCase)));
+        Assert.Equal(1, snapshot.Tenants.Count(x => string.Equals(x.Status, "suspended", StringComparison.OrdinalIgnoreCase)));
+        Assert.Equal(3, snapshot.Subscriptions.Count);
+        Assert.Equal(1, snapshot.Subscriptions.Count(x => x.SubscriptionStatus == "ACTIVE"));
+        Assert.Equal(1, snapshot.PendingBillingCount);
+        Assert.Equal(1, snapshot.TotalOutlets);
+        Assert.Equal(1, snapshot.TotalTills);
+        Assert.Equal(1, snapshot.TotalTenantUsers);
+        Assert.Equal(Now, snapshot.GeneratedAt);
     }
 
     [Fact]
-    public async Task GetDashboardAsync_AttentionCounts_DoNotSwapPastDueAndPendingBilling()
+    public async Task GetComputationSnapshotAsync_AttentionSourceCounts_DoNotSwapPastDueAndPendingBilling()
     {
         await using var dbContext = CreateDbContext();
         var pastDueTenantId = Guid.Parse("11111111-1111-4111-8111-111111111201");
@@ -191,63 +167,28 @@ public sealed class PlatformDashboardRepositoryTests
         await dbContext.SaveChangesAsync();
 
         IPlatformDashboardRepository repository = new PlatformDashboardRepository(dbContext);
-        var dashboard = await repository.GetDashboardAsync(Now, CancellationToken.None);
+        var snapshot = await repository.GetComputationSnapshotAsync(Now, CancellationToken.None);
 
-        var pastDue = Assert.Single(dashboard.AttentionItems, x => x.Type == "past_due_subscriptions");
-        var pendingBilling = Assert.Single(dashboard.AttentionItems, x => x.Type == "pending_billing");
-        Assert.Equal(2, pastDue.Count);
-        Assert.Equal(1, pendingBilling.Count);
-        Assert.Equal(1, dashboard.PendingBillingCount);
+        Assert.Equal(2, snapshot.Subscriptions.Count(x => x.SubscriptionStatus == "PAST_DUE"));
+        Assert.Equal(1, snapshot.PendingBillingCount);
     }
 
-    [Fact]
-    public async Task GetDashboardAsync_PendingActivationAttention_UsesCanonicalTypeAndExcludesOtherStatuses()
-    {
-        await using var dbContext = CreateDbContext();
-        var pendingActivationId = Guid.Parse("11111111-1111-4111-8111-111111111301");
-        var pendingPaymentId = Guid.Parse("11111111-1111-4111-8111-111111111302");
-        var activeId = Guid.Parse("11111111-1111-4111-8111-111111111303");
-        var secondPendingActivationId = Guid.Parse("11111111-1111-4111-8111-111111111304");
 
-        dbContext.Tenants.AddRange(
-            Tenant.Create(pendingActivationId, "TEN-PA1", "ten-pa1", "Pending Activation One", "pending_activation", "LKR", "Asia/Colombo", null, null, Now),
-            Tenant.Create(pendingPaymentId, "TEN-PP1", "ten-pp1", "Pending Payment", "pending_payment", "LKR", "Asia/Colombo", null, null, Now),
-            Tenant.Create(activeId, "TEN-ACT2", "ten-act2", "Active Tenant", "active", "LKR", "Asia/Colombo", null, null, Now),
-            Tenant.Create(secondPendingActivationId, "TEN-PA2", "ten-pa2", "Pending Activation Two", "pending_activation", "LKR", "Asia/Colombo", null, null, Now));
-
-        await dbContext.SaveChangesAsync();
-
-        IPlatformDashboardRepository repository = new PlatformDashboardRepository(dbContext);
-        var dashboard = await repository.GetDashboardAsync(Now, CancellationToken.None);
-
-        var pendingActivation = Assert.Single(dashboard.AttentionItems, x => x.Type == "pending_activation");
-        Assert.Equal(2, pendingActivation.Count);
-        Assert.Equal("Pending Activation", pendingActivation.Title);
-        Assert.DoesNotContain(dashboard.AttentionItems, x => x.Type == "setup_pending");
-        Assert.Equal(1, dashboard.ActiveTenants);
-        Assert.Equal(4, dashboard.TotalTenants);
-    }
 
     [Fact]
-    public async Task GetDashboardAsync_WithEmptyDatabase_ReturnsZeroCountsAndEmptyLists()
+    public async Task GetComputationSnapshotAsync_WithEmptyDatabase_ReturnsZeroCounts()
     {
         await using var dbContext = CreateDbContext();
         IPlatformDashboardRepository repository = new PlatformDashboardRepository(dbContext);
 
-        var dashboard = await repository.GetDashboardAsync(Now, CancellationToken.None);
+        var snapshot = await repository.GetComputationSnapshotAsync(Now, CancellationToken.None);
 
-        Assert.Equal(0, dashboard.TotalTenants);
-        Assert.Equal(0, dashboard.ActiveTenants);
-        Assert.Equal(0, dashboard.SuspendedTenants);
-        Assert.Equal(0, dashboard.TrialTenants);
-        Assert.Equal(0, dashboard.TotalSubscriptions);
-        Assert.Equal(0, dashboard.ActiveSubscriptions);
-        Assert.Equal(0, dashboard.PendingBillingCount);
-        Assert.Equal(0, dashboard.TotalOutlets);
-        Assert.Equal(0, dashboard.TotalTills);
-        Assert.Equal(0, dashboard.TotalUsers);
-        Assert.Empty(dashboard.RecentTenants);
-        Assert.All(dashboard.AttentionItems, item => Assert.Equal(0, item.Count));
+        Assert.Empty(snapshot.Tenants);
+        Assert.Empty(snapshot.Subscriptions);
+        Assert.Equal(0, snapshot.PendingBillingCount);
+        Assert.Equal(0, snapshot.TotalOutlets);
+        Assert.Equal(0, snapshot.TotalTills);
+        Assert.Equal(0, snapshot.TotalTenantUsers);
     }
 
     private static EPosDbContext CreateDbContext()
@@ -259,6 +200,3 @@ public sealed class PlatformDashboardRepositoryTests
         return new EPosDbContext(options);
     }
 }
-
-
-

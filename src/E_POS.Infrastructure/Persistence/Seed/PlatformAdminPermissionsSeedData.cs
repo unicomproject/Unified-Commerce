@@ -22,6 +22,7 @@ public static class PlatformAdminPermissionsSeedData
     [
         new(Guid.Parse("62000000-0000-0000-0000-000000000001"), PlatformPermissionCodes.DashboardView, "View Platform Dashboard", "View platform dashboard summaries."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000002"), PlatformPermissionCodes.TenantsView, "View Tenants", "View platform tenants."),
+        new(Guid.Parse("62000000-0000-0000-0000-000000000037"), PlatformPermissionCodes.TenantSubscriptionsView, "View Tenant Subscriptions", "View tenant-level subscription lifecycle and dashboard subscription widgets."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000003"), PlatformPermissionCodes.TenantsCreate, "Create Tenants", "Create platform tenants."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000004"), PlatformPermissionCodes.TenantsUpdate, "Update Tenants", "Update platform tenants."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000005"), PlatformPermissionCodes.TenantsActivate, "Activate Tenants", "Activate platform tenants."),
