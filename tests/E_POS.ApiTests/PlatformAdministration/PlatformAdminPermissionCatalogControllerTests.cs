@@ -49,7 +49,7 @@ public sealed class PlatformAdminPermissionCatalogControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<LegacyApiResponse<PlatformPermissionFlatResponse>>(ok.Value);
         Assert.True(payload.Success);
-        Assert.Equal(36, payload.Data.TotalCount);
+        Assert.Equal(37, payload.Data.TotalCount);
     }
 
     [Fact]

@@ -6,10 +6,10 @@ namespace E_POS.UnitTests.PlatformAdministration;
 public sealed class PlatformPermissionCodesTests
 {
     [Fact]
-    public void All_ContainsExactlyThirtySixTmEposPlatformPermissionCodes()
+    public void All_ContainsExactlyThirtySevenTmEposPlatformPermissionCodes()
     {
-        Assert.Equal(36, PlatformPermissionCodes.All.Count);
-        Assert.Equal(36, PlatformPermissionCodes.All.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(37, PlatformPermissionCodes.All.Count);
+        Assert.Equal(37, PlatformPermissionCodes.All.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
@@ -19,6 +19,7 @@ public sealed class PlatformPermissionCodesTests
 
         Assert.Contains(PlatformPermissionCodes.DashboardView, codes);
         Assert.Contains(PlatformPermissionCodes.TenantsView, codes);
+        Assert.Contains(PlatformPermissionCodes.TenantSubscriptionsView, codes);
         Assert.Contains(PlatformPermissionCodes.TenantsEntitlementsUpdate, codes);
         Assert.Contains(PlatformPermissionCodes.SubscriptionPlansView, codes);
         Assert.Contains(PlatformPermissionCodes.SubscriptionPlansDelete, codes);

@@ -24,7 +24,7 @@ public sealed class PlatformSettingsRepositoryTests
 
         var settings = await repository.GetGeneralSettingsAsync(CancellationToken.None);
 
-        Assert.Equal("SCS-TIX", settings.PlatformDisplayName);
+        Assert.Equal(PlatformSettingsDefaults.PlatformDisplayName, settings.PlatformDisplayName);
         Assert.Equal("LK", settings.DefaultCountryCode);
         Assert.Equal("LKR", settings.DefaultCurrencyCode);
         Assert.Equal("Asia/Colombo", settings.DefaultTimezone);
@@ -73,14 +73,14 @@ public sealed class PlatformSettingsRepositoryTests
         var saved = await repository.SaveGeneralSettingsAsync(
             new UpdatePlatformSettingsRequest
             {
-                PlatformDisplayName = "SCS-TIX",
+                PlatformDisplayName = PlatformSettingsDefaults.PlatformDisplayName,
                 DefaultCountryCode = "LK"
             },
             PlatformUserId,
             Now,
             CancellationToken.None);
 
-        Assert.Equal("SCS-TIX", saved.PlatformDisplayName);
+        Assert.Equal(PlatformSettingsDefaults.PlatformDisplayName, saved.PlatformDisplayName);
         Assert.Equal("LK", saved.DefaultCountryCode);
 
         var count = await dbContext.PlatformSettings.CountAsync();
@@ -93,7 +93,7 @@ public sealed class PlatformSettingsRepositoryTests
             PlatformSetting.Create(
                 Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 PlatformSettingKeys.PlatformDisplayName,
-                "SCS-TIX",
+                PlatformSettingsDefaults.PlatformDisplayName,
                 isSecret: false,
                 "Platform display name",
                 Now),

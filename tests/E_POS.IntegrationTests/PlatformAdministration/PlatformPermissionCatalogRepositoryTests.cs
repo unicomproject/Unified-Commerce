@@ -23,7 +23,7 @@ public sealed class PlatformPermissionCatalogRepositoryTests
 
         var permissions = await repository.GetActiveBusinessPermissionsAsync(CancellationToken.None);
 
-        Assert.Equal(36, permissions.Count);
+        Assert.Equal(37, permissions.Count);
         Assert.Equal(
             PlatformPermissionCodes.All.OrderBy(x => x, StringComparer.Ordinal),
             permissions.Select(permission => permission.Code).OrderBy(x => x, StringComparer.Ordinal));
@@ -49,7 +49,7 @@ public sealed class PlatformPermissionCatalogRepositoryTests
 
         var permissions = await repository.GetActiveBusinessPermissionsAsync(CancellationToken.None);
 
-        Assert.Equal(36, permissions.Count);
+        Assert.Equal(37, permissions.Count);
         Assert.DoesNotContain(
             permissions,
             permission => permission.Code == PlatformBootstrapPermissionCodes.AdminAccess);

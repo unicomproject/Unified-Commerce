@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
-using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,13 +15,13 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
         _dbContext = dbContext;
     }
 
-    public async Task<PlatformDashboardResponse> GetDashboardAsync(
+    public async Task<PlatformDashboardComputationSnapshot> GetComputationSnapshotAsync(
         DateTimeOffset generatedAt,
         CancellationToken cancellationToken)
     {
         var tenants = await _dbContext.Tenants
             .AsNoTracking()
-            .Select(x => new TenantSnapshot(
+            .Select(x => new PlatformDashboardTenantRow(
                 x.Id,
                 x.TenantCode,
                 x.DisplayName,
@@ -28,76 +29,105 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
 
-        var subscriptions = await _dbContext.TenantSubscriptions
-            .AsNoTracking()
-            .Select(x => new SubscriptionSnapshot(x.TenantId, x.SubscriptionStatus))
+        var subscriptions = await (
+            from sub in _dbContext.TenantSubscriptions.AsNoTracking()
+            join plan in _dbContext.SubscriptionPlans.AsNoTracking()
+                on sub.SubscriptionPlanId equals plan.Id into plans
+            from plan in plans.DefaultIfEmpty()
+            select new PlatformDashboardSubscriptionRow(
+                sub.Id,
+                sub.TenantId,
+                sub.SubscriptionStatus,
+                sub.CurrencyCode,
+                sub.PlanPrice,
+                sub.BillingCycle,
+                plan != null ? plan.BillingInterval : null,
+                sub.DiscountType,
+                sub.DiscountValue,
+                sub.CreatedAt,
+                sub.StartedAt))
             .ToListAsync(cancellationToken);
 
-        var trialTenantIds = subscriptions
-            .Where(x => IsStatus(x.SubscriptionStatus, "TRIAL"))
-            .Select(x => x.TenantId)
-            .ToHashSet();
+        var addons = await _dbContext.TenantSubscriptionAddons
+            .AsNoTracking()
+            .Select(x => new PlatformDashboardAddonRow(
+                x.TenantSubscriptionId,
+                x.Status,
+                x.UnitPrice,
+                x.Quantity,
+                x.CurrencyCode,
+                x.AutoRenew,
+                x.StartsAt,
+                x.EndsAt))
+            .ToListAsync(cancellationToken);
 
-        var suspendedTenants = tenants.Count(x => IsStatus(x.Status, "suspended"));
-        var pendingActivationTenants = tenants.Count(x =>
-            IsStatus(x.Status, "pending_activation"));
-        var pastDueSubscriptions = subscriptions.Count(x => IsStatus(x.SubscriptionStatus, "PAST_DUE"));
+        var history = await _dbContext.TenantSubscriptionHistory
+            .AsNoTracking()
+            .Select(x => new PlatformDashboardSubscriptionHistoryRow(
+                x.TenantSubscriptionId,
+                x.ChangeType,
+                x.ChangedAt,
+                x.OldStatus,
+                x.NewStatus,
+                x.ChangeData))
+            .ToListAsync(cancellationToken);
+
+        var currencyRows = await _dbContext.Currencies
+            .AsNoTracking()
+            .Select(x => new { x.CurrencyCode, x.DecimalPlaces, x.IsActive })
+            .ToListAsync(cancellationToken);
+
+        var currencies = new Dictionary<string, PlatformDashboardMrrCalculator.CurrencyMetadata>(StringComparer.OrdinalIgnoreCase);
+        var conflicting = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in currencyRows.GroupBy(x => x.CurrencyCode.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            var active = group.Where(x => x.IsActive).ToList();
+            var candidates = active.Count > 0 ? active : group.ToList();
+            if (candidates.Count != 1)
+            {
+                conflicting.Add(group.Key);
+                continue;
+            }
+
+            var row = candidates[0];
+            currencies[group.Key] = new PlatformDashboardMrrCalculator.CurrencyMetadata(
+                row.CurrencyCode.Trim().ToUpperInvariant(),
+                row.DecimalPlaces);
+        }
+
+        // Conflicting currencies are intentionally absent so MRR resolution fails safely.
+        foreach (var code in conflicting)
+        {
+            currencies.Remove(code);
+        }
+
         var pendingBilling = await _dbContext.SubscriptionInvoices.AsNoTracking()
             .CountAsync(x => x.InvoiceStatus == "PENDING" && x.BalanceDue > 0m, cancellationToken);
 
-        var attentionItems = new List<PlatformDashboardAttentionItemDto>
-        {
-            Attention(
-                "suspended_tenants",
-                "Suspended Tenants",
-                "Tenants currently suspended.",
-                suspendedTenants,
-                "critical"),
-            Attention(
-                "pending_activation",
-                "Pending Activation",
-                "Tenants in PENDING_ACTIVATION awaiting Super Admin activation.",
-                pendingActivationTenants,
-                "warning"),
-            Attention(
-                "past_due_subscriptions",
-                "Past Due Subscriptions",
-                "Tenant subscriptions with PAST_DUE status.",
-                pastDueSubscriptions,
-                "critical"),
-            Attention(
-                "pending_billing",
-                "Pending Billing",
-                "Issued invoices that are PENDING with a balance due.",
-                pendingBilling,
-                "warning")
-        };
+        var totalOutlets = await CountNonDeletedAsync(_dbContext.Outlets.Select(x => x.Status), cancellationToken);
+        var totalTills = await CountNonDeletedAsync(_dbContext.Tills.Select(x => x.Status), cancellationToken);
+        var totalTenantUsers = await CountNonDeletedAsync(_dbContext.TenantUsers.Select(x => x.AccountStatus), cancellationToken);
+        var totalPlatformUsers = await CountNonDeletedAsync(_dbContext.PlatformUsers.Select(x => x.Status), cancellationToken);
 
-        var recentTenants = tenants
-            .OrderByDescending(x => x.CreatedAt)
-            .Take(5)
-            .Select(x => new PlatformDashboardRecentTenantDto(
-                x.Id,
-                x.TenantCode,
-                x.Name,
-                x.Status,
-                x.CreatedAt))
-            .ToList();
+        var timezoneSetting = await _dbContext.PlatformSettings.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.SettingKey == PlatformSettingKeys.DefaultTimezone, cancellationToken);
+        var timezone = timezoneSetting?.GetStringValue();
 
-        return new PlatformDashboardResponse(
-            TotalTenants: tenants.Count,
-            ActiveTenants: tenants.Count(x => IsStatus(x.Status, "active")),
-            SuspendedTenants: suspendedTenants,
-            TrialTenants: tenants.Count(x => trialTenantIds.Contains(x.Id)),
-            TotalSubscriptions: subscriptions.Count,
-            ActiveSubscriptions: subscriptions.Count(x => IsStatus(x.SubscriptionStatus, "ACTIVE")),
-            PendingBillingCount: pendingBilling,
-            TotalOutlets: await CountNonDeletedAsync(_dbContext.Outlets.Select(x => x.Status), cancellationToken),
-            TotalTills: await CountNonDeletedAsync(_dbContext.Tills.Select(x => x.Status), cancellationToken),
-            TotalUsers: await CountNonDeletedAsync(_dbContext.TenantUsers.Select(x => x.AccountStatus), cancellationToken),
-            RecentTenants: recentTenants,
-            AttentionItems: attentionItems,
-            GeneratedAt: generatedAt);
+        return new PlatformDashboardComputationSnapshot(
+            generatedAt,
+            timezone,
+            tenants,
+            subscriptions,
+            addons,
+            history,
+            currencies,
+            pendingBilling,
+            totalOutlets,
+            totalTills,
+            totalTenantUsers,
+            totalPlatformUsers,
+            tenants.Select(x => (x.CreatedAt, x.Id)).ToList(),
+            subscriptions.Select(x => (x.CreatedAt, x.Id)).ToList());
     }
 
     private static async Task<int> CountNonDeletedAsync(
@@ -105,28 +135,6 @@ public sealed class PlatformDashboardRepository : IPlatformDashboardRepository
         CancellationToken cancellationToken)
     {
         var values = await statuses.ToListAsync(cancellationToken);
-        return values.Count(x => !IsStatus(x, "DELETED"));
+        return values.Count(x => !string.Equals(x, "DELETED", StringComparison.OrdinalIgnoreCase));
     }
-
-    private static bool IsStatus(string value, string expected) =>
-        string.Equals(value, expected, StringComparison.OrdinalIgnoreCase);
-
-    private static PlatformDashboardAttentionItemDto Attention(
-        string type,
-        string title,
-        string description,
-        int count,
-        string severity) =>
-        new(type, title, description, count, severity);
-
-    private sealed record TenantSnapshot(
-        Guid Id,
-        string TenantCode,
-        string Name,
-        string Status,
-        DateTimeOffset CreatedAt);
-
-    private sealed record SubscriptionSnapshot(Guid TenantId, string SubscriptionStatus);
 }
-
-
