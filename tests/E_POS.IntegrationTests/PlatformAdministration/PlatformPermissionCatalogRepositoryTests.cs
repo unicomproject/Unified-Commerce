@@ -71,10 +71,13 @@ public sealed class PlatformPermissionCatalogRepositoryTests
 
         var permissions = await repository.GetActiveBusinessPermissionsAsync(CancellationToken.None);
 
-        Assert.Equal(35, permissions.Count);
+        Assert.Equal(36, permissions.Count);
         Assert.DoesNotContain(
             permissions,
             permission => permission.Code == PlatformPermissionCodes.AuditView);
+        Assert.Single(
+            permissions,
+            permission => permission.Code == PlatformPermissionCodes.TenantSubscriptionsView);
     }
 
     private static EPosDbContext CreateDbContext()

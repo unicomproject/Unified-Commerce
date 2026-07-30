@@ -54,10 +54,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             SuspendedTenants: rows.Count(x => IsStatus(x.Status, TenantStatusConstants.Suspended)),
             TrialTenants: rows.Count(x => x.HasTrialSubscription),
             PendingActivationTenants: rows.Count(x =>
-                IsStatus(x.Status, "draft") ||
-                IsStatus(x.Status, "setup_pending") ||
-                IsStatus(x.Status, "pending_activation") ||
-                IsStatus(x.Status, "pending_payment")),
+                IsStatus(x.Status, TenantStatusConstants.PendingActivation)),
             PendingBillingCount: rows.Count(x =>
                 IsStatus(x.BillingStatus, "PAST_DUE")),
             TotalOutlets: rows.Sum(x => x.OutletCount),
