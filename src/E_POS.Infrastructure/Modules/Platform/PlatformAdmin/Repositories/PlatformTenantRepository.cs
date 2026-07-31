@@ -279,7 +279,8 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             SetupCompletedSteps: setup.CompletedSteps,
             SetupMissingSteps: setup.MissingSteps,
             SetupProgressPercent: setup.ProgressPercent,
-            ContinueSetupPath: PlatformTenantSetupChecklistEvaluator.ContinueSetupPath(tenant.Id));
+            ContinueSetupPath: PlatformTenantSetupChecklistEvaluator.ContinueSetupPath(tenant.Id),
+            ConcurrencyVersion: (tenant.UpdatedAt ?? tenant.CreatedAt).Ticks.ToString());
     }
 
     public Task<bool> TenantCodeExistsAsync(string tenantCode, CancellationToken cancellationToken)
@@ -964,6 +965,88 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         string PlanCode,
         string SubscriptionStatus,
         DateTimeOffset CreatedAt);
+
+    public async Task AddAuditLogAsync(
+        Guid tenantId,
+        Guid? platformUserId,
+        string action,
+        string summary,
+        string? reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var subscription = await _dbContext.TenantSubscriptions.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId, cancellationToken);
+        var subId = subscription?.Id ?? tenantId;
+
+        var seq = await _dbContext.TenantSubscriptionHistory.AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .CountAsync(cancellationToken) + 1;
+
+        var history = TenantSubscriptionHistory.CreateEvent(
+            Guid.NewGuid(),
+            tenantId,
+            subId,
+            seq,
+            action,
+            now,
+            reason: reason ?? summary,
+            changeData: summary,
+            changedByPlatformUserId: platformUserId);
+
+        _dbContext.TenantSubscriptionHistory.Add(history);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
+        Guid tenantId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        pageNumber = pageNumber < 1 ? 1 : pageNumber;
+        pageSize = pageSize < 1 ? 10 : Math.Min(pageSize, 100);
+
+        var query = from history in _dbContext.TenantSubscriptionHistory.AsNoTracking()
+                    where history.TenantId == tenantId
+                    join user in _dbContext.PlatformUsers.AsNoTracking()
+                        on history.ChangedByPlatformUserId equals user.Id into users
+                    from user in users.DefaultIfEmpty()
+                    select new
+                    {
+                        history.Id,
+                        OccurredAt = history.ChangedAt,
+                        history.ChangeType,
+                        history.Reason,
+                        history.ChangeData,
+                        PlatformUserId = user != null ? (Guid?)user.Id : null,
+                        Email = user != null ? user.Email : null
+                    };
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(x => x.OccurredAt)
+            .ThenByDescending(x => x.Id)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new PlatformTenantAuditLogItemDto(
+                x.Id,
+                x.OccurredAt,
+                new PlatformAuditLogActorDto(x.PlatformUserId, x.Email),
+                x.ChangeType,
+                x.ChangeData ?? x.Reason ?? "Tenant audit event recorded.",
+                x.Reason))
+            .ToListAsync(cancellationToken);
+
+        var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        return new PlatformTenantAuditLogListResponse(
+            items,
+            pageNumber,
+            pageSize,
+            totalCount,
+            totalPages);
+    }
 }
 
 

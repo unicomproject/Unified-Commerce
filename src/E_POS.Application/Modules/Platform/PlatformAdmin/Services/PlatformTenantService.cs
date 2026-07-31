@@ -90,6 +90,13 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         NormalizeQuery(query);
 
         var response = await _repository.GetTenantsAsync(query, cancellationToken);
+
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantSubscriptionsView, cancellationToken))
+        {
+            var redactedItems = response.Items.Select(item => item with { Subscription = null }).ToList();
+            response = response with { Items = redactedItems };
+        }
+
         return ApplicationResult<PlatformTenantListResponse>.Success(response);
     }
 
@@ -159,6 +166,13 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(NotFound);
         }
 
+        if (!string.IsNullOrWhiteSpace(request.ConcurrencyVersion) &&
+            !string.Equals(request.ConcurrencyVersion, (tenant.UpdatedAt ?? tenant.CreatedAt).Ticks.ToString(), StringComparison.Ordinal))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                Conflict with { Message = "The tenant record was updated by another user. Please reload and try again." });
+        }
+
         var name = NormalizeRequiredText(request.Name);
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -219,6 +233,14 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             }
         }
 
+        var subscription = await _repository.GetCurrentTenantSubscriptionEntityAsync(tenantId, cancellationToken);
+        if (subscription is not null && request.BillingStatus is not null && !string.Equals(request.BillingStatus, subscription.SubscriptionStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.billing_state_changed", $"Tenant billing status updated to {request.BillingStatus}.", null, now, cancellationToken);
+        }
+
+        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.profile_updated", "Tenant profile updated by platform admin.", null, now, cancellationToken);
+
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
     }
 
@@ -242,6 +264,12 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         {
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(
                 InvalidTransition with { Message = "Tenant is already active." });
+        }
+
+        if (string.Equals(tenant.Status, TenantStatusConstants.Suspended, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                InvalidTransition with { Message = "Suspended tenants must be reactivated using the reactivate action." });
         }
 
         if (string.Equals(tenant.Status, TenantStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase))
@@ -299,6 +327,44 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
 
         await _repository.UpdateTenantSubscriptionAsync(subscription, cancellationToken);
         await _repository.UpdateTenantAsync(tenant, cancellationToken);
+        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.activated", "Tenant activated by platform admin.", null, now, cancellationToken);
+
+        return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<PlatformTenantDetailResponse>> ReactivateTenantAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantsActivate, cancellationToken))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(AccessDenied);
+        }
+
+        var tenant = await _repository.GetTenantEntityByIdAsync(tenantId, cancellationToken);
+        if (tenant is null)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(NotFound);
+        }
+
+        if (!string.Equals(tenant.Status, TenantStatusConstants.Suspended, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                InvalidTransition with { Message = "Only suspended tenants can be reactivated." });
+        }
+
+        var subscription = await _repository.GetCurrentTenantSubscriptionEntityAsync(tenantId, cancellationToken);
+        var now = _dateTimeProvider.UtcNow;
+        tenant.Activate(platformUserId, now);
+        if (subscription is not null)
+        {
+            subscription.Activate(now);
+            await _repository.UpdateTenantSubscriptionAsync(subscription, cancellationToken);
+        }
+
+        await _repository.UpdateTenantAsync(tenant, cancellationToken);
+        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.reactivated", "Tenant reactivated by platform admin.", null, now, cancellationToken);
 
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
     }
@@ -326,8 +392,10 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                 InvalidTransition with { Message = "Tenant cannot be suspended from its current status." });
         }
 
-        tenant.Suspend(platformUserId, _dateTimeProvider.UtcNow);
+        var now = _dateTimeProvider.UtcNow;
+        tenant.Suspend(platformUserId, now);
         await _repository.UpdateTenantAsync(tenant, cancellationToken);
+        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.suspended", "Tenant suspended by platform admin.", null, now, cancellationToken);
 
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
     }
@@ -352,6 +420,13 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         if (tenant is null)
         {
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(NotFound);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ConcurrencyVersion) &&
+            !string.Equals(request.ConcurrencyVersion, (tenant.UpdatedAt ?? tenant.CreatedAt).Ticks.ToString(), StringComparison.Ordinal))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                Conflict with { Message = "The tenant record was updated by another user. Please reload and try again." });
         }
 
         var subscription = await _repository.GetCurrentTenantSubscriptionEntityAsync(tenantId, cancellationToken);
@@ -399,6 +474,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                 selectedPlan?.PriceAmount,
                 now);
             await _repository.UpdateTenantSubscriptionAsync(subscription, cancellationToken);
+            await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.subscription_changed", $"Tenant subscription plan updated to {selectedPlan?.PlanName ?? planId.ToString()}.", null, now, cancellationToken);
         }
 
         await _repository.ReplaceTenantEntitlementsAsync(
@@ -409,7 +485,31 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             "Removed by platform admin entitlement update.",
             cancellationToken);
 
+        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.entitlements_updated", "Tenant entitlements updated by platform admin.", null, now, cancellationToken);
+
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<PlatformTenantAuditLogListResponse>> GetTenantAuditLogsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        if (!await HasPermissionAsync(platformUserId, PlatformPermissionCodes.AuditView, cancellationToken))
+        {
+            return ApplicationResult<PlatformTenantAuditLogListResponse>.Failure(AccessDenied);
+        }
+
+        var tenant = await _repository.GetTenantEntityByIdAsync(tenantId, cancellationToken);
+        if (tenant is null)
+        {
+            return ApplicationResult<PlatformTenantAuditLogListResponse>.Failure(NotFound);
+        }
+
+        var logs = await _repository.GetTenantAuditLogsAsync(tenantId, pageNumber, pageSize, cancellationToken);
+        return ApplicationResult<PlatformTenantAuditLogListResponse>.Success(logs);
     }
 
     private async Task<ApplicationResult<PlatformTenantDetailResponse>> LoadTenantDetailAsync(
@@ -427,8 +527,13 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             platformUserId,
             cancellationToken);
 
-        return ApplicationResult<PlatformTenantDetailResponse>.Success(
-            PlatformTenantDetailMapper.ApplyActionFlags(detail, permissions));
+        var resultDetail = PlatformTenantDetailMapper.ApplyActionFlags(detail, permissions);
+        if (!permissions.Contains(PlatformPermissionCodes.TenantSubscriptionsView))
+        {
+            resultDetail = resultDetail with { Subscription = null };
+        }
+
+        return ApplicationResult<PlatformTenantDetailResponse>.Success(resultDetail);
     }
 
     private async Task<ApplicationResult<IReadOnlyList<Guid>>> ResolveEnabledFeaturesForPlanAsync(

@@ -28,6 +28,7 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<E_POS.Domain.
         builder.Property(x => x.UpdatedAt)
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone")
+            .IsConcurrencyToken()
             .IsRequired();
 
         builder.Ignore(x => x.CreatedBy);

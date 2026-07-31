@@ -852,6 +852,23 @@ public sealed class PlatformTenantLifecycleServiceTests
 
         public Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<Guid>>([]);
+
+        public Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
+            Guid tenantId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new PlatformTenantAuditLogListResponse([], pageNumber, pageSize, 0, 0));
+
+        public Task AddAuditLogAsync(
+            Guid tenantId,
+            Guid? platformUserId,
+            string action,
+            string summary,
+            string? reason,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 
     private sealed class FakeLifecyclePasswordHashService : IPasswordHashService

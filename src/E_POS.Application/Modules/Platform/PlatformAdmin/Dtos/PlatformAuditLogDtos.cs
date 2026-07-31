@@ -44,3 +44,19 @@ public sealed record PlatformAuditLogListResponse(
     int TotalCount,
     int TotalPages);
 
+public sealed record PlatformTenantAuditLogItemDto(
+    Guid Id,
+    DateTimeOffset OccurredAt,
+    PlatformAuditLogActorDto Actor,
+    string Action,
+    string Summary,
+    string? Reason);
+
+public sealed record PlatformTenantAuditLogListResponse(
+    IReadOnlyList<PlatformTenantAuditLogItemDto> Items,
+    int PageNumber,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
+
+
