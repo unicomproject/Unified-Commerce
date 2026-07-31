@@ -439,6 +439,7 @@ public sealed partial class PlatformTenantService
         }
 
         await _repository.CreateTenantWizardAsync(writeModel, cancellationToken);
+        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.created", "Tenant created via platform wizard.", null, now, cancellationToken);
 
         try
         {

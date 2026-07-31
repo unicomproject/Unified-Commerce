@@ -273,6 +273,23 @@ public sealed class PlatformTenantServiceTests
         public Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
+        public Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
+            Guid tenantId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new PlatformTenantAuditLogListResponse([], pageNumber, pageSize, 0, 0));
+
+        public Task AddAuditLogAsync(
+            Guid tenantId,
+            Guid? platformUserId,
+            string action,
+            string summary,
+            string? reason,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,
             CancellationToken cancellationToken)
@@ -483,6 +500,23 @@ public sealed class PlatformTenantServiceTests
 
         public Task CopyPlanConfigurationAsync(Guid sourcePlanId, Guid targetPlanId, DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotImplementedException();
+
+        public Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
+            Guid tenantId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new PlatformTenantAuditLogListResponse([], pageNumber, pageSize, 0, 0));
+
+        public Task AddAuditLogAsync(
+            Guid tenantId,
+            Guid? platformUserId,
+            string action,
+            string summary,
+            string? reason,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 }
 

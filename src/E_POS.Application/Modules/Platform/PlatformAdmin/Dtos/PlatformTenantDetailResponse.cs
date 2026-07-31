@@ -40,5 +40,6 @@ public sealed record PlatformTenantDetailResponse(
     IReadOnlyList<string>? SetupCompletedSteps = null,
     IReadOnlyList<string>? SetupMissingSteps = null,
     int? SetupProgressPercent = null,
-    string? ContinueSetupPath = null);
+    string? ContinueSetupPath = null,
+    string? ConcurrencyVersion = null);
 

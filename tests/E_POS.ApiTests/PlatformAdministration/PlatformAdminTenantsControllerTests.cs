@@ -525,11 +525,26 @@ public sealed class PlatformAdminTenantsControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(_entitlementOptionsResult);
 
+        public Task<ApplicationResult<PlatformTenantDetailResponse>> ReactivateTenantAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(_detailResult);
+
         public Task<ApplicationResult<PlatformTenantCreateOptionsResponse>> GetCreateOptionsAsync(
             Guid platformUserId,
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<PlatformTenantCreateOptionsResponse>.Success(
                 new PlatformTenantCreateOptionsResponse([], [], [], [], [], [], [], [], [], [], [], [], [])));
+
+        public Task<ApplicationResult<PlatformTenantAuditLogListResponse>> GetTenantAuditLogsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PlatformTenantAuditLogListResponse>.Success(
+                new PlatformTenantAuditLogListResponse([], pageNumber, pageSize, 0, 0)));
     }
 }
 

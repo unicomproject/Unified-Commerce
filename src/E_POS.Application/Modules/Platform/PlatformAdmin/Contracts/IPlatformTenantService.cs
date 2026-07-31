@@ -80,6 +80,21 @@ public interface IPlatformTenantRepository
     /// Used as Release 1 payment-verification evidence for paid activation.
     /// </summary>
     Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
+        Guid tenantId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    Task AddAuditLogAsync(
+        Guid tenantId,
+        Guid? platformUserId,
+        string action,
+        string summary,
+        string? reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }
 
 public interface IPlatformTenantService
@@ -118,6 +133,11 @@ public interface IPlatformTenantService
         Guid platformUserId,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<PlatformTenantDetailResponse>> ReactivateTenantAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<PlatformTenantDetailResponse>> SuspendTenantAsync(
         Guid tenantId,
         Guid platformUserId,
@@ -137,6 +157,11 @@ public interface IPlatformTenantService
     Task<ApplicationResult<PlatformTenantCreateOptionsResponse>> GetCreateOptionsAsync(
         Guid platformUserId,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformTenantAuditLogListResponse>> GetTenantAuditLogsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken);
 }
-
-

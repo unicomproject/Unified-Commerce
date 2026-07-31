@@ -60,6 +60,8 @@ public sealed record UpdatePlatformTenantRequest
     public string? BusinessType { get; init; }
 
     public string? BillingStatus { get; init; }
+
+    public string? ConcurrencyVersion { get; init; }
 }
 
 public sealed record UpdatePlatformTenantEntitlementsRequest
@@ -69,6 +71,8 @@ public sealed record UpdatePlatformTenantEntitlementsRequest
     public IReadOnlyList<Guid>? EnabledFeatureIds { get; init; }
 
     public IReadOnlyList<string>? EnabledFeatureCodes { get; init; }
+
+    public string? ConcurrencyVersion { get; init; }
 }
 
 public sealed record ResolvedTenantFeature(
