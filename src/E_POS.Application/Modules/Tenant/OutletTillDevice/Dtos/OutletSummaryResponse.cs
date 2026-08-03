@@ -13,4 +13,6 @@ public sealed record OutletSummaryResponse(
     bool CollectionEnabled,
     int? PreparationLeadMinutes,
     int? PickupWindowMinutes,
-    TimeOnly? CollectionCutoffTime);
+    TimeOnly? CollectionCutoffTime,
+    string? City,
+    int TillCount);

@@ -1,9 +1,14 @@
+using E_POS.Application.Common.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Options;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
+using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 
@@ -12,10 +17,17 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
     private const string OpenSessionStatus = "OPEN";
 
     private readonly EPosDbContext _dbContext;
+    private readonly IOptionsSnapshot<TillMonitoringOptions> _options;
+    private readonly IDateTimeProvider _dateTimeProvider;
 
-    public TenantAdminTillRepository(EPosDbContext dbContext)
+    public TenantAdminTillRepository(
+        EPosDbContext dbContext,
+        IOptionsSnapshot<TillMonitoringOptions> options,
+        IDateTimeProvider dateTimeProvider)
     {
         _dbContext = dbContext;
+        _options = options;
+        _dateTimeProvider = dateTimeProvider;
     }
 
     public Task<bool> OutletBelongsToTenantAsync(
@@ -67,7 +79,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
         return (maxNumber ?? 0) + 1;
     }
 
-    public async Task<TenantAdminTillListResponse> ListAsync(
+    public async Task<(IReadOnlyList<TillMonitoringReadModel> Items, int TotalCount)> ListAsync(
         Guid tenantId,
         string? search,
         string? status,
@@ -78,90 +90,247 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
         string sortDirection,
         CancellationToken cancellationToken)
     {
-        var rows = await BuildTillRowsQuery(tenantId).ToListAsync(cancellationToken);
-        var filtered = ApplyStatusFilter(rows, status);
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToUpperInvariant();
-            filtered = filtered
-                .Where(x =>
-                    x.TillName.ToUpperInvariant().Contains(term) ||
-                    x.TillCode.ToUpperInvariant().Contains(term) ||
-                    x.OutletName.ToUpperInvariant().Contains(term))
-                .ToList();
-        }
+        var query = BuildBaseQuery(tenantId);
 
         if (outletId.HasValue)
         {
-            filtered = filtered.Where(x => x.OutletId == outletId.Value).ToList();
+            query = query.Where(x => x.Till.OutletId == outletId.Value);
         }
 
-        filtered = ApplySort(filtered, sortBy, sortDirection);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToUpper();
+            query = query.Where(x =>
+                x.Till.TillName.ToUpper().Contains(term) ||
+                x.Till.TillCode.ToUpper().Contains(term) ||
+                x.Outlet.OutletName.ToUpper().Contains(term));
+        }
 
-        var totalCount = filtered.Count;
-        var pageItems = filtered
+        var timeoutSeconds = _options.Value.HeartbeatTimeoutSeconds;
+        var now = _dateTimeProvider.UtcNow;
+        var heartbeatCutoff = now.AddSeconds(-timeoutSeconds);
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var st = status.Trim().ToLowerInvariant();
+            if (st == "inactive")
+            {
+                query = query.Where(x => x.Till.Status == TillConstants.InactiveStatus);
+            }
+            else if (st == "needs_attention")
+            {
+                query = query.Where(x => 
+                    x.Till.Status == TillConstants.MaintenanceStatus ||
+                    (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice == null) ||
+                    (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice != null && x.AssignedDevice.Status != PosDeviceConstants.ActiveStatus) ||
+                    (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice != null && !x.AssignedDevice.IsTrusted) ||
+                    (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice != null && x.AssignedDevice.LastSeenAt == null) ||
+                    (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice != null && x.AssignedDevice.LastSeenAt < heartbeatCutoff)
+                );
+            }
+            else if (st == "online")
+            {
+                query = query.Where(x => 
+                    x.Till.Status == TillConstants.ActiveStatus &&
+                    x.AssignedDevice != null &&
+                    x.AssignedDevice.Status == PosDeviceConstants.ActiveStatus &&
+                    x.AssignedDevice.IsTrusted &&
+                    x.AssignedDevice.LastSeenAt != null &&
+                    x.AssignedDevice.LastSeenAt >= heartbeatCutoff
+                );
+            }
+            else if (st == "offline")
+            {
+                // Operational offline: Active lifecycle but not currently online.
+                // Inactive lifecycle is filtered separately via status=inactive.
+                query = query.Where(x =>
+                    x.Till.Status == TillConstants.ActiveStatus &&
+                    !(x.AssignedDevice != null &&
+                      x.AssignedDevice.Status == PosDeviceConstants.ActiveStatus &&
+                      x.AssignedDevice.IsTrusted &&
+                      x.AssignedDevice.LastSeenAt != null &&
+                      x.AssignedDevice.LastSeenAt >= heartbeatCutoff));
+            }
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // Sorting
+        var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+        var sortField = sortBy?.Trim().ToLowerInvariant() ?? "name";
+
+        query = sortField switch
+        {
+            "code" or "tillcode" => descending
+                ? query.OrderByDescending(x => x.Till.TillCode)
+                : query.OrderBy(x => x.Till.TillCode),
+            "outlet" or "outletname" => descending
+                ? query.OrderByDescending(x => x.Outlet.OutletName)
+                : query.OrderBy(x => x.Outlet.OutletName),
+            "status" => descending
+                ? query.OrderByDescending(x => x.Till.Status)
+                : query.OrderBy(x => x.Till.Status),
+            "lastactive" or "lastactiveat" => descending
+                ? query.OrderByDescending(x => x.Till.UpdatedAt)
+                : query.OrderBy(x => x.Till.UpdatedAt),
+            _ => descending
+                ? query.OrderByDescending(x => x.Till.TillName)
+                : query.OrderBy(x => x.Till.TillName),
+        };
+
+        var pageItems = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(MapListItem)
-            .ToList();
+            .ToListAsync(cancellationToken);
 
-        return new TenantAdminTillListResponse(pageItems, page, pageSize, totalCount);
+        var results = pageItems.Select(x => new TillMonitoringReadModel(
+            x.Till,
+            x.Outlet,
+            x.AssignedDevice,
+            x.ActiveSession,
+            x.CashierUser)).ToList();
+
+        return (results, totalCount);
     }
 
     public async Task<TenantAdminTillSummaryResponse> GetSummaryAsync(
         Guid tenantId,
         CancellationToken cancellationToken)
     {
-        var rows = await BuildTillRowsQuery(tenantId).ToListAsync(cancellationToken);
+        var timeoutSeconds = _options.Value.HeartbeatTimeoutSeconds;
+        var now = _dateTimeProvider.UtcNow;
+        var heartbeatCutoff = now.AddSeconds(-timeoutSeconds);
+
+        var query = BuildBaseQuery(tenantId);
+
+        var total = await query.CountAsync(cancellationToken);
+        
+        var inactive = await query.CountAsync(x => x.Till.Status == TillConstants.InactiveStatus, cancellationToken);
+        
+        var needsAttention = await query.CountAsync(x => 
+            x.Till.Status == TillConstants.MaintenanceStatus ||
+            (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice == null) ||
+            (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice != null && x.AssignedDevice.Status != PosDeviceConstants.ActiveStatus) ||
+            (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice != null && !x.AssignedDevice.IsTrusted) ||
+            (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice != null && x.AssignedDevice.LastSeenAt == null) ||
+            (x.Till.Status == TillConstants.ActiveStatus && x.AssignedDevice != null && x.AssignedDevice.LastSeenAt < heartbeatCutoff), 
+            cancellationToken);
+
+        var online = await query.CountAsync(x => 
+            x.Till.Status == TillConstants.ActiveStatus &&
+            x.AssignedDevice != null &&
+            x.AssignedDevice.Status == PosDeviceConstants.ActiveStatus &&
+            x.AssignedDevice.IsTrusted &&
+            x.AssignedDevice.LastSeenAt != null &&
+            x.AssignedDevice.LastSeenAt >= heartbeatCutoff,
+            cancellationToken);
+
+        var offline = await query.CountAsync(x =>
+            x.Till.Status == TillConstants.ActiveStatus &&
+            !(x.AssignedDevice != null &&
+              x.AssignedDevice.Status == PosDeviceConstants.ActiveStatus &&
+              x.AssignedDevice.IsTrusted &&
+              x.AssignedDevice.LastSeenAt != null &&
+              x.AssignedDevice.LastSeenAt >= heartbeatCutoff),
+            cancellationToken);
 
         return new TenantAdminTillSummaryResponse(
-            rows.Count,
-            rows.Count(x => x.DeviceStatus == "Online"),
-            rows.Count(x => x.DeviceStatus == "Offline"),
-            rows.Count(x => x.TillStatus == TillConstants.InactiveStatus),
-            rows.Count(x => x.NeedsAttention));
+            TotalTills: total,
+            OnlineTills: online,
+            OfflineTills: offline,
+            InactiveTills: inactive,
+            NeedsAttentionTills: needsAttention);
     }
 
-    public async Task<TenantAdminTillDetailResponse?> GetDetailAsync(
+    public async Task<TillMonitoringReadModel?> GetDetailAsync(
         Guid tenantId,
         Guid tillId,
         CancellationToken cancellationToken)
     {
-        var row = await BuildTillRowsQuery(tenantId)
-            .FirstOrDefaultAsync(x => x.TillId == tillId, cancellationToken);
-
-        if (row is null)
-        {
-            return null;
-        }
-
-        var till = await _dbContext.Tills
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.TenantId == tenantId &&
-                     x.Id == tillId &&
-                     x.Status != TillConstants.DeletedStatus,
-                cancellationToken);
-
-        if (till is null)
-        {
-            return null;
-        }
-
-        return MapDetail(row, till);
+        var item = await BuildBaseQuery(tenantId, tillId).FirstOrDefaultAsync(cancellationToken);
+        if (item == null) return null;
+        
+        return new TillMonitoringReadModel(
+            item.Till,
+            item.Outlet,
+            item.AssignedDevice,
+            item.ActiveSession,
+            item.CashierUser);
     }
 
-    public async Task AddAsync(Till till, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TillHardwareReadinessReadModel>> GetHardwareReadinessDataAsync(
+        Guid tenantId,
+        Guid tillId,
+        Guid? activePosDeviceId,
+        CancellationToken cancellationToken)
+    {
+        var assignmentRows = await (
+            from assignment in _dbContext.HardwareDeviceAssignments.AsNoTracking()
+            join hw in _dbContext.HardwareDevices.AsNoTracking()
+                on assignment.HardwareDeviceId equals hw.Id
+            where assignment.TenantId == tenantId &&
+                  hw.TenantId == tenantId &&
+                  assignment.ReleasedAt == null &&
+                  hw.Status != "DELETED" &&
+                  (
+                      assignment.TillId == tillId ||
+                      (activePosDeviceId.HasValue && assignment.PosDeviceId == activePosDeviceId.Value)
+                  )
+            select new { Hardware = hw, Assignment = assignment }
+        ).ToListAsync(cancellationToken);
+
+        if (assignmentRows.Count == 0)
+        {
+            return Array.Empty<TillHardwareReadinessReadModel>();
+        }
+
+        var deduped = assignmentRows
+            .GroupBy(x => x.Hardware.Id)
+            .Select(group =>
+            {
+                var preferred = group
+                    .OrderByDescending(x => x.Assignment.IsPrimary)
+                    .ThenByDescending(x => x.Assignment.AssignedAt)
+                    .ThenByDescending(x => x.Assignment.TillId == tillId)
+                    .First();
+
+                var source = preferred.Assignment.TillId == tillId ? "TILL" : "POS_DEVICE";
+                return new { preferred.Hardware, preferred.Assignment, Source = source };
+            })
+            .ToList();
+
+        var deviceIds = deduped.Select(x => x.Hardware.Id).ToList();
+        var latestLogs = await _dbContext.HardwareTestLogs
+            .AsNoTracking()
+            .Where(log =>
+                log.TenantId == tenantId &&
+                log.HardwareDeviceId.HasValue &&
+                deviceIds.Contains(log.HardwareDeviceId.Value))
+            .OrderByDescending(log => log.TestedAt)
+            .ToListAsync(cancellationToken);
+
+        var latestByDevice = latestLogs
+            .Where(log => log.HardwareDeviceId.HasValue)
+            .GroupBy(log => log.HardwareDeviceId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        return deduped
+            .Select(x => new TillHardwareReadinessReadModel(
+                x.Hardware,
+                x.Assignment,
+                latestByDevice.GetValueOrDefault(x.Hardware.Id),
+                x.Source))
+            .ToList();
+    }
+
+    // Other unchanged methods...
+    public Task AddAsync(Till till, CancellationToken cancellationToken)
     {
         _dbContext.Tills.Add(till);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<Till?> GetEditableAsync(
-        Guid tenantId,
-        Guid tillId,
-        CancellationToken cancellationToken)
+    public Task<Till?> GetEditableAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken)
     {
         return _dbContext.Tills
             .FirstOrDefaultAsync(
@@ -176,10 +345,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<bool> HasActiveDeviceAssignmentAsync(
-        Guid tenantId,
-        Guid tillId,
-        CancellationToken cancellationToken)
+    public Task<bool> HasActiveDeviceAssignmentAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken)
     {
         return _dbContext.TillDeviceAssignments
             .AsNoTracking()
@@ -193,10 +359,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                 cancellationToken);
     }
 
-    public Task<bool> HasActiveSessionAsync(
-        Guid tenantId,
-        Guid tillId,
-        CancellationToken cancellationToken)
+    public Task<bool> HasActiveSessionAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken)
     {
         return _dbContext.TillSessions
             .AsNoTracking()
@@ -210,10 +373,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                 cancellationToken);
     }
 
-    public Task<bool> HasSalesAsync(
-        Guid tenantId,
-        Guid tillId,
-        CancellationToken cancellationToken)
+    public Task<bool> HasSalesAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken)
     {
         return _dbContext.SalesOrders
             .AsNoTracking()
@@ -226,10 +386,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                 cancellationToken);
     }
 
-    public Task<bool> HasCashMovementsAsync(
-        Guid tenantId,
-        Guid tillId,
-        CancellationToken cancellationToken)
+    public Task<bool> HasCashMovementsAsync(Guid tenantId, Guid tillId, CancellationToken cancellationToken)
     {
         return _dbContext.TillCashMovements
             .AsNoTracking()
@@ -242,9 +399,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                 cancellationToken);
     }
 
-    public async Task<IReadOnlyList<TenantAdminOutletOptionResponse>> GetOutletOptionsAsync(
-        Guid tenantId,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TenantAdminOutletOptionResponse>> GetOutletOptionsAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         return await _dbContext.Outlets
             .AsNoTracking()
@@ -258,193 +413,45 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
             .ToListAsync(cancellationToken);
     }
 
-    private IQueryable<TillRow> BuildTillRowsQuery(Guid tenantId)
+    private sealed class TillMonitoringProjection
+    {
+        public Till Till { get; set; } = null!;
+        public Outlet Outlet { get; set; } = null!;
+        public PosDevice? AssignedDevice { get; set; }
+        public TillSession? ActiveSession { get; set; }
+        public TenantUser? CashierUser { get; set; }
+    }
+
+    private IQueryable<TillMonitoringProjection> BuildBaseQuery(Guid tenantId, Guid? tillId = null)
     {
         return from till in _dbContext.Tills.AsNoTracking()
                join outlet in _dbContext.Outlets.AsNoTracking()
                    on till.OutletId equals outlet.Id
                where till.TenantId == tenantId &&
                      outlet.TenantId == tenantId &&
-                     till.Status != TillConstants.DeletedStatus
-               let activeAssignment = _dbContext.TillDeviceAssignments
-                   .Where(assignment =>
-                       assignment.TillId == till.Id &&
-                       assignment.ReleasedAt == null)
-                   .OrderByDescending(assignment => assignment.AssignedAt)
+                     till.Status != TillConstants.DeletedStatus &&
+                     (tillId == null || till.Id == tillId)
+               let assignedDevice = (from assignment in _dbContext.TillDeviceAssignments
+                                     where assignment.TillId == till.Id && assignment.ReleasedAt == null
+                                     orderby assignment.AssignedAt descending
+                                     join device in _dbContext.PosDevices on assignment.PosDeviceId equals device.Id
+                                     select device).FirstOrDefault()
+               let activeSession = _dbContext.TillSessions
+                   .Where(session => session.TillId == till.Id && session.Status == OpenSessionStatus)
+                   .OrderByDescending(session => session.OpenedAt)
                    .FirstOrDefault()
-               let assignedDevice = activeAssignment == null
-                   ? null
-                   : _dbContext.PosDevices
-                       .Where(device => device.Id == activeAssignment.PosDeviceId)
-                       .FirstOrDefault()
-               let lastSessionAt = _dbContext.TillSessions
-                   .Where(session => session.TillId == till.Id)
-                   .OrderByDescending(session => session.UpdatedAt)
-                   .Select(session => (DateTimeOffset?)session.UpdatedAt)
-                   .FirstOrDefault()
-               select new TillRow
+               let cashierUser = (from session in _dbContext.TillSessions
+                                  where session.TillId == till.Id && session.Status == OpenSessionStatus
+                                  orderby session.OpenedAt descending
+                                  join u in _dbContext.TenantUsers on session.OpenedByTenantUserId equals u.Id
+                                  select u).FirstOrDefault()
+               select new TillMonitoringProjection
                {
-                   TillId = till.Id,
-                   TillName = till.TillName,
-                   TillCode = till.TillCode,
-                   OutletId = outlet.Id,
-                   OutletName = outlet.OutletName,
-                   OutletCode = outlet.OutletCode,
-                   TillStatus = till.Status,
-                   DeviceName = till.DeviceName,
-                   PrinterName = till.PrinterName,
-                   ScannerName = till.ScannerName,
-                   CashDrawerName = till.CashDrawerName,
-                   CardReaderName = till.CardReaderName,
-                   InternalNote = till.InternalNote,
-                   CreatedAt = till.CreatedAt,
-                   UpdatedAt = till.UpdatedAt,
-                   HasActiveAssignment = activeAssignment != null,
-                   AssignedDeviceActive = assignedDevice != null &&
-                                          assignedDevice.Status == PosDeviceConstants.ActiveStatus,
-                   LastActiveAt = lastSessionAt ?? till.UpdatedAt,
+                   Till = till,
+                   Outlet = outlet,
+                   AssignedDevice = assignedDevice,
+                   ActiveSession = activeSession,
+                   CashierUser = cashierUser
                };
-    }
-
-    private static List<TillRow> ApplyStatusFilter(List<TillRow> rows, string? status)
-    {
-        if (string.IsNullOrWhiteSpace(status))
-        {
-            return rows;
-        }
-
-        return status.Trim().ToLowerInvariant() switch
-        {
-            "online" => rows.Where(x => x.DeviceStatus == "Online").ToList(),
-            "offline" => rows.Where(x => x.DeviceStatus == "Offline").ToList(),
-            "inactive" => rows.Where(x => x.TillStatus == TillConstants.InactiveStatus).ToList(),
-            "needs_attention" => rows.Where(x => x.NeedsAttention).ToList(),
-            _ => rows,
-        };
-    }
-
-    private static List<TillRow> ApplySort(
-        List<TillRow> rows,
-        string sortBy,
-        string sortDirection)
-    {
-        var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
-
-        return (sortBy?.Trim().ToLowerInvariant() ?? "name") switch
-        {
-            "code" or "tillcode" => descending
-                ? rows.OrderByDescending(x => x.TillCode).ToList()
-                : rows.OrderBy(x => x.TillCode).ToList(),
-            "outlet" or "outletname" => descending
-                ? rows.OrderByDescending(x => x.OutletName).ToList()
-                : rows.OrderBy(x => x.OutletName).ToList(),
-            "status" => descending
-                ? rows.OrderByDescending(x => x.TillStatus).ToList()
-                : rows.OrderBy(x => x.TillStatus).ToList(),
-            "lastactive" or "lastactiveat" => descending
-                ? rows.OrderByDescending(x => x.LastActiveAt).ToList()
-                : rows.OrderBy(x => x.LastActiveAt).ToList(),
-            _ => descending
-                ? rows.OrderByDescending(x => x.TillName).ToList()
-                : rows.OrderBy(x => x.TillName).ToList(),
-        };
-    }
-
-    private static TenantAdminTillListItemResponse MapListItem(TillRow row)
-    {
-        return new TenantAdminTillListItemResponse(
-            row.TillId,
-            row.TillName,
-            row.TillCode,
-            row.OutletId,
-            row.OutletName,
-            FormatStatus(row.TillStatus),
-            row.DeviceStatus,
-            row.LastActiveAt,
-            row.NeedsAttention);
-    }
-
-    private static TenantAdminTillDetailResponse MapDetail(TillRow row, Till till)
-    {
-        return new TenantAdminTillDetailResponse(
-            row.TillId,
-            row.TillName,
-            row.TillCode,
-            row.OutletId,
-            row.OutletName,
-            row.OutletCode,
-            FormatStatus(row.TillStatus),
-            row.DeviceStatus,
-            row.LastActiveAt,
-            row.NeedsAttention,
-            till.DeviceName,
-            till.PrinterName,
-            till.ScannerName,
-            till.CashDrawerName,
-            till.CardReaderName,
-            till.InternalNote,
-            till.CreatedAt,
-            till.UpdatedAt ?? till.CreatedAt);
-    }
-
-    private static string FormatStatus(string status)
-    {
-        return status.Trim().ToUpperInvariant() switch
-        {
-            TillConstants.ActiveStatus => "Active",
-            TillConstants.InactiveStatus => "Inactive",
-            TillConstants.MaintenanceStatus => "Maintenance",
-            _ => status,
-        };
-    }
-
-    private sealed class TillRow
-    {
-        public Guid TillId { get; init; }
-        public string TillName { get; init; } = string.Empty;
-        public string TillCode { get; init; } = string.Empty;
-        public Guid OutletId { get; init; }
-        public string OutletName { get; init; } = string.Empty;
-        public string OutletCode { get; init; } = string.Empty;
-        public string TillStatus { get; init; } = string.Empty;
-        public string? DeviceName { get; init; }
-        public string? PrinterName { get; init; }
-        public string? ScannerName { get; init; }
-        public string? CashDrawerName { get; init; }
-        public string? CardReaderName { get; init; }
-        public string? InternalNote { get; init; }
-        public DateTimeOffset CreatedAt { get; init; }
-        public DateTimeOffset? UpdatedAt { get; init; }
-        public bool HasActiveAssignment { get; init; }
-        public bool AssignedDeviceActive { get; init; }
-        public DateTimeOffset? LastActiveAt { get; init; }
-
-        public string DeviceStatus
-        {
-            get
-            {
-                if (TillStatus == TillConstants.InactiveStatus)
-                {
-                    return "Offline";
-                }
-
-                if (TillStatus == TillConstants.MaintenanceStatus)
-                {
-                    return "Offline";
-                }
-
-                if (HasActiveAssignment && AssignedDeviceActive)
-                {
-                    return "Online";
-                }
-
-                return "Offline";
-            }
-        }
-
-        public bool NeedsAttention =>
-            TillStatus == TillConstants.MaintenanceStatus ||
-            (TillStatus == TillConstants.ActiveStatus && !HasActiveAssignment) ||
-            (TillStatus == TillConstants.ActiveStatus && HasActiveAssignment && !AssignedDeviceActive);
     }
 }

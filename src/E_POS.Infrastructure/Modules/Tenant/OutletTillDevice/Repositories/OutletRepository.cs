@@ -65,11 +65,29 @@ public sealed class OutletRepository : IOutletRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<OutletSummaryDashboardResponse> GetSummaryAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var outlets = await _dbContext.Outlets.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status != OutletConstants.DeletedStatus)
+            .Select(x => new { x.Status, x.OutletType })
+            .ToListAsync(cancellationToken);
+
+        var total = outlets.Count;
+        var active = outlets.Count(x => x.Status == OutletConstants.ActiveStatus);
+        var warehouse = outlets.Count(x => x.OutletType == OutletConstants.WarehouseOutletType);
+
+        return new OutletSummaryDashboardResponse(total, active, warehouse, null);
+    }
+
     public async Task<OutletListResponse> ListAsync(
         Guid tenantId,
         int pageNumber,
         int pageSize,
         string? search,
+        string? outletType,
+        string? status,
+        string? sortBy,
+        string? sortDirection,
         CancellationToken cancellationToken)
     {
         var outlets = _dbContext.Outlets
@@ -92,6 +110,16 @@ public sealed class OutletRepository : IOutletRepository
                 outlets = outlets.Where(x => x.OutletName.ToUpper().Contains(normalizedTerm) ||
                                              x.OutletCode.ToUpper().Contains(normalizedTerm));
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(outletType))
+        {
+            outlets = outlets.Where(x => x.OutletType == outletType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            outlets = outlets.Where(x => x.Status == status);
         }
 
         var activePickupMappings = (
@@ -140,11 +168,25 @@ public sealed class OutletRepository : IOutletRepository
                     .ThenBy(x => x.MethodId)
                     .ThenBy(x => x.Mapping.Id)
                     .Select(x => x.Mapping.CutoffTime)
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                City = _dbContext.OutletAddresses.AsNoTracking()
+                    .Where(a => a.TenantId == tenantId && a.OutletId == outlet.Id && a.AddressType == OutletConstants.PhysicalAddressType)
+                    .Select(a => a.City)
+                    .FirstOrDefault(),
+                TillCount = _dbContext.Tills.AsNoTracking()
+                    .Count(t => t.TenantId == tenantId && t.OutletId == outlet.Id && t.Status != OutletConstants.DeletedStatus)
             };
 
+        query = sortBy?.ToLowerInvariant() switch
+        {
+            "name" => sortDirection?.ToLowerInvariant() == "desc" ? query.OrderByDescending(x => x.Outlet.OutletName) : query.OrderBy(x => x.Outlet.OutletName),
+            "code" => sortDirection?.ToLowerInvariant() == "desc" ? query.OrderByDescending(x => x.Outlet.OutletCode) : query.OrderBy(x => x.Outlet.OutletCode),
+            "status" => sortDirection?.ToLowerInvariant() == "desc" ? query.OrderByDescending(x => x.Outlet.Status) : query.OrderBy(x => x.Outlet.Status),
+            "type" => sortDirection?.ToLowerInvariant() == "desc" ? query.OrderByDescending(x => x.Outlet.OutletType) : query.OrderBy(x => x.Outlet.OutletType),
+            _ => query.OrderBy(x => x.Outlet.OutletCode)
+        };
+
         var rows = await query
-            .OrderBy(x => x.Outlet.OutletCode)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new
@@ -162,6 +204,8 @@ public sealed class OutletRepository : IOutletRepository
                 x.PreparationLeadMinutes,
                 x.PickupWindowMinutes,
                 x.CollectionCutoffTime,
+                x.City,
+                x.TillCount,
                 TotalCount = query.Count()
             })
             .ToListAsync(cancellationToken);
@@ -181,7 +225,9 @@ public sealed class OutletRepository : IOutletRepository
                 x.CollectionEnabled,
                 x.PreparationLeadMinutes,
                 x.PickupWindowMinutes,
-                x.CollectionCutoffTime))
+                x.CollectionCutoffTime,
+                x.City,
+                x.TillCount))
             .ToList();
 
         return new OutletListResponse(items, pageNumber, pageSize, totalCount);

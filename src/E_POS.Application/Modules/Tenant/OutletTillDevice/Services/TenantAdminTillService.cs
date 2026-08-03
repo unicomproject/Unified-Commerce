@@ -2,8 +2,10 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Options;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using Microsoft.Extensions.Options;
 
 namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 
@@ -19,13 +21,16 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
 
     private readonly ITenantAdminTillRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IOptionsSnapshot<TillMonitoringOptions> _options;
 
     public TenantAdminTillService(
         ITenantAdminTillRepository repository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IOptionsSnapshot<TillMonitoringOptions> options)
     {
         _repository = repository;
         _dateTimeProvider = dateTimeProvider;
+        _options = options;
     }
 
     public async Task<ApplicationResult<TenantAdminTillListResponse>> ListAsync(
@@ -56,7 +61,7 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
 
         var safePage = Math.Max(1, page);
         var safePageSize = Math.Clamp(pageSize, 1, 100);
-        var response = await _repository.ListAsync(
+        var (items, totalCount) = await _repository.ListAsync(
             context.TenantId,
             search,
             status,
@@ -67,6 +72,39 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             sortDirection ?? "asc",
             cancellationToken);
 
+        var now = _dateTimeProvider.UtcNow;
+        var timeout = _options.Value.HeartbeatTimeoutSeconds;
+
+        var mappedItems = items.Select(model => {
+            var resolvedStatus = TillMonitoringStatusResolver.Resolve(
+                model.Till.Status,
+                model.AssignedDevice != null, // Wait, active assignment is inferred from AssignedDevice != null here
+                model.AssignedDevice?.Status,
+                model.AssignedDevice?.IsTrusted ?? false,
+                model.AssignedDevice?.LastSeenAt,
+                now,
+                timeout
+            );
+
+            return new TenantAdminTillListItemResponse(
+                model.Till.Id,
+                model.Till.TillName,
+                model.Till.TillCode,
+                model.Outlet.Id,
+                model.Outlet.OutletName,
+                FormatStatus(model.Till.Status),
+                model.AssignedDevice?.Status,
+                model.Till.UpdatedAt ?? model.Till.CreatedAt, // Or use model.AssignedDevice.LastSeenAt? Original code used last session updated at
+                resolvedStatus.NeedsAttention,
+                resolvedStatus.OperationalStatus,
+                resolvedStatus.DisplayStatus,
+                model.CashierUser?.FullName,
+                model.AssignedDevice?.LastSeenAt,
+                model.AssignedDevice != null
+            );
+        }).ToList();
+
+        var response = new TenantAdminTillListResponse(mappedItems, safePage, safePageSize, totalCount);
         return ApplicationResult<TenantAdminTillListResponse>.Success(response);
     }
 
@@ -156,10 +194,10 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             request.InternalNote);
 
         await _repository.AddAsync(till, cancellationToken);
-        var response = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
-        return response is null
+        var model = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
+        return model is null
             ? ApplicationResult<TenantAdminTillDetailResponse>.Failure(NotFound)
-            : ApplicationResult<TenantAdminTillDetailResponse>.Success(response);
+            : ApplicationResult<TenantAdminTillDetailResponse>.Success(MapToDetailResponse(model));
     }
 
     public async Task<ApplicationResult<TenantAdminTillDetailResponse>> GetByIdAsync(
@@ -177,10 +215,10 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             return ApplicationResult<TenantAdminTillDetailResponse>.Failure(accessError);
         }
 
-        var response = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
-        return response is null
+        var model = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
+        return model is null
             ? ApplicationResult<TenantAdminTillDetailResponse>.Failure(NotFound)
-            : ApplicationResult<TenantAdminTillDetailResponse>.Success(response);
+            : ApplicationResult<TenantAdminTillDetailResponse>.Success(MapToDetailResponse(model));
     }
 
     public async Task<ApplicationResult<TenantAdminTillDetailResponse>> UpdateAsync(
@@ -249,10 +287,10 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             request.InternalNote);
 
         await _repository.SaveChangesAsync(cancellationToken);
-        var response = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
-        return response is null
+        var model = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
+        return model is null
             ? ApplicationResult<TenantAdminTillDetailResponse>.Failure(NotFound)
-            : ApplicationResult<TenantAdminTillDetailResponse>.Success(response);
+            : ApplicationResult<TenantAdminTillDetailResponse>.Success(MapToDetailResponse(model));
     }
 
     public async Task<ApplicationResult> DeleteAsync(
@@ -326,6 +364,177 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
 
         var options = await _repository.GetOutletOptionsAsync(context.TenantId, cancellationToken);
         return ApplicationResult<IReadOnlyList<TenantAdminOutletOptionResponse>>.Success(options);
+    }
+
+    public async Task<ApplicationResult<TenantAdminTillHardwareReadinessResponse>> GetHardwareReadinessAsync(
+        TenantRequestContext context,
+        Guid tillId,
+        CancellationToken cancellationToken)
+    {
+        // Till page access remains available via till permissions on list/summary/detail.
+        // Hardware readiness specifically requires tenant.hardware.view (or manage).
+        var tillAccessError = ValidateAccessAny(
+            context,
+            TenantAdminTillPermissions.DetailsView,
+            TenantAdminTillPermissions.View,
+            TenantAdminTillPermissions.Manage);
+        if (tillAccessError is not null)
+        {
+            return ApplicationResult<TenantAdminTillHardwareReadinessResponse>.Failure(tillAccessError);
+        }
+
+        var hardwareAccessError = ValidateAccess(
+            context,
+            TenantAdminTillPermissions.HardwareView,
+            TenantAdminTillPermissions.HardwareManage);
+        if (hardwareAccessError is not null)
+        {
+            return ApplicationResult<TenantAdminTillHardwareReadinessResponse>.Failure(
+                new ApplicationError(
+                    "till.permission_denied",
+                    "Permission denied for hardware readiness."));
+        }
+
+        var model = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
+        if (model is null)
+        {
+            return ApplicationResult<TenantAdminTillHardwareReadinessResponse>.Failure(NotFound);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var timeout = _options.Value.HeartbeatTimeoutSeconds;
+        var tillResolved = TillMonitoringStatusResolver.Resolve(
+            model.Till.Status,
+            model.AssignedDevice != null,
+            model.AssignedDevice?.Status,
+            model.AssignedDevice?.IsTrusted ?? false,
+            model.AssignedDevice?.LastSeenAt,
+            now,
+            timeout);
+
+        var data = await _repository.GetHardwareReadinessDataAsync(
+            context.TenantId,
+            tillId,
+            model.AssignedDevice?.Id,
+            cancellationToken);
+
+        var mappedConnections = data.Select(x =>
+        {
+            var resolved = HardwareConnectionStatusResolver.Resolve(
+                x.HardwareDevice.Status,
+                x.LatestTestLog?.TestStatus,
+                x.LatestTestLog?.ResultMessage,
+                x.LatestTestLog?.TestedAt,
+                x.HardwareDevice.LastSeenAt,
+                now,
+                timeout);
+
+            return new TenantAdminHardwareConnectionResponse(
+                x.HardwareDevice.Id,
+                x.HardwareDevice.HardwareDeviceName,
+                x.HardwareDevice.HardwareDeviceType,
+                x.HardwareDevice.HardwareDeviceCode,
+                x.HardwareDevice.Status,
+                resolved.ConnectionStatus,
+                x.LatestTestLog?.TestStatus,
+                x.LatestTestLog?.TestedAt,
+                x.HardwareDevice.LastSeenAt,
+                x.Assignment.Id,
+                x.HardwareDevice.ConnectionType,
+                x.HardwareDevice.Manufacturer,
+                x.HardwareDevice.Model,
+                resolved.HealthStatus,
+                resolved.WarningCode,
+                resolved.WarningMessage,
+                x.Assignment.IsPrimary,
+                x.AssignmentSource);
+        }).ToList();
+
+        var cashier = model.CashierUser is null
+            ? null
+            : new TenantAdminTillCashierResponse(
+                model.CashierUser.Id,
+                string.IsNullOrWhiteSpace(model.CashierUser.DisplayName)
+                    ? model.CashierUser.FullName
+                    : model.CashierUser.DisplayName!);
+
+        var posDevice = model.AssignedDevice is null
+            ? null
+            : new TenantAdminTillPosDeviceResponse(
+                model.AssignedDevice.Id,
+                model.AssignedDevice.DeviceCode,
+                model.AssignedDevice.DeviceName,
+                model.AssignedDevice.Status,
+                model.AssignedDevice.IsTrusted,
+                model.AssignedDevice.LastSeenAt);
+
+        var lastActivityAt = ResolveLastActivityAt(
+            model.ActiveSession?.OpenedAt,
+            model.ActiveSession?.UpdatedAt,
+            model.AssignedDevice?.LastSeenAt,
+            mappedConnections.Select(c => c.LastSeenAt),
+            model.Till.UpdatedAt,
+            model.Till.CreatedAt);
+
+        var attentionReasons = HardwareAttentionReasonBuilder.Build(
+            tillResolved.AttentionReasons,
+            mappedConnections,
+            model.AssignedDevice != null,
+            now);
+
+        var alertCount = HardwareAttentionReasonBuilder.CalculateAlertCount(attentionReasons);
+
+        var response = new TenantAdminTillHardwareReadinessResponse(
+            model.Till.Id,
+            model.Till.TillName,
+            model.Till.TillCode,
+            model.Outlet.Id,
+            model.Outlet.OutletName,
+            mappedConnections,
+            FormatStatus(model.Till.Status),
+            tillResolved.DisplayStatus,
+            cashier,
+            lastActivityAt,
+            posDevice,
+            attentionReasons,
+            alertCount);
+
+        return ApplicationResult<TenantAdminTillHardwareReadinessResponse>.Success(response);
+    }
+
+    private static DateTimeOffset? ResolveLastActivityAt(
+        DateTimeOffset? sessionOpenedAt,
+        DateTimeOffset? sessionUpdatedAt,
+        DateTimeOffset? posLastSeenAt,
+        IEnumerable<DateTimeOffset?> hardwareLastSeenAt,
+        DateTimeOffset? tillUpdatedAt,
+        DateTimeOffset tillCreatedAt)
+    {
+        DateTimeOffset? max = null;
+        void Consider(DateTimeOffset? value)
+        {
+            if (!value.HasValue)
+            {
+                return;
+            }
+
+            if (!max.HasValue || value.Value > max.Value)
+            {
+                max = value;
+            }
+        }
+
+        Consider(sessionOpenedAt);
+        Consider(sessionUpdatedAt);
+        Consider(posLastSeenAt);
+        foreach (var hardwareSeen in hardwareLastSeenAt)
+        {
+            Consider(hardwareSeen);
+        }
+
+        Consider(tillUpdatedAt);
+        Consider(tillCreatedAt);
+        return max;
     }
 
     private static ApplicationError? ValidateCreateRequest(TenantAdminTillCreateRequest request)
@@ -434,5 +643,58 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
         }
 
         return permissions.Any(context.HasPermission) ? null : PermissionDenied;
+    }
+
+    private TenantAdminTillDetailResponse MapToDetailResponse(TillMonitoringReadModel model)
+    {
+        var now = _dateTimeProvider.UtcNow;
+        var timeout = _options.Value.HeartbeatTimeoutSeconds;
+
+        var resolvedStatus = TillMonitoringStatusResolver.Resolve(
+            model.Till.Status,
+            model.AssignedDevice != null,
+            model.AssignedDevice?.Status,
+            model.AssignedDevice?.IsTrusted ?? false,
+            model.AssignedDevice?.LastSeenAt,
+            now,
+            timeout
+        );
+
+        return new TenantAdminTillDetailResponse(
+            model.Till.Id,
+            model.Till.TillName,
+            model.Till.TillCode,
+            model.Outlet.Id,
+            model.Outlet.OutletName,
+            model.Outlet.OutletCode,
+            FormatStatus(model.Till.Status),
+            model.AssignedDevice?.Status,
+            model.Till.UpdatedAt ?? model.Till.CreatedAt,
+            resolvedStatus.NeedsAttention,
+            resolvedStatus.OperationalStatus,
+            resolvedStatus.DisplayStatus,
+            model.CashierUser?.FullName,
+            model.AssignedDevice?.LastSeenAt,
+            model.AssignedDevice != null,
+            model.Till.DeviceName,
+            model.Till.PrinterName,
+            model.Till.ScannerName,
+            model.Till.CashDrawerName,
+            model.Till.CardReaderName,
+            model.Till.InternalNote,
+            model.Till.CreatedAt,
+            model.Till.UpdatedAt ?? model.Till.CreatedAt
+        );
+    }
+
+    private static string FormatStatus(string status)
+    {
+        return status.Trim().ToUpperInvariant() switch
+        {
+            TillConstants.ActiveStatus => "Active",
+            TillConstants.InactiveStatus => "Inactive",
+            TillConstants.MaintenanceStatus => "Maintenance",
+            _ => status,
+        };
     }
 }

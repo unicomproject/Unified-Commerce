@@ -111,6 +111,21 @@ public sealed class TenantAdminTillsController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpGet("{id:guid}/hardware-readiness")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetHardwareReadiness(Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "till.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminTillService.GetHardwareReadinessAsync(context, id, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpPut("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(

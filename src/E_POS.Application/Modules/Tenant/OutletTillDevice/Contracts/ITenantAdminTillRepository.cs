@@ -1,5 +1,7 @@
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
+using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 
 namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 
@@ -22,7 +24,7 @@ public interface ITenantAdminTillRepository
         string tillAreaName,
         CancellationToken cancellationToken);
 
-    Task<TenantAdminTillListResponse> ListAsync(
+    Task<(IReadOnlyList<TillMonitoringReadModel> Items, int TotalCount)> ListAsync(
         Guid tenantId,
         string? search,
         string? status,
@@ -37,7 +39,7 @@ public interface ITenantAdminTillRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
-    Task<TenantAdminTillDetailResponse?> GetDetailAsync(
+    Task<TillMonitoringReadModel?> GetDetailAsync(
         Guid tenantId,
         Guid tillId,
         CancellationToken cancellationToken);
@@ -74,4 +76,23 @@ public interface ITenantAdminTillRepository
     Task<IReadOnlyList<TenantAdminOutletOptionResponse>> GetOutletOptionsAsync(
         Guid tenantId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<TillHardwareReadinessReadModel>> GetHardwareReadinessDataAsync(
+        Guid tenantId,
+        Guid tillId,
+        Guid? activePosDeviceId,
+        CancellationToken cancellationToken);
 }
+
+public sealed record TillMonitoringReadModel(
+    Till Till,
+    Outlet Outlet,
+    PosDevice? AssignedDevice,
+    TillSession? ActiveSession,
+    TenantUser? CashierUser);
+
+public sealed record TillHardwareReadinessReadModel(
+    HardwareDevice HardwareDevice,
+    HardwareDeviceAssignment Assignment,
+    HardwareTestLog? LatestTestLog,
+    string AssignmentSource);

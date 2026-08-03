@@ -364,7 +364,7 @@ public sealed class OutletServiceTests
     {
         var service = CreateService(new FakeOutletRepository());
 
-        var result = await service.ListAsync(CreateContext([OutletConstants.ViewPermission]), 1, 50, null, CancellationToken.None);
+        var result = await service.ListAsync(CreateContext([OutletConstants.ViewPermission]), 1, 50, null, null, null, null, null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
     }
@@ -480,11 +480,39 @@ public sealed class OutletServiceTests
         public string? TenantStatus { get; init; } = TenantAuthConstants.ActiveTenantStatus;
         public bool OutletFeatureEnabled { get; init; } = true;
         public bool ClickCollectFeatureEnabled { get; init; } = true;
+        private readonly List<Outlet> _outlets = [];
 
         public Task<bool> OutletCodeExistsAsync(Guid tenantId, string outletCode, Guid? excludeOutletId, CancellationToken cancellationToken) => Task.FromResult(DuplicateCode);
         public Task<Guid?> GetActivePickupFulfillmentMethodIdAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(PickupMethodId);
-        public Task<OutletListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => Task.FromResult(new OutletListResponse([], pageNumber, pageSize, 0));
-        public Task<OutletResponse?> GetByIdAsync(Guid tenantId, Guid outletId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<OutletResponse?>(CreateResponse(outletId));
+        public Task<OutletListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, string? outletType, string? status, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
+        {
+            var query = _outlets.Where(x => x.TenantId == tenantId);
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(x => x.OutletName.Contains(search) || x.OutletCode.Contains(search));
+            }
+            if (!string.IsNullOrWhiteSpace(outletType))
+            {
+                query = query.Where(x => x.OutletType == outletType);
+            }
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(x => x.Status == status);
+            }
+
+            var items = query.Skip((pageNumber - 1) * pageSize).Take(pageSize)
+                .Select(x => new OutletSummaryResponse(x.Id, x.OutletCode, x.OutletName, x.Status, x.OutletType, x.Timezone, x.IsDefaultOutlet, x.Phone, x.Email, true, null, null, null, null, 1))
+                .ToList();
+            return Task.FromResult(new OutletListResponse(items, pageNumber, pageSize, query.Count()));
+        }
+
+        public Task<OutletSummaryDashboardResponse> GetSummaryAsync(Guid tenantId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new OutletSummaryDashboardResponse(1, 1, 0, null));
+        }
+
+        public Task<OutletResponse?> GetByIdAsync(Guid tenantId, Guid outletId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<OutletResponse?>(null);
+
         public Task<OutletEditAggregate?> GetEditAggregateAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(EditAggregate);
         public Task<bool> HasActiveTillOrDeviceAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(HasActiveTillOrDevice);
         public Task<bool> AllOutletsBelongToTenantAsync(Guid tenantId, Guid[] outletIds, CancellationToken cancellationToken) => Task.FromResult(true);

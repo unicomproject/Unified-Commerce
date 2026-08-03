@@ -449,4 +449,25 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
 
     private static DeviceActivationRepositoryResult Failure(string errorCode, string message) =>
         new(false, errorCode, message, null);
+
+    public async Task<PosDevice?> GetEditableByFingerprintAsync(
+        Guid tenantId,
+        string deviceFingerprint,
+        CancellationToken cancellationToken)
+    {
+        var fingerprintHash = DeviceFingerprintHasher.Hash(deviceFingerprint);
+        
+        return await _dbContext.PosDevices
+            .FirstOrDefaultAsync(x => 
+                x.TenantId == tenantId && 
+                x.DeviceFingerprintHash == fingerprintHash &&
+                x.Status == PosDeviceConstants.ActiveStatus &&
+                x.IsTrusted, 
+                cancellationToken);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    {
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }
