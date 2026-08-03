@@ -12,6 +12,7 @@ public class ShoppingCartItem : AuditableEntity
     public string? SkuSnapshot { get; protected set; }
     public string ProductNameSnapshot { get; protected set; } = string.Empty;
     public string? ProductStructure { get; protected set; }
+    public string? LineNote { get; protected set; }
     public decimal Quantity { get; protected set; }
     public decimal UnitPrice { get; protected set; }
     public decimal LineSubtotalAmount { get; protected set; }
@@ -87,6 +88,12 @@ public class ShoppingCartItem : AuditableEntity
     public void Remove(DateTimeOffset now)
     {
         LineStatus = "REMOVED";
+        UpdatedAt = now;
+    }
+
+    public void SetLineNote(string? lineNote, DateTimeOffset now)
+    {
+        LineNote = string.IsNullOrWhiteSpace(lineNote) ? null : lineNote.Trim();
         UpdatedAt = now;
     }
 }

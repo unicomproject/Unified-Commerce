@@ -21,6 +21,7 @@ public class SalesOrderLine : AuditableEntity
     public string? CategoryNameSnapshot { get; protected set; }
     public string? SubcategoryNameSnapshot { get; protected set; }
     public string? BrandNameSnapshot { get; protected set; }
+    public string? LineNote { get; protected set; }
     public string UomCodeSnapshot { get; protected set; } = string.Empty;
     public string UomNameSnapshot { get; protected set; } = string.Empty;
     public string ProductTypeSnapshot { get; protected set; } = string.Empty;
@@ -266,6 +267,12 @@ public class SalesOrderLine : AuditableEntity
         }
 
         ReturnedQuantity += quantity;
+        UpdatedAt = now;
+    }
+
+    public void SetLineNote(string? lineNote, DateTimeOffset now)
+    {
+        LineNote = string.IsNullOrWhiteSpace(lineNote) ? null : lineNote.Trim();
         UpdatedAt = now;
     }
 }

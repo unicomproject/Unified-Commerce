@@ -92,25 +92,37 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 from variant in _dbContext.ProductVariants.AsNoTracking()
                 join product in _dbContext.Products.AsNoTracking()
                     on variant.ProductId equals product.Id
+                join uom in _dbContext.UnitOfMeasures.AsNoTracking()
+                    on variant.SalesUomId equals uom.Id
                 where variant.TenantId == tenantId &&
                       variantIds.Contains(variant.Id) &&
                       variant.Status != ProductConstants.DeletedStatus &&
                       variant.IsSellable &&
                       product.TenantId == tenantId &&
                       product.Status == ProductConstants.ActiveStatus &&
-                      product.IsSellable
+                      product.IsSellable && (uom.TenantId == null || uom.TenantId == tenantId)
                 select new CheckoutVariantRow(
                     variant.Id,
                     variant.ProductId,
                     variant.SalesUomId,
                     product.ProductName,
-                    product.IsTaxable))
+                    product.IsTaxable,
+                    variant.VariantName,
+                    variant.Sku,
+                    uom.UomCode))
             .ToListAsync(cancellationToken);
 
         if (variants.Count != variantIds.Count)
         {
             return new PosCheckoutCalculationResult("pos_checkout.variant_not_found", null);
         }
+
+        if (normalizedLines.Any(x => x.UomId.HasValue &&
+                                     variants.Single(v => v.VariantId == x.VariantId).SalesUomId != x.UomId))
+            return new PosCheckoutCalculationResult("pos_checkout.invalid_uom", null);
+        if (!await ValidateRecommendationLinesAsync(
+                tenantId, sessionResolution.Snapshot!.OutletId, normalizedLines, now, cancellationToken))
+            return new PosCheckoutCalculationResult("pos_cart.invalid_recommendation", null);
 
         var variantsById = variants.ToDictionary(row => row.VariantId);
         var priceList = await ResolvePriceListAsync(
@@ -132,6 +144,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         decimal taxTotal = 0m;
         var itemCount = 0;
         var calculatedLines = new List<CalculatedCheckoutLine>(normalizedLines.Count);
+        var responseLines = new List<PosCalculatedCartLineDto>(normalizedLines.Count);
         var availableByVariant = await ResolveAvailableStockAsync(
             tenantId, sessionResolution.Snapshot!.OutletId, variantIds, cancellationToken);
         var taxPercentByVariant = await ResolveTaxPercentsAsync(
@@ -161,6 +174,15 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             {
                 validationMessages.Add($"Insufficient stock for {variant.ProductName}.");
             }
+            responseLines.Add(new PosCalculatedCartLineDto(
+                line.ClientLineId, variant.ProductId, variant.VariantId, variant.ProductName,
+                variant.VariantName, variant.Sku, variant.SalesUomId, variant.UomCode, line.Qty,
+                line.LineNote, ToMoney(unitPrice), 0, ToMoney(lineTax),
+                ToMoney(lineSubtotal + lineTax),
+                availableByVariant.TryGetValue(line.VariantId, out var available) && available < line.Qty
+                    ? "insufficient_stock" : "available",
+                availableByVariant.TryGetValue(line.VariantId, out available) && available < line.Qty
+                    ? "pos_checkout.insufficient_stock" : null));
         }
 
         if (itemCount == 0)
@@ -214,7 +236,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 now,
                 cashierName),
             await ResolvePaymentMethodsAsync(tenantId, permissions, cancellationToken),
-            validationMessages);
+            validationMessages,
+            responseLines);
 
         return new PosCheckoutCalculationResult(null, summary);
     }
@@ -324,6 +347,13 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             return new PosCheckoutStartPaymentResult("pos_checkout.variant_not_found", null);
         }
 
+        if (normalizedLines.Any(x => x.UomId.HasValue &&
+                                     variants.Single(v => v.VariantId == x.VariantId).SalesUomId != x.UomId))
+            return new PosCheckoutStartPaymentResult("pos_checkout.invalid_uom", null);
+        if (!await ValidateRecommendationLinesAsync(
+                tenantId, session.OutletId, normalizedLines, now, cancellationToken))
+            return new PosCheckoutStartPaymentResult("pos_cart.invalid_recommendation", null);
+
         var variantsById = variants.ToDictionary(row => row.VariantId);
         var priceList = await ResolvePriceListAsync(
             tenantId, session.OutletId, now, cancellationToken);
@@ -380,6 +410,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             builtLines.Add(new BuiltCheckoutLine(
                 line.VariantId,
                 variant,
+                line.ClientLineId,
+                line.LineNote,
                 quantity,
                 unitPrice,
                 lineSubtotal,
@@ -685,6 +717,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 now);
 
             _dbContext.SalesOrderLines.Add(orderLine);
+            orderLine.SetLineNote(builtLine.LineNote, now);
             responseLines.Add(new PosCheckoutStartPaymentLineResponseDto(
                 builtLine.Variant.ProductName,
                 (int)builtLine.Quantity,
@@ -692,7 +725,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 ToMoney(builtLine.LineSubtotal - builtLine.LineDiscount + builtLine.LineTax),
                 builtLine.Variant.Sku,
                 orderLine.Id,
-                ToMoney(builtLine.LineDiscount)));
+                ToMoney(builtLine.LineDiscount),
+                builtLine.LineNote));
 
             var remainingQuantity = builtLine.Quantity;
             var movementIndex = 0;
@@ -843,7 +877,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 lineTotal = item.LineTotal,
                 sku = item.Sku,
                 saleLineId = item.SaleLineId,
-                discountAmount = item.DiscountAmount
+                discountAmount = item.DiscountAmount,
+                lineNote = item.LineNote
             }),
             tenders = receiptTenders,
             discountLines = receiptDiscountLines,
@@ -1305,7 +1340,10 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         Guid ProductId,
         Guid SalesUomId,
         string ProductName,
-        bool IsTaxable);
+        bool IsTaxable,
+        string VariantName,
+        string? Sku,
+        string UomCode);
 
     private sealed record CheckoutVariantDetailRow(
         Guid VariantId,
@@ -1323,6 +1361,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
     private sealed record BuiltCheckoutLine(
         Guid VariantId,
         CheckoutVariantDetailRow Variant,
+        Guid? ClientLineId,
+        string? LineNote,
         decimal Quantity,
         decimal UnitPrice,
         decimal LineSubtotal,
@@ -1406,7 +1446,9 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         IReadOnlyList<PosCheckoutLineRequestDto>? lines)
     {
         if (lines is null || lines.Count == 0 ||
-            lines.Any(line => line.VariantId == Guid.Empty || line.Qty <= 0))
+            lines.Any(line => line.VariantId == Guid.Empty || line.Qty <= 0 ||
+                              (line.LineNote?.Trim().Length ?? 0) > 500) ||
+            lines.Where(x => x.ClientLineId.HasValue).GroupBy(x => x.ClientLineId).Any(x => x.Count() > 1))
         {
             return null;
         }
@@ -1414,17 +1456,57 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         try
         {
             return lines
-                .GroupBy(line => line.VariantId)
-                .OrderBy(group => group.Key)
+                .Select(line => line with
+                {
+                    LineNote = string.IsNullOrWhiteSpace(line.LineNote) ? null : line.LineNote.Trim(),
+                    Source = string.IsNullOrWhiteSpace(line.Source) ? null : line.Source.Trim()
+                })
+                .GroupBy(line => new { line.VariantId, line.UomId, line.LineNote,
+                    line.Source, line.RecommendationParentProductId, line.RecommendationRelationshipId })
+                .OrderBy(group => group.Key.VariantId).ThenBy(group => group.Key.LineNote)
                 .Select(group => new PosCheckoutLineRequestDto(
-                    group.Key,
-                    checked(group.Sum(line => line.Qty))))
+                    group.Key.VariantId,
+                    checked(group.Sum(line => line.Qty)),
+                    group.Key.UomId,
+                    group.Key.LineNote,
+                    group.First().ClientLineId,
+                    group.Key.Source,
+                    group.Key.RecommendationParentProductId,
+                    group.Key.RecommendationRelationshipId))
                 .ToList();
         }
         catch (OverflowException)
         {
             return null;
         }
+    }
+
+    private async Task<bool> ValidateRecommendationLinesAsync(
+        Guid tenantId, Guid outletId, IReadOnlyList<PosCheckoutLineRequestDto> lines,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var recommendations = lines.Where(x =>
+            x.RecommendationParentProductId.HasValue || x.RecommendationRelationshipId.HasValue).ToList();
+        if (recommendations.Count == 0) return true;
+        if (recommendations.Any(x => !x.RecommendationParentProductId.HasValue ||
+                                     !x.RecommendationRelationshipId.HasValue)) return false;
+
+        var relationshipIds = recommendations.Select(x => x.RecommendationRelationshipId!.Value).Distinct().ToList();
+        var rows = await (from link in _dbContext.ProductRecommendationLinks.AsNoTracking()
+                          join variant in _dbContext.ProductVariants.AsNoTracking()
+                              on new { link.TenantId, ProductId = link.RecommendedProductId }
+                              equals new { variant.TenantId, variant.ProductId }
+                          where link.TenantId == tenantId && relationshipIds.Contains(link.Id) &&
+                                link.Status == "ACTIVE" && link.RecommendationType == "FREQUENTLY_BOUGHT_TOGETHER" &&
+                                (!link.OutletId.HasValue || link.OutletId == outletId) &&
+                                (!link.ValidFrom.HasValue || link.ValidFrom <= now) &&
+                                (!link.ValidUntil.HasValue || link.ValidUntil >= now) &&
+                                variant.Status == "ACTIVE" && variant.IsSellable &&
+                                (!link.RecommendedVariantId.HasValue || link.RecommendedVariantId == variant.Id)
+                          select new { link.Id, link.SourceProductId, VariantId = variant.Id })
+            .ToListAsync(cancellationToken);
+        return recommendations.All(line => rows.Any(row => row.Id == line.RecommendationRelationshipId &&
+            row.SourceProductId == line.RecommendationParentProductId && row.VariantId == line.VariantId));
     }
 
     private static string CreatePaymentRequestHash(
@@ -1437,7 +1519,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             request.DeviceId,
             saleType = string.IsNullOrWhiteSpace(request.SaleType) ? "NewSale" : request.SaleType.Trim(),
             request.CustomerId,
-            lines = normalizedLines.Select(x => new { x.VariantId, x.Qty }),
+            lines = normalizedLines.Select(x => new { x.VariantId, x.Qty, x.UomId, x.LineNote,
+                x.Source, x.RecommendationParentProductId, x.RecommendationRelationshipId }),
             paymentMethod = paymentMethodCode,
             request.CashReceived,
             request.DiscountApplicationId
@@ -1469,7 +1552,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             .OrderBy(x => x.LineNumber)
             .Select(x => new PosCheckoutStartPaymentLineResponseDto(
                 x.ProductNameSnapshot, (int)x.Quantity, ToMoney(x.UnitPrice),
-                ToMoney(x.LineTotalAmount), x.SkuSnapshot))
+                ToMoney(x.LineTotalAmount), x.SkuSnapshot, x.Id, 0, x.LineNote))
             .ToListAsync(cancellationToken);
 
         return new(true, new PosCheckoutStartPaymentResponseDto(

@@ -14,7 +14,7 @@ public sealed class PosCartCalculationServiceTests
     public async Task CalculateCartAsync_WithUpdateItemPermission_UsesCalculationRepository()
     {
         var repository = new FakeRepository();
-        var service = new PosCheckoutService(repository, new FakeDateTimeProvider());
+        var service = new PosCheckoutService(repository, new FakeDateTimeProvider(), null!, null!);
         var context = new TenantRequestContext(
             Guid.NewGuid(),
             Guid.NewGuid(),
@@ -30,13 +30,60 @@ public sealed class PosCartCalculationServiceTests
     public async Task CalculateCartAsync_WithoutUpdateItemPermission_ReturnsPermissionDenied()
     {
         var repository = new FakeRepository();
-        var service = new PosCheckoutService(repository, new FakeDateTimeProvider());
+        var service = new PosCheckoutService(repository, new FakeDateTimeProvider(), null!, null!);
         var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Sale.Checkout]);
 
         var result = await service.CalculateCartAsync(context, CreateRequest(), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("pos_cart.permission_denied", result.Error.Code);
+        Assert.False(repository.CalculateCalled);
+    }
+
+    [Fact]
+    public async Task CalculateCartAsync_WithOverlongLineNote_RejectsBeforeRepository()
+    {
+        var repository = new FakeRepository();
+        var service = new PosCheckoutService(repository, new FakeDateTimeProvider(), null!, null!);
+        var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Cart.UpdateItem]);
+        var request = CreateRequest() with { Lines = [new(Guid.NewGuid(), 1, LineNote: new string('x', 501))] };
+
+        var result = await service.CalculateCartAsync(context, request, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_cart.line_note_too_long", result.Error.Code);
+        Assert.False(repository.CalculateCalled);
+    }
+
+    [Fact]
+    public async Task CalculateCartAsync_WithFiveHundredCharacterLineNote_RemainsBackwardCompatible()
+    {
+        var repository = new FakeRepository();
+        var service = new PosCheckoutService(repository, new FakeDateTimeProvider(), null!, null!);
+        var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Cart.UpdateItem]);
+        var request = CreateRequest() with { Lines = [new(Guid.NewGuid(), 1, LineNote: new string('x', 500))] };
+
+        var result = await service.CalculateCartAsync(context, request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(repository.CalculateCalled);
+    }
+
+    [Fact]
+    public async Task CalculateCartAsync_WithDuplicateClientLineIds_RejectsAtomically()
+    {
+        var repository = new FakeRepository();
+        var service = new PosCheckoutService(repository, new FakeDateTimeProvider(), null!, null!);
+        var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Cart.UpdateItem]);
+        var clientLineId = Guid.NewGuid();
+        var request = CreateRequest() with { Lines = [
+            new(Guid.NewGuid(), 1, ClientLineId: clientLineId),
+            new(Guid.NewGuid(), 1, ClientLineId: clientLineId)] };
+
+        var result = await service.CalculateCartAsync(context, request, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_cart.duplicate_client_line_id", result.Error.Code);
         Assert.False(repository.CalculateCalled);
     }
 

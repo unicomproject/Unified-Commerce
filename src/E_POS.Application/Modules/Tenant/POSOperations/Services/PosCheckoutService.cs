@@ -2,6 +2,9 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
+using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
+using System.Text.Json;
 using E_POS.Domain.Modules.Tenant.Orders.Constants;
 
 namespace E_POS.Application.Modules.Tenant.POSOperations.Services;
@@ -62,13 +65,19 @@ public sealed class PosCheckoutService : IPosCheckoutService
 
     private readonly IPosCheckoutRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IPosDrawerService _drawerService;
+    private readonly IPosDrawerRepository _drawerRepository;
 
     public PosCheckoutService(
         IPosCheckoutRepository repository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IPosDrawerService drawerService,
+        IPosDrawerRepository drawerRepository)
     {
         _repository = repository;
         _dateTimeProvider = dateTimeProvider;
+        _drawerService = drawerService;
+        _drawerRepository = drawerRepository;
     }
 
     public Task<ApplicationResult<PosCheckoutSummaryResponseDto>> CalculateCartAsync(
@@ -113,6 +122,13 @@ public sealed class PosCheckoutService : IPosCheckoutService
         {
             return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(InvalidLines);
         }
+
+        if (request.Lines.Any(x => (x.LineNote?.Trim().Length ?? 0) > 500))
+            return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(new ApplicationError(
+                "pos_cart.line_note_too_long", "Line note cannot exceed 500 characters."));
+        if (request.Lines.Where(x => x.ClientLineId.HasValue).GroupBy(x => x.ClientLineId).Any(x => x.Count() > 1))
+            return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(new ApplicationError(
+                "pos_cart.duplicate_client_line_id", "Client line ids must be unique."));
 
         if (!IsSupportedSaleType(request.SaleType))
         {
@@ -173,6 +189,11 @@ public sealed class PosCheckoutService : IPosCheckoutService
         {
             return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(InvalidLines);
         }
+
+
+        if (request.Lines.Any(x => (x.LineNote?.Trim().Length ?? 0) > 500))
+            return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(new ApplicationError(
+                "pos_cart.line_note_too_long", "Line note cannot exceed 500 characters."));
 
 
         if (!IsSupportedSaleType(request.SaleType))
@@ -257,7 +278,39 @@ public sealed class PosCheckoutService : IPosCheckoutService
                 });
         }
 
-        return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Success(result.Payment);
+        var payment = result.Payment;
+        var isCash = string.Equals(request.PaymentMethod, "CASH", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(request.PaymentMethod, "SPLIT_CASH", StringComparison.OrdinalIgnoreCase);
+
+        if (isCash)
+        {
+            var registerResult = await _drawerService.RegisterOperationAsync(
+                context,
+                new RegisterDrawerOperationRequest(
+                    Guid.NewGuid(),
+                    request.DeviceId,
+                    null,
+                    "cashSale",
+                    "Cash Sale Open",
+                    "SALE",
+                    payment.SaleId),
+                cancellationToken);
+
+            if (registerResult.IsSuccess && registerResult.Value is not null)
+            {
+                var drawerOperationId = registerResult.Value.OperationId;
+                // Fetch drawer settings to return them via Repository
+                var cashDrawerSettings = await _drawerRepository.GetActiveDrawerSettingsAsync(
+                    context.TenantId, request.DeviceId, cancellationToken);
+
+                payment = payment with {
+                    DrawerOperationId = drawerOperationId,
+                    CashDrawerSettings = cashDrawerSettings
+                };
+            }
+        }
+
+        return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Success(payment);
     }
 
     private static bool IsSupportedSaleType(string? saleType) =>

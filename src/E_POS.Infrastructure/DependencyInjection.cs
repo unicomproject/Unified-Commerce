@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
@@ -195,6 +195,7 @@ public static class DependencyInjection
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
         services.AddScoped<IPosHardwareRepository, PosHardwareRepository>();
+        services.AddScoped<IPosDrawerRepository, PosDrawerRepository>();
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
         services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
         services.AddScoped(static provider =>

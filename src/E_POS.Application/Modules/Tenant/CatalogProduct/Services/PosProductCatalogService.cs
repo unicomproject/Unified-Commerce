@@ -43,7 +43,8 @@ public sealed class PosProductCatalogService : IPosProductCatalogService
         Guid? deviceId,
         Guid? categoryId,
         string? search,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? segment = null)
     {
         if (!HasViewPermission(context))
         {
@@ -65,7 +66,8 @@ public sealed class PosProductCatalogService : IPosProductCatalogService
             deviceId.Value,
             categoryId,
             search,
-            cancellationToken);
+            cancellationToken,
+            segment: segment);
 
         if (!result.IsSuccess)
         {
@@ -211,6 +213,34 @@ public sealed class PosProductCatalogService : IPosProductCatalogService
         }
 
         return ApplicationResult<PosBarcodeProductResponseDto>.Success(result.Product);
+    }
+
+    public async Task<ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>> GetRecommendationsAsync(
+        TenantRequestContext context, Guid? deviceId, Guid productId, Guid? sourceVariantId,
+        string? type, int limit, CancellationToken cancellationToken)
+    {
+        if (!HasViewPermission(context))
+            return ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>.Failure(ViewPermissionDenied);
+        if (!deviceId.HasValue || deviceId == Guid.Empty)
+            return ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>.Failure(InvalidDeviceId);
+        if (productId == Guid.Empty)
+            return ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>.Failure(ProductNotFound);
+
+        var normalizedType = string.IsNullOrWhiteSpace(type)
+            ? ProductRecommendationConstants.FrequentlyBoughtTogetherType
+            : type.Trim().Replace('-', '_').ToUpperInvariant();
+        if (normalizedType != ProductRecommendationConstants.FrequentlyBoughtTogetherType)
+            return ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>.Failure(
+                new ApplicationError("pos_recommendations.invalid_type", "Recommendation type is not supported."));
+
+        var result = await _repository.GetRecommendationsAsync(
+            context.TenantId, deviceId.Value, productId, sourceVariantId,
+            normalizedType, Math.Clamp(limit, 1, 3), DateTimeOffset.UtcNow, cancellationToken);
+        if (!result.IsSuccess)
+            return ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>.Failure(
+                new ApplicationError(result.ErrorCode!, result.ErrorCode == "pos_products.device_not_found"
+                    ? "POS device could not be found." : "Recommendations could not be loaded."));
+        return ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>.Success(result.Recommendations);
     }
 
     private static bool HasViewPermission(TenantRequestContext context) =>
