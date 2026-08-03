@@ -110,6 +110,35 @@ public sealed class DeviceContextService : IDeviceContextService
         return ApplicationResult<CurrentDeviceResponseDto>.Success(MapToResponse(result.Snapshot));
     }
 
+    public async Task<ApplicationResult<DeviceHeartbeatResponse>> RecordHeartbeatAsync(
+        TenantRequestContext context,
+        DeviceHeartbeatRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.DeviceFingerprint))
+        {
+            return ApplicationResult<DeviceHeartbeatResponse>.Failure(InvalidFingerprint);
+        }
+
+        var device = await _repository.GetEditableByFingerprintAsync(
+            context.TenantId,
+            request.DeviceFingerprint.Trim(),
+            cancellationToken);
+
+        if (device is null)
+        {
+            return ApplicationResult<DeviceHeartbeatResponse>.Failure(NotFound);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        device.RecordHeartbeat(now, request.AppVersion);
+
+        await _repository.SaveChangesAsync(cancellationToken);
+
+        return ApplicationResult<DeviceHeartbeatResponse>.Success(
+            new DeviceHeartbeatResponse(device.Id, now, device.LastSeenAt ?? now, device.IsTrusted));
+    }
+
     private static CurrentDeviceResponseDto MapToResponse(CurrentDeviceDbSnapshot snapshot) =>
         new(
             TenantId: snapshot.TenantId,

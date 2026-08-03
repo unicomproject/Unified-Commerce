@@ -1,9 +1,10 @@
-﻿using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
+using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.AccessControl.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
@@ -21,6 +22,8 @@ using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
+using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services;
 using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
@@ -83,8 +86,8 @@ public static class DependencyInjection
         services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
-        services.Configure<AzureBlobStorageOptions>(
-            configuration.GetSection(AzureBlobStorageOptions.SectionName));
+        services.Configure<E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions>(
+            configuration.GetSection(E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions.SectionName));
         services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
@@ -165,6 +168,8 @@ public static class DependencyInjection
         services.AddScoped<IOutletAuditLogger, OutletAuditLogger>();
         services.AddScoped<ITenantAdminOutletRepository, TenantAdminOutletRepository>();
         services.AddScoped<ITenantAdminTillRepository, TenantAdminTillRepository>();
+        services.AddScoped<ITenantAdminHardwareRepository, TenantAdminHardwareRepository>();
+        services.AddScoped<ITenantAdminHardwareAuditLogger, TenantAdminHardwareAuditLogger>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();

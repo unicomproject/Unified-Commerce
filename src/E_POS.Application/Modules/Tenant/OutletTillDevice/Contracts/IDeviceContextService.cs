@@ -16,4 +16,9 @@ public interface IDeviceContextService
         TenantRequestContext context,
         ActivateDeviceRequest request,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<DeviceHeartbeatResponse>> RecordHeartbeatAsync(
+        TenantRequestContext context,
+        DeviceHeartbeatRequest request,
+        CancellationToken cancellationToken);
 }

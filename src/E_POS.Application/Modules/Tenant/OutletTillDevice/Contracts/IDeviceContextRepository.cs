@@ -13,6 +13,13 @@ public interface IDeviceContextRepository
         DeviceActivationCommand command,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+
+    Task<E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice?> GetEditableByFingerprintAsync(
+        Guid tenantId,
+        string deviceFingerprint,
+        CancellationToken cancellationToken);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
 public sealed record DeviceActivationCommand(
