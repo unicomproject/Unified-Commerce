@@ -148,14 +148,23 @@ public sealed class OutletService : IOutletService
         return ApplicationResult<OutletResponse>.Failure(CreateDuplicateCodeError());
     }
 
-    public async Task<ApplicationResult<OutletListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken)
+    public async Task<ApplicationResult<OutletSummaryDashboardResponse>> GetSummaryAsync(TenantRequestContext context, CancellationToken cancellationToken)
+    {
+        var accessError = ValidateReadAccess(context);
+        if (accessError is not null) return ApplicationResult<OutletSummaryDashboardResponse>.Failure(accessError);
+
+        var response = await _repository.GetSummaryAsync(context.TenantId, cancellationToken);
+        return ApplicationResult<OutletSummaryDashboardResponse>.Success(response);
+    }
+
+    public async Task<ApplicationResult<OutletListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, string? outletType, string? status, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
     {
         var accessError = ValidateReadAccess(context);
         if (accessError is not null) return ApplicationResult<OutletListResponse>.Failure(accessError);
 
         var safePageNumber = Math.Max(1, pageNumber);
         var safePageSize = Math.Clamp(pageSize, 1, 100);
-        var response = await _repository.ListAsync(context.TenantId, safePageNumber, safePageSize, search, cancellationToken);
+        var response = await _repository.ListAsync(context.TenantId, safePageNumber, safePageSize, search, outletType, status, sortBy, sortDirection, cancellationToken);
         return ApplicationResult<OutletListResponse>.Success(response);
     }
 

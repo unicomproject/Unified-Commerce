@@ -71,8 +71,6 @@ using E_POS.Application.Modules.Shared.Storage.Contracts;
 using E_POS.Infrastructure.Modules.Shared.Storage.Services;
 using E_POS.Infrastructure.Modules.Shared.Media.Options;
 using E_POS.Infrastructure.Modules.Shared.Media.Services;
-using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
-using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 
 
 namespace E_POS.Infrastructure;

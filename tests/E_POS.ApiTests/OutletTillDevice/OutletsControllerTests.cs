@@ -174,10 +174,14 @@ public sealed class OutletsControllerTests
 
         public TenantRequestContext? ListContext { get; private set; }
 
-        public Task<ApplicationResult<OutletCreateOptionsResponse>> GetCreateOptionsAsync(TenantRequestContext context, CancellationToken cancellationToken)
+        public Task<ApplicationResult<OutletCreateOptionsResponse>> GetCreateOptionsAsync(TenantRequestContext context, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<OutletCreateOptionsResponse>.Success(new OutletCreateOptionsResponse([], [], [], new OutletCreateDefaultsResponse("", "", ""))));
+
+        public Task<ApplicationResult<OutletSummaryDashboardResponse>> GetSummaryAsync(TenantRequestContext context, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<OutletSummaryDashboardResponse>.Success(new OutletSummaryDashboardResponse(0, 0, 0, null)));
+
+        public Task<ApplicationResult<OutletListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, string? outletType, string? status, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
         {
-            return Task.FromResult(ApplicationResult<OutletCreateOptionsResponse>.Success(
-                new OutletCreateOptionsResponse([], [], [], new OutletCreateDefaultsResponse("LK", "UTC", "ACTIVE"))));
+            ListContext = context;
+            return Task.FromResult(ApplicationResult<OutletListResponse>.Success(new OutletListResponse([], pageNumber, pageSize, 0)));
         }
 
         public Task<ApplicationResult<OutletResponse>> CreateAsync(TenantRequestContext context, OutletCreateRequest request, CancellationToken cancellationToken)

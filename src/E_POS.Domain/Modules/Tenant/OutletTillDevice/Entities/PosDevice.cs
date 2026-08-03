@@ -96,4 +96,19 @@ public class PosDevice : AuditableEntity
         UpdatedByTenantUserId = pairedByTenantUserId;
         UpdatedAt = now;
     }
+
+    public void RecordHeartbeat(DateTimeOffset now, string? appVersion)
+    {
+        LastSeenAt = now;
+
+        if (!string.IsNullOrWhiteSpace(appVersion))
+        {
+            var trimmedVersion = appVersion.Trim();
+            if (AppVersion != trimmedVersion)
+            {
+                AppVersion = trimmedVersion;
+                UpdatedAt = now;
+            }
+        }
+    }
 }

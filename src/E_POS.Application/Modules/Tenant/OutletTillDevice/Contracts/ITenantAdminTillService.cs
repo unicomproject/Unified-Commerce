@@ -44,4 +44,9 @@ public interface ITenantAdminTillService
     Task<ApplicationResult<IReadOnlyList<TenantAdminOutletOptionResponse>>> GetOutletOptionsAsync(
         TenantRequestContext context,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<TenantAdminTillHardwareReadinessResponse>> GetHardwareReadinessAsync(
+        TenantRequestContext context,
+        Guid tillId,
+        CancellationToken cancellationToken);
 }

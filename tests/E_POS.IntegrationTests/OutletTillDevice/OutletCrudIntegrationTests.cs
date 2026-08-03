@@ -62,7 +62,7 @@ public sealed class OutletCrudIntegrationTests
         Assert.Equal(30, mapping.PickupWindowMinutes);
         Assert.Equal(new TimeOnly(16, 0), mapping.CutoffTime);
 
-        var list = await service.ListAsync(CreateContext(tenantId), 1, 20, null, CancellationToken.None);
+        var list = await service.ListAsync(CreateContext(tenantId), 1, 20, null, null, null, null, null, CancellationToken.None);
         var summary = Assert.Single(list.Value!.Items);
         Assert.True(summary.CollectionEnabled);
         Assert.Equal(30, summary.PreparationLeadMinutes);

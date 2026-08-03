@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
@@ -391,15 +393,23 @@ public sealed class TenantAdminHardwareService : ITenantAdminHardwareService
                     item.HealthStatus,
                 });
 
+                var requestId = Guid.NewGuid();
                 var log = HardwareTestLog.Create(
                     Guid.NewGuid(),
                     context.TenantId,
                     device.OutletId,
                     device.Id,
                     posDeviceId,
+                    tillId: null,
+                    tillSessionId: null,
                     context.UserId == Guid.Empty ? null : context.UserId,
+                    requestId,
+                    ComputePayloadHash(payload),
+                    device.ConfigurationVersion,
+                    device.HardwareDeviceType,
                     "TELEMETRY",
                     status,
+                    resultCategory: null,
                     item.WarningMessage,
                     payload,
                     observedAt,
@@ -483,15 +493,23 @@ public sealed class TenantAdminHardwareService : ITenantAdminHardwareService
             ? null
             : JsonSerializer.Serialize(new { resultCode = request.ResultCode });
 
+        var requestId = Guid.NewGuid();
         var log = HardwareTestLog.Create(
             Guid.NewGuid(),
             context.TenantId,
             device.OutletId,
             device.Id,
             posDeviceId,
+            tillId: null,
+            tillSessionId: null,
             context.UserId == Guid.Empty ? null : context.UserId,
+            requestId,
+            ComputePayloadHash(payload ?? requestId.ToString("N")),
+            device.ConfigurationVersion,
+            device.HardwareDeviceType,
             request.TestType,
             request.TestStatus,
+            resultCategory: null,
             request.ResultMessage,
             payload,
             testedAt,
@@ -729,5 +747,11 @@ public sealed class TenantAdminHardwareService : ITenantAdminHardwareService
             assignment?.Id,
             assignment?.TillId,
             assignment?.PosDeviceId);
+    }
+
+    private static string ComputePayloadHash(string payload)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 }
