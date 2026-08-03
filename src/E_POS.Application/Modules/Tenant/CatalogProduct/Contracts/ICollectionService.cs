@@ -10,4 +10,7 @@ public interface ICollectionService
     Task<ApplicationResult<CollectionResponse>> GetByIdAsync(TenantRequestContext context, Guid collectionId, CancellationToken cancellationToken);
     Task<ApplicationResult<CollectionResponse>> UpdateAsync(TenantRequestContext context, Guid collectionId, CollectionUpdateRequest request, CancellationToken cancellationToken);
     Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid collectionId, CancellationToken cancellationToken);
+    Task<ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>> GetPopularProductsAsync(TenantRequestContext context, CancellationToken cancellationToken);
+    Task<ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>> ReplacePopularProductsAsync(TenantRequestContext context, List<Guid> productIds, CancellationToken cancellationToken);
 }
+

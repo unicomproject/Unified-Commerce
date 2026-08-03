@@ -30,6 +30,7 @@ public sealed class PlatformAdminDashboardControllerTests
         var payload = Assert.IsType<LegacyApiResponse<PlatformDashboardResponse>>(ok.Value);
         Assert.True(payload.Success);
         Assert.Equal(2, payload.Data.TotalTenants);
+        Assert.Equal(PlatformDashboardSectionStatuses.Success, payload.Data.TenantSummary.Status);
     }
 
     [Fact]
@@ -94,20 +95,57 @@ public sealed class PlatformAdminDashboardControllerTests
 
     private static PlatformDashboardResponse CreateDashboard()
     {
+        var tenantSummary = new PlatformDashboardSectionDto<PlatformDashboardTenantSummaryDto>(
+            PlatformDashboardSectionStatuses.Success,
+            null,
+            new PlatformDashboardTenantSummaryDto(2, 1, 0, 1, 0,
+            [
+                new("Active", 1),
+                new("Setup Pending", 0),
+                new("Suspended", 1),
+                new("Inactive", 0)
+            ]));
+
         return new PlatformDashboardResponse(
+            GeneratedAt: Now,
+            TenantSummary: tenantSummary,
+            SubscriptionSummary: new PlatformDashboardSectionDto<PlatformDashboardSubscriptionSummaryDto>(
+                PlatformDashboardSectionStatuses.Success, null,
+                new PlatformDashboardSubscriptionSummaryDto(1, 0, 1, 0, 0, 0)),
+            RevenueSummary: new PlatformDashboardSectionDto<PlatformDashboardRevenueSummaryDto>(
+                PlatformDashboardSectionStatuses.Success, null,
+                new PlatformDashboardRevenueSummaryDto([], Now)),
+            Trends: null,
+            AttentionSummary: new PlatformDashboardSectionDto<PlatformDashboardAttentionSummaryDto>(
+                PlatformDashboardSectionStatuses.Success, null,
+                new PlatformDashboardAttentionSummaryDto([], 0)),
+            PlatformFootprint: new PlatformDashboardSectionDto<PlatformDashboardFootprintDto>(
+                PlatformDashboardSectionStatuses.Success, null,
+                new PlatformDashboardFootprintDto(0, 0, 0, 0)),
+            SystemHealth: new PlatformDashboardSectionDto<PlatformDashboardSystemHealthDto>(
+                PlatformDashboardSectionStatuses.Success, null,
+                new PlatformDashboardSystemHealthDto("HEALTHY", Now, [])),
+            RecentTenants: new PlatformDashboardSectionDto<IReadOnlyList<PlatformDashboardRecentTenantDto>>(
+                PlatformDashboardSectionStatuses.Success, null, []),
             TotalTenants: 2,
             ActiveTenants: 1,
             SuspendedTenants: 1,
+            InactiveTenants: 0,
+            SetupPendingTenants: 0,
             TrialTenants: 0,
             TotalSubscriptions: 1,
             ActiveSubscriptions: 1,
+            PastDueSubscriptions: 0,
+            CancelledSubscriptions: 0,
+            ExpiredSubscriptions: 0,
             PendingBillingCount: 0,
             TotalOutlets: 0,
             TotalTills: 0,
             TotalUsers: 0,
-            RecentTenants: [],
-            AttentionItems: [],
-            GeneratedAt: Now);
+            TotalTenantUsers: 0,
+            TotalPlatformUsers: 0,
+            RecentTenantsList: [],
+            AttentionItems: []);
     }
 
     private sealed class FakePlatformDashboardService : IPlatformDashboardService
@@ -127,4 +165,3 @@ public sealed class PlatformAdminDashboardControllerTests
         }
     }
 }
-

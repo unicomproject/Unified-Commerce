@@ -367,7 +367,7 @@ public sealed class PlatformUserServiceTests
                 PlatformAuthConstants.ActiveStatus,
                 [PlatformRoleCodes.SuperAdministrator],
                 ["Super Administrator"],
-                36,
+                37,
                 Now,
                 Now,
                 Now)

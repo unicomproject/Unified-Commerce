@@ -25,7 +25,7 @@ public sealed class PlatformSettingsServiceTests
         var result = await service.GetSettingsAsync(PlatformUserId, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("SCS-TIX", result.Value!.PlatformDisplayName);
+        Assert.Equal(PlatformSettingsDefaults.PlatformDisplayName, result.Value!.PlatformDisplayName);
         Assert.Equal("LK", result.Value.DefaultCountryCode);
     }
 
@@ -161,7 +161,7 @@ public sealed class PlatformSettingsServiceTests
     {
         return new PlatformSettingsResponse
         {
-            PlatformDisplayName = "SCS-TIX",
+            PlatformDisplayName = PlatformSettingsDefaults.PlatformDisplayName,
             SupportEmail = null,
             DefaultCountryCode = "LK",
             DefaultCurrencyCode = "LKR",
@@ -176,7 +176,7 @@ public sealed class PlatformSettingsServiceTests
     {
         return new UpdatePlatformSettingsRequest
         {
-            PlatformDisplayName = "SCS-TIX",
+            PlatformDisplayName = PlatformSettingsDefaults.PlatformDisplayName,
             DefaultCountryCode = "LK",
             DefaultCurrencyCode = "LKR",
             DefaultTimezone = "Asia/Colombo",

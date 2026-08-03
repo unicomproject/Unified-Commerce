@@ -36,5 +36,10 @@ public sealed record PlatformTenantDetailResponse(
     /// <summary>
     /// Authoritative tenant lifecycle status from <c>tenants.status</c>.
     /// </summary>
-    string LifecycleStatus = "");
+    string LifecycleStatus = "",
+    IReadOnlyList<string>? SetupCompletedSteps = null,
+    IReadOnlyList<string>? SetupMissingSteps = null,
+    int? SetupProgressPercent = null,
+    string? ContinueSetupPath = null,
+    string? ConcurrencyVersion = null);
 

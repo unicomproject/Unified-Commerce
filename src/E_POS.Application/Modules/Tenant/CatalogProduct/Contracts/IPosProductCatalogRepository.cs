@@ -10,7 +10,8 @@ public interface IPosProductCatalogRepository
         Guid? categoryId,
         string? search,
         CancellationToken cancellationToken,
-        Guid? outletId = null);
+        Guid? outletId = null,
+        string? segment = null);
 
     Task<PosProductCatalogCategoriesRepositoryResult> ListCategoriesAsync(
         Guid tenantId,
@@ -28,6 +29,12 @@ public interface IPosProductCatalogRepository
         Guid deviceId,
         string barcode,
         CancellationToken cancellationToken);
+
+    Task<PosProductRecommendationsRepositoryResult> GetRecommendationsAsync(
+        Guid tenantId, Guid deviceId, Guid productId, Guid? sourceVariantId,
+        string recommendationType, int limit, DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new PosProductRecommendationsRepositoryResult(null, []));
 }
 
 public sealed record PosProductCatalogRepositoryResult(
@@ -54,6 +61,13 @@ public sealed record PosProductDetailRepositoryResult(
 public sealed record PosBarcodeProductRepositoryResult(
     string? ErrorCode,
     PosBarcodeProductResponseDto? Product)
+{
+    public bool IsSuccess => ErrorCode is null;
+}
+
+public sealed record PosProductRecommendationsRepositoryResult(
+    string? ErrorCode,
+    IReadOnlyList<PosProductRecommendationResponseDto> Recommendations)
 {
     public bool IsSuccess => ErrorCode is null;
 }

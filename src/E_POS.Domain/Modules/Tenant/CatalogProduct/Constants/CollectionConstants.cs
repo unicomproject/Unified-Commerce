@@ -6,6 +6,9 @@ public static class CollectionConstants
     public const string InactiveStatus = "INACTIVE";
     public const string DeletedStatus = "DELETED";
 
+    public const string PopularCollectionCode = "POS_POPULAR";
+    public const string PopularCollectionType = "POS_QUICK_LIST";
+
     public const string ViewPermission = "catalog.collections.view";
     public const string CreatePermission = "catalog.collections.create";
     public const string UpdatePermission = "catalog.collections.update";
@@ -21,4 +24,5 @@ public static class CollectionConstants
         return normalized is ActiveStatus or InactiveStatus;
     }
 }
+
 

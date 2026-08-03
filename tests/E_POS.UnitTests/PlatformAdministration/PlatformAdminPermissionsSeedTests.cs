@@ -7,9 +7,9 @@ namespace E_POS.UnitTests.PlatformAdministration;
 public sealed class PlatformAdminPermissionsSeedTests
 {
     [Fact]
-    public void Definitions_ContainExactlyThirtySixTmEposPlatformPermissions()
+    public void Definitions_ContainExactlyThirtySevenTmEposPlatformPermissions()
     {
-        Assert.Equal(36, PlatformAdminPermissionsSeedData.Definitions.Count);
+        Assert.Equal(37, PlatformAdminPermissionsSeedData.Definitions.Count);
         Assert.Equal(
             PlatformPermissionCodes.All.OrderBy(x => x, StringComparer.Ordinal),
             PlatformAdminPermissionsSeedData.Definitions

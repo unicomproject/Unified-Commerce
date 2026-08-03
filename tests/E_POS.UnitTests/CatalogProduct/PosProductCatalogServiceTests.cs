@@ -95,6 +95,37 @@ public sealed class PosProductCatalogServiceTests
         Assert.Null(repository.Barcode);
     }
 
+    [Fact]
+    public async Task GetRecommendations_ClampsLimitAndNormalizesType()
+    {
+        var repository = new FakePosProductCatalogRepository();
+        var service = new PosProductCatalogService(repository);
+        var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [ProductPosPermissions.View]);
+
+        var result = await service.GetRecommendationsAsync(
+            context, Guid.NewGuid(), Guid.NewGuid(), null, "frequently-bought-together", 99,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, repository.RecommendationLimit);
+        Assert.Equal(ProductRecommendationConstants.FrequentlyBoughtTogetherType, repository.RecommendationType);
+    }
+
+    [Fact]
+    public async Task GetRecommendations_UnsupportedType_IsRejectedWithoutQuery()
+    {
+        var repository = new FakePosProductCatalogRepository();
+        var service = new PosProductCatalogService(repository);
+        var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [ProductPosPermissions.View]);
+
+        var result = await service.GetRecommendationsAsync(
+            context, Guid.NewGuid(), Guid.NewGuid(), null, "ai-generated", 3, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_recommendations.invalid_type", result.Error.Code);
+        Assert.Null(repository.RecommendationType);
+    }
+
     private sealed class FakePosProductCatalogRepository : IPosProductCatalogRepository
     {
         public int ListProductsCallCount { get; private set; }
@@ -105,6 +136,8 @@ public sealed class PosProductCatalogServiceTests
         public PosBarcodeProductRepositoryResult BarcodeResult { get; init; } =
             new("pos_barcode.not_found", null);
         public string? Barcode { get; private set; }
+        public string? RecommendationType { get; private set; }
+        public int RecommendationLimit { get; private set; }
 
         public Task<PosProductCatalogRepositoryResult> ListProductsAsync(
             Guid tenantId,
@@ -112,7 +145,8 @@ public sealed class PosProductCatalogServiceTests
             Guid? categoryId,
             string? search,
             CancellationToken cancellationToken,
-            Guid? outletId = null)
+            Guid? outletId = null,
+            string? segment = null)
         {
             ListProductsCallCount++;
             return Task.FromResult(ListProductsResult);
@@ -147,6 +181,15 @@ public sealed class PosProductCatalogServiceTests
         {
             Barcode = barcode;
             return Task.FromResult(BarcodeResult);
+        }
+
+        public Task<PosProductRecommendationsRepositoryResult> GetRecommendationsAsync(
+            Guid tenantId, Guid deviceId, Guid productId, Guid? sourceVariantId,
+            string recommendationType, int limit, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            RecommendationType = recommendationType;
+            RecommendationLimit = limit;
+            return Task.FromResult(new PosProductRecommendationsRepositoryResult(null, []));
         }
     }
 }

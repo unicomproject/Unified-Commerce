@@ -1,3 +1,5 @@
+using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
+
 namespace E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 
 public sealed record PosReturnSaleSummaryDto(
@@ -265,7 +267,9 @@ public sealed record PosReturnReceiptDto(
     decimal? ReplacementTax = null,
     decimal? ReplacementTotal = null,
     int PrintCount = 0,
-    bool HasBeenPrinted = false);
+    bool HasBeenPrinted = false,
+    Guid? DrawerOperationId = null,
+    CashDrawerSettingsDto? CashDrawerSettings = null);
 
 public sealed record PosReturnCompletionItemDto(
     Guid? SaleLineId,

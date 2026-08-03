@@ -23,6 +23,7 @@ public sealed record PosHomeContextResolutionResult(
 public sealed record PosHomeDashboardDbSnapshot(
     Guid CashierTenantUserId,
     string CashierDisplayName,
+    string? CashierProfileImageUrl,
     Guid DeviceId,
     string DeviceCode,
     string DeviceName,

@@ -11,6 +11,7 @@ public static class PlatformPermissionCodes
     public const string DashboardView = "platform.dashboard.view";
 
     public const string TenantsView = "platform.tenants.view";
+    public const string TenantSubscriptionsView = "platform.tenant_subscriptions.view";
     public const string TenantsCreate = "platform.tenants.create";
     public const string TenantsUpdate = "platform.tenants.update";
     public const string TenantsActivate = "platform.tenants.activate";
@@ -60,6 +61,7 @@ public static class PlatformPermissionCodes
     [
         DashboardView,
         TenantsView,
+        TenantSubscriptionsView,
         TenantsCreate,
         TenantsUpdate,
         TenantsActivate,

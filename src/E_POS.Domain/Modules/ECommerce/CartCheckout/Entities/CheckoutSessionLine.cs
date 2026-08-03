@@ -11,6 +11,7 @@ public class CheckoutSessionLine : AuditableEntity
     public Guid? ProductVariantId { get; protected set; }
     public string? SkuSnapshot { get; protected set; }
     public string ProductNameSnapshot { get; protected set; } = string.Empty;
+    public string? LineNote { get; protected set; }
     public decimal Quantity { get; protected set; }
     public decimal UnitPrice { get; protected set; }
     public decimal LineSubtotalAmount { get; protected set; }
@@ -42,6 +43,7 @@ public class CheckoutSessionLine : AuditableEntity
             ProductVariantId = item.ProductVariantId,
             SkuSnapshot = item.SkuSnapshot,
             ProductNameSnapshot = item.ProductNameSnapshot,
+            LineNote = item.LineNote,
             Quantity = item.Quantity,
             UnitPrice = item.UnitPrice,
             LineSubtotalAmount = item.LineSubtotalAmount,

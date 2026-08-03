@@ -215,6 +215,19 @@ public sealed class PosProductsControllerTests
     }
 
     [Fact]
+    public async Task GetRecommendations_WithValidClaims_ReturnsOk()
+    {
+        var controller = CreateController(new FakePosProductCatalogService());
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "products.view");
+
+        var result = await controller.GetRecommendations(
+            Guid.NewGuid(), Guid.NewGuid(), null, "frequently-bought-together", 3,
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
     public void Controller_RequiresTenantOnlyPolicy()
     {
         var authorize = Assert.Single(typeof(PosProductsController).GetCustomAttributes<AuthorizeAttribute>());
@@ -268,7 +281,8 @@ public sealed class PosProductsControllerTests
             Guid? deviceId,
             Guid? categoryId,
             string? search,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? segment = null)
         {
             Context = context;
             DeviceId = deviceId;

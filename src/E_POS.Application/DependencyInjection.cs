@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Services;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Services;
@@ -43,6 +43,8 @@ using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
 using E_POS.Application.Modules.ECommerce.ProductReviews.Services;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Application.Modules.Tenant.Reports.Services;
+using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
+using E_POS.Application.Modules.Tenant.HardwareCash.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -118,6 +120,8 @@ public static class DependencyInjection
         services.AddScoped<IPosReturnService, PosReturnService>();
         services.AddScoped<IPosHoldService, PosHoldService>();
         services.AddScoped<IPosDiscountService, PosDiscountService>();
+        services.AddScoped<IPosHardwareService, PosHardwareService>();
+        services.AddScoped<IPosDrawerService, PosDrawerService>();
         services.AddScoped<IDiscountPolicyAdminService, DiscountPolicyAdminService>();
 
         services.AddScoped<ITenantAdminInventoryService, TenantAdminInventoryService>();

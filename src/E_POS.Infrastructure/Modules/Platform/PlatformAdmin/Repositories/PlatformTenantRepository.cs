@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
@@ -222,6 +223,29 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 StartsAt: null,
                 EndsAt: null);
 
+        var hasPendingInvoice = await _dbContext.SubscriptionInvoices.AsNoTracking()
+            .AnyAsync(x => x.TenantId == tenantId && x.InvoiceStatus == "PENDING" && x.BalanceDue > 0m, cancellationToken);
+        var hasAdmin = await _dbContext.TenantUsers.AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     (x.AccountStatus == "INVITED" || x.AccountStatus == "ACTIVE"),
+                cancellationToken);
+        var hasProfile = profile?.Profile is not null &&
+                         (!string.IsNullOrWhiteSpace(profile.Profile.LegalName) ||
+                          !string.IsNullOrWhiteSpace(profile.Profile.PrimaryEmail));
+        var billingOk = PlatformTenantSetupChecklistEvaluator.IsSetupBillingSatisfied(
+            tenantBillingStatus: null,
+            subscriptionStatus: currentSubscription?.SubscriptionStatus,
+            hasPendingInvoice: hasPendingInvoice,
+            isPendingPaymentStatus: IsStatus(tenant.Status, "pending_payment"));
+        var setup = PlatformTenantSetupChecklistEvaluator.Evaluate(
+            new PlatformTenantSetupChecklistEvaluator.ChecklistInput(
+                HasBusinessProfile: hasProfile,
+                HasSubscriptionPlan: currentSubscription is not null,
+                HasEnabledEntitlements: enabledFeatureIds.Count > 0,
+                BillingConditionSatisfied: billingOk,
+                HasTenantAdmin: hasAdmin));
+
         return new PlatformTenantDetailResponse(
             tenant.Id,
             tenant.TenantCode,
@@ -251,7 +275,12 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             CanActivate: false,
             CanSuspend: false,
             CanManageEntitlements: false,
-            LifecycleStatus: tenant.Status);
+            LifecycleStatus: tenant.Status,
+            SetupCompletedSteps: setup.CompletedSteps,
+            SetupMissingSteps: setup.MissingSteps,
+            SetupProgressPercent: setup.ProgressPercent,
+            ContinueSetupPath: PlatformTenantSetupChecklistEvaluator.ContinueSetupPath(tenant.Id),
+            ConcurrencyVersion: (tenant.UpdatedAt ?? tenant.CreatedAt).Ticks.ToString());
     }
 
     public Task<bool> TenantCodeExistsAsync(string tenantCode, CancellationToken cancellationToken)
@@ -570,6 +599,8 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             select new
             {
                 profile.TenantId,
+                profile.LegalName,
+                profile.PrimaryEmail,
                 BusinessTypeCode = businessType != null ? businessType.BusinessCode : null
             })
             .ToListAsync(cancellationToken);
@@ -578,6 +609,29 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .GroupBy(x => x.TenantId)
             .ToDictionary(group => group.Key, group => group.First().BusinessTypeCode);
 
+        var hasProfileByTenant = profileBusinessTypes
+            .GroupBy(x => x.TenantId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Any(p =>
+                    !string.IsNullOrWhiteSpace(p.LegalName) || !string.IsNullOrWhiteSpace(p.PrimaryEmail)));
+
+        var adminUsers = await _dbContext.TenantUsers.AsNoTracking()
+            .Select(x => new { x.TenantId, x.AccountStatus })
+            .ToListAsync(cancellationToken);
+        var hasAdminByTenant = adminUsers
+            .GroupBy(x => x.TenantId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Any(u => PlatformTenantSetupChecklistEvaluator.IsTenantAdminStatus(u.AccountStatus)));
+
+        var pendingInvoiceTenantIds = await _dbContext.SubscriptionInvoices.AsNoTracking()
+            .Where(x => x.InvoiceStatus == "PENDING" && x.BalanceDue > 0m)
+            .Select(x => x.TenantId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var pendingInvoiceSet = pendingInvoiceTenantIds.ToHashSet();
+
         return tenants
             .Select(tenant =>
             {
@@ -585,6 +639,22 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 featuresByTenant.TryGetValue(tenant.Id, out var featureCodes);
                 featureCodes ??= [];
                 businessTypeByTenant.TryGetValue(tenant.Id, out var businessTypeCode);
+                hasProfileByTenant.TryGetValue(tenant.Id, out var hasProfile);
+                hasAdminByTenant.TryGetValue(tenant.Id, out var hasAdmin);
+
+                var billingOk = PlatformTenantSetupChecklistEvaluator.IsSetupBillingSatisfied(
+                    tenantBillingStatus: null,
+                    subscriptionStatus: subscription?.SubscriptionStatus,
+                    hasPendingInvoice: pendingInvoiceSet.Contains(tenant.Id),
+                    isPendingPaymentStatus: IsStatus(tenant.Status, "pending_payment"));
+
+                var checklist = PlatformTenantSetupChecklistEvaluator.Evaluate(
+                    new PlatformTenantSetupChecklistEvaluator.ChecklistInput(
+                        HasBusinessProfile: hasProfile,
+                        HasSubscriptionPlan: subscription is not null,
+                        HasEnabledEntitlements: featureCodes.Count > 0,
+                        BillingConditionSatisfied: billingOk,
+                        HasTenantAdmin: hasAdmin));
 
                 return new TenantRow
                 {
@@ -607,7 +677,10 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                     Subscription = subscription,
                     OnlineStoreEnabled = HasFeature(featureCodes, PlatformTenantFeatureCodes.OnlineStore),
                     ClickCollectEnabled = HasFeature(featureCodes, PlatformTenantFeatureCodes.ClickCollect),
-                    OfflineEnabled = HasFeature(featureCodes, PlatformTenantFeatureCodes.OfflineOperationSync)
+                    OfflineEnabled = HasFeature(featureCodes, PlatformTenantFeatureCodes.OfflineOperationSync),
+                    SetupCompletedSteps = checklist.CompletedSteps,
+                    SetupMissingSteps = checklist.MissingSteps,
+                    SetupProgressPercent = checklist.ProgressPercent
                 };
             })
             .ToList();
@@ -638,7 +711,16 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 (row.BusinessType?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
         }
 
-        if (!string.IsNullOrWhiteSpace(query.Status))
+        if (!string.IsNullOrWhiteSpace(query.StatusGroup) &&
+            string.Equals(query.StatusGroup.Trim(), "setup_pending", StringComparison.OrdinalIgnoreCase))
+        {
+            filtered = filtered.Where(row =>
+                IsStatus(row.Status, "draft") ||
+                IsStatus(row.Status, "setup_pending") ||
+                IsStatus(row.Status, "pending_activation") ||
+                IsStatus(row.Status, "pending_payment"));
+        }
+        else if (!string.IsNullOrWhiteSpace(query.Status))
         {
             var status = query.Status.Trim();
             filtered = filtered.Where(row => IsStatus(row.Status, status));
@@ -715,7 +797,13 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             row.OfflineEnabled,
             row.CreatedAt,
             row.UpdatedAt,
-            LifecycleStatus: row.Status);
+            LifecycleStatus: row.Status,
+            PlatformDashboardService.IsSetupPending(row.Status) ? row.SetupCompletedSteps : null,
+            PlatformDashboardService.IsSetupPending(row.Status) ? row.SetupMissingSteps : null,
+            PlatformDashboardService.IsSetupPending(row.Status) ? row.SetupProgressPercent : null,
+            PlatformDashboardService.IsSetupPending(row.Status)
+                ? PlatformTenantSetupChecklistEvaluator.ContinueSetupPath(row.Id)
+                : null);
     }
 
     private static bool HasFeature(IReadOnlySet<string> featureCodes, string featureCode) =>
@@ -763,6 +851,15 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
 
         if (planChanged)
         {
+            var planPriceProperty = entry.Property<decimal>(nameof(TenantSubscription.PlanPrice));
+            var changeData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                oldPlanPrice = planPriceProperty.IsModified
+                    ? planPriceProperty.OriginalValue
+                    : planPriceProperty.CurrentValue,
+                newPlanPrice = planPriceProperty.CurrentValue
+            });
+
             _dbContext.TenantSubscriptionHistory.Add(TenantSubscriptionHistory.CreateEvent(
                 Guid.NewGuid(),
                 subscription.TenantId,
@@ -771,7 +868,8 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 TenantSubscriptionHistoryChangeTypeConstants.PlanChanged,
                 changedAt,
                 oldPlanId: planProperty.OriginalValue,
-                newPlanId: planProperty.CurrentValue));
+                newPlanId: planProperty.CurrentValue,
+                changeData: changeData));
         }
 
         if (statusChanged)
@@ -852,6 +950,12 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         public bool ClickCollectEnabled { get; init; }
 
         public bool OfflineEnabled { get; init; }
+
+        public IReadOnlyList<string> SetupCompletedSteps { get; init; } = [];
+
+        public IReadOnlyList<string> SetupMissingSteps { get; init; } = [];
+
+        public int SetupProgressPercent { get; init; }
     }
 
     private sealed record SubscriptionRow(
@@ -861,6 +965,88 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         string PlanCode,
         string SubscriptionStatus,
         DateTimeOffset CreatedAt);
+
+    public async Task AddAuditLogAsync(
+        Guid tenantId,
+        Guid? platformUserId,
+        string action,
+        string summary,
+        string? reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var subscription = await _dbContext.TenantSubscriptions.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId, cancellationToken);
+        var subId = subscription?.Id ?? tenantId;
+
+        var seq = await _dbContext.TenantSubscriptionHistory.AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .CountAsync(cancellationToken) + 1;
+
+        var history = TenantSubscriptionHistory.CreateEvent(
+            Guid.NewGuid(),
+            tenantId,
+            subId,
+            seq,
+            action,
+            now,
+            reason: reason ?? summary,
+            changeData: summary,
+            changedByPlatformUserId: platformUserId);
+
+        _dbContext.TenantSubscriptionHistory.Add(history);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
+        Guid tenantId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        pageNumber = pageNumber < 1 ? 1 : pageNumber;
+        pageSize = pageSize < 1 ? 10 : Math.Min(pageSize, 100);
+
+        var query = from history in _dbContext.TenantSubscriptionHistory.AsNoTracking()
+                    where history.TenantId == tenantId
+                    join user in _dbContext.PlatformUsers.AsNoTracking()
+                        on history.ChangedByPlatformUserId equals user.Id into users
+                    from user in users.DefaultIfEmpty()
+                    select new
+                    {
+                        history.Id,
+                        OccurredAt = history.ChangedAt,
+                        history.ChangeType,
+                        history.Reason,
+                        history.ChangeData,
+                        PlatformUserId = user != null ? (Guid?)user.Id : null,
+                        Email = user != null ? user.Email : null
+                    };
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(x => x.OccurredAt)
+            .ThenByDescending(x => x.Id)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new PlatformTenantAuditLogItemDto(
+                x.Id,
+                x.OccurredAt,
+                new PlatformAuditLogActorDto(x.PlatformUserId, x.Email),
+                x.ChangeType,
+                x.ChangeData ?? x.Reason ?? "Tenant audit event recorded.",
+                x.Reason))
+            .ToListAsync(cancellationToken);
+
+        var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        return new PlatformTenantAuditLogListResponse(
+            items,
+            pageNumber,
+            pageSize,
+            totalCount,
+            totalPages);
+    }
 }
 
 

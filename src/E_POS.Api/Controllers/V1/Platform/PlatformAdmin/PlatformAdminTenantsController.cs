@@ -168,6 +168,7 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateTenant(
         Guid tenantId,
         [FromBody] UpdatePlatformTenantRequest request,
@@ -178,6 +179,13 @@ public sealed class PlatformAdminTenantsController : ControllerBase
             return Unauthorized(CreateLegacyError(new ApplicationError(
                 "platform_auth.invalid_session",
                 "Invalid platform session.")));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ConcurrencyVersion) &&
+            Request.Headers.TryGetValue("If-Match", out var ifMatchHeader) &&
+            !string.IsNullOrWhiteSpace(ifMatchHeader))
+        {
+            request = request with { ConcurrencyVersion = ifMatchHeader.ToString().Trim('"') };
         }
 
         var result = await _tenantService.UpdateTenantAsync(tenantId, request, platformUserId, cancellationToken);
@@ -202,6 +210,26 @@ public sealed class PlatformAdminTenantsController : ControllerBase
 
         var result = await _tenantService.ActivateTenantAsync(tenantId, platformUserId, cancellationToken);
         return ToDetailActionResult(result, "Platform tenant activated successfully.");
+    }
+
+    [HttpPost("{tenantId:guid}/reactivate")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantDetailResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReactivateTenant(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError(
+                "platform_auth.invalid_session",
+                "Invalid platform session.")));
+        }
+
+        var result = await _tenantService.ReactivateTenantAsync(tenantId, platformUserId, cancellationToken);
+        return ToDetailActionResult(result, "Platform tenant reactivated successfully.");
     }
 
     [HttpPost("{tenantId:guid}/suspend")]
@@ -230,6 +258,7 @@ public sealed class PlatformAdminTenantsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateEntitlements(
         Guid tenantId,
         [FromBody] UpdatePlatformTenantEntitlementsRequest request,
@@ -242,8 +271,37 @@ public sealed class PlatformAdminTenantsController : ControllerBase
                 "Invalid platform session.")));
         }
 
+        if (string.IsNullOrWhiteSpace(request.ConcurrencyVersion) &&
+            Request.Headers.TryGetValue("If-Match", out var ifMatchHeader) &&
+            !string.IsNullOrWhiteSpace(ifMatchHeader))
+        {
+            request = request with { ConcurrencyVersion = ifMatchHeader.ToString().Trim('"') };
+        }
+
         var result = await _tenantService.UpdateEntitlementsAsync(tenantId, request, platformUserId, cancellationToken);
         return ToDetailActionResult(result, "Platform tenant entitlements updated successfully.");
+    }
+
+    [HttpGet("{tenantId:guid}/audit-logs")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantAuditLogListResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetTenantAuditLogs(
+        Guid tenantId,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError(
+                "platform_auth.invalid_session",
+                "Invalid platform session.")));
+        }
+
+        var result = await _tenantService.GetTenantAuditLogsAsync(tenantId, platformUserId, pageNumber, pageSize, cancellationToken);
+        return ToActionResult(result, "Platform tenant audit logs loaded successfully.");
     }
 
     private IActionResult ToActionResult<T>(ApplicationResult<T> result, string successMessage)

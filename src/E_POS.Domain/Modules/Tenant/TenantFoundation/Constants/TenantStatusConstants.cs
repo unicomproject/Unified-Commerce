@@ -7,11 +7,13 @@ namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 public static class TenantStatusConstants
 {
     public const string Draft = "draft";
+    public const string SetupPending = "setup_pending";
     public const string PendingPayment = "pending_payment";
     public const string PendingActivation = "pending_activation";
     public const string Active = "active";
     public const string Suspended = "suspended";
     public const string Cancelled = "cancelled";
+    public const string Inactive = "inactive";
 
     public static readonly IReadOnlyList<string> All =
     [

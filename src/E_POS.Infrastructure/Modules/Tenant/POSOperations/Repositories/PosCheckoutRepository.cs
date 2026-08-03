@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Application.Modules.Tenant.Payment.Contracts;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -26,13 +27,17 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
 
     private readonly EPosDbContext _dbContext;
     private readonly IPosTillSessionRepository _tillSessionRepository;
+    private readonly ICardPaymentGateway _cardPaymentGateway;
 
     public PosCheckoutRepository(
         EPosDbContext dbContext,
-        IPosTillSessionRepository tillSessionRepository)
+        IPosTillSessionRepository tillSessionRepository,
+        ICardPaymentGateway? cardPaymentGateway = null)
     {
         _dbContext = dbContext;
         _tillSessionRepository = tillSessionRepository;
+        _cardPaymentGateway = cardPaymentGateway ?? new
+            E_POS.Infrastructure.Modules.Tenant.Payment.UnavailableCardPaymentGateway();
     }
 
     public async Task<PosCheckoutCalculationResult> CalculateSummaryAsync(
@@ -87,25 +92,37 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 from variant in _dbContext.ProductVariants.AsNoTracking()
                 join product in _dbContext.Products.AsNoTracking()
                     on variant.ProductId equals product.Id
+                join uom in _dbContext.UnitOfMeasures.AsNoTracking()
+                    on variant.SalesUomId equals uom.Id
                 where variant.TenantId == tenantId &&
                       variantIds.Contains(variant.Id) &&
                       variant.Status != ProductConstants.DeletedStatus &&
                       variant.IsSellable &&
                       product.TenantId == tenantId &&
                       product.Status == ProductConstants.ActiveStatus &&
-                      product.IsSellable
+                      product.IsSellable && (uom.TenantId == null || uom.TenantId == tenantId)
                 select new CheckoutVariantRow(
                     variant.Id,
                     variant.ProductId,
                     variant.SalesUomId,
                     product.ProductName,
-                    product.IsTaxable))
+                    product.IsTaxable,
+                    variant.VariantName,
+                    variant.Sku,
+                    uom.UomCode))
             .ToListAsync(cancellationToken);
 
         if (variants.Count != variantIds.Count)
         {
             return new PosCheckoutCalculationResult("pos_checkout.variant_not_found", null);
         }
+
+        if (normalizedLines.Any(x => x.UomId.HasValue &&
+                                     variants.Single(v => v.VariantId == x.VariantId).SalesUomId != x.UomId))
+            return new PosCheckoutCalculationResult("pos_checkout.invalid_uom", null);
+        if (!await ValidateRecommendationLinesAsync(
+                tenantId, sessionResolution.Snapshot!.OutletId, normalizedLines, now, cancellationToken))
+            return new PosCheckoutCalculationResult("pos_cart.invalid_recommendation", null);
 
         var variantsById = variants.ToDictionary(row => row.VariantId);
         var priceList = await ResolvePriceListAsync(
@@ -127,6 +144,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         decimal taxTotal = 0m;
         var itemCount = 0;
         var calculatedLines = new List<CalculatedCheckoutLine>(normalizedLines.Count);
+        var responseLines = new List<PosCalculatedCartLineDto>(normalizedLines.Count);
         var availableByVariant = await ResolveAvailableStockAsync(
             tenantId, sessionResolution.Snapshot!.OutletId, variantIds, cancellationToken);
         var taxPercentByVariant = await ResolveTaxPercentsAsync(
@@ -139,8 +157,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             var unitPrice = pricesByVariant[line.VariantId].SellingPrice;
 
             var grossLineAmount = unitPrice * line.Qty;
-            var taxPercent = variant.IsTaxable && taxPercentByVariant.TryGetValue(line.VariantId, out var rate)
-                ? rate
+            var taxPercent = variant.IsTaxable && taxPercentByVariant.TryGetValue(line.VariantId, out var tax)
+                ? tax.RatePercent
                 : 0m;
             var lineSubtotal = priceList.PriceIncludesTax && taxPercent > 0m
                 ? grossLineAmount * 100m / (100m + taxPercent)
@@ -156,6 +174,15 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             {
                 validationMessages.Add($"Insufficient stock for {variant.ProductName}.");
             }
+            responseLines.Add(new PosCalculatedCartLineDto(
+                line.ClientLineId, variant.ProductId, variant.VariantId, variant.ProductName,
+                variant.VariantName, variant.Sku, variant.SalesUomId, variant.UomCode, line.Qty,
+                line.LineNote, ToMoney(unitPrice), 0, ToMoney(lineTax),
+                ToMoney(lineSubtotal + lineTax),
+                availableByVariant.TryGetValue(line.VariantId, out var available) && available < line.Qty
+                    ? "insufficient_stock" : "available",
+                availableByVariant.TryGetValue(line.VariantId, out available) && available < line.Qty
+                    ? "pos_checkout.insufficient_stock" : null));
         }
 
         if (itemCount == 0)
@@ -209,7 +236,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 now,
                 cashierName),
             await ResolvePaymentMethodsAsync(tenantId, permissions, cancellationToken),
-            validationMessages);
+            validationMessages,
+            responseLines);
 
         return new PosCheckoutCalculationResult(null, summary);
     }
@@ -253,11 +281,6 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         if (!HasPaymentPermission(paymentMethodCode, permissions))
         {
             return new PosCheckoutStartPaymentResult("pos_checkout.payment_permission_denied", null);
-        }
-
-        if (!string.Equals(paymentMethodCode, "CASH", StringComparison.Ordinal))
-        {
-            return new PosCheckoutStartPaymentResult("pos_checkout.payment_provider_required", null);
         }
 
         if (request.CustomerId is { } customerId && customerId != Guid.Empty)
@@ -324,6 +347,13 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             return new PosCheckoutStartPaymentResult("pos_checkout.variant_not_found", null);
         }
 
+        if (normalizedLines.Any(x => x.UomId.HasValue &&
+                                     variants.Single(v => v.VariantId == x.VariantId).SalesUomId != x.UomId))
+            return new PosCheckoutStartPaymentResult("pos_checkout.invalid_uom", null);
+        if (!await ValidateRecommendationLinesAsync(
+                tenantId, session.OutletId, normalizedLines, now, cancellationToken))
+            return new PosCheckoutStartPaymentResult("pos_cart.invalid_recommendation", null);
+
         var variantsById = variants.ToDictionary(row => row.VariantId);
         var priceList = await ResolvePriceListAsync(
             tenantId, session.OutletId, now, cancellationToken);
@@ -359,9 +389,10 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
 
             var quantity = line.Qty;
             var listedUnitPrice = priceRow.SellingPrice;
-            var taxPercent = variant.IsTaxable && taxPercentByVariant.TryGetValue(line.VariantId, out var rate)
-                ? rate
-                : 0m;
+            var taxDetail = variant.IsTaxable
+                ? taxPercentByVariant.GetValueOrDefault(line.VariantId)
+                : null;
+            var taxPercent = taxDetail?.RatePercent ?? 0m;
             var unitPrice = priceList.PriceIncludesTax && taxPercent > 0m
                 ? listedUnitPrice * 100m / (100m + taxPercent)
                 : listedUnitPrice;
@@ -379,12 +410,15 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             builtLines.Add(new BuiltCheckoutLine(
                 line.VariantId,
                 variant,
+                line.ClientLineId,
+                line.LineNote,
                 quantity,
                 unitPrice,
                 lineSubtotal,
                 0m,
                 lineTax,
-                priceRow.PriceListItemId));
+                priceRow.PriceListItemId,
+                taxDetail));
         }
 
         var discountResolution = await ResolveDiscountApplicationAsync(
@@ -468,6 +502,61 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             return new PosCheckoutStartPaymentResult("pos_checkout.payment_method_not_found", null);
         }
 
+        CardPaymentCaptureResult? cardCapture = null;
+        if (string.Equals(paymentMethodCode, "CARD", StringComparison.Ordinal))
+        {
+            if (request.CardOperationId is not { } cardOperationId ||
+                cardOperationId == Guid.Empty)
+            {
+                return new PosCheckoutStartPaymentResult(
+                    "pos_checkout.card_operation_id_required", null);
+            }
+
+            cardCapture = await _cardPaymentGateway.CaptureAsync(
+                new CardPaymentCaptureRequest(
+                    tenantId,
+                    tenantUserId,
+                    request.DeviceId,
+                    session.TillId,
+                    session.SessionId,
+                    cardOperationId,
+                    grandTotal,
+                    currencyCode,
+                    idempotencyKey),
+                cancellationToken);
+            if (cardCapture.Outcome is CardPaymentOutcome.Completed &&
+                string.IsNullOrWhiteSpace(cardCapture.ProviderName))
+            {
+                return new PosCheckoutStartPaymentResult(
+                    "pos_checkout.card_provider_response_invalid", null);
+            }
+            if (cardCapture.Outcome is not CardPaymentOutcome.Completed)
+            {
+                var errorCode = cardCapture.Outcome switch
+                {
+                    CardPaymentOutcome.Declined => "pos_checkout.card_declined",
+                    CardPaymentOutcome.Cancelled => "pos_checkout.card_cancelled",
+                    CardPaymentOutcome.Pending => "pos_checkout.card_pending",
+                    CardPaymentOutcome.Unknown => "pos_checkout.card_outcome_unknown",
+                    CardPaymentOutcome.ProviderUnavailable or
+                    CardPaymentOutcome.Unavailable =>
+                        "pos_checkout.card_provider_not_configured",
+                    CardPaymentOutcome.TerminalUnavailable =>
+                        "pos_checkout.card_terminal_unavailable",
+                    CardPaymentOutcome.Processing or
+                    CardPaymentOutcome.AwaitingCard or
+                    CardPaymentOutcome.Initiated =>
+                        "pos_checkout.card_pending",
+                    _ => "pos_checkout.card_payment_failed"
+                };
+                return new PosCheckoutStartPaymentResult(errorCode, null);
+            }
+        }
+        else if (!string.Equals(paymentMethodCode, "CASH", StringComparison.Ordinal))
+        {
+            return new PosCheckoutStartPaymentResult(
+                "pos_checkout.payment_method_not_implemented", null);
+        }
 
         await using var transaction = _dbContext.Database.IsRelational()
             ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
@@ -628,12 +717,16 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 now);
 
             _dbContext.SalesOrderLines.Add(orderLine);
+            orderLine.SetLineNote(builtLine.LineNote, now);
             responseLines.Add(new PosCheckoutStartPaymentLineResponseDto(
                 builtLine.Variant.ProductName,
                 (int)builtLine.Quantity,
                 ToMoney(builtLine.UnitPrice),
                 ToMoney(builtLine.LineSubtotal - builtLine.LineDiscount + builtLine.LineTax),
-                builtLine.Variant.Sku));
+                builtLine.Variant.Sku,
+                orderLine.Id,
+                ToMoney(builtLine.LineDiscount),
+                builtLine.LineNote));
 
             var remainingQuantity = builtLine.Quantity;
             var movementIndex = 0;
@@ -659,30 +752,119 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 return new PosCheckoutStartPaymentResult("pos_checkout.stock_conflict", null);
         }
 
-        var salesPaymentRecords = PosCompletedPaymentPersistence.CreateCash(
-            paymentId,
-            tenantId,
-            saleId,
-            paymentNumber,
-            paymentMethod.Id,
-            session.TillId,
-            session.SessionId,
-            currencyCode,
-            grandTotal,
-            string.Equals(paymentMethodCode, "CASH", StringComparison.Ordinal) ? cashReceived : null,
-            grandTotal,
-            changeDue,
-            idempotencyKey,
-            requestHash,
-            tenantUserId,
-            now);
+        var salesPaymentRecords = cardCapture is null
+            ? PosCompletedPaymentPersistence.CreateCash(
+                paymentId,
+                tenantId,
+                saleId,
+                paymentNumber,
+                paymentMethod.Id,
+                session.TillId,
+                session.SessionId,
+                currencyCode,
+                grandTotal,
+                cashReceived,
+                grandTotal,
+                changeDue,
+                idempotencyKey,
+                requestHash,
+                tenantUserId,
+                now)
+            : PosCompletedPaymentPersistence.CreateProviderCapture(
+                paymentId,
+                tenantId,
+                saleId,
+                paymentNumber,
+                paymentMethod.Id,
+                session.TillId,
+                session.SessionId,
+                currencyCode,
+                grandTotal,
+                grandTotal,
+                idempotencyKey,
+                requestHash,
+                tenantUserId,
+                now,
+                new PosCompletedPaymentPersistence.ProviderCaptureOutcome(
+                    cardCapture.ProviderName!,
+                    cardCapture.ProviderTransactionId,
+                    cardCapture.CardBrand,
+                    cardCapture.CardLast4));
 
         _dbContext.SalesPayments.Add(salesPaymentRecords.Payment);
         _dbContext.SalesPaymentTransactions.Add(salesPaymentRecords.Transaction);
         _dbContext.SalesPaymentEvents.Add(salesPaymentRecords.Event);
 
+        var receiptTenders = new[]
+        {
+            new PosReceiptTenderLineDto(
+                paymentId,
+                paymentMethod.MethodCode,
+                paymentMethod.MethodName,
+                paymentMethod.MethodCode,
+                ToMoney(grandTotal),
+                string.Equals(paymentMethodCode, "CASH", StringComparison.Ordinal)
+                    ? ToMoney(cashReceived)
+                    : null,
+                string.Equals(paymentMethodCode, "CASH", StringComparison.Ordinal)
+                    ? ToMoney(changeDue)
+                    : null,
+                currencyCode,
+                "PAID",
+                now,
+                cardCapture?.ProviderName,
+                cardCapture?.CardBrand,
+                cardCapture?.CardLast4,
+                cardCapture?.AuthorizationReference,
+                cardCapture?.TerminalReference)
+        };
+        var receiptDiscountLines = discountApplication is null
+            ? Array.Empty<PosReceiptDiscountLineDto>()
+            : new[]
+            {
+                new PosReceiptDiscountLineDto(
+                    discountApplication.DiscountScope == "ORDER" ? "TRANSACTION" : "ITEM",
+                    discountApplication.DiscountScope == "ORDER"
+                        ? null
+                        : responseLines.FirstOrDefault(x =>
+                            builtLines.FirstOrDefault(line =>
+                                line.VariantId == discountApplication.TargetProductVariantId)
+                                ?.Variant.Sku == x.Sku)?.SaleLineId,
+                    discountApplication.PolicyNameSnapshot,
+                    discountApplication.PolicyCodeSnapshot,
+                    null,
+                    ToMoney(discountApplication.DiscountAmountSnapshot))
+            };
+        var receiptTaxLines = builtLines
+            .Where(x => x.TaxDetail is not null && x.LineTax > 0)
+            .GroupBy(x => new
+            {
+                x.TaxDetail!.TaxCode,
+                x.TaxDetail.TaxName,
+                x.TaxDetail.RatePercent
+            })
+            .Select(group => new PosReceiptTaxLineDto(
+                group.Key.TaxCode,
+                group.Key.TaxName,
+                group.Key.RatePercent,
+                ToMoney(group.Sum(x => x.LineSubtotal - x.LineDiscount)),
+                ToMoney(group.Sum(x => x.LineTax))))
+            .ToList();
+        if (receiptTaxLines.Count > 0)
+        {
+            var difference = ToMoney(taxTotal) - receiptTaxLines.Sum(x => x.TaxAmount);
+            if (difference != 0)
+            {
+                var last = receiptTaxLines[^1];
+                receiptTaxLines[^1] = last with { TaxAmount = last.TaxAmount + difference };
+            }
+        }
+        var receiptCopyPolicy = await ResolveReceiptCopyPolicyAsync(
+            tenantId, session.OutletId, request.DeviceId, cancellationToken);
+
         var receiptDataJson = JsonSerializer.Serialize(new
         {
+            contractVersion = 2,
             saleId,
             orderNumber,
             receiptNumber,
@@ -693,8 +875,15 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 qty = item.Qty,
                 unitPrice = item.UnitPrice,
                 lineTotal = item.LineTotal,
-                sku = item.Sku
-            })
+                sku = item.Sku,
+                saleLineId = item.SaleLineId,
+                discountAmount = item.DiscountAmount,
+                lineNote = item.LineNote
+            }),
+            tenders = receiptTenders,
+            discountLines = receiptDiscountLines,
+            taxLines = receiptTaxLines,
+            copyPolicy = receiptCopyPolicy
         });
 
         var receipt = Receipt.CreateForSale(
@@ -752,6 +941,24 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             return new PosCheckoutStartPaymentResult("pos_checkout.idempotency_conflict", null);
         }
 
+        var receiptDisplay = await (
+            from tenant in _dbContext.Tenants.AsNoTracking()
+            join user in _dbContext.TenantUsers.AsNoTracking()
+                on tenantUserId equals user.Id
+            join till in _dbContext.Tills.AsNoTracking()
+                on session.TillId equals till.Id
+            where tenant.Id == tenantId &&
+                  user.TenantId == tenantId &&
+                  till.TenantId == tenantId
+            select new
+            {
+                MerchantName = tenant.DisplayName,
+                CashierName = string.IsNullOrWhiteSpace(user.DisplayName)
+                    ? user.FullName
+                    : user.DisplayName,
+                TillName = till.TillName
+            }).FirstOrDefaultAsync(cancellationToken);
+
         var response = new PosCheckoutStartPaymentResponseDto(
             saleId,
             saleId,
@@ -770,7 +977,18 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             "completed",
             now,
             paymentId,
-            responseLines);
+            responseLines,
+            receiptId,
+            receiptDisplay?.MerchantName,
+            reportingOutlet.OutletName,
+            session.TillId,
+            receiptDisplay?.TillName,
+            tenantUserId,
+            receiptDisplay?.CashierName,
+            receiptTenders,
+            receiptDiscountLines,
+            receiptTaxLines,
+            receiptCopyPolicy);
 
         return new PosCheckoutStartPaymentResult(null, response);
     }
@@ -988,7 +1206,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                select new { VariantId = grouped.Key, Available = grouped.Sum(x => x.AvailableQuantity) })
             .ToDictionaryAsync(x => x.VariantId, x => x.Available, cancellationToken);
 
-    private async Task<Dictionary<Guid, decimal>> ResolveTaxPercentsAsync(
+    private async Task<Dictionary<Guid, ResolvedTax>> ResolveTaxPercentsAsync(
         Guid tenantId, IReadOnlyList<TaxLookupInput> inputs, DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -1008,21 +1226,34 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                            join taxRate in _dbContext.TaxRates.AsNoTracking()
                                on new { classRate.TenantId, Id = classRate.TaxRateId }
                                equals new { taxRate.TenantId, taxRate.Id }
+                           join taxClass in _dbContext.TaxClasses.AsNoTracking()
+                               on new { classRate.TenantId, Id = classRate.TaxClassId }
+                               equals new { taxClass.TenantId, taxClass.Id }
                            where classRate.TenantId == tenantId && classRate.Status == ActiveStatus &&
                                  classIds.Contains(classRate.TaxClassId) && taxRate.Status == ActiveStatus &&
+                                 taxClass.Status == ActiveStatus &&
                                  (!taxRate.ValidFrom.HasValue || taxRate.ValidFrom <= today) &&
                                  (!taxRate.ValidUntil.HasValue || taxRate.ValidUntil >= today)
                            select new TaxRateRow(classRate.TaxClassId, classRate.SortOrder,
-                               taxRate.RatePercent, taxRate.IsCompound))
+                               taxRate.RatePercent, taxRate.IsCompound,
+                               taxClass.TaxClassCode, taxClass.TaxClassName))
             .ToListAsync(cancellationToken);
 
         var effectiveByClass = rates.GroupBy(x => x.TaxClassId).ToDictionary(
             group => group.Key,
-            group => group.OrderBy(x => x.SortOrder).Aggregate(0m, (effective, rate) =>
-                effective + (rate.IsCompound
-                    ? (100m + effective) * rate.RatePercent / 100m
-                    : rate.RatePercent)));
-        var result = new Dictionary<Guid, decimal>();
+            group =>
+            {
+                var ordered = group.OrderBy(x => x.SortOrder).ToList();
+                var effective = ordered.Aggregate(0m, (value, rate) =>
+                    value + (rate.IsCompound
+                        ? (100m + value) * rate.RatePercent / 100m
+                        : rate.RatePercent));
+                return new ResolvedTax(
+                    ordered[0].TaxClassCode,
+                    ordered[0].TaxClassName,
+                    effective);
+            });
+        var result = new Dictionary<Guid, ResolvedTax>();
         foreach (var input in inputs)
         {
             var assignment = assignments
@@ -1109,7 +1340,10 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         Guid ProductId,
         Guid SalesUomId,
         string ProductName,
-        bool IsTaxable);
+        bool IsTaxable,
+        string VariantName,
+        string? Sku,
+        string UomCode);
 
     private sealed record CheckoutVariantDetailRow(
         Guid VariantId,
@@ -1127,12 +1361,15 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
     private sealed record BuiltCheckoutLine(
         Guid VariantId,
         CheckoutVariantDetailRow Variant,
+        Guid? ClientLineId,
+        string? LineNote,
         decimal Quantity,
         decimal UnitPrice,
         decimal LineSubtotal,
         decimal LineDiscount,
         decimal LineTax,
-        Guid PriceListItemId);
+        Guid PriceListItemId,
+        ResolvedTax? TaxDetail);
 
     private sealed record ResolvedPriceList(
         Guid Id, string CurrencyCode, bool PriceIncludesTax, bool IsDefault,
@@ -1142,7 +1379,14 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         Guid? UomId, decimal SellingPrice, decimal MinQuantity);
     private sealed record ResolvedPrice(decimal SellingPrice, Guid PriceListItemId);
     private sealed record TaxLookupInput(Guid VariantId, Guid ProductId);
-    private sealed record TaxRateRow(Guid TaxClassId, int SortOrder, decimal RatePercent, bool IsCompound);
+    private sealed record TaxRateRow(
+        Guid TaxClassId,
+        int SortOrder,
+        decimal RatePercent,
+        bool IsCompound,
+        string TaxClassCode,
+        string TaxClassName);
+    private sealed record ResolvedTax(string TaxCode, string TaxName, decimal RatePercent);
     private sealed record CalculatedCheckoutLine(Guid VariantId, decimal Subtotal, decimal Tax);
     private sealed record IdempotentPaymentResolution(
         bool Found, PosCheckoutStartPaymentResponseDto? Payment);
@@ -1202,7 +1446,9 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         IReadOnlyList<PosCheckoutLineRequestDto>? lines)
     {
         if (lines is null || lines.Count == 0 ||
-            lines.Any(line => line.VariantId == Guid.Empty || line.Qty <= 0))
+            lines.Any(line => line.VariantId == Guid.Empty || line.Qty <= 0 ||
+                              (line.LineNote?.Trim().Length ?? 0) > 500) ||
+            lines.Where(x => x.ClientLineId.HasValue).GroupBy(x => x.ClientLineId).Any(x => x.Count() > 1))
         {
             return null;
         }
@@ -1210,17 +1456,57 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         try
         {
             return lines
-                .GroupBy(line => line.VariantId)
-                .OrderBy(group => group.Key)
+                .Select(line => line with
+                {
+                    LineNote = string.IsNullOrWhiteSpace(line.LineNote) ? null : line.LineNote.Trim(),
+                    Source = string.IsNullOrWhiteSpace(line.Source) ? null : line.Source.Trim()
+                })
+                .GroupBy(line => new { line.VariantId, line.UomId, line.LineNote,
+                    line.Source, line.RecommendationParentProductId, line.RecommendationRelationshipId })
+                .OrderBy(group => group.Key.VariantId).ThenBy(group => group.Key.LineNote)
                 .Select(group => new PosCheckoutLineRequestDto(
-                    group.Key,
-                    checked(group.Sum(line => line.Qty))))
+                    group.Key.VariantId,
+                    checked(group.Sum(line => line.Qty)),
+                    group.Key.UomId,
+                    group.Key.LineNote,
+                    group.First().ClientLineId,
+                    group.Key.Source,
+                    group.Key.RecommendationParentProductId,
+                    group.Key.RecommendationRelationshipId))
                 .ToList();
         }
         catch (OverflowException)
         {
             return null;
         }
+    }
+
+    private async Task<bool> ValidateRecommendationLinesAsync(
+        Guid tenantId, Guid outletId, IReadOnlyList<PosCheckoutLineRequestDto> lines,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var recommendations = lines.Where(x =>
+            x.RecommendationParentProductId.HasValue || x.RecommendationRelationshipId.HasValue).ToList();
+        if (recommendations.Count == 0) return true;
+        if (recommendations.Any(x => !x.RecommendationParentProductId.HasValue ||
+                                     !x.RecommendationRelationshipId.HasValue)) return false;
+
+        var relationshipIds = recommendations.Select(x => x.RecommendationRelationshipId!.Value).Distinct().ToList();
+        var rows = await (from link in _dbContext.ProductRecommendationLinks.AsNoTracking()
+                          join variant in _dbContext.ProductVariants.AsNoTracking()
+                              on new { link.TenantId, ProductId = link.RecommendedProductId }
+                              equals new { variant.TenantId, variant.ProductId }
+                          where link.TenantId == tenantId && relationshipIds.Contains(link.Id) &&
+                                link.Status == "ACTIVE" && link.RecommendationType == "FREQUENTLY_BOUGHT_TOGETHER" &&
+                                (!link.OutletId.HasValue || link.OutletId == outletId) &&
+                                (!link.ValidFrom.HasValue || link.ValidFrom <= now) &&
+                                (!link.ValidUntil.HasValue || link.ValidUntil >= now) &&
+                                variant.Status == "ACTIVE" && variant.IsSellable &&
+                                (!link.RecommendedVariantId.HasValue || link.RecommendedVariantId == variant.Id)
+                          select new { link.Id, link.SourceProductId, VariantId = variant.Id })
+            .ToListAsync(cancellationToken);
+        return recommendations.All(line => rows.Any(row => row.Id == line.RecommendationRelationshipId &&
+            row.SourceProductId == line.RecommendationParentProductId && row.VariantId == line.VariantId));
     }
 
     private static string CreatePaymentRequestHash(
@@ -1233,7 +1519,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             request.DeviceId,
             saleType = string.IsNullOrWhiteSpace(request.SaleType) ? "NewSale" : request.SaleType.Trim(),
             request.CustomerId,
-            lines = normalizedLines.Select(x => new { x.VariantId, x.Qty }),
+            lines = normalizedLines.Select(x => new { x.VariantId, x.Qty, x.UomId, x.LineNote,
+                x.Source, x.RecommendationParentProductId, x.RecommendationRelationshipId }),
             paymentMethod = paymentMethodCode,
             request.CashReceived,
             request.DiscountApplicationId
@@ -1265,7 +1552,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             .OrderBy(x => x.LineNumber)
             .Select(x => new PosCheckoutStartPaymentLineResponseDto(
                 x.ProductNameSnapshot, (int)x.Quantity, ToMoney(x.UnitPrice),
-                ToMoney(x.LineTotalAmount), x.SkuSnapshot))
+                ToMoney(x.LineTotalAmount), x.SkuSnapshot, x.Id, 0, x.LineNote))
             .ToListAsync(cancellationToken);
 
         return new(true, new PosCheckoutStartPaymentResponseDto(
@@ -1275,6 +1562,68 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             ToMoney(payment.ChangeAmount), methodCode.ToLowerInvariant(), order.CurrencyCode,
             "completed", "completed", payment.PaidAt ?? payment.InitiatedAt, payment.Id, lines));
     }
+
+    private async Task<PosReceiptCopyPolicyDto> ResolveReceiptCopyPolicyAsync(
+        Guid tenantId,
+        Guid outletId,
+        Guid posDeviceId,
+        CancellationToken cancellationToken)
+    {
+        var configJson = await (
+            from assignment in _dbContext.HardwareDeviceAssignments.AsNoTracking()
+            join hardware in _dbContext.HardwareDevices.AsNoTracking()
+                on assignment.HardwareDeviceId equals hardware.Id
+            where assignment.TenantId == tenantId &&
+                  assignment.OutletId == outletId &&
+                  assignment.PosDeviceId == posDeviceId &&
+                  assignment.ReleasedAt == null &&
+                  assignment.IsPrimary &&
+                  hardware.HardwareDeviceType == "RECEIPTPRINTER" &&
+                  hardware.Status == "ACTIVE"
+            orderby hardware.UpdatedAt descending
+            select hardware.ConfigJson).FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(configJson))
+            return SafeDefaultReceiptCopyPolicy;
+
+        try
+        {
+            using var document = JsonDocument.Parse(configJson);
+            var root = document.RootElement;
+            var printCustomer = ReadBoolean(root, "printCustomerCopy", true);
+            var customerCount = Math.Clamp(ReadInt(root, "customerCopyCount", 1), 0, 5);
+            var printMerchant = ReadBoolean(root, "printMerchantCopy", false);
+            var merchantCount = Math.Clamp(ReadInt(root, "merchantCopyCount", 0), 0, 5);
+            if ((printCustomer && customerCount == 0) ||
+                (printMerchant && merchantCount == 0))
+                return SafeDefaultReceiptCopyPolicy;
+
+            var terminalExpected = ReadBoolean(root, "externalTerminalSlipExpected", false);
+            var terminalPrints = ReadBoolean(root, "externalTerminalPrintsCustomerSlip", false) ||
+                                 ReadBoolean(root, "externalTerminalPrintsMerchantSlip", false);
+            return new PosReceiptCopyPolicyDto(
+                customerCount, merchantCount, printCustomer, printMerchant,
+                terminalExpected, terminalPrints);
+        }
+        catch (JsonException)
+        {
+            return SafeDefaultReceiptCopyPolicy;
+        }
+    }
+
+    private static readonly PosReceiptCopyPolicyDto SafeDefaultReceiptCopyPolicy =
+        new(1, 0, true, false, false, false);
+
+    private static bool ReadBoolean(JsonElement root, string name, bool fallback) =>
+        root.TryGetProperty(name, out var value) &&
+        value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
+            : fallback;
+
+    private static int ReadInt(JsonElement root, string name, int fallback) =>
+        root.TryGetProperty(name, out var value) && value.TryGetInt32(out var result)
+            ? result
+            : fallback;
 
     private sealed record DiscountApplicationResolution(
         string? ErrorCode,

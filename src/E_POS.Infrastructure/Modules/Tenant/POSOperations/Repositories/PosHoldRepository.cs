@@ -136,7 +136,8 @@ public sealed class PosHoldRepository : IPosHoldRepository
             .Where(x => x.TenantId == tenantId && x.SalesOrderId == parked.Order.Id &&
                         x.ProductVariantId.HasValue && x.Quantity > 0)
             .OrderBy(x => x.LineNumber)
-            .Select(x => new PosCheckoutLineRequestDto(x.ProductVariantId!.Value, (int)x.Quantity))
+            .Select(x => new PosCheckoutLineRequestDto(
+                x.ProductVariantId!.Value, (int)x.Quantity, x.UomId, x.LineNote))
             .ToListAsync(cancellationToken);
         if (storedLines.Count == 0)
             return new("pos_checkout.invalid_lines", null);
@@ -178,9 +179,12 @@ public sealed class PosHoldRepository : IPosHoldRepository
         CancellationToken cancellationToken)
     {
         var normalizedLines = request.Lines
-            .GroupBy(x => x.VariantId)
-            .OrderBy(x => x.Key)
-            .Select(x => new PosCheckoutLineRequestDto(x.Key, checked(x.Sum(y => y.Qty))))
+            .Select(x => x with { LineNote = string.IsNullOrWhiteSpace(x.LineNote) ? null : x.LineNote.Trim() })
+            .GroupBy(x => new { x.VariantId, x.UomId, x.LineNote })
+            .OrderBy(x => x.Key.VariantId)
+            .Select(x => new PosCheckoutLineRequestDto(x.Key.VariantId, checked(x.Sum(y => y.Qty)),
+                x.Key.UomId, x.Key.LineNote, x.First().ClientLineId, x.First().Source,
+                x.First().RecommendationParentProductId, x.First().RecommendationRelationshipId))
             .ToList();
         var keyHash = Hash(request.IdempotencyKey!.Trim())[..32];
         var requestHash = Hash(JsonSerializer.Serialize(new
@@ -338,13 +342,14 @@ public sealed class PosHoldRepository : IPosHoldRepository
                 detail.Product.ProductStructure, requestedLine.Qty, unitPrice,
                 lineSubtotal, lineDiscount, lineTax, priceList.PriceIncludesTax, now);
             _dbContext.SalesOrderLines.Add(line);
+            line.SetLineNote(requestedLine.LineNote, now);
             var lineTotal = priceList.PriceIncludesTax
                 ? lineSubtotal - lineDiscount
                 : lineSubtotal - lineDiscount + lineTax;
             responseLines.Add(new PosHoldLineDto(
                 line.Id, detail.Variant.Id, detail.Product.ProductName,
                 detail.Variant.VariantName, detail.Variant.Sku, requestedLine.Qty,
-                ToMoney(unitPrice), ToMoney(lineTotal)));
+                ToMoney(unitPrice), ToMoney(lineTotal), requestedLine.LineNote));
         }
 
         var hold = PosOrderHold.Create(
@@ -418,7 +423,8 @@ public sealed class PosHoldRepository : IPosHoldRepository
                     x.SkuSnapshot,
                     (int)x.Quantity,
                     ToMoney(x.UnitPrice),
-                    ToMoney(x.LineTotalAmount))
+                    ToMoney(x.LineTotalAmount),
+                    x.LineNote)
             })
             .ToListAsync(cancellationToken);
         var linesBySale = lines

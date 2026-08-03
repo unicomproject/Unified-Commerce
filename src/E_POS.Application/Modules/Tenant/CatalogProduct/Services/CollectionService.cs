@@ -31,6 +31,11 @@ public sealed class CollectionService : ICollectionService
         if (validationError is not null) return ApplicationResult<CollectionResponse>.Failure(validationError);
 
         var normalizedCode = CollectionConstants.NormalizeCode(request.CollectionCode);
+        if (normalizedCode == CollectionConstants.PopularCollectionCode)
+        {
+            return ApplicationResult<CollectionResponse>.Failure(new ApplicationError("collection.reserved_code", "The collection code POS_POPULAR is reserved and cannot be created manually."));
+        }
+
         if (await _repository.CollectionCodeExistsAsync(context.TenantId, normalizedCode, null, cancellationToken))
         {
             return ApplicationResult<CollectionResponse>.Failure(new ApplicationError("collection.duplicate_code", "Collection code already exists."));
@@ -93,6 +98,18 @@ public sealed class CollectionService : ICollectionService
         if (collection is null) return ApplicationResult<CollectionResponse>.Failure(NotFound);
 
         var normalizedCode = CollectionConstants.NormalizeCode(request.CollectionCode);
+        if (collection.CollectionCode == CollectionConstants.PopularCollectionCode)
+        {
+            if (normalizedCode != CollectionConstants.PopularCollectionCode || request.CollectionType != CollectionConstants.PopularCollectionType || request.Status != CollectionConstants.ActiveStatus)
+            {
+                return ApplicationResult<CollectionResponse>.Failure(new ApplicationError("collection.reserved_modification_denied", "The code, type, or active status of the reserved POS_POPULAR collection cannot be modified."));
+            }
+        }
+        else if (normalizedCode == CollectionConstants.PopularCollectionCode)
+        {
+            return ApplicationResult<CollectionResponse>.Failure(new ApplicationError("collection.reserved_code", "The collection code POS_POPULAR is reserved and cannot be assigned to another collection."));
+        }
+
         if (await _repository.CollectionCodeExistsAsync(context.TenantId, normalizedCode, collectionId, cancellationToken))
         {
             return ApplicationResult<CollectionResponse>.Failure(new ApplicationError("collection.duplicate_code", "Collection code already exists."));
@@ -128,6 +145,11 @@ public sealed class CollectionService : ICollectionService
         var collection = await _repository.GetEditableAsync(context.TenantId, collectionId, cancellationToken);
         if (collection is null) return ApplicationResult.Failure(NotFound);
 
+        if (collection.CollectionCode == CollectionConstants.PopularCollectionCode)
+        {
+            return ApplicationResult.Failure(new ApplicationError("collection.cannot_delete_reserved_collection", "The reserved POS_POPULAR collection cannot be deleted."));
+        }
+
         if (await _repository.HasProductLinksAsync(context.TenantId, collectionId, cancellationToken))
         {
             return ApplicationResult.Failure(new ApplicationError("collection.delete_conflict", "Collection cannot be deleted while products are linked."));
@@ -136,6 +158,87 @@ public sealed class CollectionService : ICollectionService
         collection.SoftDelete(context.UserId, _dateTimeProvider.UtcNow);
         await _repository.SaveChangesAsync(cancellationToken);
         return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>> GetPopularProductsAsync(TenantRequestContext context, CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccess(context, CollectionConstants.ViewPermission);
+        if (accessError is not null) return ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Failure(accessError);
+
+        var collection = await _repository.GetByCodeAsync(context.TenantId, CollectionConstants.PopularCollectionCode, cancellationToken);
+        if (collection is null)
+        {
+            var collectionId = Guid.NewGuid();
+            collection = Collection.Create(
+                collectionId,
+                context.TenantId,
+                CollectionConstants.PopularCollectionCode,
+                "Popular Products",
+                "pos-popular",
+                "Manually curated popular products for the POS screen.",
+                CollectionConstants.PopularCollectionType,
+                null,
+                null,
+                0,
+                CollectionConstants.ActiveStatus,
+                context.UserId,
+                _dateTimeProvider.UtcNow);
+            await _repository.AddAsync(collection, cancellationToken);
+        }
+
+        var products = await _repository.GetCollectionProductsAsync(context.TenantId, collection.Id, cancellationToken);
+        return ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Success(products);
+    }
+
+    public async Task<ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>> ReplacePopularProductsAsync(TenantRequestContext context, List<Guid> productIds, CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccess(context, CollectionConstants.UpdatePermission);
+        if (accessError is not null) return ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Failure(accessError);
+
+        if (productIds == null)
+        {
+            return ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Failure(new ApplicationError("collection.invalid_request", "Product list cannot be null."));
+        }
+
+        if (productIds.Distinct().Count() != productIds.Count)
+        {
+            return ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Failure(new ApplicationError("collection.duplicate_product_ids", "Duplicate product IDs are not allowed in the assignment list."));
+        }
+
+        var collection = await _repository.GetByCodeAsync(context.TenantId, CollectionConstants.PopularCollectionCode, cancellationToken);
+        if (collection is null)
+        {
+            var collectionId = Guid.NewGuid();
+            collection = Collection.Create(
+                collectionId,
+                context.TenantId,
+                CollectionConstants.PopularCollectionCode,
+                "Popular Products",
+                "pos-popular",
+                "Manually curated popular products for the POS screen.",
+                CollectionConstants.PopularCollectionType,
+                null,
+                null,
+                0,
+                CollectionConstants.ActiveStatus,
+                context.UserId,
+                _dateTimeProvider.UtcNow);
+            await _repository.AddAsync(collection, cancellationToken);
+        }
+
+        if (productIds.Count > 0)
+        {
+            var valid = await _repository.AllProductsExistAndNotDeletedAsync(context.TenantId, productIds, cancellationToken);
+            if (!valid)
+            {
+                return ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Failure(new ApplicationError("collection.invalid_product_ids", "One or more product IDs are invalid, belong to a different tenant, or are deleted."));
+            }
+        }
+
+        await _repository.ReplaceCollectionProductsAsync(context.TenantId, collection.Id, productIds, context.UserId, _dateTimeProvider.UtcNow, cancellationToken);
+
+        var products = await _repository.GetCollectionProductsAsync(context.TenantId, collection.Id, cancellationToken);
+        return ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Success(products);
     }
 
     private static ApplicationError? ValidateAccess(TenantRequestContext context, string requiredPermission)
@@ -148,4 +251,5 @@ public sealed class CollectionService : ICollectionService
         return context.HasPermission(requiredPermission) || context.HasPermission(CollectionConstants.ManagePermission) ? null : PermissionDenied;
     }
 }
+
 

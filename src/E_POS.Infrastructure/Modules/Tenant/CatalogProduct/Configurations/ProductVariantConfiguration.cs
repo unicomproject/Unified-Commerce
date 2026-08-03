@@ -133,6 +133,9 @@ public sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Produ
             .IsUnique()
             .HasDatabaseName("uq_product_variants_tenant_id_id");
 
+        builder.HasAlternateKey(x => new { x.TenantId, x.ProductId, x.Id })
+            .HasName("ak_product_variants_tenant_id_product_id_id");
+
         builder.ToTable(t => t.HasCheckConstraint("ck_product_variants_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }
 }

@@ -20,6 +20,7 @@ public static class DevelopmentPosPaymentReceiptPermissionsSeedData
         new(Guid.Parse("77777777-0321-4000-8000-000000000001"), SalesPermissions.Sale.View, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosSalesFeatureId, "view", "View completed POS sales."),
         new(Guid.Parse("77777777-0322-4000-8000-000000000001"), ReceiptPermissions.View, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosReceiptsFeatureId, "view", "View POS receipts."),
         new(Guid.Parse("77777777-0323-4000-8000-000000000001"), ReceiptPermissions.Print, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosReceiptsFeatureId, "print", "Print POS receipts."),
+        new(Guid.Parse("a4d1b0c2-8f31-4a2b-9f76-50a8b98d9101"), ReceiptPermissions.Reprint, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosReceiptsFeatureId, "reprint", "Reprint persisted POS receipts with an audited reason."),
         new(Guid.Parse("77777777-0324-4000-8000-000000000001"), SalesPermissions.Orders.View, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosOrdersFeatureId, "view", "View POS orders sidebar."),
         new(Guid.Parse("77777777-0325-4000-8000-000000000001"), ReturnsPermissions.ViewReturns, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosReturnsFeatureId, "view_returns", "View POS returns."),
         new(Guid.Parse("77777777-0326-4000-8000-000000000001"), ReturnsPermissions.ViewRefunds, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosReturnsFeatureId, "view_refunds", "View POS refunds."),

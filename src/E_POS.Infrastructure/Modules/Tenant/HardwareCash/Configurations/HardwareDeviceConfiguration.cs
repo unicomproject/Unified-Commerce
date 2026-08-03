@@ -36,6 +36,7 @@ public sealed class HardwareDeviceConfiguration : IEntityTypeConfiguration<Hardw
         builder.Property(x => x.AssetTag).HasColumnName("asset_tag").HasColumnType("varchar(100)").HasMaxLength(100).IsRequired(false);
         builder.Property(x => x.FirmwareVersion).HasColumnName("firmware_version").HasColumnType("varchar(80)").HasMaxLength(80).IsRequired(false);
         builder.Property(x => x.ConfigJson).HasColumnName("config_json").HasColumnType("jsonb").IsRequired(false);
+        builder.Property(x => x.ConfigurationVersion).HasColumnName("configuration_version").HasDefaultValue(1).IsConcurrencyToken().IsRequired();
         builder.Property(x => x.LastSeenAt).HasColumnName("last_seen_at").HasColumnType("timestamp with time zone").IsRequired(false);
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
 

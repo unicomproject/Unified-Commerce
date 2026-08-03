@@ -31,7 +31,9 @@ public sealed class PlatformAdminPermissionCatalogControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<LegacyApiResponse<PlatformPermissionCatalogResponse>>(ok.Value);
         Assert.True(payload.Success);
-        Assert.Equal(13, payload.Data.Modules.Count);
+        Assert.Equal(14, payload.Data.Modules.Count);
+        Assert.Contains(payload.Data.Modules, m => m.Key == "tenant_subscriptions" && m.Name == "Tenant Subscriptions");
+        Assert.Contains(payload.Data.Modules.SelectMany(m => m.Features).SelectMany(f => f.Permissions), p => p.Code == "platform.tenant_subscriptions.view");
     }
 
     [Fact]
@@ -49,7 +51,8 @@ public sealed class PlatformAdminPermissionCatalogControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<LegacyApiResponse<PlatformPermissionFlatResponse>>(ok.Value);
         Assert.True(payload.Success);
-        Assert.Equal(36, payload.Data.TotalCount);
+        Assert.Equal(37, payload.Data.TotalCount);
+        Assert.Contains(payload.Data.Permissions, p => p.Code == "platform.tenant_subscriptions.view");
     }
 
     [Fact]

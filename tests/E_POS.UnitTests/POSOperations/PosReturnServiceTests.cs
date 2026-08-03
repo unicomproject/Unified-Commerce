@@ -2581,7 +2581,8 @@ public sealed class PosReturnServiceTests
             Guid? categoryId,
             string? search,
             CancellationToken cancellationToken,
-            Guid? outletId = null) =>
+            Guid? outletId = null,
+            string? segment = null) =>
             Task.FromResult(new PosProductCatalogRepositoryResult(null, Products));
 
         public Task<PosProductCatalogCategoriesRepositoryResult> ListCategoriesAsync(

@@ -107,7 +107,6 @@ public sealed class PosPermissionSeedTests
             SalesPermissions.Cart.UpdateItem,
             SalesPermissions.Cart.RemoveItem,
             SalesPermissions.Cart.Clear,
-            CustomerPermissions.Create,
             SalesPermissions.Discount.Apply,
             SalesPermissions.Park.Create,
             SalesPermissions.Sale.Checkout,
@@ -145,7 +144,6 @@ public sealed class PosPermissionSeedTests
             SalesPermissions.Cart.UpdateItem,
             SalesPermissions.Cart.RemoveItem,
             SalesPermissions.Cart.Clear,
-            CustomerPermissions.Create,
             SalesPermissions.Discount.Apply,
             SalesPermissions.Park.Create,
             SalesPermissions.Sale.Checkout,
@@ -299,5 +297,24 @@ public sealed class PosPermissionSeedTests
             "WHERE permission_code = 'customers.update';",
             downSql,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HardwareSettingsPermission_IsSeededAndGrantedToCashier()
+    {
+        Assert.Equal(
+            "pos.hardware.settings",
+            DevelopmentPosHardwareSettingsPermissionSeedData.PermissionCode);
+        Assert.Contains(
+            DevelopmentPosHardwareSettingsPermissionSeedData.PermissionCode,
+            DevelopmentPosCashierPermissionAssignmentSeedData.PermissionCodes);
+        Assert.Contains(
+            "pos.hardware.settings",
+            DevelopmentPosHardwareSettingsPermissionSeedData.UpSql,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            DevelopmentTenantSeedConstants.CashierRoleId.ToString(),
+            DevelopmentPosHardwareSettingsPermissionSeedData.CashierAssignmentUpSql,
+            StringComparison.OrdinalIgnoreCase);
     }
 }
