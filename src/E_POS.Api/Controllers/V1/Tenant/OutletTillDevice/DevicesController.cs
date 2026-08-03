@@ -80,6 +80,34 @@ public sealed class DevicesController : ControllerBase
         return Ok(new { data = result.Value });
     }
 
+    [HttpPost("heartbeat")]
+    [ProducesResponseType(typeof(DeviceHeartbeatResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RecordHeartbeat(
+        [FromBody] DeviceHeartbeatRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(
+                new ApplicationError("device_context.invalid_tenant_context", "Invalid tenant context.")));
+        }
+
+        var result = await _deviceContextService.RecordHeartbeatAsync(
+            context,
+            request,
+            cancellationToken);
+
+        if (!result.IsSuccess || result.Value is null)
+        {
+            return ToErrorResult(result.Error);
+        }
+
+        return Ok(new { data = result.Value });
+    }
+
     private IActionResult ToErrorResult(ApplicationError error)
     {
         return error.Code switch

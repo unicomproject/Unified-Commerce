@@ -53,10 +53,29 @@ public sealed class OutletsController : ControllerBase
     [ProducesResponseType(typeof(OutletListResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> List([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> List(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null,
+        [FromQuery] string? outletType = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = null,
+        CancellationToken cancellationToken = default)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized(CreateError(new ApplicationError("outlet.invalid_tenant_context", "Invalid tenant context.")));
-        var result = await _outletService.ListAsync(context, pageNumber, pageSize, search, cancellationToken);
+        var result = await _outletService.ListAsync(context, page, pageSize, search, outletType, status, sortBy, sortDirection, cancellationToken);
+        return result.IsSuccess && result.Value is not null ? Ok(result.Value) : ToErrorResult(result.Error);
+    }
+
+    [HttpGet("summary")]
+    [ProducesResponseType(typeof(OutletSummaryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetSummary(CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized(CreateError(new ApplicationError("outlet.invalid_tenant_context", "Invalid tenant context.")));
+        var result = await _outletService.GetSummaryAsync(context, cancellationToken);
         return result.IsSuccess && result.Value is not null ? Ok(result.Value) : ToErrorResult(result.Error);
     }
 
