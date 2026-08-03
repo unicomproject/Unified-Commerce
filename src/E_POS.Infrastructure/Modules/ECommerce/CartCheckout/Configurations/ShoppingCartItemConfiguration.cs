@@ -63,6 +63,11 @@ public sealed class ShoppingCartItemConfiguration : IEntityTypeConfiguration<Sho
             .HasColumnType("varchar(40)")
             .HasMaxLength(40);
 
+        builder.Property(x => x.LineNote)
+            .HasColumnName("line_note")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500);
+
         builder.Property(x => x.Quantity)
             .HasColumnName("quantity")
             .HasColumnType("numeric(18,4)")

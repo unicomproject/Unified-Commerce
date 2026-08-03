@@ -5,12 +5,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
 var command = args.FirstOrDefault()?.Trim().ToLowerInvariant();
-if (command is not ("inspect" or "top-up"))
+if (command is not ("inspect" or "top-up" or "seed-dev"))
 {
     Console.Error.WriteLine(
         "Usage: inspect | top-up --tenant-code <code> --outlet-code <code> " +
         "--location-code <code> --actor-email <email> [--minimum 100] " +
-        "--confirm-local-development");
+        "--confirm-local-development | seed-dev --confirm-local-development");
     return 2;
 }
 
@@ -41,6 +41,18 @@ if (command == "inspect")
 {
     var context = await service.InspectAsync(CancellationToken.None);
     Console.WriteLine(JsonSerializer.Serialize(context, jsonOptions));
+    return 0;
+}
+
+if (command == "seed-dev")
+{
+    if (!values.ContainsKey("confirm-local-development"))
+    {
+        throw new InvalidOperationException(
+            "Refusing to seed database without --confirm-local-development.");
+    }
+    await service.SeedDevPopularAndOffersAsync(CancellationToken.None);
+    Console.WriteLine("Successfully seeded 10 Popular products and 10 Discount/Offer products!");
     return 0;
 }
 

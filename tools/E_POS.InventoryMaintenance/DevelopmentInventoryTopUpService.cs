@@ -509,4 +509,130 @@ public sealed class DevelopmentInventoryTopUpService
         InventoryBalance? Balance,
         decimal QuantityBefore,
         decimal QuantityChange);
+
+    public async Task SeedDevPopularAndOffersAsync(CancellationToken cancellationToken)
+    {
+        var tenantId = Guid.Parse("55555555-0000-4000-8000-000000000001");
+        
+        // 1. Create or get POS_POPULAR collection
+        var popularColl = await _dbContext.Collections
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.CollectionCode == "POS_POPULAR", cancellationToken);
+        if (popularColl == null)
+        {
+            var coll = new E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Collection();
+            Set(coll, "Id", Guid.NewGuid());
+            Set(coll, "TenantId", tenantId);
+            Set(coll, "CollectionCode", "POS_POPULAR");
+            Set(coll, "CollectionName", "POS Popular Products");
+            Set(coll, "Description", "Popular items for POS quick select");
+            Set(coll, "Status", "ACTIVE");
+            Set(coll, "CreatedAt", DateTimeOffset.UtcNow);
+            Set(coll, "UpdatedAt", DateTimeOffset.UtcNow);
+            _dbContext.Collections.Add(coll);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            popularColl = coll;
+        }
+
+        // 2. Fetch the first 10 products
+        var productIds = new List<string>
+        {
+            "cccc0004-0001-4000-8000-000000000001",
+            "cccc0004-0002-4000-8000-000000000001",
+            "cccc0004-0003-4000-8000-000000000001",
+            "cccc0004-0004-4000-8000-000000000001",
+            "cccc0004-0005-4000-8000-000000000001",
+            "cccc0004-0006-4000-8000-000000000001",
+            "cccc0004-0007-4000-8000-000000000001",
+            "cccc0004-0008-4000-8000-000000000001",
+            "cccc0004-0009-4000-8000-000000000001",
+            "cccc0004-000a-4000-8000-000000000001"
+        }.Select(Guid.Parse).ToList();
+
+        // 3. Link them to the POS_POPULAR collection
+        var existingProductColls = await _dbContext.ProductCollections
+            .Where(pc => pc.TenantId == tenantId && pc.CollectionId == popularColl.Id)
+            .Select(pc => pc.ProductId)
+            .ToListAsync(cancellationToken);
+
+        var nextSortOrder = 0;
+        foreach (var pId in productIds)
+        {
+            if (!existingProductColls.Contains(pId))
+            {
+                var pc = new E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductCollection();
+                Set(pc, "Id", Guid.NewGuid());
+                Set(pc, "TenantId", tenantId);
+                Set(pc, "ProductId", pId);
+                Set(pc, "CollectionId", popularColl.Id);
+                Set(pc, "SortOrder", nextSortOrder++);
+                Set(pc, "CreatedAt", DateTimeOffset.UtcNow);
+                Set(pc, "UpdatedAt", DateTimeOffset.UtcNow);
+                _dbContext.ProductCollections.Add(pc);
+            }
+        }
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // 4. Create or get DEV_PROMO_25 discount policy
+        var discountType = await _dbContext.DiscountTypes
+            .FirstOrDefaultAsync(x => x.CalculationMethod == "PERCENTAGE" && x.Status == "ACTIVE", cancellationToken);
+        if (discountType == null)
+        {
+            throw new InvalidOperationException("Active PERCENTAGE discount type not found in database.");
+        }
+
+        var policy = await _dbContext.DiscountPolicies
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.DiscountPolicyCode == "DEV_PROMO_25", cancellationToken);
+        if (policy == null)
+        {
+            var dp = new E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicy();
+            Set(dp, "Id", Guid.NewGuid());
+            Set(dp, "TenantId", tenantId);
+            Set(dp, "DiscountTypeId", discountType.Id);
+            Set(dp, "DiscountPolicyCode", "DEV_PROMO_25");
+            Set(dp, "DiscountPolicyName", "Dev Promo 25% Off");
+            Set(dp, "Description", "Seeded 25% discount for development catalog testing.");
+            Set(dp, "DiscountScope", "LINE");
+            Set(dp, "DiscountValue", 25m);
+            Set(dp, "Status", "ACTIVE");
+            Set(dp, "Priority", 100);
+            Set(dp, "CreatedAt", DateTimeOffset.UtcNow);
+            Set(dp, "UpdatedAt", DateTimeOffset.UtcNow);
+            _dbContext.DiscountPolicies.Add(dp);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            policy = dp;
+        }
+
+        // 5. Target the 10 products
+        var existingTargets = await _dbContext.DiscountPolicyTargets
+            .Where(x => x.TenantId == tenantId && x.DiscountPolicyId == policy.Id)
+            .Select(x => x.ProductId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var pId in productIds)
+        {
+            if (!existingTargets.Contains(pId))
+            {
+                var target = new E_POS.Domain.Modules.Tenant.Discount.Entities.DiscountPolicyTarget();
+                Set(target, "Id", Guid.NewGuid());
+                Set(target, "TenantId", tenantId);
+                Set(target, "DiscountPolicyId", policy.Id);
+                Set(target, "TargetType", "PRODUCT");
+                Set(target, "TargetMode", "INCLUDE");
+                Set(target, "ProductId", pId);
+                Set(target, "Status", "ACTIVE");
+                Set(target, "CreatedAt", DateTimeOffset.UtcNow);
+                Set(target, "UpdatedAt", DateTimeOffset.UtcNow);
+                _dbContext.DiscountPolicyTargets.Add(target);
+            }
+        }
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void Set<T>(object entity, string propertyName, T value)
+    {
+        var prop = entity.GetType().GetProperty(
+            propertyName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+        prop?.SetValue(entity, value);
+    }
 }

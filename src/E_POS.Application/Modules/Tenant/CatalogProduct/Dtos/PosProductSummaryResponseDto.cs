@@ -14,7 +14,17 @@ public sealed record PosProductSummaryResponseDto(
     decimal? AvailableQuantity,
     string? Sku = null,
     string? Barcode = null,
-    string? VariantName = null)
+    string? VariantName = null,
+    bool HasOffer = false,
+    string? OfferType = null,
+    Guid? OfferPolicyId = null,
+    string? OfferName = null,
+    int? OriginalPrice = null,
+    int? SellingPrice = null,
+    int? OfferPrice = null,
+    string? DiscountLabel = null,
+    bool RequiresCartValidation = false,
+    bool RequiresManagerApproval = false)
 {
     public string? ImageUrl => ImageStorageKey;
 }

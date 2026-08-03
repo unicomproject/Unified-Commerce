@@ -98,6 +98,11 @@ public sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sales
             .HasColumnType("varchar(150)")
             .HasMaxLength(150);
 
+        builder.Property(x => x.LineNote)
+            .HasColumnName("line_note")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500);
+
         builder.Property(x => x.UomCodeSnapshot)
             .HasColumnName("uom_code_snapshot")
             .HasColumnType("varchar(50)")

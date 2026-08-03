@@ -5,10 +5,14 @@ using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
+using E_POS.Domain.Modules.Tenant.Discount.Entities;
+using E_POS.Domain.Modules.Platform.PlatformFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace E_POS.IntegrationTests.CatalogProduct;
@@ -849,6 +853,378 @@ public sealed class PosProductCatalogRepositoryTests
         await dbContext.SaveChangesAsync();
     }
 
+    [Fact]
+    public async Task ListProductsAsync_FrequentlySold_ReturnsRankedProducts()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        var productIdA = Guid.NewGuid();
+        var variantIdA = Guid.NewGuid();
+        var productIdB = Guid.NewGuid();
+        var variantIdB = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdA, variantIdA, 1000m);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdB, variantIdB, 2000m);
+
+        dbContext.Products.Add(Product.Create(productIdA, tenantId, "P-A", "Product A", "p-a", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdA, tenantId, productIdA, "DEFAULT", "Product A", "SKU-A", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+
+        dbContext.Products.Add(Product.Create(productIdB, tenantId, "P-B", "Product B", "p-b", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdB, tenantId, productIdB, "DEFAULT", "Product B", "SKU-B", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+        await dbContext.SaveChangesAsync();
+
+        // Seed Sales: Product B has 15 units sold, Product A has 10 units sold
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-2), productIdA, variantIdA, 10m);
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-1), productIdB, variantIdB, 15m);
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.ListProductsAsync(
+            tenantId,
+            deviceId,
+            null,
+            null,
+            CancellationToken.None,
+            segment: "frequently-sold");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Products.Count);
+        // Product B should be first (15 sold)
+        Assert.Equal(productIdB, result.Products[0].Id);
+        Assert.Equal(productIdA, result.Products[1].Id);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_FrequentlySold_DeductsCancellationsAndReturns()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        var productIdA = Guid.NewGuid();
+        var variantIdA = Guid.NewGuid();
+        var productIdB = Guid.NewGuid();
+        var variantIdB = Guid.NewGuid();
+        var productIdC = Guid.NewGuid();
+        var variantIdC = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdA, variantIdA, 1000m);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdB, variantIdB, 2000m);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdC, variantIdC, 3000m);
+
+        dbContext.Products.Add(Product.Create(productIdA, tenantId, "P-A", "Product A", "p-a", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdA, tenantId, productIdA, "DEFAULT", "Product A", "SKU-A", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+
+        dbContext.Products.Add(Product.Create(productIdB, tenantId, "P-B", "Product B", "p-b", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdB, tenantId, productIdB, "DEFAULT", "Product B", "SKU-B", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+
+        dbContext.Products.Add(Product.Create(productIdC, tenantId, "P-C", "Product C", "p-c", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdC, tenantId, productIdC, "DEFAULT", "Product C", "SKU-C", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+        await dbContext.SaveChangesAsync();
+
+        // Product A: 10 sold, 3 cancelled, 2 returned = net 5
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-2), productIdA, variantIdA, 10m, cancelledQuantity: 3m, returnedQuantity: 2m);
+        // Product B: 4 sold = net 4
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-1), productIdB, variantIdB, 4m);
+        // Product C: 5 sold, 5 cancelled = net 0 (excluded)
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-3), productIdC, variantIdC, 5m, cancelledQuantity: 5m);
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.ListProductsAsync(
+            tenantId,
+            deviceId,
+            null,
+            null,
+            CancellationToken.None,
+            segment: "frequently-sold");
+
+        Assert.True(result.IsSuccess);
+        // Only Product A and B should qualify. Product C has net 0, so excluded.
+        Assert.Equal(2, result.Products.Count);
+        Assert.Equal(productIdA, result.Products[0].Id);
+        Assert.Equal(productIdB, result.Products[1].Id);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_FrequentlySold_ExcludesNonCompletedAndOldOrders()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        var productIdA = Guid.NewGuid();
+        var variantIdA = Guid.NewGuid();
+        var productIdB = Guid.NewGuid();
+        var variantIdB = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdA, variantIdA, 1000m);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdB, variantIdB, 2000m);
+
+        dbContext.Products.Add(Product.Create(productIdA, tenantId, "P-A", "Product A", "p-a", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdA, tenantId, productIdA, "DEFAULT", "Product A", "SKU-A", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+
+        dbContext.Products.Add(Product.Create(productIdB, tenantId, "P-B", "Product B", "p-b", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdB, tenantId, productIdB, "DEFAULT", "Product B", "SKU-B", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+        await dbContext.SaveChangesAsync();
+
+        // 1. Seed completed sale: Product A (10 sold)
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-2), productIdA, variantIdA, 10m);
+        // 2. Seed draft sale: Product B (15 sold) -> should be excluded
+        await SeedPosSaleWithStatusAsync(dbContext, tenantId, Guid.NewGuid(), outletId, "DRAFT", DateTimeOffset.UtcNow.AddDays(-1), productIdB, variantIdB, 15m);
+        // 3. Seed cancelled sale: Product B (20 sold) -> should be excluded
+        await SeedPosSaleWithStatusAsync(dbContext, tenantId, Guid.NewGuid(), outletId, "CANCELLED", DateTimeOffset.UtcNow.AddDays(-1), productIdB, variantIdB, 20m);
+        // 4. Seed old completed sale: Product B (25 sold) -> outside 30 days lookback -> should be excluded
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-35), productIdB, variantIdB, 25m);
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.ListProductsAsync(
+            tenantId,
+            deviceId,
+            null,
+            null,
+            CancellationToken.None,
+            segment: "frequently-sold");
+
+        Assert.True(result.IsSuccess);
+        // Only Product A qualifies
+        var summary = Assert.Single(result.Products);
+        Assert.Equal(productIdA, summary.Id);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_FrequentlySold_ResolvesConfigsAndAppliesLimit()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        var productIdA = Guid.NewGuid();
+        var variantIdA = Guid.NewGuid();
+        var productIdB = Guid.NewGuid();
+        var variantIdB = Guid.NewGuid();
+        var productIdC = Guid.NewGuid();
+        var variantIdC = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdA, variantIdA, 1000m);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdB, variantIdB, 2000m);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productIdC, variantIdC, 3000m);
+
+        dbContext.Products.Add(Product.Create(productIdA, tenantId, "P-A", "Product A", "p-a", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdA, tenantId, productIdA, "DEFAULT", "Product A", "SKU-A", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+
+        dbContext.Products.Add(Product.Create(productIdB, tenantId, "P-B", "Product B", "p-b", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdB, tenantId, productIdB, "DEFAULT", "Product B", "SKU-B", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+
+        dbContext.Products.Add(Product.Create(productIdC, tenantId, "P-C", "Product C", "p-c", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantIdC, tenantId, productIdC, "DEFAULT", "Product C", "SKU-C", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+        await dbContext.SaveChangesAsync();
+
+        // Product A: 10 sold, 2 days ago (qualifies for 10-day lookback)
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-2), productIdA, variantIdA, 10m);
+        // Product B: 8 sold, 1 day ago (qualifies for 10-day lookback)
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-1), productIdB, variantIdB, 8m);
+        // Product C: 20 sold, 12 days ago (does not qualify for 10-day lookback)
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-12), productIdC, variantIdC, 20m);
+
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                { "PosProducts:FrequentlySold:LookbackDays", "10" },
+                { "PosProducts:FrequentlySold:Limit", "1" }
+            })
+            .Build();
+
+        var repository = new PosProductCatalogRepository(dbContext, config);
+        var result = await repository.ListProductsAsync(
+            tenantId,
+            deviceId,
+            null,
+            null,
+            CancellationToken.None,
+            segment: "frequently-sold");
+
+        Assert.True(result.IsSuccess);
+        // Limit is 1, so only Product A (highest quantity within 10 days) should be returned
+        var summary = Assert.Single(result.Products);
+        Assert.Equal(productIdA, summary.Id);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_FrequentlySold_ObeysTenantAndOutletIsolation()
+    {
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var otherOutletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 1000m);
+
+        dbContext.Products.Add(Product.Create(productId, tenantId, "P-A", "Product A", "p-a", "STANDARD", "SIMPLE", null, null, null, null, null, true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantId, tenantId, productId, "DEFAULT", "Product A", "SKU-A", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now));
+        await dbContext.SaveChangesAsync();
+
+        // Sales for different tenant -> should not qualify
+        await SeedCompletedPosSaleAsync(dbContext, otherTenantId, Guid.NewGuid(), outletId, DateTimeOffset.UtcNow.AddDays(-1), productId, variantId, 10m);
+        // Sales for different outlet on same tenant -> should not qualify
+        await SeedCompletedPosSaleAsync(dbContext, tenantId, Guid.NewGuid(), otherOutletId, DateTimeOffset.UtcNow.AddDays(-1), productId, variantId, 15m);
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.ListProductsAsync(
+            tenantId,
+            deviceId,
+            null,
+            null,
+            CancellationToken.None,
+            segment: "frequently-sold");
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Products);
+    }
+
+    private static async Task SeedCompletedPosSaleAsync(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        Guid orderId,
+        Guid outletId,
+        DateTimeOffset completedAt,
+        Guid productId,
+        Guid variantId,
+        decimal quantity,
+        decimal cancelledQuantity = 0,
+        decimal returnedQuantity = 0)
+    {
+        var order = SalesOrder.CreateCompletedPosSale(
+            orderId,
+            tenantId,
+            $"ORD-{orderId.ToString().Substring(0, 8)}",
+            Guid.NewGuid(),
+            null,
+            null,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            "LKR",
+            true,
+            100m,
+            0m,
+            0m,
+            100m,
+            100m,
+            null,
+            completedAt);
+
+        Set(order, "ReportingOutletId", outletId);
+        dbContext.SalesOrders.Add(order);
+
+        var line = SalesOrderLine.CreateForPosSale(
+            Guid.NewGuid(),
+            tenantId,
+            orderId,
+            1,
+            productId,
+            variantId,
+            Guid.NewGuid(),
+            null,
+            "SKU",
+            "Product Name",
+            "Variant Name",
+            "UOM",
+            "UOM Name",
+            "STANDARD",
+            "SIMPLE",
+            quantity,
+            100m,
+            100m,
+            0m,
+            0m,
+            true,
+            completedAt);
+
+        Set(line, "CancelledQuantity", cancelledQuantity);
+        Set(line, "ReturnedQuantity", returnedQuantity);
+        dbContext.SalesOrderLines.Add(line);
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedPosSaleWithStatusAsync(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        Guid orderId,
+        Guid outletId,
+        string status,
+        DateTimeOffset completedAt,
+        Guid productId,
+        Guid variantId,
+        decimal quantity)
+    {
+        var order = SalesOrder.CreateCompletedPosSale(
+            orderId,
+            tenantId,
+            $"ORD-{orderId.ToString().Substring(0, 8)}",
+            Guid.NewGuid(),
+            null,
+            null,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            "LKR",
+            true,
+            100m,
+            0m,
+            0m,
+            100m,
+            100m,
+            null,
+            completedAt);
+
+        Set(order, "ReportingOutletId", outletId);
+        Set(order, "Status", status);
+        dbContext.SalesOrders.Add(order);
+
+        var line = SalesOrderLine.CreateForPosSale(
+            Guid.NewGuid(),
+            tenantId,
+            orderId,
+            1,
+            productId,
+            variantId,
+            Guid.NewGuid(),
+            null,
+            "SKU",
+            "Product Name",
+            "Variant Name",
+            "UOM",
+            "UOM Name",
+            "STANDARD",
+            "SIMPLE",
+            quantity,
+            100m,
+            100m,
+            0m,
+            0m,
+            true,
+            completedAt);
+
+        dbContext.SalesOrderLines.Add(line);
+        await dbContext.SaveChangesAsync();
+    }
+
     private static PriceListItem CreatePriceListItem(
         Guid id,
         Guid tenantId,
@@ -1024,6 +1400,404 @@ public sealed class PosProductCatalogRepositoryTests
             "ACTIVE",
             null,
             Now);
+    [Fact]
+    public async Task ListProductsAsync_OffersSegment_ResolvesSpecialPrices()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        var p = Product.Create(productId, tenantId, "P-1", "Prod 1", "prod-1", "STANDARD", "SIMPLE", null, null, null, "Desc", null, true, true, ProductConstants.ActiveStatus, null, Now);
+        dbContext.Products.Add(p);
+        var v = ProductVariant.Create(variantId, tenantId, productId, "DEFAULT", "Prod 1", "SKU-1", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now);
+        dbContext.ProductVariants.Add(v);
+
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 1000m);
+
+        // Active Special Price
+        var pl = CreateEntity<PriceList>();
+        Set(pl, "Id", Guid.NewGuid());
+        Set(pl, "TenantId", tenantId);
+        Set(pl, "PriceListName", "Offers PL");
+        Set(pl, "Status", "ACTIVE");
+        Set(pl, "Priority", 20);
+        dbContext.PriceLists.Add(pl);
+
+        var pli = CreateEntity<PriceListItem>();
+        Set(pli, "Id", Guid.NewGuid());
+        Set(pli, "TenantId", tenantId);
+        Set(pli, "PriceListId", pl.Id);
+        Set(pli, "ProductId", productId);
+        Set(pli, "ProductVariantId", variantId);
+        Set(pli, "SellingPrice", 700m);
+        Set(pli, "CompareAtPrice", 1000m);
+        Set(pli, "Status", "ACTIVE");
+        dbContext.PriceListItems.Add(pli);
+
+        await SeedPlatformSalesChannelAsync(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var repo = new PosProductCatalogRepository(dbContext);
+        var res = await repo.ListProductsAsync(tenantId, deviceId, null, null, CancellationToken.None, segment: "offers");
+
+        Assert.True(res.IsSuccess);
+        var summary = Assert.Single(res.Products);
+        Assert.True(summary.HasOffer);
+        Assert.Equal("SPECIAL_PRICE", summary.OfferType);
+        Assert.Equal(1000, summary.OriginalPrice);
+        Assert.Equal(700, summary.SellingPrice);
+        Assert.Equal(700, summary.OfferPrice);
+        Assert.Equal("30% OFF", summary.DiscountLabel);
+        Assert.False(summary.RequiresCartValidation);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_OffersSegment_ResolvesDiscountPolicies_PercentageAndFixed()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        var p = Product.Create(productId, tenantId, "P-1", "Prod 1", "prod-1", "STANDARD", "SIMPLE", null, null, null, "Desc", null, true, true, ProductConstants.ActiveStatus, null, Now);
+        dbContext.Products.Add(p);
+        var v = ProductVariant.Create(variantId, tenantId, productId, "DEFAULT", "Prod 1", "SKU-1", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now);
+        dbContext.ProductVariants.Add(v);
+
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 2000m);
+
+        var dt = CreateEntity<DiscountType>();
+        Set(dt, "Id", Guid.NewGuid());
+        Set(dt, "CalculationMethod", "PERCENTAGE");
+        Set(dt, "Status", "ACTIVE");
+        dbContext.DiscountTypes.Add(dt);
+
+        var dp = CreateEntity<DiscountPolicy>();
+        Set(dp, "Id", Guid.NewGuid());
+        Set(dp, "TenantId", tenantId);
+        Set(dp, "DiscountTypeId", dt.Id);
+        Set(dp, "DiscountPolicyCode", "DP-PCT");
+        Set(dp, "DiscountPolicyName", "15% discount");
+        Set(dp, "DiscountScope", "LINE");
+        Set(dp, "DiscountValue", 15m);
+        Set(dp, "Status", "ACTIVE");
+        dbContext.DiscountPolicies.Add(dp);
+
+        await SeedPlatformSalesChannelAsync(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var repo = new PosProductCatalogRepository(dbContext);
+        var res = await repo.ListProductsAsync(tenantId, deviceId, null, null, CancellationToken.None, segment: "offers");
+
+        Assert.True(res.IsSuccess);
+        var summary = Assert.Single(res.Products);
+        Assert.True(summary.HasOffer);
+        Assert.Equal("PERCENTAGE", summary.OfferType);
+        Assert.Equal(2000, summary.OriginalPrice);
+        Assert.Equal(1700, summary.OfferPrice);
+        Assert.Equal("15% OFF", summary.DiscountLabel);
+        Assert.False(summary.RequiresCartValidation);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_OffersSegment_EvaluatesIncludeAndExcludeTargets()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var p1 = Guid.NewGuid();
+        var p2 = Guid.NewGuid();
+        var v1 = Guid.NewGuid();
+        var v2 = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        // Product 1
+        var prod1 = Product.Create(p1, tenantId, "P-1", "Prod 1", "prod-1", "STANDARD", "SIMPLE", null, null, null, "Desc", null, true, true, ProductConstants.ActiveStatus, null, Now);
+        dbContext.Products.Add(prod1);
+        var var1 = ProductVariant.Create(v1, tenantId, p1, "DEFAULT", "Prod 1", "SKU-1", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now);
+        dbContext.ProductVariants.Add(var1);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, p1, v1, 1000m);
+
+        // Product 2 (Excluded)
+        var prod2 = Product.Create(p2, tenantId, "P-2", "Prod 2", "prod-2", "STANDARD", "SIMPLE", null, null, null, "Desc", null, true, true, ProductConstants.ActiveStatus, null, Now);
+        dbContext.Products.Add(prod2);
+        var var2 = ProductVariant.Create(v2, tenantId, p2, "DEFAULT", "Prod 2", "SKU-2", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now);
+        dbContext.ProductVariants.Add(var2);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, p2, v2, 1000m);
+
+        var dt = CreateEntity<DiscountType>();
+        Set(dt, "Id", Guid.NewGuid());
+        Set(dt, "CalculationMethod", "FIXED_AMOUNT");
+        Set(dt, "Status", "ACTIVE");
+        dbContext.DiscountTypes.Add(dt);
+
+        var dp = CreateEntity<DiscountPolicy>();
+        Set(dp, "Id", Guid.NewGuid());
+        Set(dp, "TenantId", tenantId);
+        Set(dp, "DiscountTypeId", dt.Id);
+        Set(dp, "DiscountPolicyCode", "DP-FIX");
+        Set(dp, "DiscountPolicyName", "100 LKR Off");
+        Set(dp, "DiscountScope", "LINE");
+        Set(dp, "DiscountValue", 100m);
+        Set(dp, "Status", "ACTIVE");
+        dbContext.DiscountPolicies.Add(dp);
+
+        // Target Include Product 1
+        var tInc = CreateEntity<DiscountPolicyTarget>();
+        Set(tInc, "Id", Guid.NewGuid());
+        Set(tInc, "TenantId", tenantId);
+        Set(tInc, "DiscountPolicyId", dp.Id);
+        Set(tInc, "TargetType", "PRODUCT");
+        Set(tInc, "TargetMode", "INCLUDE");
+        Set(tInc, "ProductId", p1);
+        Set(tInc, "Status", "ACTIVE");
+        dbContext.DiscountPolicyTargets.Add(tInc);
+
+        // Target Exclude Product 2
+        var tExc = CreateEntity<DiscountPolicyTarget>();
+        Set(tExc, "Id", Guid.NewGuid());
+        Set(tExc, "TenantId", tenantId);
+        Set(tExc, "DiscountPolicyId", dp.Id);
+        Set(tExc, "TargetType", "PRODUCT");
+        Set(tExc, "TargetMode", "EXCLUDE");
+        Set(tExc, "ProductId", p2);
+        Set(tExc, "Status", "ACTIVE");
+        dbContext.DiscountPolicyTargets.Add(tExc);
+
+        await SeedPlatformSalesChannelAsync(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var repo = new PosProductCatalogRepository(dbContext);
+        var res = await repo.ListProductsAsync(tenantId, deviceId, null, null, CancellationToken.None, segment: "offers");
+
+        Assert.True(res.IsSuccess);
+        var summary = Assert.Single(res.Products);
+        Assert.Equal(p1, summary.Id);
+        Assert.True(summary.HasOffer);
+        Assert.Equal(900, summary.OfferPrice);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_OffersSegment_EvaluatesConditionsAndRequiresCartValidation()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        var p = Product.Create(productId, tenantId, "P-1", "Prod 1", "prod-1", "STANDARD", "SIMPLE", null, null, null, "Desc", null, true, true, ProductConstants.ActiveStatus, null, Now);
+        dbContext.Products.Add(p);
+        var v = ProductVariant.Create(variantId, tenantId, productId, "DEFAULT", "Prod 1", "SKU-1", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now);
+        dbContext.ProductVariants.Add(v);
+
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 1500m);
+
+        var dt = CreateEntity<DiscountType>();
+        Set(dt, "Id", Guid.NewGuid());
+        Set(dt, "CalculationMethod", "PERCENTAGE");
+        Set(dt, "Status", "ACTIVE");
+        dbContext.DiscountTypes.Add(dt);
+
+        var dp = CreateEntity<DiscountPolicy>();
+        Set(dp, "Id", Guid.NewGuid());
+        Set(dp, "TenantId", tenantId);
+        Set(dp, "DiscountTypeId", dt.Id);
+        Set(dp, "DiscountPolicyCode", "DP-COND");
+        Set(dp, "DiscountPolicyName", "20% Conditional Off");
+        Set(dp, "DiscountScope", "LINE");
+        Set(dp, "DiscountValue", 20m);
+        Set(dp, "Status", "ACTIVE");
+        dbContext.DiscountPolicies.Add(dp);
+
+        // Condition: Min Quantity = 5
+        var cond = CreateEntity<DiscountPolicyCondition>();
+        Set(cond, "Id", Guid.NewGuid());
+        Set(cond, "TenantId", tenantId);
+        Set(cond, "DiscountPolicyId", dp.Id);
+        Set(cond, "ConditionGroupNo", 1);
+        Set(cond, "GroupOperator", "AND");
+        Set(cond, "ConditionType", "MIN_QUANTITY");
+        Set(cond, "ConditionOperator", ">=");
+        Set(cond, "ConditionValueJson", "5");
+        Set(cond, "SortOrder", 1);
+        Set(cond, "Status", "ACTIVE");
+        dbContext.DiscountPolicyConditions.Add(cond);
+
+        await SeedPlatformSalesChannelAsync(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var repo = new PosProductCatalogRepository(dbContext);
+        var res = await repo.ListProductsAsync(tenantId, deviceId, null, null, CancellationToken.None, segment: "offers");
+
+        Assert.True(res.IsSuccess);
+        var summary = Assert.Single(res.Products);
+        Assert.True(summary.HasOffer);
+        Assert.True(summary.RequiresCartValidation);
+        Assert.Null(summary.OfferPrice);
+        Assert.Equal("Offer available", summary.DiscountLabel);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_OffersSegment_ResolvesTieBreakerRules()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        var p = Product.Create(productId, tenantId, "P-1", "Prod 1", "prod-1", "STANDARD", "SIMPLE", null, null, null, "Desc", null, true, true, ProductConstants.ActiveStatus, null, Now);
+        dbContext.Products.Add(p);
+        var v = ProductVariant.Create(variantId, tenantId, productId, "DEFAULT", "Prod 1", "SKU-1", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now);
+        dbContext.ProductVariants.Add(v);
+
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 1000m);
+
+        var dt = CreateEntity<DiscountType>();
+        Set(dt, "Id", Guid.NewGuid());
+        Set(dt, "CalculationMethod", "FIXED_AMOUNT");
+        Set(dt, "Status", "ACTIVE");
+        dbContext.DiscountTypes.Add(dt);
+
+        // Policy 1 (Priority 10, saving 200 => Price 800)
+        var dp1 = CreateEntity<DiscountPolicy>();
+        Set(dp1, "Id", Guid.NewGuid());
+        Set(dp1, "TenantId", tenantId);
+        Set(dp1, "DiscountTypeId", dt.Id);
+        Set(dp1, "DiscountPolicyCode", "DP-1");
+        Set(dp1, "DiscountPolicyName", "200 Off");
+        Set(dp1, "DiscountScope", "LINE");
+        Set(dp1, "DiscountValue", 200m);
+        Set(dp1, "Priority", 10);
+        Set(dp1, "Status", "ACTIVE");
+        dbContext.DiscountPolicies.Add(dp1);
+
+        // Policy 2 (Priority 20, saving 150 => Price 850)
+        // Even though Policy 2 has higher priority, Policy 1 has a lower effective unit price, so Policy 1 wins!
+        var dp2 = CreateEntity<DiscountPolicy>();
+        Set(dp2, "Id", Guid.NewGuid());
+        Set(dp2, "TenantId", tenantId);
+        Set(dp2, "DiscountTypeId", dt.Id);
+        Set(dp2, "DiscountPolicyCode", "DP-2");
+        Set(dp2, "DiscountPolicyName", "150 Off");
+        Set(dp2, "DiscountScope", "LINE");
+        Set(dp2, "DiscountValue", 150m);
+        Set(dp2, "Priority", 20);
+        Set(dp2, "Status", "ACTIVE");
+        dbContext.DiscountPolicies.Add(dp2);
+
+        await SeedPlatformSalesChannelAsync(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var repo = new PosProductCatalogRepository(dbContext);
+        var res = await repo.ListProductsAsync(tenantId, deviceId, null, null, CancellationToken.None, segment: "offers");
+
+        Assert.True(res.IsSuccess);
+        var summary = Assert.Single(res.Products);
+        Assert.Equal(800, summary.OfferPrice); // Lowest effective price wins!
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_OffersSegment_EnforcesOutletAndChannelLimits()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var otherOutletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        var p = Product.Create(productId, tenantId, "P-1", "Prod 1", "prod-1", "STANDARD", "SIMPLE", null, null, null, "Desc", null, true, true, ProductConstants.ActiveStatus, null, Now);
+        dbContext.Products.Add(p);
+        var v = ProductVariant.Create(variantId, tenantId, productId, "DEFAULT", "Prod 1", "SKU-1", Guid.NewGuid(), Guid.NewGuid(), true, true, false, ProductConstants.ActiveStatus, null, Now);
+        dbContext.ProductVariants.Add(v);
+
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 1000m);
+
+        var dt = CreateEntity<DiscountType>();
+        Set(dt, "Id", Guid.NewGuid());
+        Set(dt, "CalculationMethod", "PERCENTAGE");
+        Set(dt, "Status", "ACTIVE");
+        dbContext.DiscountTypes.Add(dt);
+
+        // Policy restricted to otherOutletId
+        var dp = CreateEntity<DiscountPolicy>();
+        Set(dp, "Id", Guid.NewGuid());
+        Set(dp, "TenantId", tenantId);
+        Set(dp, "DiscountTypeId", dt.Id);
+        Set(dp, "DiscountPolicyCode", "DP-OUTLET");
+        Set(dp, "DiscountPolicyName", "Restricted");
+        Set(dp, "DiscountScope", "LINE");
+        Set(dp, "DiscountValue", 50m);
+        Set(dp, "Status", "ACTIVE");
+        dbContext.DiscountPolicies.Add(dp);
+
+        var dpo = CreateEntity<DiscountPolicyOutlet>();
+        Set(dpo, "Id", Guid.NewGuid());
+        Set(dpo, "TenantId", tenantId);
+        Set(dpo, "DiscountPolicyId", dp.Id);
+        Set(dpo, "OutletId", otherOutletId);
+        Set(dpo, "Status", "ACTIVE");
+        dbContext.DiscountPolicyOutlets.Add(dpo);
+
+        await SeedPlatformSalesChannelAsync(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var repo = new PosProductCatalogRepository(dbContext);
+        var res = await repo.ListProductsAsync(tenantId, deviceId, null, null, CancellationToken.None, segment: "offers");
+
+        Assert.True(res.IsSuccess);
+        Assert.Empty(res.Products); // No eligible offers since it's restricted to another outlet!
+    }
+
+    private static async Task SeedPlatformSalesChannelAsync(EPosDbContext dbContext, Guid tenantId)
+    {
+        var psc = CreateEntity<PlatformSalesChannel>();
+        Set(psc, "Id", E_POS.Infrastructure.Persistence.Seed.PlatformSalesChannelSeedConstants.PhysicalChannelId);
+        Set(psc, "ChannelCode", "POS");
+        Set(psc, "ChannelType", "POS");
+        Set(psc, "Status", "ACTIVE");
+        dbContext.PlatformSalesChannels.Add(psc);
+
+        var sc = CreateEntity<SalesChannel>();
+        Set(sc, "Id", Guid.NewGuid());
+        Set(sc, "TenantId", tenantId);
+        Set(sc, "PlatformSalesChannelId", psc.Id);
+        Set(sc, "Status", "ACTIVE");
+        dbContext.SalesChannels.Add(sc);
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static T CreateEntity<T>() where T : new()
+    {
+        var entity = new T();
+        Set(entity, "CreatedAt", Now);
+        Set(entity, "UpdatedAt", Now);
+        return entity;
+    }
+
     private static void Set<T>(object entity, string propertyName, T value)
     {
         var prop = entity.GetType().GetProperty(

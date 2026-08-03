@@ -69,6 +69,9 @@ public sealed class SalesChannelConfiguration : IEntityTypeConfiguration<SalesCh
             .IsUnique()
             .HasDatabaseName("ix_sales_channels_tenant_id_platform_channel_id");
 
+        builder.HasAlternateKey(x => new { x.TenantId, x.Id })
+            .HasName("AK_sales_channels_tenant_id_id");
+
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_sales_channels_status",
             "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));

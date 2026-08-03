@@ -33,7 +33,8 @@ public sealed record PosHoldLineDto(
     string? Sku,
     int Qty,
     int UnitPrice,
-    int LineTotal);
+    int LineTotal,
+    string? LineNote = null);
 
 public sealed record PosHoldListItemDto(
     Guid HoldId,

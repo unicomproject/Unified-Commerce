@@ -1,8 +1,34 @@
+using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
+
 namespace E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 
 public sealed record PosCheckoutLineRequestDto(
     Guid VariantId,
-    int Qty);
+    int Qty,
+    Guid? UomId = null,
+    string? LineNote = null,
+    Guid? ClientLineId = null,
+    string? Source = null,
+    Guid? RecommendationParentProductId = null,
+    Guid? RecommendationRelationshipId = null);
+
+public sealed record PosCalculatedCartLineDto(
+    Guid? ClientLineId,
+    Guid ProductId,
+    Guid VariantId,
+    string ProductName,
+    string? VariantName,
+    string? Sku,
+    Guid UomId,
+    string UomCode,
+    int Quantity,
+    string? LineNote,
+    int UnitPrice,
+    int Discount,
+    int Tax,
+    int LineTotal,
+    string StockStatus,
+    string? ConflictCode = null);
 
 public sealed record PosCheckoutSummaryRequestDto(
     Guid DeviceId,
@@ -29,7 +55,8 @@ public sealed record PosCheckoutSummaryResponseDto(
     PosCheckoutBillingSummaryDto BillingSummary,
     PosCheckoutSaleDetailsDto SaleDetails,
     IReadOnlyList<string> PaymentMethods,
-    IReadOnlyList<string> ValidationMessages);
+    IReadOnlyList<string> ValidationMessages,
+    IReadOnlyList<PosCalculatedCartLineDto>? Lines = null);
 
 public sealed record PosCheckoutStartPaymentRequestDto(
     Guid DeviceId,
@@ -56,7 +83,8 @@ public sealed record PosCheckoutStartPaymentLineResponseDto(
     int LineTotal,
     string? Sku,
     Guid SaleLineId = default,
-    int DiscountAmount = 0);
+    int DiscountAmount = 0,
+    string? LineNote = null);
 
 public sealed record PosReceiptTenderLineDto(
     Guid PaymentId,
@@ -129,4 +157,6 @@ public sealed record PosCheckoutStartPaymentResponseDto(
     IReadOnlyList<PosReceiptTaxLineDto>? TaxLines = null,
     PosReceiptCopyPolicyDto? CopyPolicy = null,
     string? TaxRegistrationNumber = null,
-    string? TaxInvoiceLabel = null);
+    string? TaxInvoiceLabel = null,
+    Guid? DrawerOperationId = null,
+    CashDrawerSettingsDto? CashDrawerSettings = null);
