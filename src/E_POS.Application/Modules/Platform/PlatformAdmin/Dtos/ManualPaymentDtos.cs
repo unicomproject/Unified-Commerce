@@ -20,7 +20,22 @@ public sealed record ManualPaymentStatusResponse(
     string PaymentStatusUrl,
     string? CheckoutUrl,
     string TenantStatus,
-    string InvitationStatus);
+    string InvitationStatus,
+    string TenantName,
+    string SubscriptionStatus,
+    DateTimeOffset? SubscriptionPeriodStart,
+    DateTimeOffset? SubscriptionPeriodEnd,
+    string InvoiceStatus,
+    decimal SubtotalAmount,
+    string? PaymentMethod,
+    string? ReferenceSuffix,
+    decimal? SubmittedAmount,
+    DateTimeOffset? PaymentDate,
+    string? PayerNote,
+    IReadOnlyList<ManualPaymentEvidenceDto> Evidence,
+    DateTimeOffset? SubmittedAt,
+    DateTimeOffset? PaidAt,
+    DateTimeOffset UpdatedAt);
 
 public sealed record SubmitManualPaymentEvidenceRequest(
     string PaymentMethod,
@@ -45,7 +60,6 @@ public sealed record ManualPaymentEvidenceDto(
     string FileName,
     string ContentType,
     long FileSize,
-    string Sha256,
     string ScanStatus,
     long SubmissionVersion,
     DateTimeOffset UploadedAt);
@@ -150,7 +164,13 @@ public sealed record ManualPaymentDetailResponse(
     IReadOnlyList<ManualPaymentEvidenceDto> Evidence,
     IReadOnlyList<ManualPaymentReviewHistoryItem> History,
     IReadOnlyList<string> AllowedActions,
-    bool ActivationEligible);
+    bool ActivationEligible,
+    string SubscriptionStatus,
+    string InvoiceStatus,
+    decimal SubtotalAmount,
+    decimal TaxAmount,
+    string InvitationStatus,
+    string? SubmittedByType);
 
 public sealed record ResendPaymentNotificationRequest(string NotificationType, string? Reason = null);
 

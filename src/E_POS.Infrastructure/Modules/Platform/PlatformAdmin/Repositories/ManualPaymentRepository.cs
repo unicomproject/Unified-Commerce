@@ -72,13 +72,19 @@ public sealed class ManualPaymentRepository : IManualPaymentRepository
         var invitation = await _db.PlatformTenantOnboardingOperations.AsNoTracking()
             .Where(x => x.TenantId == row.tenant.Id).OrderByDescending(x => x.CreatedAt)
             .Select(x => x.InvitationStatus).FirstOrDefaultAsync(ct) ?? "NOT_ELIGIBLE";
+        var evidence = await EvidenceDtos(paymentId).ToListAsync(ct);
         var escaped = Uri.EscapeDataString(accessToken);
         var statusUrl = $"/api/v1/tenant-onboarding/payment-access/{escaped}";
         return new(row.tenant.Id, row.tenant.TenantCode, row.payment.Id, row.invoice.Id, row.invoice.InvoiceNumber,
             row.payment.ExpectedAmount, row.invoice.TaxAmount, row.invoice.TotalAmount, row.payment.CurrencyCode,
             row.invoice.DueAt, row.payment.TransactionStatus, row.payment.Version, row.plan.Name,
             row.subscription.BillingCycle, "Pay by the configured manual method and submit a clear PDF, JPEG, or PNG proof.",
-            $"{statusUrl}/invoice", statusUrl, null, row.tenant.Status, invitation);
+            $"{statusUrl}/invoice", statusUrl, null, row.tenant.Status, invitation,
+            row.tenant.DisplayName, row.subscription.SubscriptionStatus, row.subscription.CurrentPeriodStart,
+            row.subscription.CurrentPeriodEnd, row.invoice.InvoiceStatus, row.invoice.SubtotalAmount,
+            row.payment.PaymentMethod, Suffix(row.payment.ManualReference), row.payment.SubmittedAmount,
+            row.payment.PaymentDate, row.payment.PayerNote, evidence, row.payment.SubmittedAt,
+            row.payment.PaidAt, row.payment.UpdatedAt ?? row.payment.CreatedAt);
     }
 
     public async Task<ManualPaymentSubmitResult> SubmitAsync(ManualPaymentSubmitCommand command, CancellationToken ct)
@@ -198,13 +204,32 @@ public sealed class ManualPaymentRepository : IManualPaymentRepository
     {
         var payment = await QueueQuery().SingleOrDefaultAsync(x => x.PaymentId == paymentId, ct);
         if (payment is null) return null;
-        var details = await _db.SubscriptionPaymentTransactions.AsNoTracking().Where(x => x.Id == paymentId)
-            .Select(x => new { x.PaymentMethod, x.ManualReference, x.PaymentDate, x.PayerNote }).SingleAsync(ct);
+        var details = await (from transaction in _db.SubscriptionPaymentTransactions.AsNoTracking()
+                             join invoice in _db.SubscriptionInvoices.AsNoTracking() on transaction.InvoiceId equals invoice.Id
+                             join subscription in _db.TenantSubscriptions.AsNoTracking() on invoice.SubscriptionId equals subscription.Id
+                             where transaction.Id == paymentId
+                             select new
+                             {
+                                 transaction.PaymentMethod,
+                                 transaction.ManualReference,
+                                 transaction.PaymentDate,
+                                 transaction.PayerNote,
+                                 transaction.SubmittedByType,
+                                 subscription.SubscriptionStatus,
+                                 invoice.InvoiceStatus,
+                                 invoice.SubtotalAmount,
+                                 invoice.TaxAmount
+                             }).SingleAsync(ct);
         var evidence = await EvidenceDtos(paymentId).ToListAsync(ct);
         var history = (await GetHistoryAsync(paymentId, true, ct))!.Items;
+        var invitation = await _db.PlatformTenantOnboardingOperations.AsNoTracking()
+            .Where(x => x.TenantId == payment.TenantId).OrderByDescending(x => x.CreatedAt)
+            .Select(x => x.InvitationStatus).FirstOrDefaultAsync(ct) ?? "NOT_ELIGIBLE";
         return new(payment, details.PaymentMethod, Suffix(details.ManualReference), details.PaymentDate,
             details.PayerNote, evidence, history, AllowedActions(payment.Status),
-            payment.Status == ManualPaymentConstants.Paid && payment.TenantStatus == TenantStatusConstants.PendingActivation);
+            payment.Status == ManualPaymentConstants.Paid && payment.TenantStatus == TenantStatusConstants.PendingActivation,
+            details.SubscriptionStatus, details.InvoiceStatus, details.SubtotalAmount, details.TaxAmount,
+            invitation, details.SubmittedByType);
     }
 
     public Task<SubscriptionPaymentEvidence?> GetEvidenceAsync(Guid paymentId, Guid evidenceId, CancellationToken ct) =>
@@ -357,7 +382,7 @@ public sealed class ManualPaymentRepository : IManualPaymentRepository
         _db.SubscriptionPaymentEvidence.AsNoTracking().Where(x => x.PaymentId == paymentId && x.IsActive)
             .OrderBy(x => x.CreatedAt)
             .Select(x => new ManualPaymentEvidenceDto(x.Id, x.SafeFileName, x.ContentType, x.FileSize,
-                x.Sha256, x.ScanStatus, x.SubmissionVersion, x.CreatedAt));
+                x.ScanStatus, x.SubmissionVersion, x.CreatedAt));
 
     private async Task<ManualPaymentSubmissionResponse> BuildSubmissionAsync(Guid paymentId, bool replay, CancellationToken ct)
     {
