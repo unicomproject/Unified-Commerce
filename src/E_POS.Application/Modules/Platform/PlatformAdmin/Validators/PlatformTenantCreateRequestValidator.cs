@@ -54,6 +54,8 @@ public static partial class PlatformTenantCreateRequestValidator
         var fieldErrors = new List<ApplicationFieldError>();
 
         ValidateCountryCode(fieldErrors, "countryCode", request.CountryCode, required: false);
+        // The compatibility endpoint still accepts older partial requests. The durable onboarding
+        // workflow performs the mandatory final checks before it invokes tenant creation.
         ValidateCurrencyCode(fieldErrors, "baseCurrency", request.BaseCurrency, required: false);
         ValidateLocale(fieldErrors, "defaultLocale", request.DefaultLocale, required: false);
         ValidateOperatingMode(fieldErrors, "operatingMode", request.OperatingMode, required: false);

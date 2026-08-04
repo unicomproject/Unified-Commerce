@@ -18,9 +18,6 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
 {
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 100;
-    private const string DefaultBaseCurrency = "LKR";
-    private const string DefaultTimezone = "Asia/Colombo";
-
     private static readonly ApplicationError AccessDenied = new(
         "platform_tenants.access_denied",
         "Platform tenant access denied.");

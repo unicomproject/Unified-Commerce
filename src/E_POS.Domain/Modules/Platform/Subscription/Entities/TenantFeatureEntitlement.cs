@@ -17,6 +17,7 @@ public class TenantFeatureEntitlement : AuditableEntity
     public DateTimeOffset? RevokedAt { get; protected set; }
     public Guid? RevokedByPlatformUserId { get; protected set; }
     public string? RevokedReason { get; protected set; }
+    public string? OverrideReason { get; protected set; }
     public Guid? CreatedByPlatformUserId { get; protected set; }
     public Guid? UpdatedByPlatformUserId { get; protected set; }
 
@@ -114,6 +115,17 @@ public class TenantFeatureEntitlement : AuditableEntity
             ? null
             : revokedReason.Trim();
         UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void ApplyOverride(string reason, DateTimeOffset? effectiveUntil, Guid actorId, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Override reason is required.", nameof(reason));
+        SourceType = "OVERRIDE";
+        OverrideReason = reason.Trim();
+        EffectiveUntil = effectiveUntil;
+        UpdatedByPlatformUserId = actorId;
         UpdatedAt = now;
     }
 }

@@ -2,6 +2,8 @@ using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Domain.Modules.Shared.Integration.Entities;
 
 namespace E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 
@@ -12,6 +14,8 @@ public sealed class PlatformTenantCreateWriteModel
     public TenantProfile? Profile { get; init; }
 
     public TenantAddress? Address { get; init; }
+
+    public TenantDomain? Domain { get; init; }
 
     public required TenantSubscription Subscription { get; init; }
 
@@ -32,6 +36,14 @@ public sealed class PlatformTenantCreateWriteModel
     public SubscriptionInvoice? DraftInvoice { get; init; }
 
     public IReadOnlyList<SubscriptionInvoiceLine> DraftInvoiceLines { get; init; } = [];
+
+    public PlatformTenantOnboardingFinalizeContext? OnboardingFinalizeContext { get; init; }
+
+    public PlatformTenantOnboardingOperation? OnboardingOperation { get; init; }
+
+    public IReadOnlyList<TenantContact> OnboardingContacts { get; init; } = [];
+
+    public IReadOnlyList<IntegrationOutboxMessage> OnboardingOutboxMessages { get; init; } = [];
 }
 
 

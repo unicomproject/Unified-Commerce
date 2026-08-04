@@ -11,7 +11,7 @@ public class TenantSubscription : AuditableEntity
     public string SubscriptionStatus { get; protected set; } = string.Empty;
     public Guid PlanId { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
-    public string CurrencyCode { get; protected set; } = "LKR";
+    public string CurrencyCode { get; protected set; } = string.Empty;
     public decimal PlanPrice { get; protected set; }
     public DateTimeOffset StartedAt { get; protected set; }
     public DateTimeOffset CurrentPeriodStart { get; protected set; }
@@ -23,7 +23,7 @@ public class TenantSubscription : AuditableEntity
     public DateTimeOffset? EndedAt { get; protected set; }
     public string? CancellationReason { get; protected set; }
     public Guid? AssignedByPlatformUserId { get; protected set; }
-    public string BillingCycle { get; protected set; } = TenantSubscriptionBillingConstants.BillingCycleMonthly;
+    public string BillingCycle { get; protected set; } = string.Empty;
     public DateTimeOffset? TrialStartAt { get; protected set; }
     public DateTimeOffset? TrialEndAt { get; protected set; }
     public DateTimeOffset? BillingStartAt { get; protected set; }

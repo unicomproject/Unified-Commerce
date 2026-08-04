@@ -10,6 +10,9 @@ using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Domain.Modules.Shared.Integration.Entities;
+using System.Text.Json;
 
 namespace E_POS.Application.Modules.Platform.PlatformAdmin.Services;
 
@@ -108,12 +111,6 @@ public sealed partial class PlatformTenantService
         {
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(
                 ValidationFailed with { Message = "Tenant admin first name and email are required." });
-        }
-
-        if (await _repository.TenantUserEmailExistsAsync(adminEmail, cancellationToken))
-        {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                Conflict with { Message = "A tenant user with this email already exists." });
         }
 
         var createOptions = await _repository.GetCreateOptionsAsync(cancellationToken);
@@ -216,11 +213,11 @@ public sealed partial class PlatformTenantService
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
             tenantId,
             code,
-            code.ToLowerInvariant(),
+            NormalizeOptionalText(request.TenantSlug)?.ToLowerInvariant() ?? code.ToLowerInvariant(),
             name,
             initialLifecycleStatus,
-            NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
-            NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
+            NormalizeOptionalText(request.BaseCurrency) ?? plan.BaseCurrency,
+            NormalizeOptionalText(request.DefaultTimezone) ?? TenantCreateWizardReferenceData.Timezones[0].Value,
             null, // dataRegion
             platformUserId,
             now,
@@ -240,6 +237,7 @@ public sealed partial class PlatformTenantService
             now,
             businessTypeResolution.Value);
         var address = CreateTenantAddressOrNull(tenantId, request, now);
+        var domain = CreateTenantDomainOrNull(tenantId, request, platformUserId, now);
 
         var billingCycle = PlatformTenantCreateRequestValidator.TryNormalizeBillingCycle(subscriptionRequest.BillingCycle)
             ?? TenantSubscriptionBillingConstants.BillingCycleMonthly;
@@ -359,17 +357,6 @@ public sealed partial class PlatformTenantService
             null,
             now);
 
-        var invite = UserInvite.CreatePending(
-            Guid.NewGuid(),
-            tenantId,
-            adminEmail,
-            adminEmail.ToUpperInvariant(),
-            roleId,
-            null, // platform user id
-            Guid.NewGuid().ToString("N"), // token hash mock, real hash is done by auth service usually but this is wizard
-            now.AddDays(7), // expires
-            now);
-
         var shouldCreateDraftInvoice = subscriptionRequest?.CreateDraftInvoice == true ||
                                        string.Equals(billingStatus, TenantBillingStatusConstants.Pending, StringComparison.OrdinalIgnoreCase);
 
@@ -400,11 +387,43 @@ public sealed partial class PlatformTenantService
                 now);
         }
 
+        var onboardingContext = request.OnboardingFinalizeContext;
+        PlatformTenantOnboardingOperation? onboardingOperation = null;
+        IReadOnlyList<TenantContact> onboardingContacts = [];
+        IReadOnlyList<IntegrationOutboxMessage> onboardingMessages = [];
+        if (onboardingContext is not null)
+        {
+            onboardingOperation = PlatformTenantOnboardingOperation.CreateCompleted(
+                onboardingContext.OperationId,
+                onboardingContext.DraftId,
+                tenantId,
+                onboardingContext.IdempotencyKeyHash,
+                onboardingContext.RequestHash,
+                onboardingContext.RequiresPayment ? "PENDING" : "NOT_REQUIRED",
+                onboardingContext.RequiresPayment ? "NOT_ELIGIBLE" : "PENDING",
+                now);
+            onboardingContacts = onboardingContext.Contacts.Select(contact => TenantContact.Create(
+                Guid.NewGuid(), tenantId, contact.ContactType, contact.ContactName, contact.Email, contact.Phone,
+                onboardingContext.ActorPlatformUserId, now)).ToArray();
+            var eventType = onboardingContext.RequiresPayment
+                ? "tenant.payment_link.requested"
+                : "tenant_admin.invitation_requested";
+            onboardingMessages =
+            [
+                IntegrationOutboxMessage.Create(
+                    Guid.NewGuid(), eventType, "tenant_onboarding", onboardingContext.OperationId, 1,
+                    tenantId, onboardingContext.OperationId, null,
+                    JsonSerializer.Serialize(new { tenantId, operationId = onboardingContext.OperationId }),
+                    $"{eventType}:{tenantId:D}", now)
+            ];
+        }
+
         var writeModel = new PlatformTenantCreateWriteModel
         {
             Tenant = tenant,
             Profile = profile,
             Address = address,
+            Domain = domain,
             Subscription = subscription,
             Entitlements = entitlements,
             SubscriptionAddons = subscriptionAddons,
@@ -412,9 +431,13 @@ public sealed partial class PlatformTenantService
             TenantAdminRolePermissions = rolePermissions,
             TenantAdminUser = tenantAdminUser,
             TenantAdminUserRole = tenantAdminUserRole,
-            TenantAdminInvite = invite,
+            TenantAdminInvite = null,
             DraftInvoice = draftInvoice,
-            DraftInvoiceLines = draftInvoiceLines
+            DraftInvoiceLines = draftInvoiceLines,
+            OnboardingFinalizeContext = onboardingContext,
+            OnboardingOperation = onboardingOperation,
+            OnboardingContacts = onboardingContacts,
+            OnboardingOutboxMessages = onboardingMessages
         };
 
         try
@@ -439,18 +462,24 @@ public sealed partial class PlatformTenantService
         }
 
         await _repository.CreateTenantWizardAsync(writeModel, cancellationToken);
-        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.created", "Tenant created via platform wizard.", null, now, cancellationToken);
+        if (onboardingContext is null)
+        {
+            await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.created", "Tenant created via platform wizard.", null, now, cancellationToken);
+        }
 
         try
         {
-            await _tenantUsageCounterService.SeedTenantCapacityCountersAsync(
-                tenantId,
-                subscription.CurrentPeriodStart,
-                subscription.CurrentPeriodEnd,
-                maxOutlets,
-                maxUsers,
-                maxTills,
-                cancellationToken);
+            if (onboardingContext is null)
+            {
+                await _tenantUsageCounterService.SeedTenantCapacityCountersAsync(
+                    tenantId,
+                    subscription.CurrentPeriodStart,
+                    subscription.CurrentPeriodEnd,
+                    maxOutlets,
+                    maxUsers,
+                    maxTills,
+                    cancellationToken);
+            }
         }
         catch (MissingCanonicalCapacityLimitDefinitionException ex)
         {
@@ -548,8 +577,8 @@ public sealed partial class PlatformTenantService
             code.ToLowerInvariant(),
             name,
             TenantStatusConstants.Draft,
-            NormalizeOptionalText(request.BaseCurrency) ?? DefaultBaseCurrency,
-            NormalizeOptionalText(request.DefaultTimezone) ?? DefaultTimezone,
+            NormalizeOptionalText(request.BaseCurrency) ?? plan.BaseCurrency,
+            NormalizeOptionalText(request.DefaultTimezone) ?? TenantCreateWizardReferenceData.Timezones[0].Value,
             null, // dataRegion
             platformUserId,
             now,
@@ -711,10 +740,21 @@ public sealed partial class PlatformTenantService
             contactName,
             contactEmail,
             contactPhone,
-            null, // websiteUrl
+            NormalizeOptionalText(request.WebsiteUrl),
             null, // description
             platformUserId,
-            now);
+            now,
+            registrationNumber: registrationNumber,
+            taxNumber: taxNumber);
+    }
+
+    private static TenantDomain? CreateTenantDomainOrNull(Guid tenantId, CreatePlatformTenantRequest request,
+        Guid actorId, DateTimeOffset now)
+    {
+        var domain = NormalizeOptionalText(request.RequestedSubdomain)?.ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(domain)) return null;
+        return TenantDomain.Create(Guid.NewGuid(), tenantId, null, "SUBDOMAIN", domain, true,
+            "PENDING", null, null, "PENDING", null, null, "ACTIVE", actorId, now);
     }
 
     private static TenantAddress? CreateTenantAddressOrNull(

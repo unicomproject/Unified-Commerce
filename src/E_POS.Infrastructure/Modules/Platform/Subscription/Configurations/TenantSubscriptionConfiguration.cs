@@ -38,7 +38,7 @@ public sealed class TenantSubscriptionConfiguration : IEntityTypeConfiguration<T
         builder.Property(x => x.EndedAt).HasColumnName("ended_at").HasColumnType("timestamp with time zone");
         builder.Property(x => x.CancellationReason).HasColumnName("cancellation_reason").HasColumnType("text");
         builder.Property(x => x.AssignedByPlatformUserId).HasColumnName("assigned_by_platform_user_id");
-        builder.Property(x => x.BillingCycle).HasColumnName("billing_cycle").HasColumnType("varchar(20)").HasMaxLength(20).HasDefaultValue("monthly");
+        builder.Property(x => x.BillingCycle).HasColumnName("billing_cycle").HasColumnType("varchar(20)").HasMaxLength(20).IsRequired();
         builder.Property(x => x.TrialStartAt).HasColumnName("trial_start_at").HasColumnType("timestamp with time zone");
         builder.Property(x => x.TrialEndAt).HasColumnName("trial_end_at").HasColumnType("timestamp with time zone");
         builder.Property(x => x.BillingStartAt).HasColumnName("billing_start_at").HasColumnType("timestamp with time zone");

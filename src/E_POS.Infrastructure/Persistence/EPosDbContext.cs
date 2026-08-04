@@ -48,6 +48,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<PlatformUserRole> PlatformUserRoles => Set<PlatformUserRole>();
     public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
     public DbSet<PlatformSalesChannel> PlatformSalesChannels => Set<PlatformSalesChannel>();
+    public DbSet<PlatformTenantOnboardingDraft> PlatformTenantOnboardingDrafts => Set<PlatformTenantOnboardingDraft>();
+    public DbSet<PlatformTenantOnboardingOperation> PlatformTenantOnboardingOperations => Set<PlatformTenantOnboardingOperation>();
 
     // Tenant Foundation
     public DbSet<BusinessType> BusinessTypes => Set<BusinessType>();
@@ -58,6 +60,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantAddress> TenantAddresses => Set<TenantAddress>();
     public DbSet<TenantDomain> TenantDomains => Set<TenantDomain>();
     public DbSet<TenantProfile> TenantProfiles => Set<TenantProfile>();
+    public DbSet<TenantContact> TenantContacts => Set<TenantContact>();
     public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
 
     // Subscription Billing
@@ -105,6 +108,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantRefreshToken> TenantRefreshTokens => Set<TenantRefreshToken>();
     public DbSet<UserInvite> UserInvites => Set<UserInvite>();
     public DbSet<UserSetupToken> UserSetupTokens => Set<UserSetupToken>();
+    public DbSet<IntegrationOutboxMessage> IntegrationOutboxMessages => Set<IntegrationOutboxMessage>();
 
     // Outlet, Till and Device
     public DbSet<HardwareProfile> HardwareProfiles => Set<HardwareProfile>();

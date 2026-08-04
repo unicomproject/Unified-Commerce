@@ -5,6 +5,9 @@ using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 
 namespace E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 
@@ -99,6 +102,7 @@ public sealed partial class PlatformTenantRepository
                 addon.Name,
                 addon.Description,
                 addon.PriceAmount,
+                addon.BaseCurrencyCode,
                 RelatedFeatureCode = feature != null ? feature.FeatureCode : null,
                 LimitCode = limitDefinition != null ? limitDefinition.LimitCode : null,
                 IncrementValue = addonLimit != null ? (decimal?)addonLimit.IncrementValue : null
@@ -112,7 +116,8 @@ public sealed partial class PlatformTenantRepository
                 row.AddonCode,
                 row.Name,
                 row.Description,
-                row.PriceAmount
+                row.PriceAmount,
+                row.BaseCurrencyCode
             })
             .Select(group =>
             {
@@ -136,7 +141,7 @@ public sealed partial class PlatformTenantRepository
                     group.Key.Name,
                     group.Key.Description,
                     group.Key.PriceAmount,
-                    "LKR",
+                    group.Key.BaseCurrencyCode,
                     group.Select(x => x.RelatedFeatureCode).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)),
                     increments);
             })
@@ -228,6 +233,16 @@ public sealed partial class PlatformTenantRepository
             .Select(value => new PlatformTenantCreateLookupOptionDto(value, ToLookupLabel(value)))
             .ToList();
 
+        var settingRows = await _dbContext.PlatformSettings.AsNoTracking()
+            .Where(x => PlatformSettingKeys.GeneralSettings.Contains(x.SettingKey))
+            .ToListAsync(cancellationToken);
+        var settingValues = settingRows.ToDictionary(x => x.SettingKey, x => x.GetStringValue());
+        string? Setting(string key) => settingValues.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value.Trim()
+            : null;
+        var defaultBillingCycle = plans.Select(x => x.BillingCycle)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1 ? plans[0].BillingCycle : null;
+
         return new PlatformTenantCreateOptionsResponse(
             plans,
             addons,
@@ -241,7 +256,18 @@ public sealed partial class PlatformTenantRepository
             businessTypes,
             operatingModes,
             subscriptionStatuses,
-            billingCycles);
+            billingCycles,
+            new PlatformTenantCreateDefaultsDto(
+                Setting(PlatformSettingKeys.DefaultCountryCode),
+                Setting(PlatformSettingKeys.DefaultCurrencyCode),
+                Setting(PlatformSettingKeys.DefaultTimezone),
+                Setting(PlatformSettingKeys.DefaultLocale),
+                defaultBillingCycle),
+            new PlatformTenantCreateValidationDto(
+                "^[A-Z0-9-]{3,60}$",
+                "^[a-z0-9](?:[a-z0-9-]{1,98}[a-z0-9])?$",
+                30,
+                null));
     }
 
     public Task<bool> TenantUserEmailExistsAsync(string email, CancellationToken cancellationToken)
@@ -304,6 +330,30 @@ public sealed partial class PlatformTenantRepository
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         try
         {
+            PlatformTenantOnboardingDraft? onboardingDraft = null;
+            if (model.OnboardingFinalizeContext is { } onboarding)
+            {
+                onboardingDraft = await _dbContext.PlatformTenantOnboardingDrafts
+                    .FromSqlInterpolated($"SELECT * FROM platform_tenant_onboarding_drafts WHERE id = {onboarding.DraftId} FOR UPDATE")
+                    .SingleOrDefaultAsync(cancellationToken)
+                    ?? throw new TenantOnboardingConcurrencyException(new InvalidOperationException("Onboarding draft no longer exists."));
+
+                if (onboardingDraft.Status == "completed")
+                {
+                    var sameRequest = string.Equals(onboardingDraft.FinalizeIdempotencyKeyHash, onboarding.IdempotencyKeyHash, StringComparison.Ordinal) &&
+                                      string.Equals(onboardingDraft.FinalizeRequestHash, onboarding.RequestHash, StringComparison.Ordinal);
+                    throw new TenantOnboardingAlreadyFinalizedException(sameRequest);
+                }
+
+                if (onboardingDraft.Version != onboarding.ExpectedDraftVersion || onboardingDraft.Status != "in_progress")
+                {
+                    throw new TenantOnboardingConcurrencyException(new InvalidOperationException("Onboarding draft version or state changed."));
+                }
+
+                onboardingDraft.BeginFinalization(onboarding.IdempotencyKeyHash, onboarding.RequestHash,
+                    onboarding.ActorPlatformUserId, onboarding.RequestedAt);
+            }
+
             _dbContext.Tenants.Add(model.Tenant);
             if (model.Profile is not null)
             {
@@ -313,6 +363,11 @@ public sealed partial class PlatformTenantRepository
             if (model.Address is not null)
             {
                 _dbContext.TenantAddresses.Add(model.Address);
+            }
+
+            if (model.Domain is not null)
+            {
+                _dbContext.TenantDomains.Add(model.Domain);
             }
 
             _dbContext.TenantSubscriptions.Add(model.Subscription);
@@ -369,6 +424,52 @@ public sealed partial class PlatformTenantRepository
                 {
                     _dbContext.SubscriptionInvoiceLines.AddRange(model.DraftInvoiceLines);
                 }
+            }
+
+            if (model.OnboardingFinalizeContext is { } finalization && onboardingDraft is not null)
+            {
+                if (model.OnboardingContacts.Count > 0)
+                {
+                    _dbContext.TenantContacts.AddRange(model.OnboardingContacts);
+                }
+                if (model.OnboardingOperation is not null)
+                {
+                    _dbContext.PlatformTenantOnboardingOperations.Add(model.OnboardingOperation);
+                }
+                if (model.OnboardingOutboxMessages.Count > 0)
+                {
+                    _dbContext.IntegrationOutboxMessages.AddRange(model.OnboardingOutboxMessages);
+                }
+
+                var definitions = await _dbContext.FeatureLimitDefinitions
+                    .Where(x => x.Status == SubscriptionCatalogConstants.RecordStatus.Active &&
+                                (x.Id == SubscriptionCatalogLimitSeedConstants.MaxOutletsLimitDefinitionId ||
+                                 x.Id == SubscriptionCatalogLimitSeedConstants.MaxUsersLimitDefinitionId ||
+                                 x.Id == SubscriptionCatalogLimitSeedConstants.MaxTillsLimitDefinitionId))
+                    .ToListAsync(cancellationToken);
+                var limits = new Dictionary<Guid, int?>
+                {
+                    [SubscriptionCatalogLimitSeedConstants.MaxOutletsLimitDefinitionId] = model.Subscription.MaxOutletsOverride,
+                    [SubscriptionCatalogLimitSeedConstants.MaxUsersLimitDefinitionId] = model.Subscription.MaxUsersOverride,
+                    [SubscriptionCatalogLimitSeedConstants.MaxTillsLimitDefinitionId] = model.Subscription.MaxTillsOverride
+                };
+                if (definitions.Count != 3)
+                {
+                    throw new InvalidOperationException("Canonical capacity limit definitions are missing or inactive.");
+                }
+                _dbContext.TenantUsageCounters.AddRange(definitions.Select(definition => TenantUsageCounter.Create(
+                    Guid.NewGuid(), model.Tenant.Id, definition.Id, definition.PlatformFeatureId,
+                    TenantUsageCounterAlignmentConstants.UsageScope.Tenant, null, 0m,
+                    limits[definition.Id], model.Subscription.CurrentPeriodStart, model.Subscription.CurrentPeriodEnd,
+                    finalization.RequestedAt)));
+
+                _dbContext.TenantSubscriptionHistory.Add(TenantSubscriptionHistory.CreateEvent(
+                    Guid.NewGuid(), model.Tenant.Id, model.Subscription.Id, 2, "tenant.created",
+                    finalization.RequestedAt, newPlanId: model.Subscription.SubscriptionPlanId,
+                    newStatus: model.Subscription.SubscriptionStatus, reason: "Tenant finalized from onboarding draft.",
+                    changeData: $"draftId={finalization.DraftId:D};operationId={finalization.OperationId:D}",
+                    changedByPlatformUserId: finalization.ActorPlatformUserId));
+                onboardingDraft.Complete(model.Tenant.Id, finalization.ActorPlatformUserId, finalization.RequestedAt);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);

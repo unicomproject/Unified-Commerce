@@ -31,6 +31,7 @@ using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Infrastructure.Modules.Shared.Integration.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
@@ -111,6 +112,9 @@ public static class DependencyInjection
         services.AddScoped<IPlatformDashboardRepository, PlatformDashboardRepository>();
         services.AddScoped<IPlatformDashboardHealthProbe, PlatformDashboardHealthProbe>();
         services.AddScoped<IPlatformTenantRepository, PlatformTenantRepository>();
+        services.AddScoped<IPlatformTenantOnboardingRepository, PlatformTenantOnboardingRepository>();
+        services.Configure<TenantOnboardingOutboxOptions>(configuration.GetSection(TenantOnboardingOutboxOptions.SectionName));
+        services.AddHostedService<TenantOnboardingOutboxWorker>();
         services.AddScoped<IPlatformPermissionCatalogRepository, PlatformPermissionCatalogRepository>();
         services.AddScoped<IPlatformModulesCatalogRepository, PlatformModulesCatalogRepository>();
         services.AddScoped<IPlatformSettingsRepository, PlatformSettingsRepository>();

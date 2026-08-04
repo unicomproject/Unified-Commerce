@@ -152,6 +152,11 @@ public sealed class SubscriptionPaymentTransactionConfiguration : IEntityTypeCon
         builder.HasIndex(x => x.PaymentLinkId)
             .HasDatabaseName("ix_subscription_payment_transactions_payment_link_id");
 
+        builder.HasIndex(x => x.IdempotencyKey)
+            .IsUnique()
+            .HasFilter("idempotency_key IS NOT NULL")
+            .HasDatabaseName("uq_subscription_payment_transactions_idempotency_key");
+
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_subscription_payment_transactions_amount", "amount >= 0");

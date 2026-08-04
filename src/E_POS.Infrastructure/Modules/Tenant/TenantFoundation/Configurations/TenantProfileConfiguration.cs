@@ -82,6 +82,16 @@ public sealed class TenantProfileConfiguration : IEntityTypeConfiguration<Tenant
             .HasColumnType("text")
             .IsRequired(false);
 
+        builder.Property(x => x.RegistrationNumber)
+            .HasColumnName("registration_number")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100);
+
+        builder.Property(x => x.TaxNumber)
+            .HasColumnName("tax_number")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100);
+
         builder.Property(x => x.CreatedByPlatformUserId)
             .HasColumnName("created_by_platform_user_id")
             .IsRequired(false);
@@ -109,5 +119,11 @@ public sealed class TenantProfileConfiguration : IEntityTypeConfiguration<Tenant
         builder.HasIndex(x => x.TenantId)
             .IsUnique()
             .HasDatabaseName("uq_tenant_profiles_tenant_id");
+
+        builder.HasIndex(x => x.RegistrationNumber)
+            .HasDatabaseName("ix_tenant_profiles_registration_number");
+
+        builder.HasIndex(x => x.TaxNumber)
+            .HasDatabaseName("ix_tenant_profiles_tax_number");
     }
 }

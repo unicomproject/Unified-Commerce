@@ -13,7 +13,22 @@ public sealed record PlatformTenantCreateOptionsResponse(
     IReadOnlyList<PlatformTenantCreateLookupOptionDto> BusinessTypes,
     IReadOnlyList<PlatformTenantCreateLookupOptionDto> OperatingModes,
     IReadOnlyList<PlatformTenantCreateLookupOptionDto> SubscriptionStatuses,
-    IReadOnlyList<PlatformTenantCreateLookupOptionDto> BillingCycles);
+    IReadOnlyList<PlatformTenantCreateLookupOptionDto> BillingCycles,
+    PlatformTenantCreateDefaultsDto? Defaults = null,
+    PlatformTenantCreateValidationDto? Validation = null);
+
+public sealed record PlatformTenantCreateDefaultsDto(
+    string? CountryCode,
+    string? CurrencyCode,
+    string? Timezone,
+    string? Locale,
+    string? BillingCycle);
+
+public sealed record PlatformTenantCreateValidationDto(
+    string TenantCodePattern,
+    string TenantSlugPattern,
+    int DraftRetentionDays,
+    string? PlatformBaseDomain);
 
 public sealed record PlatformTenantCreatePlanOptionDto(
     Guid Id,

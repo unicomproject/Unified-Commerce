@@ -90,7 +90,7 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.NotNull(repository.LastWriteModel);
         Assert.Single(repository.LastWriteModel!.Entitlements);
         Assert.Equal(FeatureId, repository.LastWriteModel.Entitlements[0].PlatformFeatureId);
-        Assert.NotNull(repository.LastWriteModel.TenantAdminInvite);
+        Assert.Null(repository.LastWriteModel.TenantAdminInvite);
         Assert.Equal(TenantStatusConstants.Active, repository.LastWriteModel.Tenant.Status);
         Assert.NotNull(repository.LastWriteModel.Tenant.ActivatedAt);
     }
@@ -265,7 +265,7 @@ public sealed class PlatformTenantWizardServiceTests
     }
 
     [Fact]
-    public async Task CreateTenantAsync_WizardWhenAdminEmailExists_ReturnsConflict()
+    public async Task CreateTenantAsync_WizardWhenEmailExistsInAnotherTenant_DoesNotApplyGlobalConflict()
     {
         var repository = new FakeWizardTenantRepository { TenantUserEmailExists = true };
         var service = CreateService(
@@ -289,8 +289,8 @@ public sealed class PlatformTenantWizardServiceTests
             Guid.NewGuid(),
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("platform_tenants.conflict", result.Error.Code);
+        Assert.True(repository.CreateWizardCalled);
+        Assert.NotEqual("platform_tenants.conflict", result.Error.Code);
     }
 
     [Fact]
