@@ -60,4 +60,33 @@ public sealed class PlatformTenantOnboardingOperation : AuditableEntity
         UpdatedAt = now;
         Version++;
     }
+
+    public void MarkInvitationPending(DateTimeOffset now)
+    {
+        InvitationStatus = "PENDING";
+        UpdatedAt = now;
+        Version++;
+    }
+
+    public void MarkPaymentSubmitted(DateTimeOffset now)
+    {
+        PaymentStatus = "PAYMENT_SUBMITTED";
+        UpdatedAt = now;
+        Version++;
+    }
+
+    public void MarkPaymentReviewOutcome(string status, DateTimeOffset now)
+    {
+        PaymentStatus = status.Trim().ToUpperInvariant();
+        if (PaymentStatus == "PAID") InvitationStatus = "PENDING_ACTIVATION";
+        UpdatedAt = now;
+        Version++;
+    }
+
+    public void MarkActivationCompleted(DateTimeOffset now)
+    {
+        InvitationStatus = "PENDING";
+        UpdatedAt = now;
+        Version++;
+    }
 }

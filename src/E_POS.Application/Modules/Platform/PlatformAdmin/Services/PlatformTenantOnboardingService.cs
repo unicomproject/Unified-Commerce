@@ -160,6 +160,47 @@ public sealed class PlatformTenantOnboardingService : IPlatformTenantOnboardingS
         return ApplicationResult<TenantOnboardingOperationResponse>.Success(MapOperation(operation));
     }
 
+    public async Task<ApplicationResult<TenantOnboardingOperationResponse>> RetryOperationAsync(Guid operationId, Guid actorId, CancellationToken ct)
+    {
+        var current = await _repository.GetOperationAsync(operationId, ct);
+        if (current is null) return Failure<TenantOnboardingOperationResponse>("not_found", "Tenant onboarding operation not found.");
+        var permission = current.PaymentStatus == "NOT_REQUIRED"
+            ? PlatformPermissionCodes.TenantsUpdate : PlatformPermissionCodes.BillingManage;
+        if (!await Has(actorId, permission, ct))
+            return Failure<TenantOnboardingOperationResponse>("access_denied", "Tenant onboarding retry access denied.");
+        var retried = await _repository.RetryOperationAsync(operationId, _clock.UtcNow, ct);
+        if (!retried) return Failure<TenantOnboardingOperationResponse>("invalid_transition", "Operation has no failed delivery to retry.");
+        var operation = await _repository.GetOperationAsync(operationId, ct);
+        return operation is null ? Failure<TenantOnboardingOperationResponse>("not_found", "Tenant onboarding operation not found.") :
+            ApplicationResult<TenantOnboardingOperationResponse>.Success(MapOperation(operation));
+    }
+
+    public async Task<ApplicationResult<TenantOnboardingOperationResponse>> ResendInvitationAsync(Guid tenantId,
+        string idempotencyKey, Guid actorId, CancellationToken ct)
+    {
+        if (!await Has(actorId, PlatformPermissionCodes.TenantsUpdate, ct))
+            return Failure<TenantOnboardingOperationResponse>("access_denied", "Tenant invitation resend access denied.");
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Trim().Length > 100)
+            return Failure<TenantOnboardingOperationResponse>("precondition_required", "A valid Idempotency-Key is required.");
+        var keyHash = Hash(idempotencyKey.Trim());
+        var requestHash = Hash($"invitation-resend:{tenantId:D}");
+        var result = await _repository.ResendInvitationAsync(tenantId, keyHash, requestHash, actorId, _clock.UtcNow, ct);
+        if (result.Outcome is TenantInvitationResendOutcome.Success or TenantInvitationResendOutcome.Replay)
+        {
+            var operation = await _repository.GetOperationByTenantAsync(tenantId, ct);
+            return operation is null ? Failure<TenantOnboardingOperationResponse>("not_found", "Tenant onboarding operation not found.") :
+                ApplicationResult<TenantOnboardingOperationResponse>.Success(MapOperation(operation));
+        }
+        return result.Outcome switch
+        {
+            TenantInvitationResendOutcome.NotFound => Failure<TenantOnboardingOperationResponse>("not_found", "Tenant onboarding operation not found."),
+            TenantInvitationResendOutcome.IdempotencyConflict => Failure<TenantOnboardingOperationResponse>("idempotency_conflict", "Idempotency key was reused with a different request."),
+            TenantInvitationResendOutcome.RateLimited => Failure<TenantOnboardingOperationResponse>("rate_limited", "Invitation was resent too recently."),
+            _ => Failure<TenantOnboardingOperationResponse>("invalid_transition", "Tenant invitation cannot be resent in its current state.")
+        };
+    }
+
+
     private static CreatePlatformTenantRequest MapCreateRequest(TenantOnboardingPayloadDto p)
     {
         var b = p.BasicDetails!; var c = p.BusinessContact!; var plan = p.Plan!; var billing = p.Billing!; var admin = p.TenantAdmin!;
@@ -215,5 +256,7 @@ public sealed class PlatformTenantOnboardingService : IPlatformTenantOnboardingS
         new(o.Id, o.DraftId, o.TenantId, o.Status, o.ProvisioningStatus, o.PaymentStatus, o.InvitationStatus,
             o.AttemptCount, o.FailureCode, o.Status == "FAILED_RETRYABLE", o.NextRetryAt, o.Version, o.UpdatedAt);
     private static string InferTenantStatus(PlatformTenantOnboardingOperation operation) =>
-        operation.PaymentStatus == "PENDING" ? "pending_payment" : "active";
+        operation.PaymentStatus is "AWAITING_PAYMENT" or "PAYMENT_SUBMITTED" or "UNDER_REVIEW" or "ACTION_REQUIRED" or "REJECTED"
+            ? "pending_payment"
+            : operation.PaymentStatus == "PAID" ? "pending_activation" : "active";
 }

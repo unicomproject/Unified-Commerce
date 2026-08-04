@@ -426,6 +426,21 @@ public sealed partial class PlatformTenantRepository
                 }
             }
 
+            if (model.ManualPayment is not null)
+            {
+                _dbContext.SubscriptionPaymentTransactions.Add(model.ManualPayment);
+            }
+
+            if (model.ManualPaymentAccess is not null)
+            {
+                _dbContext.SubscriptionPaymentLinks.Add(model.ManualPaymentAccess);
+            }
+
+            if (model.ManualPaymentCreatedHistory is not null)
+            {
+                _dbContext.SubscriptionPaymentReviews.Add(model.ManualPaymentCreatedHistory);
+            }
+
             if (model.OnboardingFinalizeContext is { } finalization && onboardingDraft is not null)
             {
                 if (model.OnboardingContacts.Count > 0)

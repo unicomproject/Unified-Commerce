@@ -163,6 +163,9 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+// Keep route-bound payment access secrets out of hosting completion/error logs.
+app.UseMiddleware<PaymentAccessRequestRedactionMiddleware>();
+
 // Convert unexpected runtime failures into safe standard API errors.
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 

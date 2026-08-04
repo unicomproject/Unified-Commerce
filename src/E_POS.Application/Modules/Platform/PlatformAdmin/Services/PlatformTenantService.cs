@@ -259,8 +259,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
 
         if (string.Equals(tenant.Status, TenantStatusConstants.Active, StringComparison.OrdinalIgnoreCase))
         {
-            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
-                InvalidTransition with { Message = "Tenant is already active." });
+            return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
         }
 
         if (string.Equals(tenant.Status, TenantStatusConstants.Suspended, StringComparison.OrdinalIgnoreCase))
@@ -318,15 +317,26 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             }
         }
 
-        var now = _dateTimeProvider.UtcNow;
-        tenant.Activate(platformUserId, now);
-        subscription.Activate(now);
-
-        await _repository.UpdateTenantSubscriptionAsync(subscription, cancellationToken);
-        await _repository.UpdateTenantAsync(tenant, cancellationToken);
-        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.activated", "Tenant activated by platform admin.", null, now, cancellationToken);
-
-        return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+        var activation = await _repository.ActivateTenantRuntimeAsync(
+            tenantId, platformUserId, _dateTimeProvider.UtcNow, cancellationToken);
+        if (activation.Outcome is PlatformTenantActivationRuntimeOutcome.Success or PlatformTenantActivationRuntimeOutcome.Replay)
+            return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+        return activation.Outcome switch
+        {
+            PlatformTenantActivationRuntimeOutcome.NotFound => ApplicationResult<PlatformTenantDetailResponse>.Failure(NotFound),
+            PlatformTenantActivationRuntimeOutcome.PaymentNotVerified => ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                InvalidTransition with { Message = "Paid tenants cannot be activated before payment verification." }),
+            PlatformTenantActivationRuntimeOutcome.SubscriptionMissing => ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with { Message = "Tenant subscription is required before activation." }),
+            PlatformTenantActivationRuntimeOutcome.MembershipMissing => ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with { Message = "Tenant Admin membership and role are required before activation." }),
+            PlatformTenantActivationRuntimeOutcome.EntitlementsNotReady => ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with { Message = "Tenant entitlements are not ready for activation." }),
+            PlatformTenantActivationRuntimeOutcome.ConcurrencyConflict => ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                Conflict with { Message = "Tenant activation was changed by another request." }),
+            _ => ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                InvalidTransition with { Message = "Tenant cannot be activated from its current status." })
+        };
     }
 
     public async Task<ApplicationResult<PlatformTenantDetailResponse>> ReactivateTenantAsync(

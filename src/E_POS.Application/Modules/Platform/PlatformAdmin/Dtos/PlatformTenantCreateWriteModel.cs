@@ -37,6 +37,12 @@ public sealed class PlatformTenantCreateWriteModel
 
     public IReadOnlyList<SubscriptionInvoiceLine> DraftInvoiceLines { get; init; } = [];
 
+    public SubscriptionPaymentTransaction? ManualPayment { get; init; }
+
+    public SubscriptionPaymentLink? ManualPaymentAccess { get; init; }
+
+    public SubscriptionPaymentReview? ManualPaymentCreatedHistory { get; init; }
+
     public PlatformTenantOnboardingFinalizeContext? OnboardingFinalizeContext { get; init; }
 
     public PlatformTenantOnboardingOperation? OnboardingOperation { get; init; }

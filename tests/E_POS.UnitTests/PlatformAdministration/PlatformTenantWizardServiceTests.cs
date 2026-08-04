@@ -381,6 +381,57 @@ public sealed class PlatformTenantWizardServiceTests
     }
 
     [Fact]
+    public async Task CreateTenantAsync_PaidOnboarding_CreatesManualPaymentAccessAndOutboxWithoutCheckoutOrInvite()
+    {
+        var tenantId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository { DetailResponse = CreateDetail(tenantId) };
+        var service = CreateService(repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(new CreatePlatformTenantRequest
+        {
+            Code = "TEN-MANUAL-PAY",
+            Name = "Manual Payment Tenant",
+            BillingStatus = TenantBillingStatusConstants.Pending,
+            SubscriptionPlanId = PlanId,
+            Subscription = new CreatePlatformTenantSubscriptionDetailsRequest
+            {
+                SubscriptionType = TenantSubscriptionTypeConstants.Paid,
+                SubscriptionStatus = TenantSubscriptionStatusConstants.Active,
+                BillingCycle = "monthly",
+                InvoiceEmail = "billing@manual.test",
+                CreateDraftInvoice = true
+            },
+            TenantAdmin = new CreatePlatformTenantAdminRequest
+            {
+                FirstName = "Payer",
+                Email = "admin@manual.test",
+                SendInvite = true
+            },
+            OnboardingFinalizeContext = new(Guid.NewGuid(), 1, Guid.NewGuid(), new string('a', 64),
+                new string('b', 64), true, [], actorId, Now)
+        }, actorId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var model = Assert.IsType<PlatformTenantCreateWriteModel>(repository.LastWriteModel);
+        Assert.NotNull(model.DraftInvoice);
+        Assert.NotNull(model.ManualPayment);
+        Assert.Equal(ManualPaymentConstants.AwaitingPayment, model.ManualPayment!.TransactionStatus);
+        Assert.Equal(model.DraftInvoice!.Id, model.ManualPayment.InvoiceId);
+        Assert.Equal(model.Subscription.Id, model.ManualPayment.TenantSubscriptionId);
+        Assert.NotNull(model.ManualPaymentAccess);
+        Assert.Null(model.ManualPaymentAccess!.TokenHash);
+        Assert.Null(model.ManualPaymentAccess.PaymentUrl);
+        Assert.Equal(model.ManualPayment.Id, model.ManualPaymentAccess.PaymentTransactionId);
+        Assert.Null(model.TenantAdminInvite);
+        Assert.Equal(ManualPaymentConstants.AwaitingPayment, model.OnboardingOperation!.PaymentStatus);
+        var message = Assert.Single(model.OnboardingOutboxMessages);
+        Assert.Equal("manual_payment.access_notification_requested", message.MessageType);
+        Assert.DoesNotContain("token", message.PayloadJson, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CreateTenantAsync_WizardWithPaidBilling_SkipsDraftInvoiceAndLines()
     {
         var tenantId = Guid.NewGuid();
@@ -851,6 +902,10 @@ public sealed class PlatformTenantWizardServiceTests
 
         public Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult(false);
+
+        public Task<PlatformTenantActivationRuntimeResult> ActivateTenantRuntimeAsync(Guid tenantId, Guid actorPlatformUserId,
+            DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(new PlatformTenantActivationRuntimeResult(PlatformTenantActivationRuntimeOutcome.Success));
 
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,

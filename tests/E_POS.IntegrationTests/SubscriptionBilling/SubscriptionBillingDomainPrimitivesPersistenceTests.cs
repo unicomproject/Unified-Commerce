@@ -57,7 +57,7 @@ public sealed class SubscriptionBillingDomainPrimitivesPersistenceTests
         var linkId = Guid.NewGuid();
         var transactionId = Guid.NewGuid();
 
-        SeedInvoiceGraph(dbContext, tenantId, invoiceId);
+        var subscriptionId = SeedInvoiceGraph(dbContext, tenantId, invoiceId);
 
         var link = SubscriptionPaymentLink.CreatePending(
             linkId,
@@ -72,6 +72,7 @@ public sealed class SubscriptionBillingDomainPrimitivesPersistenceTests
         var transaction = SubscriptionPaymentTransaction.CreatePending(
             transactionId,
             tenantId,
+            subscriptionId,
             invoiceId,
             linkId,
             99.99m,
@@ -156,7 +157,7 @@ public sealed class SubscriptionBillingDomainPrimitivesPersistenceTests
         Assert.Equal(savedCreditNote.TotalCreditAmount, savedLine.LineCreditAmount);
     }
 
-    private static void SeedInvoiceGraph(EPosDbContext dbContext, Guid tenantId, Guid invoiceId)
+    private static Guid SeedInvoiceGraph(EPosDbContext dbContext, Guid tenantId, Guid invoiceId)
     {
         var subscriptionId = Guid.NewGuid();
         var planId = Guid.NewGuid();
@@ -223,6 +224,8 @@ public sealed class SubscriptionBillingDomainPrimitivesPersistenceTests
             Now,
             Now.AddMonths(1),
             Now));
+
+        return subscriptionId;
     }
 
     private static EPosDbContext CreateDbContext()

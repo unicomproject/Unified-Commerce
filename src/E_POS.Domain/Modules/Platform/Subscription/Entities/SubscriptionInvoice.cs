@@ -14,7 +14,7 @@ public class SubscriptionInvoice : AuditableEntity
     public DateTimeOffset? DueAt { get; protected set; }
     public Guid SubscriptionId { get; protected set; }
     public string InvoiceType { get; protected set; } = SubscriptionBillingAlignmentConstants.InvoiceTypeSubscription;
-    public string CurrencyCode { get; protected set; } = "LKR";
+    public string CurrencyCode { get; protected set; } = string.Empty;
     public decimal SubtotalAmount { get; protected set; }
     public decimal DiscountAmount { get; protected set; }
     public decimal TaxAmount { get; protected set; }
@@ -64,6 +64,7 @@ public class SubscriptionInvoice : AuditableEntity
         decimal totalAmount,
         string? billingCycle,
         DateTimeOffset? dueAt,
+        string currencyCode,
         DateTimeOffset now)
     {
         return CreateDraft(
@@ -74,7 +75,7 @@ public class SubscriptionInvoice : AuditableEntity
             totalAmount,
             billingCycle,
             dueAt,
-            currencyCode: null,
+            currencyCode,
             billingPeriodStart: null,
             billingPeriodEnd: null,
             now);
@@ -88,15 +89,14 @@ public class SubscriptionInvoice : AuditableEntity
         decimal totalAmount,
         string? billingCycle,
         DateTimeOffset? dueAt,
-        string? currencyCode,
+        string currencyCode,
         DateTimeOffset? billingPeriodStart,
         DateTimeOffset? billingPeriodEnd,
         DateTimeOffset now)
     {
         var normalizedTotal = Math.Max(0m, totalAmount);
-        var normalizedCurrency = string.IsNullOrWhiteSpace(currencyCode)
-            ? "LKR"
-            : currencyCode.Trim().ToUpperInvariant();
+        ArgumentException.ThrowIfNullOrWhiteSpace(currencyCode);
+        var normalizedCurrency = currencyCode.Trim().ToUpperInvariant();
 
         return new SubscriptionInvoice
         {

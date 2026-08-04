@@ -1,6 +1,10 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using E_POS.Application.Common.Email;
 using E_POS.Application.Common.Security;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Persistence;
@@ -22,6 +26,9 @@ public sealed class TenantOnboardingOutboxOptions
     public int MaximumAttempts { get; init; } = 8;
     public int InvitationExpiryHours { get; init; } = 24;
     public string? TenantAdminAppBaseUrl { get; init; }
+    public string? PaymentAccessBaseUrl { get; init; }
+    public string? ManualPaymentInstructions { get; init; }
+    public string? PaymentSupportDetails { get; init; }
 }
 
 public sealed class TenantOnboardingOutboxWorker : BackgroundService
@@ -76,10 +83,10 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
         if (message is null || message.Status != "PROCESSING" || message.LeaseOwner != _workerId) return;
         try
         {
-            if (message.MessageType == "tenant_admin.invitation_requested")
+            if (message.MessageType is "tenant_admin.invitation_requested" or "tenant_admin.invitation_resend_requested")
                 await DispatchInvitationAsync(scope.ServiceProvider, db, message.AggregateId, message.TenantId!.Value, ct);
-            else if (message.MessageType == "tenant.payment_link.requested")
-                throw new RetryableDeliveryException("payment_provider_not_configured", "Payment provider is not configured.");
+            else if (message.MessageType.StartsWith("manual_payment.", StringComparison.Ordinal))
+                await DispatchManualPaymentAsync(scope.ServiceProvider, db, message, ct);
             else throw new InvalidOperationException("Unsupported outbox event type.");
             message.MarkDelivered(DateTimeOffset.UtcNow);
         }
@@ -129,6 +136,95 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
         invite.MarkSent(DateTimeOffset.UtcNow);
         var operation = await db.PlatformTenantOnboardingOperations.SingleAsync(x => x.Id == operationId, ct);
         operation.MarkInvitationSent(DateTimeOffset.UtcNow);
+    }
+
+    private async Task DispatchManualPaymentAsync(IServiceProvider services, EPosDbContext db,
+        E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage message, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_options.PaymentAccessBaseUrl))
+            throw new RetryableDeliveryException("payment_access_base_url_not_configured", "Payment access URL is not configured.");
+        if (string.IsNullOrWhiteSpace(_options.ManualPaymentInstructions))
+            throw new RetryableDeliveryException("payment_instructions_not_configured", "Manual payment instructions are not configured.");
+        var sender = services.GetRequiredService<IApplicationEmailSender>();
+        if (!sender.IsConfigured)
+            throw new RetryableDeliveryException("payment_email_not_configured", "Payment notification provider is not configured.");
+
+        Guid paymentId;
+        Guid? requestedAccessId = null;
+        using (var payload = JsonDocument.Parse(message.PayloadJson))
+        {
+            var root = payload.RootElement;
+            paymentId = root.TryGetProperty("paymentId", out var p) && p.TryGetGuid(out var parsed)
+                ? parsed : message.AggregateId;
+            if (root.TryGetProperty("accessId", out var a) && a.ValueKind != JsonValueKind.Null && a.TryGetGuid(out var accessId))
+                requestedAccessId = accessId;
+        }
+
+        var payment = await db.SubscriptionPaymentTransactions.SingleOrDefaultAsync(x => x.Id == paymentId, ct)
+            ?? throw new InvalidOperationException("Manual payment is missing.");
+        var invoice = await db.SubscriptionInvoices.SingleAsync(x => x.Id == payment.InvoiceId, ct);
+        var subscription = await db.TenantSubscriptions.SingleAsync(x => x.Id == invoice.SubscriptionId, ct);
+        var tenant = await db.Tenants.AsNoTracking().SingleAsync(x => x.Id == payment.TenantId, ct);
+        var planName = await db.SubscriptionPlans.AsNoTracking().Where(x => x.Id == subscription.SubscriptionPlanId)
+            .Select(x => x.Name).SingleAsync(ct);
+        var recipient = subscription.InvoiceEmail;
+        if (string.IsNullOrWhiteSpace(recipient))
+            recipient = await db.TenantUsers.AsNoTracking().Where(x => x.TenantId == payment.TenantId)
+                .OrderBy(x => x.CreatedAt).Select(x => x.Email).FirstOrDefaultAsync(ct);
+        if (string.IsNullOrWhiteSpace(recipient))
+            throw new RetryableDeliveryException("payment_recipient_missing", "Payment notification recipient is missing.");
+
+        SubscriptionPaymentLink? access = requestedAccessId.HasValue
+            ? await db.SubscriptionPaymentLinks.SingleOrDefaultAsync(x => x.Id == requestedAccessId.Value &&
+                x.PaymentTransactionId == payment.Id, ct)
+            : await db.SubscriptionPaymentLinks.Where(x => x.PaymentTransactionId == payment.Id && x.RevokedAt == null)
+                .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
+        var now = DateTimeOffset.UtcNow;
+        if (access is null || access.ExpiresAt <= now)
+        {
+            access?.Revoke(now);
+            access = SubscriptionPaymentLink.CreateManualAccess(Guid.NewGuid(), payment.TenantId, payment.InvoiceId,
+                payment.Id, Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+                    recipient.Trim().ToUpperInvariant()))).ToLowerInvariant(), now.AddDays(14), now);
+            db.SubscriptionPaymentLinks.Add(access);
+        }
+
+        var tokenService = services.GetRequiredService<IManualPaymentAccessTokenService>();
+        var rawToken = tokenService.GenerateToken();
+        access.ProvisionToken(tokenService.HashToken(rawToken), recipient, now);
+        // Persist the hash before delivery so a successfully delivered link remains usable
+        // even if the worker terminates before it can mark the outbox message delivered.
+        await db.SaveChangesAsync(ct);
+        var url = $"{_options.PaymentAccessBaseUrl.TrimEnd('/')}/api/v1/tenant-onboarding/payment-access/{Uri.EscapeDataString(rawToken)}";
+        var invoiceUrl = $"{url}/invoice";
+        var status = payment.TransactionStatus.Replace('_', ' ').ToLowerInvariant();
+        var subject = message.MessageType switch
+        {
+            "manual_payment.access_notification_requested" => $"Payment required for invoice {invoice.InvoiceNumber}",
+            "manual_payment.submitted_notification_requested" => $"Payment submission received for {invoice.InvoiceNumber}",
+            "manual_payment.approved_notification_requested" => $"Payment approved for {invoice.InvoiceNumber}",
+            "manual_payment.rejected_notification_requested" => $"Payment review update for {invoice.InvoiceNumber}",
+            "manual_payment.action_required_notification_requested" => $"Payment information required for {invoice.InvoiceNumber}",
+            _ => $"Payment update for invoice {invoice.InvoiceNumber}"
+        };
+        var safeUrl = System.Net.WebUtility.HtmlEncode(url);
+        var safeInvoiceUrl = System.Net.WebUtility.HtmlEncode(invoiceUrl);
+        Func<string, string> encode = value => System.Net.WebUtility.HtmlEncode(value);
+        var support = string.IsNullOrWhiteSpace(_options.PaymentSupportDetails)
+            ? string.Empty : $"<p>Support: {encode(_options.PaymentSupportDetails!)}</p>";
+        var send = await sender.SendAsync(new ApplicationEmailMessage(recipient, subject,
+            $"<p>Tenant: {encode(tenant.DisplayName)} ({encode(tenant.TenantCode)})</p>" +
+            $"<p>Plan: {encode(planName)}; billing cycle: {encode(subscription.BillingCycle ?? "not set")}</p>" +
+            $"<p>Invoice {encode(invoice.InvoiceNumber)}; amount {invoice.TotalAmount:0.00} {encode(invoice.CurrencyCode)}; " +
+            $"tax {invoice.TaxAmount:0.00}; due {encode(invoice.DueAt?.ToString("yyyy-MM-dd") ?? "not set")}</p>" +
+            $"<p>Status: {encode(status)}</p><p>{encode(_options.ManualPaymentInstructions!)}</p>" +
+            $"<p><a href=\"{safeInvoiceUrl}\">View invoice</a></p>" +
+            $"<p><a href=\"{safeUrl}\">View payment status</a></p>{support}",
+            $"Manual payment for {tenant.TenantCode}, invoice {invoice.InvoiceNumber}: {invoice.TotalAmount:0.00} " +
+            $"{invoice.CurrencyCode}. Status: {status}. Use the secure invoice and payment-status links in this email.",
+            message.CorrelationId.ToString("D")), ct);
+        if (send.IsFailure)
+            throw new RetryableDeliveryException(send.Error.Code, "Payment notification provider rejected the message.");
     }
 
     private static string ToBase64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');

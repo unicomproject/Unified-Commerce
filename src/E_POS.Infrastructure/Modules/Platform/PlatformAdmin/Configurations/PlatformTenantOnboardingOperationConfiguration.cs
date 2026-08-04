@@ -13,8 +13,10 @@ public sealed class PlatformTenantOnboardingOperationConfiguration : IEntityType
             t.HasCheckConstraint("ck_onboarding_operations_status", "status IN ('PROCESSING','SUCCEEDED','FAILED_RETRYABLE','FAILED_FINAL')");
             t.HasCheckConstraint("ck_onboarding_operations_attempts", "attempt_count >= 0");
             t.HasCheckConstraint("ck_onboarding_operations_provisioning_status", "provisioning_status IN ('PROCESSING','SUCCEEDED','FAILED_RETRYABLE','FAILED_FINAL')");
-            t.HasCheckConstraint("ck_onboarding_operations_payment_status", "payment_status IN ('NOT_REQUIRED','PENDING','CONFIRMED','FAILED','WAIVED')");
-            t.HasCheckConstraint("ck_onboarding_operations_invitation_status", "invitation_status IN ('NOT_ELIGIBLE','PENDING','SENT','FAILED','ACCEPTED','EXPIRED')");
+            t.HasCheckConstraint("ck_onboarding_operations_payment_status",
+                "payment_status IN ('NOT_REQUIRED','PENDING','CONFIRMED','FAILED','WAIVED','AWAITING_PAYMENT','PAYMENT_SUBMITTED','UNDER_REVIEW','ACTION_REQUIRED','PAID','REJECTED','EXPIRED','CANCELLED','DEFERRED')");
+            t.HasCheckConstraint("ck_onboarding_operations_invitation_status",
+                "invitation_status IN ('NOT_ELIGIBLE','PENDING_ACTIVATION','PENDING','SENT','FAILED','ACCEPTED','EXPIRED')");
         });
         b.HasKey(x => x.Id).HasName("pk_platform_tenant_onboarding_operations");
         b.Property(x => x.Id).HasColumnName("id");

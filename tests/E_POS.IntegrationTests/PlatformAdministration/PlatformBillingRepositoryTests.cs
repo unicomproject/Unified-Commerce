@@ -153,7 +153,8 @@ public sealed class PlatformBillingRepositoryTests
         var draft = Draft("INV-004", alphaId, alphaSubscriptionId, 30m, "LKR", Now.AddDays(-1), Now.AddDays(10));
         db.SubscriptionInvoices.AddRange(paid, overdue, pendingUsd, draft);
         db.SubscriptionInvoiceLines.Add(SubscriptionInvoiceLine.Create(Guid.NewGuid(), paid.Id, "1", 1, "SUBSCRIPTION", "Subscription charge", 1m, 100m, 100m, Now.AddDays(-4)));
-        var payment = SubscriptionPaymentTransaction.CreatePending(Guid.NewGuid(), alphaId, paid.Id, Guid.NewGuid(), 100m, "LKR", "MANUAL", "PAY-001", Now.AddDays(-3));
+        var payment = SubscriptionPaymentTransaction.CreatePending(Guid.NewGuid(), alphaId, alphaSubscriptionId,
+            paid.Id, Guid.NewGuid(), 100m, "LKR", "MANUAL", "PAY-001", Now.AddDays(-3));
         payment.MarkSucceeded(Now.AddDays(-3));
         db.SubscriptionPaymentTransactions.Add(payment);
         await db.SaveChangesAsync();

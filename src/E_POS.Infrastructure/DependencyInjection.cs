@@ -81,6 +81,7 @@ public static class DependencyInjection
         services.Configure<TenantJwtOptions>(configuration.GetSection(TenantJwtOptions.SectionName));
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
         services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
+        services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
         services.Configure<AzureBlobStorageOptions>(
@@ -119,6 +120,11 @@ public static class DependencyInjection
         services.AddScoped<IPlatformModulesCatalogRepository, PlatformModulesCatalogRepository>();
         services.AddScoped<IPlatformSettingsRepository, PlatformSettingsRepository>();
         services.AddScoped<IPlatformBillingRepository, PlatformBillingRepository>();
+        services.AddScoped<IManualPaymentRepository, ManualPaymentRepository>();
+        services.AddScoped<IManualPaymentAccessTokenService, ManualPaymentAccessTokenService>();
+        services.AddScoped<IManualPaymentEvidenceStorage, AzureManualPaymentEvidenceStorage>();
+        services.AddScoped<IManualPaymentEvidenceScanner, ClamAvManualPaymentEvidenceScanner>();
+        services.AddScoped<IPaymentProvider, ManualPaymentProvider>();
         services.AddScoped<IPlatformRoleRepository, PlatformRoleRepository>();
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();

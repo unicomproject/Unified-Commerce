@@ -78,4 +78,17 @@ public sealed class IntegrationOutboxMessage : AuditableEntity
         LeaseExpiresAt = null;
         UpdatedAt = now;
     }
+
+    public void RetryNow(DateTimeOffset now)
+    {
+        if (Status is not ("FAILED_RETRYABLE" or "FAILED_FINAL"))
+            throw new InvalidOperationException("Only failed outbox messages can be retried.");
+        Status = "PENDING";
+        AvailableAt = now;
+        LeaseOwner = null;
+        LeaseExpiresAt = null;
+        LastErrorCode = null;
+        SanitizedLastError = null;
+        UpdatedAt = now;
+    }
 }

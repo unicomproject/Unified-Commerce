@@ -27,8 +27,12 @@ public interface IPlatformTenantOnboardingRepository
     Task SaveChangesAsync(CancellationToken cancellationToken);
     Task<PlatformTenantOnboardingOperation?> GetOperationByDraftAsync(Guid draftId, CancellationToken cancellationToken);
     Task<PlatformTenantOnboardingOperation?> GetOperationAsync(Guid operationId, CancellationToken cancellationToken);
+    Task<PlatformTenantOnboardingOperation?> GetOperationByTenantAsync(Guid tenantId, CancellationToken cancellationToken);
     Task AddCompletionAsync(PlatformTenantOnboardingOperation operation, IReadOnlyList<TenantContact> contacts,
         IReadOnlyList<IntegrationOutboxMessage> outboxMessages, CancellationToken cancellationToken);
+    Task<bool> RetryOperationAsync(Guid operationId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<TenantInvitationResendResult> ResendInvitationAsync(Guid tenantId, string idempotencyKeyHash,
+        string requestHash, Guid actorId, DateTimeOffset now, CancellationToken cancellationToken);
 }
 
 public interface IPlatformTenantOnboardingService
@@ -41,4 +45,7 @@ public interface IPlatformTenantOnboardingService
     Task<ApplicationResult<TenantOnboardingValidationResponse>> ValidateDraftAsync(Guid draftId, Guid actorId, CancellationToken cancellationToken);
     Task<ApplicationResult<TenantOnboardingReceiptResponse>> FinalizeAsync(Guid draftId, FinalizeTenantOnboardingRequest request, long expectedVersion, string idempotencyKey, Guid actorId, CancellationToken cancellationToken);
     Task<ApplicationResult<TenantOnboardingOperationResponse>> GetOperationAsync(Guid operationId, Guid actorId, CancellationToken cancellationToken);
+    Task<ApplicationResult<TenantOnboardingOperationResponse>> RetryOperationAsync(Guid operationId, Guid actorId, CancellationToken cancellationToken);
+    Task<ApplicationResult<TenantOnboardingOperationResponse>> ResendInvitationAsync(Guid tenantId, string idempotencyKey,
+        Guid actorId, CancellationToken cancellationToken);
 }

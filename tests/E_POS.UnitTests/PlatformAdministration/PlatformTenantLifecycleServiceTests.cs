@@ -277,7 +277,7 @@ public sealed class PlatformTenantLifecycleServiceTests
     }
 
     [Fact]
-    public async Task ActivateTenantAsync_FromActive_ReturnsInvalidTransition()
+    public async Task ActivateTenantAsync_FromActive_IsIdempotent()
     {
         var tenantId = Guid.NewGuid();
         var repository = new FakeLifecycleTenantRepository
@@ -298,7 +298,8 @@ public sealed class PlatformTenantLifecycleServiceTests
                 tenantId,
                 PlanId,
                 TenantSubscriptionStatusConstants.Active,
-                Now)
+                Now),
+            DetailResponse = CreateDetail(tenantId, TenantStatusConstants.Active)
         };
 
         var service = CreateService(
@@ -308,8 +309,8 @@ public sealed class PlatformTenantLifecycleServiceTests
 
         var result = await service.ActivateTenantAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("platform_tenants.invalid_transition", result.Error.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TenantStatusConstants.Active, result.Value!.LifecycleStatus);
     }
 
     [Fact]
@@ -750,6 +751,16 @@ public sealed class PlatformTenantLifecycleServiceTests
 
         public Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult(HasVerifiedPaidInvoice);
+
+        public Task<PlatformTenantActivationRuntimeResult> ActivateTenantRuntimeAsync(Guid tenantId, Guid actorPlatformUserId,
+            DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            if (TenantEntity is null || SubscriptionEntity is null)
+                return Task.FromResult(new PlatformTenantActivationRuntimeResult(PlatformTenantActivationRuntimeOutcome.NotFound));
+            TenantEntity.Activate(actorPlatformUserId, now);
+            SubscriptionEntity.Activate(now);
+            return Task.FromResult(new PlatformTenantActivationRuntimeResult(PlatformTenantActivationRuntimeOutcome.Success));
+        }
 
         public Task<PlatformTenantListResponse> GetTenantsAsync(
             PlatformTenantListQuery query,

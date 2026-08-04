@@ -41,6 +41,7 @@ public sealed class PlatformDashboardRepositoryTests
             100m,
             "MONTHLY",
             Now.AddDays(14),
+            "LKR",
             Now);
         pendingInvoice.Issue(Now);
         dbContext.SubscriptionInvoices.Add(pendingInvoice);
@@ -161,6 +162,7 @@ public sealed class PlatformDashboardRepositoryTests
             50m,
             "MONTHLY",
             Now.AddDays(14),
+            "LKR",
             Now);
         pendingInvoice.Issue(Now);
         dbContext.SubscriptionInvoices.Add(pendingInvoice);

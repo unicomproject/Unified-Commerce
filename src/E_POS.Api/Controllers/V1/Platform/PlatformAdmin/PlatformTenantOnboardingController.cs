@@ -100,6 +100,22 @@ public sealed class PlatformTenantOnboardingController : ControllerBase
         return ToResult(await _service.GetOperationAsync(operationId, actor, ct), "Tenant onboarding operation loaded.");
     }
 
+    [HttpPost("operations/{operationId:guid}/retry")]
+    public async Task<IActionResult> RetryOperation(Guid operationId, CancellationToken ct)
+    {
+        if (!TryActor(out var actor)) return Unauthorized();
+        return ToResult(await _service.RetryOperationAsync(operationId, actor, ct), "Tenant onboarding operation retry queued.");
+    }
+
+    [HttpPost("tenants/{tenantId:guid}/invitation/resend")]
+    public async Task<IActionResult> ResendInvitation(Guid tenantId, CancellationToken ct)
+    {
+        if (!TryActor(out var actor)) return Unauthorized();
+        var key = Request.Headers["Idempotency-Key"].ToString();
+        if (string.IsNullOrWhiteSpace(key)) return PreconditionRequired();
+        return ToResult(await _service.ResendInvitationAsync(tenantId, key, actor, ct), "Tenant Admin invitation resend queued.");
+    }
+
     private IActionResult ToResult<T>(ApplicationResult<T> result, string message) =>
         result.IsSuccess && result.Value is not null ? Ok(LegacyApiResponse<T>.Ok(message, result.Value)) : Error(result.Error);
     private IActionResult Error(ApplicationError error)
@@ -109,8 +125,9 @@ public sealed class PlatformTenantOnboardingController : ControllerBase
         return error.Code.Split('.').LastOrDefault() switch
         {
             "not_found" => NotFound(body), "access_denied" => StatusCode(403, body),
+            "rate_limited" => StatusCode(429, body),
             "validation_failed" => UnprocessableEntity(body), "precondition_required" => StatusCode(428, body),
-            "concurrency_conflict" or "idempotency_conflict" or "duplicate_conflict" => Conflict(body),
+            "concurrency_conflict" or "idempotency_conflict" or "duplicate_conflict" or "invalid_transition" => Conflict(body),
             _ => StatusCode(500, body)
         };
     }

@@ -362,6 +362,9 @@ public sealed partial class PlatformTenantService
 
         SubscriptionInvoice? draftInvoice = null;
         IReadOnlyList<SubscriptionInvoiceLine> draftInvoiceLines = [];
+        SubscriptionPaymentTransaction? manualPayment = null;
+        SubscriptionPaymentLink? manualPaymentAccess = null;
+        SubscriptionPaymentReview? manualPaymentCreatedHistory = null;
         if (shouldCreateDraftInvoice)
         {
             var invoiceId = Guid.NewGuid();
@@ -385,6 +388,29 @@ public sealed partial class PlatformTenantService
                 addonSelections,
                 addonMap,
                 now);
+
+            if (request.OnboardingFinalizeContext?.RequiresPayment == true)
+            {
+                var paymentId = Guid.NewGuid();
+                manualPayment = SubscriptionPaymentTransaction.CreateAwaitingManual(
+                    paymentId, tenantId, subscriptionId, invoiceId, invoiceAmount,
+                    plan.BaseCurrency, $"MANUAL-{paymentId:N}", now);
+                var recipient = NormalizeRequiredText(subscriptionRequest?.InvoiceEmail);
+                if (string.IsNullOrWhiteSpace(recipient)) recipient = adminEmail;
+                manualPaymentAccess = SubscriptionPaymentLink.CreateManualAccess(
+                    Guid.NewGuid(), tenantId, invoiceId, paymentId,
+                    Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(recipient.ToUpperInvariant()))).ToLowerInvariant(),
+                    now.AddDays(14), now, platformUserId);
+                var finalize = request.OnboardingFinalizeContext!;
+                manualPaymentCreatedHistory = SubscriptionPaymentReview.Create(Guid.NewGuid(), tenantId,
+                    paymentId, invoiceId, "CREATED", ManualPaymentConstants.AwaitingPayment,
+                    ManualPaymentConstants.AwaitingPayment, "PLATFORM_ADMIN", platformUserId,
+                    null, null, finalize.IdempotencyKeyHash, finalize.RequestHash,
+                    finalize.OperationId, manualPayment.Version, now,
+                    expectedAmountSnapshot: manualPayment.ExpectedAmount,
+                    currencySnapshot: manualPayment.CurrencyCode);
+            }
         }
 
         var onboardingContext = request.OnboardingFinalizeContext;
@@ -399,21 +425,28 @@ public sealed partial class PlatformTenantService
                 tenantId,
                 onboardingContext.IdempotencyKeyHash,
                 onboardingContext.RequestHash,
-                onboardingContext.RequiresPayment ? "PENDING" : "NOT_REQUIRED",
+                onboardingContext.RequiresPayment ? ManualPaymentConstants.AwaitingPayment : ManualPaymentConstants.NotRequired,
                 onboardingContext.RequiresPayment ? "NOT_ELIGIBLE" : "PENDING",
                 now);
             onboardingContacts = onboardingContext.Contacts.Select(contact => TenantContact.Create(
                 Guid.NewGuid(), tenantId, contact.ContactType, contact.ContactName, contact.Email, contact.Phone,
                 onboardingContext.ActorPlatformUserId, now)).ToArray();
             var eventType = onboardingContext.RequiresPayment
-                ? "tenant.payment_link.requested"
+                ? "manual_payment.access_notification_requested"
                 : "tenant_admin.invitation_requested";
             onboardingMessages =
             [
                 IntegrationOutboxMessage.Create(
                     Guid.NewGuid(), eventType, "tenant_onboarding", onboardingContext.OperationId, 1,
                     tenantId, onboardingContext.OperationId, null,
-                    JsonSerializer.Serialize(new { tenantId, operationId = onboardingContext.OperationId }),
+                    JsonSerializer.Serialize(new
+                    {
+                        tenantId,
+                        operationId = onboardingContext.OperationId,
+                        paymentId = manualPayment?.Id,
+                        accessId = manualPaymentAccess?.Id,
+                        invoiceId = draftInvoice?.Id
+                    }),
                     $"{eventType}:{tenantId:D}", now)
             ];
         }
@@ -434,6 +467,9 @@ public sealed partial class PlatformTenantService
             TenantAdminInvite = null,
             DraftInvoice = draftInvoice,
             DraftInvoiceLines = draftInvoiceLines,
+            ManualPayment = manualPayment,
+            ManualPaymentAccess = manualPaymentAccess,
+            ManualPaymentCreatedHistory = manualPaymentCreatedHistory,
             OnboardingFinalizeContext = onboardingContext,
             OnboardingOperation = onboardingOperation,
             OnboardingContacts = onboardingContacts,

@@ -77,6 +77,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<SubscriptionInvoiceLine> SubscriptionInvoiceLines => Set<SubscriptionInvoiceLine>();
     public DbSet<SubscriptionPaymentLink> SubscriptionPaymentLinks => Set<SubscriptionPaymentLink>();
     public DbSet<SubscriptionPaymentTransaction> SubscriptionPaymentTransactions => Set<SubscriptionPaymentTransaction>();
+    public DbSet<SubscriptionPaymentEvidence> SubscriptionPaymentEvidence => Set<SubscriptionPaymentEvidence>();
+    public DbSet<SubscriptionPaymentReview> SubscriptionPaymentReviews => Set<SubscriptionPaymentReview>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<SubscriptionPlanAddon> SubscriptionPlanAddons => Set<SubscriptionPlanAddon>();
     public DbSet<SubscriptionPlanFeature> SubscriptionPlanFeatures => Set<SubscriptionPlanFeature>();
