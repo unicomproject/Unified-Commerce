@@ -244,6 +244,7 @@ public sealed class CustomerOrdersAuthPipelineTests : IClassFixture<CustomerOrde
 
             builder.ConfigureServices(services =>
             {
+                services.RemoveAll<Microsoft.Extensions.Hosting.IHostedService>();
                 services.RemoveAll<IAuthSessionValidator>();
                 services.RemoveAll<ICustomerOrderService>();
                 services.RemoveAll<IClickCollectOrderStatusService>();

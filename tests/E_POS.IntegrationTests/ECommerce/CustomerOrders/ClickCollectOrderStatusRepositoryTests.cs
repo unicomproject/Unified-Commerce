@@ -11,7 +11,7 @@ public sealed class ClickCollectOrderStatusRepositoryTests
     private static readonly DateTimeOffset Now = new(2026, 7, 17, 8, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task UpdateStatusAsync_PendingToAccepted_PersistsStatusAndEnablesQr()
+    public async Task UpdateStatusAsync_PendingToAccepted_PersistsStatusAndKeepsQrHidden()
     {
         var tenantId = Guid.NewGuid();
         var tenantUserId = Guid.NewGuid();
@@ -31,7 +31,7 @@ public sealed class ClickCollectOrderStatusRepositoryTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("ACCEPTED", result.Response!.Status);
-        Assert.True(result.Response.CollectionQrAvailable);
+        Assert.False(result.Response.CollectionQrAvailable);
         var persisted = await dbContext.SalesOrders.SingleAsync(x => x.Id == order.Id);
         Assert.Equal("ACCEPTED", persisted.Status);
         Assert.Equal("ACCEPTED", persisted.FulfillmentStatus);
@@ -113,11 +113,15 @@ public sealed class ClickCollectOrderStatusRepositoryTests
 
         await repository.UpdateStatusAsync(tenantId, Guid.NewGuid(), order.Id, "ACCEPTED", Now.AddMinutes(1), CancellationToken.None);
         await repository.UpdateStatusAsync(tenantId, Guid.NewGuid(), order.Id, "PREPARING", Now.AddMinutes(2), CancellationToken.None);
-        await repository.UpdateStatusAsync(tenantId, Guid.NewGuid(), order.Id, "READY_FOR_COLLECTION", Now.AddMinutes(3), CancellationToken.None);
+        var ready = await repository.UpdateStatusAsync(tenantId, Guid.NewGuid(), order.Id, "READY_FOR_COLLECTION", Now.AddMinutes(3), CancellationToken.None);
         var completed = await repository.UpdateStatusAsync(tenantId, Guid.NewGuid(), order.Id, "COMPLETED", Now.AddMinutes(4), CancellationToken.None);
 
+        Assert.True(ready.IsSuccess);
+        Assert.Equal("READY_FOR_COLLECTION", ready.Response!.Status);
+        Assert.True(ready.Response.CollectionQrAvailable);
         Assert.True(completed.IsSuccess);
         Assert.Equal("COMPLETED", completed.Response!.Status);
+        Assert.False(completed.Response.CollectionQrAvailable);
         var persisted = await dbContext.SalesOrders.SingleAsync(x => x.Id == order.Id);
         Assert.Equal("COMPLETED", persisted.Status);
         Assert.Equal("COLLECTED", persisted.FulfillmentStatus);

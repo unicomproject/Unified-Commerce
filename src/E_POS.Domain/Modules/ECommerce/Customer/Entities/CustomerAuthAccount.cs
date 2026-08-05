@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.ECommerce.Customer.Entities;
 
@@ -33,6 +33,25 @@ public class CustomerAuthAccount : AuditableEntity
             PasswordHash = passwordHash,
             Status = "ACTIVE",
             LastPasswordChangedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    public static CustomerAuthAccount CreateExternal(
+        Guid id,
+        Guid tenantId,
+        Guid customerId,
+        DateTimeOffset now)
+    {
+        return new CustomerAuthAccount
+        {
+            Id = id,
+            TenantId = tenantId,
+            CustomerId = customerId,
+            PasswordHash = null,
+            EmailVerifiedAt = now,
+            Status = "ACTIVE",
             CreatedAt = now,
             UpdatedAt = now
         };

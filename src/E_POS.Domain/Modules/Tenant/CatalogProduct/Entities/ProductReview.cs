@@ -12,6 +12,7 @@ public class ProductReview : AuditableEntity
     public int RatingValue { get; private set; }
     public string? ReviewTitle { get; private set; }
     public string? ReviewText { get; private set; }
+    public bool? IsRecommended { get; private set; }
     public string Status { get; private set; } = string.Empty;
 
     protected ProductReview() { } // EF Core
@@ -23,6 +24,7 @@ public class ProductReview : AuditableEntity
         int ratingValue,
         string? reviewTitle,
         string? reviewText,
+        bool? isRecommended,
         DateTimeOffset now)
     {
         ValidateRating(ratingValue);
@@ -35,6 +37,7 @@ public class ProductReview : AuditableEntity
             RatingValue = ratingValue,
             ReviewTitle = NormalizeOptional(reviewTitle),
             ReviewText = NormalizeOptional(reviewText),
+            IsRecommended = isRecommended,
             Status = ProductReviewConstants.ApprovedStatus,
             CreatedBy = customerId,
             UpdatedBy = customerId,
@@ -47,6 +50,7 @@ public class ProductReview : AuditableEntity
         int ratingValue,
         string? reviewTitle,
         string? reviewText,
+        bool? isRecommended,
         Guid customerId,
         DateTimeOffset now)
     {
@@ -55,6 +59,7 @@ public class ProductReview : AuditableEntity
         RatingValue = ratingValue;
         ReviewTitle = NormalizeOptional(reviewTitle);
         ReviewText = NormalizeOptional(reviewText);
+        IsRecommended = isRecommended;
         Status = ProductReviewConstants.ApprovedStatus;
         UpdatedBy = customerId;
         UpdatedAt = now;
@@ -64,9 +69,10 @@ public class ProductReview : AuditableEntity
         int ratingValue,
         string? reviewTitle,
         string? reviewText,
+        bool? isRecommended,
         Guid customerId,
         DateTimeOffset now) =>
-        UpdateApproved(ratingValue, reviewTitle, reviewText, customerId, now);
+        UpdateApproved(ratingValue, reviewTitle, reviewText, isRecommended, customerId, now);
 
     public void SoftDelete(Guid customerId, DateTimeOffset now)
     {

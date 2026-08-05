@@ -34,16 +34,16 @@ public sealed class ProductReviewRepositoryTests
             CreateCustomer(tenantId, secondCustomerId, "C-002"));
         dbContext.ProductReviews.AddRange(
             ProductReview.CreateApproved(
-                tenantId, productId, firstCustomerId, 3, "Good", "Useful", Now),
+                tenantId, productId, firstCustomerId, 3, "Good", "Useful", true, Now),
             ProductReview.CreateApproved(
-                tenantId, productId, secondCustomerId, 5, "Excellent", "Perfect", Now.AddMinutes(1)),
+                tenantId, productId, secondCustomerId, 5, "Excellent", "Perfect", true, Now.AddMinutes(1)),
             ProductReview.CreateApproved(
-                otherTenantId, productId, Guid.NewGuid(), 1, "Other", "Hidden", Now.AddMinutes(2)));
+                otherTenantId, productId, Guid.NewGuid(), 1, "Other", "Hidden", false, Now.AddMinutes(2)));
         await dbContext.SaveChangesAsync();
         var repository = new ProductReviewRepository(dbContext);
 
         var result = await repository.GetAsync(
-            tenantId, productId, 1, 10, "highest", Now.AddMinutes(3), CancellationToken.None);
+            tenantId, null, productId, 1, 10, "highest", Now.AddMinutes(3), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Page!.TotalCount);
@@ -114,7 +114,7 @@ public sealed class ProductReviewRepositoryTests
         var duplicate = await repository.CreateAsync(
             tenantId, customerId, productId, request, Now.AddMinutes(2), CancellationToken.None);
         var visible = await repository.GetAsync(
-            tenantId, productId, 1, 10, "newest", Now.AddMinutes(3), CancellationToken.None);
+            tenantId, customerId, productId, 1, 10, "newest", Now.AddMinutes(3), CancellationToken.None);
 
         Assert.True(created.IsSuccess);
         Assert.Equal(ProductReviewConstants.ApprovedStatus, created.Review!.Status);
@@ -143,9 +143,9 @@ public sealed class ProductReviewRepositoryTests
             CreateCustomer(tenantId, secondCustomerId, "C-002"));
         dbContext.Products.Add(CreateProduct(tenantId, productId));
         var firstReview = ProductReview.CreateApproved(
-            tenantId, productId, firstCustomerId, 5, null, null, Now);
+            tenantId, productId, firstCustomerId, 5, null, null, true, Now);
         var secondReview = ProductReview.CreateApproved(
-            tenantId, productId, secondCustomerId, 1, null, null, Now);
+            tenantId, productId, secondCustomerId, 1, null, null, false, Now);
         dbContext.ProductReviews.AddRange(firstReview, secondReview);
         var summary = ProductRatingSummary.Create(tenantId, productId, Now);
         summary.Rebuild([5, 1], Now);
@@ -192,7 +192,7 @@ public sealed class ProductReviewRepositoryTests
         var repository = new ProductReviewRepository(dbContext);
 
         var result = await repository.GetAsync(
-            tenantId, productId, 1, 10, "newest", Now, CancellationToken.None);
+            tenantId, null, productId, 1, 10, "newest", Now, CancellationToken.None);
 
         Assert.Equal("product_reviews.feature_disabled", result.ErrorCode);
     }

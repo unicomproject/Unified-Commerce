@@ -22,5 +22,36 @@ public class NotificationEvent : AuditableEntity
     public string? CancellationReason { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? CreatedByPlatformUserId { get; protected set; }
-}
 
+    public static NotificationEvent CreateProcessed(
+        Guid tenantId,
+        Guid notificationEventTypeId,
+        string eventNumber,
+        string eventCode,
+        string? sourceModule,
+        string? sourceReferenceType,
+        Guid? sourceReferenceId,
+        string priority,
+        DateTimeOffset now,
+        Guid? createdByTenantUserId,
+        Guid? createdByPlatformUserId)
+    {
+        return new NotificationEvent
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            NotificationEventTypeId = notificationEventTypeId,
+            EventNumber = eventNumber.Trim().ToUpperInvariant(),
+            EventCode = eventCode.Trim(),
+            SourceModule = string.IsNullOrWhiteSpace(sourceModule) ? null : sourceModule.Trim(),
+            SourceReferenceType = string.IsNullOrWhiteSpace(sourceReferenceType) ? null : sourceReferenceType.Trim(),
+            SourceReferenceId = sourceReferenceId,
+            Priority = priority.Trim().ToUpperInvariant(),
+            EventStatus = "PROCESSED",
+            ProcessedAt = now,
+            CreatedAt = now,
+            CreatedByTenantUserId = createdByTenantUserId,
+            CreatedByPlatformUserId = createdByPlatformUserId
+        };
+    }
+}

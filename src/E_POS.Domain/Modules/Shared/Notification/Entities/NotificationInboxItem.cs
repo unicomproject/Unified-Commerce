@@ -19,5 +19,50 @@ public class NotificationInboxItem : AuditableEntity
     public DateTimeOffset? ReadAt { get; protected set; }
     public string? IpAddress { get; protected set; }
     public string? UserAgent { get; protected set; }
-}
 
+    public static NotificationInboxItem Create(
+        Guid tenantId,
+        Guid notificationMessageId,
+        string recipientType,
+        Guid? platformUserId,
+        Guid? tenantUserId,
+        Guid? customerId,
+        string? titleText,
+        string? bodyText,
+        string? linkUrl,
+        string inboxStatus,
+        DateTimeOffset createdAt,
+        DateTimeOffset? deliveredAt)
+    {
+        return new NotificationInboxItem
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            NotificationMessageId = notificationMessageId,
+            RecipientType = recipientType.Trim().ToUpperInvariant(),
+            PlatformUserId = platformUserId,
+            TenantUserId = tenantUserId,
+            CustomerId = customerId,
+            TitleText = TrimToNull(titleText),
+            BodyText = TrimToNull(bodyText),
+            LinkUrl = TrimToNull(linkUrl),
+            InboxStatus = inboxStatus.Trim().ToUpperInvariant(),
+            CreatedAt = createdAt,
+            DeliveredAt = deliveredAt
+        };
+    }
+
+    public void MarkRead(DateTimeOffset readAt, string? ipAddress, string? userAgent)
+    {
+        if (string.Equals(InboxStatus, "READ", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        InboxStatus = "READ";
+        ReadAt = readAt;
+        IpAddress = TrimToNull(ipAddress);
+        UserAgent = TrimToNull(userAgent);
+    }
+
+    private static string? TrimToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

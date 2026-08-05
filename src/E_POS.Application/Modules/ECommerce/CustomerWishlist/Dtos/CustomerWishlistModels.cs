@@ -28,5 +28,7 @@ public sealed class CustomerWishlistItemReadModel
     public string? ImageUrl { get; set; }
     public bool IsInStock { get; set; }
     public bool IsAvailable { get; set; }
+    public decimal Rating { get; set; }
+    public int ReviewCount { get; set; }
     public DateTimeOffset AddedAt { get; set; }
 }

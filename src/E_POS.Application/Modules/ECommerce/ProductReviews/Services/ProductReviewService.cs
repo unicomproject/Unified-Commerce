@@ -22,6 +22,7 @@ public sealed class ProductReviewService : IProductReviewService
 
     public async Task<ApplicationResult<ProductReviewsPageReadModel>> GetAsync(
         Guid tenantId,
+        Guid? customerId,
         Guid productId,
         int page,
         int pageSize,
@@ -40,11 +41,56 @@ public sealed class ProductReviewService : IProductReviewService
             return PageFailure("product_reviews.invalid_sort", "Sort must be newest, oldest, highest, or lowest.");
 
         var result = await _repository.GetAsync(
-            tenantId, productId, page, pageSize, normalizedSort,
+            tenantId, customerId, productId, page, pageSize, normalizedSort,
             _dateTimeProvider.UtcNow, cancellationToken);
         return result.IsSuccess
             ? ApplicationResult<ProductReviewsPageReadModel>.Success(result.Page!)
             : ApplicationResult<ProductReviewsPageReadModel>.Failure(MapError(result.ErrorCode!));
+    }
+
+    public async Task<ApplicationResult<CustomerReviewsPageReadModel>> GetCustomerReviewsAsync(
+        Guid tenantId,
+        Guid customerId,
+        int page,
+        int pageSize,
+        string? sort,
+        CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty || customerId == Guid.Empty)
+            return ApplicationResult<CustomerReviewsPageReadModel>.Failure(MapError("product_reviews.invalid_customer_context"));
+        if (page < 1 || pageSize < 1 || pageSize > 50)
+            return ApplicationResult<CustomerReviewsPageReadModel>.Failure(Error("product_reviews.invalid_paging", "Page must be at least 1 and pageSize must be between 1 and 50."));
+
+        var normalizedSort = string.IsNullOrWhiteSpace(sort) ? "newest" : sort.Trim().ToLowerInvariant();
+        if (!AllowedSorts.Contains(normalizedSort))
+            return ApplicationResult<CustomerReviewsPageReadModel>.Failure(Error("product_reviews.invalid_sort", "Sort must be newest, oldest, highest, or lowest."));
+
+        var result = await _repository.GetCustomerReviewsAsync(
+            tenantId, customerId, page, pageSize, normalizedSort,
+            _dateTimeProvider.UtcNow, cancellationToken);
+        return result.IsSuccess
+            ? ApplicationResult<CustomerReviewsPageReadModel>.Success(result.Page!)
+            : ApplicationResult<CustomerReviewsPageReadModel>.Failure(MapError(result.ErrorCode!));
+    }
+
+    public async Task<ApplicationResult<EligibleReviewsPageReadModel>> GetEligibleProductsForReviewAsync(
+        Guid tenantId,
+        Guid customerId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var result = await _repository.GetEligibleProductsForReviewAsync(
+            tenantId,
+            customerId,
+            page > 0 ? page : 1,
+            pageSize is > 0 and <= 100 ? pageSize : 10,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+
+        return result.IsSuccess
+            ? ApplicationResult<EligibleReviewsPageReadModel>.Success(result.Page!)
+            : ApplicationResult<EligibleReviewsPageReadModel>.Failure(MapError(result.ErrorCode!));
     }
 
     public async Task<ApplicationResult<ProductReviewItemReadModel>> CreateAsync(

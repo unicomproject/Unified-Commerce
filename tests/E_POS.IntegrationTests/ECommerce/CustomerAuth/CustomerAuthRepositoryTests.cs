@@ -1,5 +1,6 @@
-using System.Security.Claims;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+﻿using System.Security.Claims;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Common.Security;
@@ -22,7 +23,7 @@ public sealed class CustomerAuthRepositoryTests
         var tenantId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         await SeedAccountAsync(dbContext, tenantId);
-        var repository = new CustomerAuthRepository(dbContext);
+        var repository = new CustomerLoginRepository(dbContext);
 
         var byEmail = await repository.FindLoginAccountAsync(
             tenantId, "CUSTOMER@EXAMPLE.COM", string.Empty, CancellationToken.None);
@@ -45,7 +46,7 @@ public sealed class CustomerAuthRepositoryTests
         await using var dbContext = CreateDbContext();
         await SeedAccountAsync(dbContext, tenantId);
         dbContext.ChangeTracker.Clear();
-        var repository = new CustomerAuthRepository(dbContext);
+        var repository = new CustomerLoginRepository(dbContext);
         var loginAccount = await repository.FindLoginAccountAsync(
             tenantId, "CUSTOMER@EXAMPLE.COM", string.Empty, CancellationToken.None);
         Assert.NotNull(loginAccount);
@@ -92,7 +93,7 @@ public sealed class CustomerAuthRepositoryTests
         var tenantId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         var seeded = await SeedAccountAsync(dbContext, tenantId);
-        var repository = new CustomerAuthRepository(dbContext);
+        var repository = new CustomerSessionRepository(dbContext);
         var sessionId = Guid.NewGuid();
         var session = CustomerAuthSession.Create(
             sessionId,
@@ -160,7 +161,7 @@ public sealed class CustomerAuthRepositoryTests
             tenantId,
             "current-token-hash");
         dbContext.ChangeTracker.Clear();
-        var repository = new CustomerAuthRepository(dbContext);
+        var repository = new CustomerSessionRepository(dbContext);
         var replacementId = Guid.NewGuid();
         var replacementExpiresAt = Now.AddDays(30).AddMinutes(1);
 
@@ -202,7 +203,7 @@ public sealed class CustomerAuthRepositoryTests
             tenantId,
             "reused-token-hash");
         dbContext.ChangeTracker.Clear();
-        var repository = new CustomerAuthRepository(dbContext);
+        var repository = new CustomerSessionRepository(dbContext);
 
         var first = await repository.RotateRefreshTokenAsync(
             tenantId,
@@ -250,7 +251,7 @@ public sealed class CustomerAuthRepositoryTests
             "tenant-scoped-token-hash");
         await SeedAccountAsync(dbContext, otherTenantId);
         dbContext.ChangeTracker.Clear();
-        var repository = new CustomerAuthRepository(dbContext);
+        var repository = new CustomerSessionRepository(dbContext);
 
         var result = await repository.RotateRefreshTokenAsync(
             otherTenantId,
@@ -269,6 +270,135 @@ public sealed class CustomerAuthRepositoryTests
         Assert.Null(original.UsedAt);
     }
 
+
+    [Fact]
+    public async Task RegisterExternalCustomerAsync_PersistsExternalAuthLinkSessionAndRefreshToken()
+    {
+        var tenantId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var authAccountId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        dbContext.Tenants.Add(TenantEntity.Create(
+            tenantId,
+            $"T{tenantId:N}"[..12],
+            $"tenant-{tenantId:N}",
+            "Tenant",
+            TenantStatusConstants.Active,
+            "LKR",
+            "Asia/Colombo",
+            null,
+            null,
+            Now));
+        var customer = CustomerEntity.CreateECommerceCustomer(
+            customerId,
+            tenantId,
+            "CUS100001",
+            "google@example.com",
+            "Google",
+            "Customer",
+            Now);
+        var account = CustomerAuthAccount.CreateExternal(authAccountId, tenantId, customerId, Now);
+        account.RecordSuccessfulLogin(Now);
+        var external = CustomerExternalAuthAccount.Create(
+            Guid.NewGuid(),
+            tenantId,
+            authAccountId,
+            CustomerExternalAuthAccount.GoogleProviderCode,
+            "google-sub-001",
+            "google@example.com",
+            true,
+            Now);
+        external.RecordSuccessfulLogin("google@example.com", true, Now);
+        var session = CustomerAuthSession.Create(
+            sessionId,
+            tenantId,
+            authAccountId,
+            "external-session-hash",
+            null,
+            "browser-agent",
+            "Chrome",
+            Now.AddDays(30),
+            Now);
+        var refreshToken = CustomerRefreshToken.Create(
+            Guid.NewGuid(),
+            tenantId,
+            sessionId,
+            "external-refresh-hash",
+            Guid.NewGuid(),
+            Now.AddDays(30),
+            Now);
+        var consents = new[]
+        {
+            CustomerConsent.Grant(Guid.NewGuid(), tenantId, customerId, "TERMS", null, null, "ECOMMERCE", null, null, Now),
+            CustomerConsent.Grant(Guid.NewGuid(), tenantId, customerId, "PRIVACY", null, null, "ECOMMERCE", null, null, Now)
+        };
+        var repository = new CustomerExternalAuthRepository(dbContext);
+
+        var saved = await repository.RegisterExternalCustomerAsync(
+            customer,
+            account,
+            external,
+            consents,
+            session,
+            refreshToken,
+            CancellationToken.None);
+
+        Assert.True(saved);
+        dbContext.ChangeTracker.Clear();
+        var storedExternal = await dbContext.CustomerExternalAuthAccounts.SingleAsync();
+        var storedAccount = await dbContext.CustomerAuthAccounts.SingleAsync();
+        Assert.Equal("GOOGLE", storedExternal.ProviderCode);
+        Assert.Equal("google-sub-001", storedExternal.ProviderSubject);
+        Assert.Equal(Now, storedExternal.LastLoginAt);
+        Assert.Equal(Now, storedAccount.EmailVerifiedAt);
+        Assert.Equal(Now, storedAccount.LastLoginAt);
+        Assert.Equal("external-session-hash", await dbContext.CustomerAuthSessions.Select(x => x.SessionTokenHash).SingleAsync());
+        Assert.Equal("external-refresh-hash", await dbContext.CustomerRefreshTokens.Select(x => x.TokenHash).SingleAsync());
+        Assert.Equal(2, await dbContext.CustomerConsents.CountAsync());
+    }
+
+    [Fact]
+    public async Task FindExternalLoginAccountAsync_UsesProviderSubjectAndTenantBoundary()
+    {
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        var seeded = await SeedAccountAsync(dbContext, tenantId);
+        await SeedAccountAsync(dbContext, otherTenantId);
+        dbContext.CustomerExternalAuthAccounts.Add(CustomerExternalAuthAccount.Create(
+            Guid.NewGuid(),
+            tenantId,
+            seeded.Account.Id,
+            CustomerExternalAuthAccount.GoogleProviderCode,
+            "google-sub-tenant",
+            "customer@example.com",
+            true,
+            Now));
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+        var repository = new CustomerExternalAuthRepository(dbContext);
+
+        var found = await repository.FindExternalLoginAccountAsync(
+            tenantId,
+            CustomerExternalAuthAccount.GoogleProviderCode,
+            "google-sub-tenant",
+            trackAccount: false,
+            trackExternalAccount: false,
+            CancellationToken.None);
+        var otherTenant = await repository.FindExternalLoginAccountAsync(
+            otherTenantId,
+            CustomerExternalAuthAccount.GoogleProviderCode,
+            "google-sub-tenant",
+            trackAccount: false,
+            trackExternalAccount: false,
+            CancellationToken.None);
+
+        Assert.NotNull(found);
+        Assert.Equal(seeded.CustomerId, found!.Account.CustomerId);
+        Assert.Equal("google-sub-tenant", found.ExternalAccount.ProviderSubject);
+        Assert.Null(otherTenant);
+    }
     private static async Task<SeededRefreshSession> SeedRefreshSessionAsync(
         EPosDbContext dbContext,
         Guid tenantId,

@@ -1,4 +1,5 @@
-﻿using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+﻿using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 
 namespace E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Services;

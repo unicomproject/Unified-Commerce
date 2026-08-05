@@ -1,10 +1,11 @@
-using System.Net;
+﻿using System.Net;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
 using E_POS.Api.Controllers.V1.ECommerce.CustomerAuth;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -57,6 +58,45 @@ public sealed class CustomerAuthControllerTests
         Assert.DoesNotContain("refresh-token", responseJson);
     }
 
+
+    [Fact]
+    public async Task GoogleLogin_Success_ForwardsTenantAndRequestMetadata()
+    {
+        var tenantId = Guid.NewGuid();
+        var response = new CustomerLoginResponse(
+            "customer-google-token",
+            DateTimeOffset.UtcNow.AddMinutes(15),
+            new CustomerLoginCustomerDto(
+                Guid.NewGuid(), tenantId, "Customer", "customer@example.com", null));
+        var service = new FakeService
+        {
+            LoginResult = ApplicationResult<CustomerAuthTokenResult>.Success(
+                CreateTokenResult(response, "google-refresh-token"))
+        };
+        var controller = CreateController(service);
+        controller.HttpContext.Connection.RemoteIpAddress = IPAddress.Parse("192.0.2.25");
+        controller.Request.Headers.UserAgent = "customer-browser";
+        var request = new CustomerGoogleLoginRequest
+        {
+            IdToken = "google-id-token",
+            DeviceName = "Chrome"
+        };
+
+        var result = await controller.GoogleLogin(
+            tenantId, request, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(tenantId, service.GoogleTenantId);
+        Assert.Same(request, service.GoogleRequest);
+        Assert.Equal(IPAddress.Parse("192.0.2.25"), service.IpAddress);
+        Assert.Equal("customer-browser", service.UserAgent);
+        Assert.Contains(
+            "customer_refresh_token=google-refresh-token",
+            controller.Response.Headers.SetCookie.ToString());
+        var responseJson = JsonSerializer.Serialize(ok.Value);
+        Assert.Contains("customer-google-token", responseJson);
+        Assert.DoesNotContain("google-refresh-token", responseJson);
+    }
     [Fact]
     public async Task Login_InvalidCredentials_ReturnsUnauthorized()
     {
@@ -163,13 +203,16 @@ public sealed class CustomerAuthControllerTests
     {
         var login = typeof(CustomerAuthController).GetMethod(nameof(CustomerAuthController.Login));
         var refresh = typeof(CustomerAuthController).GetMethod(nameof(CustomerAuthController.Refresh));
+        var google = typeof(CustomerAuthController).GetMethod(nameof(CustomerAuthController.GoogleLogin));
         var logout = typeof(CustomerAuthController).GetMethod(nameof(CustomerAuthController.Logout));
 
         Assert.NotNull(login);
         Assert.NotNull(refresh);
+        Assert.NotNull(google);
         Assert.NotNull(logout);
         Assert.NotNull(login!.GetCustomAttribute<AllowAnonymousAttribute>());
         Assert.NotNull(refresh!.GetCustomAttribute<AllowAnonymousAttribute>());
+        Assert.NotNull(google!.GetCustomAttribute<AllowAnonymousAttribute>());
         var authorize = Assert.Single(logout!.GetCustomAttributes<AuthorizeAttribute>());
         Assert.Equal("CustomerOnly", authorize.Policy);
     }
@@ -205,7 +248,9 @@ public sealed class CustomerAuthControllerTests
         public ApplicationResult LogoutResult { get; init; } = ApplicationResult.Failure(
             new ApplicationError("customer_auth.invalid_session", "Invalid customer session."));
         public Guid? LoginTenantId { get; private set; }
+        public Guid? GoogleTenantId { get; private set; }
         public CustomerLoginRequest? LoginRequest { get; private set; }
+        public CustomerGoogleLoginRequest? GoogleRequest { get; private set; }
         public IPAddress? IpAddress { get; private set; }
         public string? UserAgent { get; private set; }
         public Guid? RefreshTenantId { get; private set; }
@@ -264,6 +309,20 @@ public sealed class CustomerAuthControllerTests
             return Task.FromResult(LoginResult);
         }
 
+
+        public Task<ApplicationResult<CustomerAuthTokenResult>> GoogleLoginAsync(
+            Guid tenantId,
+            CustomerGoogleLoginRequest request,
+            IPAddress? ipAddress,
+            string? userAgent,
+            CancellationToken cancellationToken)
+        {
+            GoogleTenantId = tenantId;
+            GoogleRequest = request;
+            IpAddress = ipAddress;
+            UserAgent = userAgent;
+            return Task.FromResult(LoginResult);
+        }
         public Task<ApplicationResult<CustomerAuthTokenResult>> RefreshAsync(
             Guid tenantId,
             string refreshToken,

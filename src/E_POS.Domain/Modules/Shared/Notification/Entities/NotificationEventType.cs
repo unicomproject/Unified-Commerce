@@ -17,5 +17,26 @@ public class NotificationEventType : AuditableEntity
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByPlatformUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
-}
 
+    public static NotificationEventType CreateSystem(
+        string eventCode,
+        string eventName,
+        string? sourceModule,
+        string defaultPriority,
+        DateTimeOffset now)
+    {
+        return new NotificationEventType
+        {
+            Id = Guid.NewGuid(),
+            TenantId = null,
+            EventCode = eventCode.Trim(),
+            EventName = eventName.Trim(),
+            SourceModule = string.IsNullOrWhiteSpace(sourceModule) ? null : sourceModule.Trim(),
+            DefaultPriority = defaultPriority.Trim().ToUpperInvariant(),
+            IsSystemEvent = true,
+            IsEnabled = true,
+            Status = "ACTIVE",
+            CreatedAt = now
+        };
+    }
+}

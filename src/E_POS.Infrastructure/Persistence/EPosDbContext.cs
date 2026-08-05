@@ -222,7 +222,9 @@ public sealed class EPosDbContext : DbContext
 
     // Customer
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
     public DbSet<CustomerAuthAccount> CustomerAuthAccounts => Set<CustomerAuthAccount>();
+    public DbSet<CustomerExternalAuthAccount> CustomerExternalAuthAccounts => Set<CustomerExternalAuthAccount>();
     public DbSet<CustomerAuthSession> CustomerAuthSessions => Set<CustomerAuthSession>();
     public DbSet<CustomerConsent> CustomerConsents => Set<CustomerConsent>();
     public DbSet<CustomerPasswordResetToken> CustomerPasswordResetTokens => Set<CustomerPasswordResetToken>();

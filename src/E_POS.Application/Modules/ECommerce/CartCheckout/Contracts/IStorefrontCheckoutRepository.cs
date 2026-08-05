@@ -1,8 +1,14 @@
-using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
+﻿using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 
 namespace E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 
-public interface IStorefrontCheckoutRepository
+public interface IStorefrontCheckoutRepository :
+    IStorefrontCheckoutSessionRepository,
+    IStorefrontCheckoutConfirmationRepository
+{
+}
+
+public interface IStorefrontCheckoutSessionRepository
 {
     Task<StorefrontCheckoutRepositoryResult> CreateFromCartAsync(
         Guid tenantId,
@@ -26,7 +32,10 @@ public interface IStorefrontCheckoutRepository
         UpdateStorefrontCheckoutCollectionRequest request,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+}
 
+public interface IStorefrontCheckoutConfirmationRepository
+{
     Task<StorefrontCheckoutRepositoryResult> ConfirmAsync(
         Guid tenantId,
         Guid customerId,
