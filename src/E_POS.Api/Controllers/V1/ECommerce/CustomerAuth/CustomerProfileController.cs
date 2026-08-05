@@ -1,7 +1,8 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using E_POS.Api.Extensions;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

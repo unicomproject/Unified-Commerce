@@ -2,7 +2,7 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 
-namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 
 public interface ICustomerAuthService
 {
@@ -43,7 +43,12 @@ public interface ICustomerAuthService
         IPAddress? ipAddress,
         string? userAgent,
         CancellationToken cancellationToken);
-
+    Task<ApplicationResult<CustomerAuthTokenResult>> GoogleLoginAsync(
+        Guid tenantId,
+        CustomerGoogleLoginRequest request,
+        IPAddress? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken);
     Task<ApplicationResult<CustomerAuthTokenResult>> RefreshAsync(
         Guid tenantId,
         string refreshToken,
@@ -67,7 +72,3 @@ public interface ICustomerAuthService
         CancellationToken cancellationToken);
 }
 
-public interface ICustomerPasswordResetLinkBuilder
-{
-    string BuildResetUrl(string email, string rawToken);
-}

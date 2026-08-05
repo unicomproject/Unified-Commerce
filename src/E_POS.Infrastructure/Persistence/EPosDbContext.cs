@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Platform.PlatformFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
@@ -219,7 +219,9 @@ public sealed class EPosDbContext : DbContext
 
     // Customer
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
     public DbSet<CustomerAuthAccount> CustomerAuthAccounts => Set<CustomerAuthAccount>();
+    public DbSet<CustomerExternalAuthAccount> CustomerExternalAuthAccounts => Set<CustomerExternalAuthAccount>();
     public DbSet<CustomerAuthSession> CustomerAuthSessions => Set<CustomerAuthSession>();
     public DbSet<CustomerConsent> CustomerConsents => Set<CustomerConsent>();
     public DbSet<CustomerPasswordResetToken> CustomerPasswordResetTokens => Set<CustomerPasswordResetToken>();

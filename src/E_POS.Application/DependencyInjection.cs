@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Services;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Services;
@@ -31,8 +31,10 @@ using E_POS.Application.Modules.ECommerce.Customer.Contracts;
 using E_POS.Application.Modules.ECommerce.Customer.Services;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Services;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Services.Support;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Services;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
@@ -41,6 +43,9 @@ using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
 using E_POS.Application.Modules.ECommerce.ProductReviews.Services;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Application.Modules.Tenant.Reports.Services;
+using E_POS.Application.Modules.Shared.Notification.Channels;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
+using E_POS.Application.Modules.Shared.Notification.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace E_POS.Application;
@@ -120,8 +125,12 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminInventoryService, TenantAdminInventoryService>();
         services.AddScoped<ITenantAdminInventoryRequestValidator, TenantAdminInventoryRequestValidator>();
         services.AddScoped<ITenantAdminReportsService, TenantAdminReportsService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<INotificationInboxService, NotificationInboxService>();
+        services.AddScoped<INotificationChannelHandler, InAppNotificationChannelHandler>();
 
         // ECommerce Storefront
+
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
         services.AddScoped<IStorefrontCategoryService, StorefrontCategoryService>();
         services.AddScoped<IStorefrontProductService, StorefrontProductService>();
@@ -130,6 +139,19 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontService, StorefrontService>();
         services.AddScoped<IStorefrontCartService, StorefrontCartService>();
         services.AddScoped<IStorefrontCheckoutService, StorefrontCheckoutService>();
+        services.AddScoped<ICustomerAuthValidator, CustomerAuthValidator>();
+        services.AddScoped<ICustomerTokenFactory, CustomerTokenFactory>();
+        services.AddScoped<ICustomerOtpService, CustomerOtpService>();
+        services.AddScoped<ICustomerAuthEmailService, CustomerAuthEmailService>();
+        services.AddScoped<ICustomerConsentFactory, CustomerConsentFactory>();
+        services.AddScoped<ICustomerRegistrationService, CustomerRegistrationService>();
+        services.AddScoped<ICustomerEmailVerificationService, CustomerEmailVerificationService>();
+        services.AddScoped<ICustomerPasswordResetService, CustomerPasswordResetService>();
+        services.AddScoped<ICustomerLoginService, CustomerLoginService>();
+        services.AddScoped<ICustomerGoogleAuthService, CustomerGoogleAuthService>();
+        services.AddScoped<ICustomerSessionService, CustomerSessionService>();
+        services.AddScoped<ICustomerProfileService, CustomerProfileService>();
+        services.AddScoped<ICustomerAddressService, CustomerAddressService>();
         services.AddScoped<ICustomerAuthService, CustomerAuthService>();
         services.AddScoped<ICustomerWishlistService, CustomerWishlistService>();
         services.AddScoped<ICustomerOrderService, CustomerOrderService>();

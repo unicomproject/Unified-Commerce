@@ -9,6 +9,7 @@ using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 
 namespace E_POS.Infrastructure.Modules.ECommerce.ProductReviews.Repositories;
 
@@ -17,6 +18,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
     private const string ActiveCustomerStatus = "ACTIVE";
     private const string CompletedOrderStatus = "COMPLETED";
     private const string FulfilledStatus = "FULFILLED";
+    private const string CollectedStatus = "COLLECTED";
     private const string UniqueReviewConstraint = "ux_product_reviews_tenant_product_customer";
 
     private readonly EPosDbContext _dbContext;
@@ -28,6 +30,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
 
     public async Task<ProductReviewPageRepositoryResult> GetAsync(
         Guid tenantId,
+        Guid? customerId,
         Guid productId,
         int page,
         int pageSize,
@@ -68,11 +71,220 @@ public sealed class ProductReviewRepository : IProductReviewRepository
             cancellationToken);
         var summary = await ReadSummaryAsync(tenantId, productId, totalCount, cancellationToken);
 
+        bool canWriteReview = false;
+        if (customerId.HasValue && customerId.Value != Guid.Empty)
+        {
+            canWriteReview = await HasPurchasedAsync(tenantId, customerId.Value, productId, cancellationToken);
+            if (canWriteReview)
+            {
+                var hasReviewed = await _dbContext.ProductReviews
+                    .AnyAsync(x => x.TenantId == tenantId && x.ProductId == productId && x.CustomerId == customerId.Value, cancellationToken);
+                canWriteReview = !hasReviewed;
+            }
+        }
+
         return ProductReviewPageRepositoryResult.Success(new ProductReviewsPageReadModel
         {
             ProductId = productId,
+            CanWriteReview = canWriteReview,
             Summary = summary,
             Items = reviews.Select(x => MapReview(x, customers.GetValueOrDefault(x.CustomerId), true)).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        });
+    }
+
+    public async Task<CustomerReviewPageRepositoryResult> GetCustomerReviewsAsync(
+        Guid tenantId,
+        Guid customerId,
+        int page,
+        int pageSize,
+        string sort,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var accessError = await GetAccessErrorAsync(tenantId, now, cancellationToken);
+        if (accessError is not null)
+            return CustomerReviewPageRepositoryResult.Failure(accessError);
+
+        var query = _dbContext.ProductReviews
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.CustomerId == customerId &&
+                x.Status == ProductReviewConstants.ApprovedStatus);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var orderedQuery = sort switch
+        {
+            "oldest" => query.OrderBy(x => x.CreatedAt).ThenBy(x => x.Id),
+            "highest" => query.OrderByDescending(x => x.RatingValue).ThenByDescending(x => x.CreatedAt),
+            "lowest" => query.OrderBy(x => x.RatingValue).ThenByDescending(x => x.CreatedAt),
+            _ => query.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+        };
+
+        var reviews = await orderedQuery
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var productIds = reviews.Select(x => x.ProductId).Distinct().ToList();
+        
+        var products = await _dbContext.Products
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        var images = await (from image in _dbContext.ProductImages.AsNoTracking()
+                            join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                            from mediaAsset in mediaAssets.DefaultIfEmpty()
+                            where image.TenantId == tenantId &&
+                                  productIds.Contains(image.ProductId) &&
+                                  image.Status == "ACTIVE"
+                            orderby image.IsPrimaryImage descending, image.SortOrder, image.Id
+                            select new
+                            {
+                                Image = image,
+                                MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                            })
+            .ToListAsync(cancellationToken);
+
+        var imageLookup = images
+            .Where(x => x.MediaStatus == "ACTIVE" && !string.IsNullOrWhiteSpace(x.MediaPublicUrl))
+            .GroupBy(x => x.Image.ProductId)
+            .ToDictionary(
+                x => x.Key,
+                x => (string?)x.First().MediaPublicUrl);
+
+        var items = new List<CustomerReviewItemReadModel>();
+        foreach (var review in reviews)
+        {
+            var product = products.GetValueOrDefault(review.ProductId);
+            var productName = product?.ProductName ?? "Unknown Product";
+            var thumbnailUrl = imageLookup.GetValueOrDefault(review.ProductId);
+            
+            items.Add(new CustomerReviewItemReadModel
+            {
+                Id = review.Id,
+                ProductId = review.ProductId,
+                ProductName = productName,
+                ProductThumbnailUrl = thumbnailUrl,
+                RatingValue = review.RatingValue,
+                ReviewTitle = review.ReviewTitle,
+                ReviewText = review.ReviewText,
+                IsRecommended = review.IsRecommended,
+                IsVerifiedPurchase = true,
+                Status = review.Status,
+                CreatedAt = review.CreatedAt,
+                UpdatedAt = review.UpdatedAt
+            });
+        }
+
+        return CustomerReviewPageRepositoryResult.Success(new CustomerReviewsPageReadModel
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        });
+    }
+
+    public async Task<EligibleReviewsPageRepositoryResult> GetEligibleProductsForReviewAsync(
+        Guid tenantId,
+        Guid customerId,
+        int page,
+        int pageSize,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var accessError = await GetAccessErrorAsync(tenantId, now, cancellationToken);
+        if (accessError is not null)
+            return EligibleReviewsPageRepositoryResult.Failure(accessError);
+
+        var purchasedProductIds = await _dbContext.SalesOrders
+            .AsNoTracking()
+            .Where(o => o.TenantId == tenantId && 
+                        o.CustomerId == customerId && 
+                        o.Status == CompletedOrderStatus && 
+                        (o.FulfillmentStatus == FulfilledStatus || o.FulfillmentStatus == CollectedStatus))
+            .Join(_dbContext.SalesOrderLines.AsNoTracking(),
+                o => o.Id,
+                l => l.SalesOrderId,
+                (o, l) => l)
+            .Where(l => l.FulfilledQuantity > 0)
+            .Select(l => l.ProductId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var reviewedProductIds = await _dbContext.ProductReviews
+            .AsNoTracking()
+            .Where(r => r.TenantId == tenantId && 
+                        r.CustomerId == customerId && 
+                        r.Status != ProductReviewConstants.DeletedStatus)
+            .Select(r => r.ProductId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var eligibleProductIds = purchasedProductIds.Except(reviewedProductIds).ToList();
+        var totalCount = eligibleProductIds.Count;
+
+        var pagedProductIds = eligibleProductIds
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        var products = await _dbContext.Products
+            .AsNoTracking()
+            .Where(p => p.TenantId == tenantId && pagedProductIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        var images = await (from image in _dbContext.ProductImages.AsNoTracking()
+                            join mediaAsset in _dbContext.Set<MediaAsset>().AsNoTracking()
+                                on new { image.TenantId, MediaAssetId = image.MediaAssetId }
+                                equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                            from mediaAsset in mediaAssets.DefaultIfEmpty()
+                            where image.TenantId == tenantId &&
+                                  pagedProductIds.Contains(image.ProductId) &&
+                                  image.Status == "ACTIVE"
+                            orderby image.IsPrimaryImage descending, image.SortOrder, image.Id
+                            select new
+                            {
+                                Image = image,
+                                MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                            })
+            .ToListAsync(cancellationToken);
+
+        var imageLookup = images
+            .Where(x => x.MediaStatus == "ACTIVE" && !string.IsNullOrWhiteSpace(x.MediaPublicUrl))
+            .GroupBy(x => x.Image.ProductId)
+            .ToDictionary(
+                x => x.Key,
+                x => (string?)x.First().MediaPublicUrl);
+
+        var items = new List<EligibleReviewItemReadModel>();
+        
+        foreach (var productId in pagedProductIds)
+        {
+            var product = products.GetValueOrDefault(productId);
+            var productName = product?.ProductName ?? "Unknown Product";
+            var thumbnailUrl = imageLookup.GetValueOrDefault(productId);
+            
+            items.Add(new EligibleReviewItemReadModel
+            {
+                ProductId = productId,
+                ProductName = productName,
+                ProductThumbnailUrl = thumbnailUrl
+            });
+        }
+
+        return EligibleReviewsPageRepositoryResult.Success(new EligibleReviewsPageReadModel
+        {
+            Items = items,
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount
@@ -107,7 +319,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
         if (existing is not null)
         {
             existing.RestoreApproved(
-                request.RatingValue, request.ReviewTitle, request.ReviewText, customerId, now);
+                request.RatingValue, request.ReviewTitle, request.ReviewText, request.IsRecommended, customerId, now);
             review = existing;
         }
         else
@@ -119,6 +331,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
                 request.RatingValue,
                 request.ReviewTitle,
                 request.ReviewText,
+                request.IsRecommended,
                 now);
             reviews.Add(review);
             _dbContext.ProductReviews.Add(review);
@@ -168,7 +381,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
             return ProductReviewMutationRepositoryResult.Failure("product_reviews.product_not_found");
 
         review.UpdateApproved(
-            request.RatingValue, request.ReviewTitle, request.ReviewText, customerId, now);
+            request.RatingValue, request.ReviewTitle, request.ReviewText, request.IsRecommended, customerId, now);
         var reviews = await _dbContext.ProductReviews
             .Where(x => x.TenantId == tenantId && x.ProductId == review.ProductId)
             .ToListAsync(cancellationToken);
@@ -298,7 +511,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
                 order.TenantId == tenantId &&
                 order.CustomerId == customerId &&
                 order.Status == CompletedOrderStatus &&
-                order.FulfillmentStatus == FulfilledStatus &&
+                (order.FulfillmentStatus == FulfilledStatus || order.FulfillmentStatus == CollectedStatus) &&
                 _dbContext.SalesOrderLines.AsNoTracking().Any(line =>
                     line.TenantId == tenantId &&
                     line.SalesOrderId == order.Id &&
@@ -373,6 +586,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
         RatingValue = review.RatingValue,
         ReviewTitle = review.ReviewTitle,
         ReviewText = review.ReviewText,
+        IsRecommended = review.IsRecommended,
         CustomerDisplayName = BuildCustomerDisplayName(customer),
         IsVerifiedPurchase = isVerifiedPurchase,
         Status = review.Status,

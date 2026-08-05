@@ -40,13 +40,28 @@ public class StorefrontProductDetailReadModel
     public int ReviewCount { get; set; }
     public bool IsInStock { get; set; }
     public string? Badge { get; set; }
+    public string? CategoryName { get; set; }
+    public string? CategorySlug { get; set; }
+    public string? SubCategoryName { get; set; }
+    public string? SubCategorySlug { get; set; }
+    public string? BrandName { get; set; }
+    public string? BrandSlug { get; set; }
     public IReadOnlyList<StorefrontProductImageReadModel> Images { get; set; } = [];
-    public IReadOnlyList<StorefrontProductOptionValueReadModel> Colours { get; set; } = [];
-    public IReadOnlyList<StorefrontProductOptionValueReadModel> Sizes { get; set; } = [];
+    public IReadOnlyList<StorefrontProductOptionReadModel> Options { get; set; } = [];
+    public IReadOnlyList<StorefrontProductOptionValueReadModel> Colours => GetOptionValues("COLOUR", "COLOR");
+    public IReadOnlyList<StorefrontProductOptionValueReadModel> Sizes => GetOptionValues("SIZE");
     public IReadOnlyList<StorefrontProductVariantReadModel> Variants { get; set; } = [];
     public IReadOnlyList<string> Highlights { get; set; } = [];
     public string DeliveryInfo { get; set; } = string.Empty;
     public string ReturnInfo { get; set; } = string.Empty;
+
+    private IReadOnlyList<StorefrontProductOptionValueReadModel> GetOptionValues(params string[] optionNameParts)
+    {
+        return Options
+            .Where(option => optionNameParts.Any(part => option.OptionName.Contains(part, StringComparison.OrdinalIgnoreCase)))
+            .SelectMany(option => option.Values)
+            .ToList();
+    }
 }
 
 public class StorefrontProductImageReadModel
@@ -56,6 +71,12 @@ public class StorefrontProductImageReadModel
     public string AltText { get; set; } = string.Empty;
     public int SortOrder { get; set; }
     public bool IsPrimary { get; set; }
+}
+
+public class StorefrontProductOptionReadModel
+{
+    public string OptionName { get; set; } = string.Empty;
+    public IReadOnlyList<StorefrontProductOptionValueReadModel> Values { get; set; } = [];
 }
 
 public class StorefrontProductOptionValueReadModel
@@ -73,12 +94,19 @@ public class StorefrontProductVariantReadModel
     public Guid Id { get; set; }
     public string? Sku { get; set; }
     public string VariantName { get; set; } = string.Empty;
-    public string? Colour { get; set; }
-    public string? Size { get; set; }
+    public IDictionary<string, string> OptionValues { get; set; } = new Dictionary<string, string>();
+    public string? Colour => GetOptionValue("COLOUR") ?? GetOptionValue("COLOR");
+    public string? Size => GetOptionValue("SIZE");
     public decimal Price { get; set; }
     public string CurrencyCode { get; set; } = string.Empty;
     public bool IsDefault { get; set; }
     public bool IsInStock { get; set; }
+
+    private string? GetOptionValue(string optionNamePart)
+    {
+        var match = OptionValues.FirstOrDefault(option => option.Key.Contains(optionNamePart, StringComparison.OrdinalIgnoreCase));
+        return string.IsNullOrWhiteSpace(match.Key) ? null : match.Value;
+    }
 }
 
 public class StorefrontPagedReadModel<T>

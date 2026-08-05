@@ -32,12 +32,61 @@ public sealed class ProductReviewsController : ControllerBase
         [FromQuery] string? sort = "newest",
         CancellationToken cancellationToken = default)
     {
+        TryGetCustomerContext(out _, out var customerId);
+        
         var result = await _service.GetAsync(
-            tenantId, productId, page, pageSize, sort, cancellationToken);
+            tenantId, customerId, productId, page, pageSize, sort, cancellationToken);
         if (result.IsSuccess && result.Value is not null)
             return Ok(Success("Product reviews retrieved successfully.", result.Value));
 
         return ErrorResult(result.Error, isPublicRequest: true);
+    }
+
+    [Authorize(Policy = "CustomerOnly")]
+    [HttpGet("account/reviews")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetCustomerReviews(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? sort = "newest",
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetCustomerContext(out var tenantId, out var customerId))
+            return InvalidSession();
+
+        var result = await _service.GetCustomerReviewsAsync(
+            tenantId, customerId, page, pageSize, sort ?? "newest", cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+            return Ok(Success("Customer reviews retrieved successfully.", result.Value));
+
+        return ErrorResult(result.Error, isPublicRequest: false);
+    }
+
+    [Authorize(Policy = "CustomerOnly")]
+    [HttpGet("account/reviews/eligible")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetEligibleProductsForReview(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetCustomerContext(out var tenantId, out var customerId))
+            return InvalidSession();
+
+        var result = await _service.GetEligibleProductsForReviewAsync(
+            tenantId, customerId, page, pageSize, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+            return Ok(Success("Eligible products for review retrieved successfully.", result.Value));
+
+        return ErrorResult(result.Error, isPublicRequest: false);
     }
 
     [Authorize(Policy = "CustomerOnly")]

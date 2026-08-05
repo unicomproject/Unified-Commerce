@@ -90,6 +90,7 @@ public static class DevelopmentStorefrontCustomersSeedData
         ON CONFLICT (tenant_id, customer_id) DO UPDATE
         SET password_hash = EXCLUDED.password_hash,
             failed_login_count = 0,
+            email_verified_at = COALESCE(customer_auth_accounts.email_verified_at, now()),
             status = 'ACTIVE',
             updated_at = now();
         """;

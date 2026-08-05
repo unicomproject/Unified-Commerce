@@ -2,6 +2,9 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Notifications;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
+using E_POS.Application.Modules.Shared.Notification.Services;
 
 namespace E_POS.Application.Modules.ECommerce.CartCheckout.Services;
 
@@ -11,13 +14,22 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
     // sales_orders.external_order_reference is varchar(100); the checkout/session prefix uses 42 characters.
     private const int MaximumIdempotencyKeyLength = 50;
     private readonly IStorefrontCheckoutRepository _repository;
+    private readonly INotificationService _notificationService;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public StorefrontCheckoutService(
         IStorefrontCheckoutRepository repository,
         IDateTimeProvider dateTimeProvider)
+        : this(repository, NoopNotificationService.Instance, dateTimeProvider)
+    {
+    }
+    public StorefrontCheckoutService(
+        IStorefrontCheckoutRepository repository,
+        INotificationService notificationService,
+        IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
+        _notificationService = notificationService;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -108,13 +120,26 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
         if (string.IsNullOrWhiteSpace(normalizedKey) || normalizedKey.Length > MaximumIdempotencyKeyLength)
             return Failure(Error("storefront_checkout.invalid_idempotency_key", "A valid Idempotency-Key header is required."));
 
-        return Map(await _repository.ConfirmAsync(
+        var result = Map(await _repository.ConfirmAsync(
             tenantId,
             customerId,
             checkoutSessionId,
             normalizedKey,
             _dateTimeProvider.UtcNow,
             cancellationToken));
+
+        if (result.IsSuccess && result.Value?.Order is not null)
+        {
+            await _notificationService.CreateAsync(
+                ECommerceOrderNotificationFactory.OrderPlaced(
+                    tenantId,
+                    customerId,
+                    result.Value.Order.Id,
+                    result.Value.Order.OrderNumber),
+                cancellationToken);
+        }
+
+        return result;
     }
 
     private static ApplicationError? ValidateCustomerContext(Guid tenantId, Guid customerId) =>

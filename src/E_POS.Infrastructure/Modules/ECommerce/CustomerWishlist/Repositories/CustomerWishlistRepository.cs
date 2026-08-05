@@ -243,6 +243,10 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
             .AsNoTracking()
             .Where(x => x.TenantId == wishlist.TenantId && productIds.Contains(x.ProductId))
             .ToListAsync(cancellationToken);
+        var ratings = await _dbContext.Set<ProductRatingSummary>()
+            .AsNoTracking()
+            .Where(x => x.TenantId == wishlist.TenantId && productIds.Contains(x.ProductId))
+            .ToDictionaryAsync(x => x.ProductId, cancellationToken);
 
         var items = wishlist.Items
             .OrderByDescending(x => x.AddedAt)
@@ -272,6 +276,7 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
                 var productAvailable = product.Status == ActiveStatus && product.IsSellable;
                 var variantAvailable = !item.ProductVariantId.HasValue ||
                                        variant is { Status: ActiveStatus, IsSellable: true };
+                var rating = ratings.GetValueOrDefault(item.ProductId);
 
                 return new CustomerWishlistItemReadModel
                 {
@@ -286,6 +291,8 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
                     ImageUrl = imageUrl,
                     IsInStock = inventory.Count == 0 || inventory.Sum(x => x.AvailableQuantity) > 0m,
                     IsAvailable = productAvailable && variantAvailable,
+                    Rating = rating?.AverageRating ?? 0m,
+                    ReviewCount = rating?.TotalReviews ?? 0,
                     AddedAt = item.AddedAt
                 };
             })

@@ -2,7 +2,13 @@ using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 
 namespace E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 
-public interface ICustomerOrderRepository
+public interface ICustomerOrderRepository :
+    ICustomerOrderReadRepository,
+    ICustomerOrderCancelRepository
+{
+}
+
+public interface ICustomerOrderReadRepository
 {
     Task<CustomerOrderListReadModel> GetAsync(
         Guid tenantId,
@@ -17,7 +23,10 @@ public interface ICustomerOrderRepository
         Guid customerId,
         Guid orderId,
         CancellationToken cancellationToken);
+}
 
+public interface ICustomerOrderCancelRepository
+{
     Task<CustomerOrderCancelRepositoryResult> CancelAsync(
         Guid tenantId,
         Guid customerId,
@@ -30,13 +39,16 @@ public interface ICustomerOrderRepository
 public sealed record CustomerOrderCancelRepositoryResult(
     string? ErrorCode,
     string? ErrorMessage,
-    CustomerOrderCancelResponse? Response)
+    CustomerOrderCancelResponse? Response,
+    CustomerOrderNotificationContext? NotificationContext)
 {
     public bool IsSuccess => ErrorCode is null && Response is not null;
 
-    public static CustomerOrderCancelRepositoryResult Success(CustomerOrderCancelResponse response) =>
-        new(null, null, response);
+    public static CustomerOrderCancelRepositoryResult Success(
+        CustomerOrderCancelResponse response,
+        CustomerOrderNotificationContext? notificationContext = null) =>
+        new(null, null, response, notificationContext);
 
     public static CustomerOrderCancelRepositoryResult Failure(string errorCode, string? errorMessage = null) =>
-        new(errorCode, errorMessage, null);
+        new(errorCode, errorMessage, null, null);
 }

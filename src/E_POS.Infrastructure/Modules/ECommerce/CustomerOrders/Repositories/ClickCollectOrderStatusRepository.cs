@@ -61,7 +61,7 @@ public sealed class ClickCollectOrderStatusRepository : IClickCollectOrderStatus
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var status = order.GetClickAndCollectCustomerStatus();
-        return ClickCollectOrderStatusUpdateRepositoryResult.Success(new ClickCollectOrderStatusUpdateResponse
+        var response = new ClickCollectOrderStatusUpdateResponse
         {
             Id = order.Id,
             OrderNumber = order.OrderNumber,
@@ -70,7 +70,11 @@ public sealed class ClickCollectOrderStatusRepository : IClickCollectOrderStatus
             FulfillmentStatus = order.FulfillmentStatus,
             UpdatedAt = order.UpdatedAt ?? now,
             CollectionQrAvailable = CanShowCollectionQr(status)
-        });
+        };
+        var notificationContext = order.CustomerId.HasValue
+            ? new CustomerOrderNotificationContext(tenantId, order.CustomerId.Value, order.Id, order.OrderNumber)
+            : null;
+        return ClickCollectOrderStatusUpdateRepositoryResult.Success(response, notificationContext);
     }
 
     private static string MapStatusLabel(string status) => status switch
@@ -85,7 +89,7 @@ public sealed class ClickCollectOrderStatusRepository : IClickCollectOrderStatus
     };
 
     private static bool CanShowCollectionQr(string status) =>
-        status is "ACCEPTED" or "PREPARING" or "READY_FOR_COLLECTION" or "COMPLETED";
+        status is "READY_FOR_COLLECTION";
 
     private async Task AddStatusHistoryAsync(
         Guid tenantId,

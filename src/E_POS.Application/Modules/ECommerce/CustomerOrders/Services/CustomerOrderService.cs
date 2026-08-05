@@ -2,6 +2,9 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Notifications;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
+using E_POS.Application.Modules.Shared.Notification.Services;
 
 namespace E_POS.Application.Modules.ECommerce.CustomerOrders.Services;
 
@@ -13,13 +16,22 @@ public sealed class CustomerOrderService : ICustomerOrderService
     private const int MaxCancelReasonLength = 500;
 
     private readonly ICustomerOrderRepository _repository;
+    private readonly INotificationService _notificationService;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public CustomerOrderService(
         ICustomerOrderRepository repository,
         IDateTimeProvider dateTimeProvider)
+        : this(repository, NoopNotificationService.Instance, dateTimeProvider)
+    {
+    }
+    public CustomerOrderService(
+        ICustomerOrderRepository repository,
+        INotificationService notificationService,
+        IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
+        _notificationService = notificationService;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -121,10 +133,25 @@ public sealed class CustomerOrderService : ICustomerOrderService
             _dateTimeProvider.UtcNow,
             cancellationToken);
 
-        return result.IsSuccess
-            ? ApplicationResult<CustomerOrderCancelResponse>.Success(result.Response!)
-            : ApplicationResult<CustomerOrderCancelResponse>.Failure(
+        if (!result.IsSuccess)
+        {
+            return ApplicationResult<CustomerOrderCancelResponse>.Failure(
                 Error(result.ErrorCode!, result.ErrorMessage ?? MapCancelErrorMessage(result.ErrorCode!)));
+        }
+
+        if (result.NotificationContext is not null)
+        {
+            await _notificationService.CreateAsync(
+                ECommerceOrderNotificationFactory.OrderStatusChanged(
+                    result.NotificationContext.TenantId,
+                    result.NotificationContext.CustomerId,
+                    result.NotificationContext.OrderId,
+                    result.NotificationContext.OrderNumber,
+                    result.Response!.Status),
+                cancellationToken);
+        }
+
+        return ApplicationResult<CustomerOrderCancelResponse>.Success(result.Response!);
     }
 
     private static bool TryNormalizeStatus(string? status, out string? normalizedStatus)

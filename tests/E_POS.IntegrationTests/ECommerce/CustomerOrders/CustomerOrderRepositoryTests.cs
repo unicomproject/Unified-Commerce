@@ -104,7 +104,7 @@ public sealed class CustomerOrderRepositoryTests
     }
 
     [Fact]
-    public async Task GetDetailAsync_AcceptedOrder_ReturnsCollectionQr()
+    public async Task GetDetailAsync_AcceptedOrder_HidesCollectionQrUntilReady()
     {
         var tenantId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
@@ -122,12 +122,41 @@ public sealed class CustomerOrderRepositoryTests
 
         Assert.NotNull(detail);
         Assert.Equal("ACCEPTED", detail!.Status);
-        Assert.True(detail.CanShowCollectionQr);
-        Assert.Contains(order.Id.ToString("N"), detail.CollectionQr);
+        Assert.False(detail.CanShowCollectionQr);
+        Assert.Null(detail.CollectionQr);
         Assert.Contains(detail.TimelineSteps, x => x.Code == "ORDER_CONFIRMED" && x.State == "COMPLETED");
         Assert.Contains(detail.TimelineSteps, x => x.Code == "PREPARING" && x.State == "CURRENT");
         Assert.Contains("TRACK", detail.AvailableActions);
         Assert.Contains("CANCEL", detail.AvailableActions);
+        Assert.Contains("NEED_HELP", detail.AvailableActions);
+    }
+
+    [Fact]
+    public async Task GetDetailAsync_ReadyForCollectionOrder_ReturnsCollectionQr()
+    {
+        var tenantId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        var order = AddOrderWithLine(dbContext, tenantId, customerId, Guid.NewGuid(), "SO-WEB-READY", 1m);
+        order.UpdateClickAndCollectStatus("ACCEPTED", Guid.NewGuid(), Now.AddMinutes(1));
+        order.UpdateClickAndCollectStatus("PREPARING", Guid.NewGuid(), Now.AddMinutes(2));
+        order.UpdateClickAndCollectStatus("READY_FOR_COLLECTION", Guid.NewGuid(), Now.AddMinutes(3));
+        await dbContext.SaveChangesAsync();
+        var repository = new CustomerOrderRepository(dbContext);
+
+        var detail = await repository.GetDetailAsync(
+            tenantId,
+            customerId,
+            order.Id,
+            CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Equal("READY_FOR_COLLECTION", detail!.Status);
+        Assert.True(detail.CanShowCollectionQr);
+        Assert.Contains(order.Id.ToString("N"), detail.CollectionQr);
+        Assert.Contains(detail.TimelineSteps, x => x.Code == "READY_FOR_COLLECTION" && x.State == "CURRENT");
+        Assert.Contains("TRACK", detail.AvailableActions);
+        Assert.DoesNotContain("CANCEL", detail.AvailableActions);
         Assert.Contains("NEED_HELP", detail.AvailableActions);
     }
 

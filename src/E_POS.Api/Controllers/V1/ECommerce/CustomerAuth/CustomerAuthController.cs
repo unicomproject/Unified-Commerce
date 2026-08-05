@@ -1,7 +1,8 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using E_POS.Api.Extensions;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -155,6 +156,46 @@ public sealed class CustomerAuthController : ControllerBase
             _ => Unauthorized(error)
         };
     }
+
+    [AllowAnonymous]
+    [HttpPost("google")]
+    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
+    public async Task<IActionResult> GoogleLogin(
+        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
+        [FromBody] CustomerGoogleLoginRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _service.GoogleLoginAsync(
+            tenantId,
+            request ?? new CustomerGoogleLoginRequest(),
+            HttpContext.Connection.RemoteIpAddress,
+            Request.Headers.UserAgent.FirstOrDefault(),
+            cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            AppendRefreshTokenCookie(result.Value);
+            return Ok(new
+            {
+                success = true,
+                message = "Login successful.",
+                data = result.Value.Response
+            });
+        }
+
+        var error = CreateError(result.Error);
+        return result.Error.Code switch
+        {
+            "customer_auth.validation_failed" => BadRequest(error),
+            "customer_auth.terms_required" => BadRequest(error),
+            "customer_auth.tenant_access_denied" => StatusCode(StatusCodes.Status403Forbidden, error),
+            "customer_auth.google_email_not_verified" => StatusCode(StatusCodes.Status403Forbidden, error),
+            "customer_auth.invalid_google_token" => Unauthorized(error),
+            "customer_auth.email_already_registered" => Conflict(error),
+            "customer_auth.external_account_conflict" => Conflict(error),
+            "customer_auth.google_not_configured" => StatusCode(StatusCodes.Status500InternalServerError, error),
+            _ => Unauthorized(error)
+        };
+    }
     [AllowAnonymous]
     [HttpPost("refresh")]
     [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
@@ -223,6 +264,10 @@ public sealed class CustomerAuthController : ControllerBase
             "customer_auth.terms_required" => BadRequest(body),
             "customer_auth.invalid_verification_code" => BadRequest(body),
             "customer_auth.invalid_reset_token" => BadRequest(body),
+            "customer_auth.invalid_google_token" => Unauthorized(body),
+            "customer_auth.google_email_not_verified" => StatusCode(StatusCodes.Status403Forbidden, body),
+            "customer_auth.external_account_conflict" => Conflict(body),
+            "customer_auth.google_not_configured" => StatusCode(StatusCodes.Status500InternalServerError, body),
             "customer_auth.email_already_registered" => Conflict(body),
             "customer_auth.tenant_access_denied" => StatusCode(StatusCodes.Status403Forbidden, body),
             "customer_auth.email_not_verified" => StatusCode(StatusCodes.Status403Forbidden, body),

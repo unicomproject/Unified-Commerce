@@ -88,8 +88,7 @@ public static class StorefrontProductMapper
 
     public static StorefrontProductVariantReadModel ToVariantReadModel(
         ProductVariant variant,
-        string? colour,
-        string? size,
+        IDictionary<string, string> optionValues,
         decimal price,
         bool isInStock,
         string currencyCode)
@@ -99,8 +98,7 @@ public static class StorefrontProductMapper
             Id = variant.Id,
             Sku = variant.Sku,
             VariantName = variant.VariantName,
-            Colour = colour,
-            Size = size,
+            OptionValues = optionValues,
             Price = price,
             CurrencyCode = currencyCode,
             IsDefault = variant.IsDefaultVariant,
@@ -115,11 +113,13 @@ public static class StorefrontProductMapper
         ProductRatingSummary? rating,
         bool isInStock,
         IReadOnlyList<StorefrontProductImageReadModel> images,
-        IReadOnlyList<StorefrontProductOptionValueReadModel> colours,
-        IReadOnlyList<StorefrontProductOptionValueReadModel> sizes,
+        IReadOnlyList<StorefrontProductOptionReadModel> options,
         IReadOnlyList<StorefrontProductVariantReadModel> variants,
         IReadOnlyList<string> highlights,
-        string returnInfo)
+        string returnInfo,
+        Category? primaryCategory,
+        Category? parentCategory,
+        Brand? brand)
     {
         var averageRating = rating?.AverageRating ?? 0m;
         var reviewCount = rating?.TotalReviews ?? 0;
@@ -137,9 +137,14 @@ public static class StorefrontProductMapper
             ReviewCount = reviewCount,
             IsInStock = isInStock,
             Badge = reviewCount > 0 && averageRating >= 4.5m ? "Best Seller" : null,
+            CategoryName = primaryCategory != null && parentCategory == null ? primaryCategory.CategoryName : (parentCategory?.CategoryName ?? primaryCategory?.CategoryName),
+            CategorySlug = primaryCategory != null && parentCategory == null ? primaryCategory.CategorySlug : (parentCategory?.CategorySlug ?? primaryCategory?.CategorySlug),
+            SubCategoryName = parentCategory != null ? primaryCategory?.CategoryName : null,
+            SubCategorySlug = parentCategory != null ? primaryCategory?.CategorySlug : null,
+            BrandName = brand?.BrandName,
+            BrandSlug = brand?.BrandSlug,
             Images = images,
-            Colours = colours,
-            Sizes = sizes,
+            Options = options,
             Variants = variants,
             Highlights = highlights,
             DeliveryInfo = "Free delivery on eligible orders. Click & Collect ready in as little as 30 minutes.",
