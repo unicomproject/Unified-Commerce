@@ -12,6 +12,7 @@ using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Common.Security;
+using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Infrastructure.Modules.Shared.Integration.Services;
@@ -214,6 +215,35 @@ public sealed class TenantOnboardingOutboxWorkerIntegrationTests
             Assert.Equal(1, outboxMsg.AttemptCount);
             Assert.Null(outboxMsg.LeaseOwner);
             Assert.Equal("provider_timeout", outboxMsg.LastErrorCode);
+        }
+        finally
+        {
+            await CleanupOutboxFixtureAsync(ids);
+        }
+    }
+
+    [Fact]
+    public async Task UnconfiguredAcsSender_OutboxMessage_MarksStatusFailedRetryableAndDoesNotDeliver()
+    {
+        if (!await CanConnectDbAsync()) return;
+
+        var ids = OutboxFixtureIds.Create();
+        var unconfiguredOptions = Options.Create(new AzureCommunicationEmailOptions { ConnectionString = "", Endpoint = "", SenderAddress = "" });
+        var unconfiguredSender = new AzureCommunicationEmailSender(unconfiguredOptions, NullLogger<AzureCommunicationEmailSender>.Instance);
+        await SeedOutboxFixtureAsync(ids, "manual_payment.access_notification_requested");
+
+        try
+        {
+            var worker = CreateWorker(unconfiguredSender);
+            await worker.RunSingleBatchAsync();
+
+            await using var db = CreateDb();
+            var outboxMsg = await db.IntegrationOutboxMessages.SingleAsync(x => x.Id == ids.OutboxMessageId);
+            Assert.Equal("FAILED_RETRYABLE", outboxMsg.Status);
+            Assert.Equal(1, outboxMsg.AttemptCount);
+            Assert.Null(outboxMsg.ProcessedAt);
+            Assert.Null(outboxMsg.LeaseOwner);
+            Assert.Equal("payment_email_not_configured", outboxMsg.LastErrorCode);
         }
         finally
         {
