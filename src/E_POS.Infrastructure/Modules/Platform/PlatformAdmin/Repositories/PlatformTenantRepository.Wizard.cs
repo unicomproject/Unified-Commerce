@@ -1,3 +1,4 @@
+using System.Text.Json;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
@@ -482,7 +483,7 @@ public sealed partial class PlatformTenantRepository
                     Guid.NewGuid(), model.Tenant.Id, model.Subscription.Id, 2, "tenant.created",
                     finalization.RequestedAt, newPlanId: model.Subscription.SubscriptionPlanId,
                     newStatus: model.Subscription.SubscriptionStatus, reason: "Tenant finalized from onboarding draft.",
-                    changeData: $"draftId={finalization.DraftId:D};operationId={finalization.OperationId:D}",
+                    changeData: BuildOnboardingChangeData(finalization.DraftId, finalization.OperationId),
                     changedByPlatformUserId: finalization.ActorPlatformUserId));
                 onboardingDraft.Complete(model.Tenant.Id, finalization.ActorPlatformUserId, finalization.RequestedAt);
             }
@@ -496,6 +497,9 @@ public sealed partial class PlatformTenantRepository
             throw;
         }
     }
+
+    internal static string BuildOnboardingChangeData(Guid draftId, Guid operationId) =>
+        JsonSerializer.Serialize(new { draftId, operationId });
 
     private static string? NormalizeLimitKey(string? limitCode)
     {

@@ -165,35 +165,49 @@ public sealed class ManualPaymentRepository : IManualPaymentRepository
 
     public async Task<ManualPaymentQueueResponse> GetQueueAsync(ManualPaymentQueueQuery query, CancellationToken ct)
     {
-        var q = QueueQuery();
+        var q =
+            from payment in _db.SubscriptionPaymentTransactions.AsNoTracking()
+            join invoice in _db.SubscriptionInvoices.AsNoTracking() on payment.InvoiceId equals invoice.Id
+            join tenant in _db.Tenants.AsNoTracking() on payment.TenantId equals tenant.Id
+            join subscription in _db.TenantSubscriptions.AsNoTracking() on invoice.SubscriptionId equals subscription.Id
+            join plan in _db.SubscriptionPlans.AsNoTracking() on subscription.SubscriptionPlanId equals plan.Id
+            where payment.ProviderName == ManualPaymentConstants.Provider
+            select new { Payment = payment, Invoice = invoice, Tenant = tenant, Subscription = subscription, Plan = plan };
         if (!string.IsNullOrWhiteSpace(query.Status))
         {
             var status = query.Status.Trim().ToUpperInvariant();
-            q = q.Where(x => x.Status == status);
+            q = q.Where(x => x.Payment.TransactionStatus == status);
         }
-        if (query.TenantId.HasValue) q = q.Where(x => x.TenantId == query.TenantId.Value);
-        if (query.PlanId.HasValue) q = q.Where(x => x.PlanId == query.PlanId.Value);
-        if (query.SubmittedFrom.HasValue) q = q.Where(x => x.SubmittedAt >= query.SubmittedFrom.Value);
-        if (query.SubmittedTo.HasValue) q = q.Where(x => x.SubmittedAt <= query.SubmittedTo.Value);
+        if (query.TenantId.HasValue) q = q.Where(x => x.Tenant.Id == query.TenantId.Value);
+        if (query.PlanId.HasValue) q = q.Where(x => x.Plan.Id == query.PlanId.Value);
+        if (query.SubmittedFrom.HasValue) q = q.Where(x => x.Payment.SubmittedAt >= query.SubmittedFrom.Value);
+        if (query.SubmittedTo.HasValue) q = q.Where(x => x.Payment.SubmittedAt <= query.SubmittedTo.Value);
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var search = query.Search.Trim().ToLowerInvariant();
-            q = q.Where(x => x.TenantCode.ToLower().Contains(search) || x.TenantName.ToLower().Contains(search) ||
-                             x.InvoiceNumber.ToLower().Contains(search));
+            var pattern = $"%{query.Search.Trim()}%";
+            q = q.Where(x => EF.Functions.ILike(x.Tenant.TenantCode, pattern) ||
+                             EF.Functions.ILike(x.Tenant.DisplayName, pattern) ||
+                             EF.Functions.ILike(x.Invoice.InvoiceNumber, pattern));
         }
         var page = Math.Max(1, query.PageNumber);
         var size = Math.Clamp(query.PageSize, 1, 100);
         var total = await q.CountAsync(ct);
         var ascending = query.SortDirection.Equals("asc", StringComparison.OrdinalIgnoreCase);
-        IOrderedQueryable<ManualPaymentQueueItem> ordered = query.SortBy.Trim().ToLowerInvariant() switch
+        var ordered = query.SortBy.Trim().ToLowerInvariant() switch
         {
-            "amount" => ascending ? q.OrderBy(x => x.ExpectedAmount) : q.OrderByDescending(x => x.ExpectedAmount),
-            "status" => ascending ? q.OrderBy(x => x.Status) : q.OrderByDescending(x => x.Status),
-            "tenant" => ascending ? q.OrderBy(x => x.TenantName) : q.OrderByDescending(x => x.TenantName),
-            _ => ascending ? q.OrderBy(x => x.SubmittedAt) : q.OrderByDescending(x => x.SubmittedAt)
+            "amount" => ascending ? q.OrderBy(x => x.Payment.ExpectedAmount) : q.OrderByDescending(x => x.Payment.ExpectedAmount),
+            "status" => ascending ? q.OrderBy(x => x.Payment.TransactionStatus) : q.OrderByDescending(x => x.Payment.TransactionStatus),
+            "tenant" => ascending ? q.OrderBy(x => x.Tenant.DisplayName) : q.OrderByDescending(x => x.Tenant.DisplayName),
+            _ => ascending ? q.OrderBy(x => x.Payment.SubmittedAt) : q.OrderByDescending(x => x.Payment.SubmittedAt)
         };
-        var rows = await ordered.ThenByDescending(x => x.UpdatedAt)
-            .Skip((page - 1) * size).Take(size).ToListAsync(ct);
+        var rows = await ordered.ThenByDescending(x => x.Payment.UpdatedAt ?? x.Payment.CreatedAt)
+            .Skip((page - 1) * size).Take(size)
+            .Select(x => new ManualPaymentQueueItem(x.Payment.Id, x.Tenant.Id, x.Tenant.TenantCode, x.Tenant.DisplayName,
+                x.Tenant.Status, x.Invoice.Id, x.Invoice.InvoiceNumber, x.Subscription.Id, x.Plan.Id, x.Plan.Name,
+                x.Subscription.BillingCycle, x.Invoice.DueAt, x.Payment.ExpectedAmount, x.Payment.SubmittedAmount,
+                x.Payment.CurrencyCode, x.Payment.TransactionStatus, x.Payment.Version, x.Payment.SubmittedAt, null,
+                x.Payment.UpdatedAt ?? x.Payment.CreatedAt))
+            .ToListAsync(ct);
         var now = DateTimeOffset.UtcNow;
         return new(rows.Select(x => x with { SubmittedAgeSeconds = x.SubmittedAt.HasValue
             ? Math.Max(0, (long)(now - x.SubmittedAt.Value).TotalSeconds) : null }).ToList(),
@@ -202,7 +216,18 @@ public sealed class ManualPaymentRepository : IManualPaymentRepository
 
     public async Task<ManualPaymentDetailResponse?> GetDetailAsync(Guid paymentId, CancellationToken ct)
     {
-        var payment = await QueueQuery().SingleOrDefaultAsync(x => x.PaymentId == paymentId, ct);
+        var payment = await (
+            from transaction in _db.SubscriptionPaymentTransactions.AsNoTracking()
+            join invoice in _db.SubscriptionInvoices.AsNoTracking() on transaction.InvoiceId equals invoice.Id
+            join tenant in _db.Tenants.AsNoTracking() on transaction.TenantId equals tenant.Id
+            join subscription in _db.TenantSubscriptions.AsNoTracking() on invoice.SubscriptionId equals subscription.Id
+            join plan in _db.SubscriptionPlans.AsNoTracking() on subscription.SubscriptionPlanId equals plan.Id
+            where transaction.ProviderName == ManualPaymentConstants.Provider && transaction.Id == paymentId
+            select new ManualPaymentQueueItem(transaction.Id, tenant.Id, tenant.TenantCode, tenant.DisplayName, tenant.Status,
+                invoice.Id, invoice.InvoiceNumber, subscription.Id, plan.Id, plan.Name, subscription.BillingCycle, invoice.DueAt,
+                transaction.ExpectedAmount, transaction.SubmittedAmount, transaction.CurrencyCode, transaction.TransactionStatus,
+                transaction.Version, transaction.SubmittedAt, null, transaction.UpdatedAt ?? transaction.CreatedAt))
+            .SingleOrDefaultAsync(ct);
         if (payment is null) return null;
         var details = await (from transaction in _db.SubscriptionPaymentTransactions.AsNoTracking()
                              join invoice in _db.SubscriptionInvoices.AsNoTracking() on transaction.InvoiceId equals invoice.Id
@@ -363,20 +388,6 @@ public sealed class ManualPaymentRepository : IManualPaymentRepository
         await _db.SaveChangesAsync(ct);
         return new(ManualPaymentMutationOutcome.Success, new(paymentId, type, "PENDING", false));
     }
-
-    private IQueryable<ManualPaymentQueueItem> QueueQuery() =>
-        from payment in _db.SubscriptionPaymentTransactions.AsNoTracking()
-        join invoice in _db.SubscriptionInvoices.AsNoTracking() on payment.InvoiceId equals invoice.Id
-        join tenant in _db.Tenants.AsNoTracking() on payment.TenantId equals tenant.Id
-        join subscription in _db.TenantSubscriptions.AsNoTracking() on invoice.SubscriptionId equals subscription.Id
-        join plan in _db.SubscriptionPlans.AsNoTracking() on subscription.SubscriptionPlanId equals plan.Id
-        where payment.ProviderName == ManualPaymentConstants.Provider
-        select new ManualPaymentQueueItem(payment.Id, tenant.Id, tenant.TenantCode, tenant.DisplayName, tenant.Status,
-            invoice.Id, invoice.InvoiceNumber, subscription.Id, plan.Id, plan.Name, subscription.BillingCycle, invoice.DueAt,
-            payment.ExpectedAmount, payment.SubmittedAmount,
-            payment.CurrencyCode, payment.TransactionStatus, payment.Version, payment.SubmittedAt,
-            null,
-            payment.UpdatedAt ?? payment.CreatedAt);
 
     private IQueryable<ManualPaymentEvidenceDto> EvidenceDtos(Guid paymentId) =>
         _db.SubscriptionPaymentEvidence.AsNoTracking().Where(x => x.PaymentId == paymentId && x.IsActive)
