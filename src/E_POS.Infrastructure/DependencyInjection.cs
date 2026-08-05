@@ -122,6 +122,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformBillingRepository, PlatformBillingRepository>();
         services.AddScoped<IManualPaymentRepository, ManualPaymentRepository>();
         services.AddScoped<IManualPaymentAccessTokenService, ManualPaymentAccessTokenService>();
+        services.AddScoped<IInvitationTokenService, InvitationTokenService>();
         services.AddScoped<IManualPaymentEvidenceStorage, AzureManualPaymentEvidenceStorage>();
         services.AddScoped<IManualPaymentEvidenceScanner, ClamAvManualPaymentEvidenceScanner>();
         services.AddScoped<IPaymentProvider, ManualPaymentProvider>();

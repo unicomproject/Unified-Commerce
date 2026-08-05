@@ -1,12 +1,10 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using E_POS.Application.Common.Email;
-using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
-using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -120,10 +118,18 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
         var oldInvites = await db.UserInvites.Where(x => x.TenantId == tenantId && x.NormalizedInvitedEmail == user.Email &&
             (x.InviteStatus == "PENDING" || x.InviteStatus == "SENT")).ToListAsync(ct);
         foreach (var old in oldInvites) old.Cancel(now);
-        var rawToken = ToBase64Url(RandomNumberGenerator.GetBytes(32));
-        var signingKey = services.GetRequiredService<IOptions<TenantJwtOptions>>().Value.SigningKey;
-        if (string.IsNullOrWhiteSpace(signingKey)) throw new RetryableDeliveryException("invitation_hash_key_not_configured", "Invitation hashing is not configured.");
-        var hash = services.GetRequiredService<ITokenHashService>().HashToken(rawToken, signingKey);
+        var tokenService = services.GetRequiredService<IInvitationTokenService>();
+        string rawToken;
+        string hash;
+        try
+        {
+            rawToken = tokenService.GenerateToken();
+            hash = tokenService.HashToken(rawToken);
+        }
+        catch (InvalidOperationException)
+        {
+            throw new RetryableDeliveryException("invitation_hash_key_not_configured", "Invitation hashing is not configured.");
+        }
         var invite = UserInvite.CreatePending(Guid.NewGuid(), tenantId, user.Email, user.Email, roleId, null, hash,
             now.AddHours(Math.Clamp(_options.InvitationExpiryHours, 1, 168)), now);
         db.UserInvites.Add(invite);
@@ -227,7 +233,6 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
             throw new RetryableDeliveryException(send.Error.Code, "Payment notification provider rejected the message.");
     }
 
-    private static string ToBase64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     private sealed class RetryableDeliveryException(string code, string safeMessage) : Exception(safeMessage)
     { public string Code { get; } = code; public string SafeMessage { get; } = safeMessage; }
 }

@@ -11,6 +11,12 @@ public interface IManualPaymentAccessTokenService
     string HashToken(string rawToken);
 }
 
+public interface IInvitationTokenService
+{
+    string GenerateToken();
+    string HashToken(string rawToken);
+}
+
 public interface IManualPaymentEvidenceStorage
 {
     bool IsConfigured { get; }
