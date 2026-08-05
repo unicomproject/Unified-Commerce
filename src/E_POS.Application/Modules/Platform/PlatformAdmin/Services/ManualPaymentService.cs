@@ -188,6 +188,11 @@ public sealed class ManualPaymentService : IManualPaymentService
         await upload.Content.CopyToAsync(buffer, ct);
         if (buffer.Length != upload.Length) return Failure<ManualPaymentSubmissionResponse>("validation_failed", "Proof upload was incomplete.");
         var normalizedContentType = upload.ContentType.Trim().ToLowerInvariant();
+        buffer.Position = 0;
+        var scan = await _scanner.ScanAsync(buffer, normalizedContentType, ct);
+        if (scan == ManualPaymentConstants.ScanRejected)
+            return Failure<ManualPaymentSubmissionResponse>("evidence_rejected", "Payment proof failed security scanning.");
+
         if (!HasValidMagic(buffer.GetBuffer().AsSpan(0, (int)buffer.Length), normalizedContentType))
             return Failure<ManualPaymentSubmissionResponse>("invalid_evidence_type", "Proof content does not match its declared type.");
         var sha = Convert.ToHexString(SHA256.HashData(buffer.GetBuffer().AsSpan(0, (int)buffer.Length))).ToLowerInvariant();
@@ -204,13 +209,8 @@ public sealed class ManualPaymentService : IManualPaymentService
         var safeName = BuildSafeFileName(upload.OriginalFileName, normalizedContentType);
         var stored = default(ManualPaymentStoredObject);
         var replay = context.Payment.LastCommandIdempotencyKeyHash == keyHash;
-        var scan = ManualPaymentConstants.ScanUnavailable;
         if (!replay)
         {
-            buffer.Position = 0;
-            scan = await _scanner.ScanAsync(buffer, normalizedContentType, ct);
-            if (scan == ManualPaymentConstants.ScanRejected)
-                return Failure<ManualPaymentSubmissionResponse>("evidence_rejected", "Payment proof failed security scanning.");
             buffer.Position = 0;
             stored = await _storage.UploadAsync(context.Payment.TenantId, context.Payment.Id, evidenceId, safeName,
                 buffer, normalizedContentType, new Dictionary<string, string>
