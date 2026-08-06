@@ -81,6 +81,12 @@ public interface IPlatformTenantRepository
     /// </summary>
     Task<bool> HasVerifiedPaidInvoiceAsync(Guid tenantId, CancellationToken cancellationToken);
 
+    Task<PlatformTenantActivationRuntimeResult> ActivateTenantRuntimeAsync(
+        Guid tenantId,
+        Guid actorPlatformUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
     Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
         Guid tenantId,
         int pageNumber,

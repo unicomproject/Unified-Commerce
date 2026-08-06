@@ -68,6 +68,15 @@ public sealed class SubscriptionPaymentLinkConfiguration : IEntityTypeConfigurat
             .HasColumnType("varchar(700)")
             .HasMaxLength(700);
 
+        builder.Property(x => x.PaymentTransactionId).HasColumnName("payment_transaction_id");
+        builder.Property(x => x.Purpose).HasColumnName("purpose").HasMaxLength(60).IsRequired();
+        builder.Property(x => x.AllowedActions).HasColumnName("allowed_actions").HasMaxLength(255).IsRequired();
+        builder.Property(x => x.RecipientType).HasColumnName("recipient_type").HasMaxLength(60).IsRequired();
+        builder.Property(x => x.RecipientIdentifierHash).HasColumnName("recipient_identifier_hash").HasMaxLength(64);
+        builder.Property(x => x.TokenProvisionedAt).HasColumnName("token_provisioned_at").HasColumnType("timestamp with time zone");
+        builder.Property(x => x.LastAccessedAt).HasColumnName("last_accessed_at").HasColumnType("timestamp with time zone");
+        builder.Property(x => x.Version).HasColumnName("version").HasDefaultValue(1).IsConcurrencyToken();
+
         builder.Property(x => x.LinkStatus)
             .HasColumnName("link_status")
             .HasColumnType("varchar(40)")
@@ -125,6 +134,9 @@ public sealed class SubscriptionPaymentLinkConfiguration : IEntityTypeConfigurat
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_subscription_payment_links_created_by_platform_user_id_platform_users");
 
+        builder.HasOne<SubscriptionPaymentTransaction>().WithMany().HasForeignKey(x => x.PaymentTransactionId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_subscription_payment_links_payment_transaction_id");
+
         builder.HasIndex(x => x.PaymentLinkTokenHash)
             .IsUnique()
             .HasDatabaseName("uq_subscription_payment_links_payment_link_token_hash");
@@ -134,6 +146,15 @@ public sealed class SubscriptionPaymentLinkConfiguration : IEntityTypeConfigurat
 
         builder.HasIndex(x => x.TenantId)
             .HasDatabaseName("ix_subscription_payment_links_tenant_id");
+
+        builder.HasIndex(x => x.TokenHash).IsUnique().HasFilter("token_hash IS NOT NULL")
+            .HasDatabaseName("uq_subscription_payment_links_token_hash");
+        builder.HasIndex(x => x.PaymentTransactionId)
+            .HasDatabaseName("ix_subscription_payment_links_payment_transaction_id");
+        builder.HasIndex(x => new { x.PaymentTransactionId, x.Purpose })
+            .IsUnique()
+            .HasFilter("payment_transaction_id IS NOT NULL AND revoked_at IS NULL AND link_status IN ('PENDING_DELIVERY','ACTIVE')")
+            .HasDatabaseName("uq_subscription_payment_links_active_purpose");
 
         builder.ToTable(t =>
         {

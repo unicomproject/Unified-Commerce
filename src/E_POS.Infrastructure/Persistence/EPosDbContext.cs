@@ -48,6 +48,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<PlatformUserRole> PlatformUserRoles => Set<PlatformUserRole>();
     public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
     public DbSet<PlatformSalesChannel> PlatformSalesChannels => Set<PlatformSalesChannel>();
+    public DbSet<PlatformTenantOnboardingDraft> PlatformTenantOnboardingDrafts => Set<PlatformTenantOnboardingDraft>();
+    public DbSet<PlatformTenantOnboardingOperation> PlatformTenantOnboardingOperations => Set<PlatformTenantOnboardingOperation>();
 
     // Tenant Foundation
     public DbSet<BusinessType> BusinessTypes => Set<BusinessType>();
@@ -58,6 +60,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantAddress> TenantAddresses => Set<TenantAddress>();
     public DbSet<TenantDomain> TenantDomains => Set<TenantDomain>();
     public DbSet<TenantProfile> TenantProfiles => Set<TenantProfile>();
+    public DbSet<TenantContact> TenantContacts => Set<TenantContact>();
     public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
 
     // Subscription Billing
@@ -74,6 +77,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<SubscriptionInvoiceLine> SubscriptionInvoiceLines => Set<SubscriptionInvoiceLine>();
     public DbSet<SubscriptionPaymentLink> SubscriptionPaymentLinks => Set<SubscriptionPaymentLink>();
     public DbSet<SubscriptionPaymentTransaction> SubscriptionPaymentTransactions => Set<SubscriptionPaymentTransaction>();
+    public DbSet<SubscriptionPaymentEvidence> SubscriptionPaymentEvidence => Set<SubscriptionPaymentEvidence>();
+    public DbSet<SubscriptionPaymentReview> SubscriptionPaymentReviews => Set<SubscriptionPaymentReview>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
     public DbSet<SubscriptionPlanAddon> SubscriptionPlanAddons => Set<SubscriptionPlanAddon>();
     public DbSet<SubscriptionPlanFeature> SubscriptionPlanFeatures => Set<SubscriptionPlanFeature>();
@@ -105,6 +110,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantRefreshToken> TenantRefreshTokens => Set<TenantRefreshToken>();
     public DbSet<UserInvite> UserInvites => Set<UserInvite>();
     public DbSet<UserSetupToken> UserSetupTokens => Set<UserSetupToken>();
+    public DbSet<IntegrationOutboxMessage> IntegrationOutboxMessages => Set<IntegrationOutboxMessage>();
 
     // Outlet, Till and Device
     public DbSet<HardwareProfile> HardwareProfiles => Set<HardwareProfile>();

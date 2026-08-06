@@ -74,31 +74,20 @@ public sealed class PlatformBillingRepository : IPlatformBillingRepository
         => MutateAsync(id, expected, invoice => invoice.Issue(now), now, ct);
 
     public Task<PlatformBillingMutationResult> MarkPaidAsync(Guid id, DateTimeOffset expected, DateTimeOffset paidAt, DateTimeOffset now, CancellationToken ct)
-        => MutateAsync(id, expected, invoice => invoice.MarkPaid(paidAt, now), now, ct, promoteTenantLifecycle: true);
+        => MutateAsync(id, expected, invoice => invoice.MarkPaid(paidAt, now), now, ct);
 
     private async Task<PlatformBillingMutationResult> MutateAsync(
         Guid id,
         DateTimeOffset expected,
         Action<E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice> action,
         DateTimeOffset now,
-        CancellationToken ct,
-        bool promoteTenantLifecycle = false)
+        CancellationToken ct)
     {
         var invoice = await _db.SubscriptionInvoices.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (invoice is null) return new(PlatformBillingMutationOutcome.NotFound);
         if (invoice.UpdatedAt != expected) return new(PlatformBillingMutationOutcome.ConcurrencyConflict);
         try { action(invoice); }
         catch (InvalidOperationException) { return new(PlatformBillingMutationOutcome.InvalidTransition); }
-
-        if (promoteTenantLifecycle)
-        {
-            var tenant = await _db.Tenants.SingleOrDefaultAsync(x => x.Id == invoice.TenantId, ct);
-            if (tenant is not null &&
-                string.Equals(tenant.Status, TenantStatusConstants.PendingPayment, StringComparison.OrdinalIgnoreCase))
-            {
-                tenant.MarkPendingActivation(updatedBy: null, now);
-            }
-        }
 
         try { await _db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return new(PlatformBillingMutationOutcome.ConcurrencyConflict); }
@@ -169,7 +158,7 @@ public sealed class PlatformBillingRepository : IPlatformBillingRepository
 
     private IQueryable<PlatformBillingPaymentDto> PaymentsQuery(Guid id) => _db.SubscriptionPaymentTransactions.AsNoTracking()
         .Where(x => x.InvoiceId == id).OrderByDescending(x => x.CreatedAt)
-        .Select(x => new PlatformBillingPaymentDto(x.Id, x.ProviderName, x.ProviderTransactionId, x.TransactionStatus,
+        .Select(x => new PlatformBillingPaymentDto(x.Id, x.ProviderName, x.ProviderTransactionId ?? string.Empty, x.TransactionStatus,
             x.CurrencyCode, x.Amount, x.ProviderFee, x.NetAmount, x.PaidAt, x.CreatedAt));
 
     private static PlatformBillingInvoiceDto ToDto(InvoiceRow x, DateTimeOffset now)

@@ -38,6 +38,7 @@ using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Infrastructure.Modules.Shared.Integration.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
@@ -92,6 +93,7 @@ public static class DependencyInjection
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
+        services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
         services.Configure<E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions>(
@@ -124,10 +126,19 @@ public static class DependencyInjection
         services.AddScoped<IPlatformDashboardRepository, PlatformDashboardRepository>();
         services.AddScoped<IPlatformDashboardHealthProbe, PlatformDashboardHealthProbe>();
         services.AddScoped<IPlatformTenantRepository, PlatformTenantRepository>();
+        services.AddScoped<IPlatformTenantOnboardingRepository, PlatformTenantOnboardingRepository>();
+        services.Configure<TenantOnboardingOutboxOptions>(configuration.GetSection(TenantOnboardingOutboxOptions.SectionName));
+        services.AddHostedService<TenantOnboardingOutboxWorker>();
         services.AddScoped<IPlatformPermissionCatalogRepository, PlatformPermissionCatalogRepository>();
         services.AddScoped<IPlatformModulesCatalogRepository, PlatformModulesCatalogRepository>();
         services.AddScoped<IPlatformSettingsRepository, PlatformSettingsRepository>();
         services.AddScoped<IPlatformBillingRepository, PlatformBillingRepository>();
+        services.AddScoped<IManualPaymentRepository, ManualPaymentRepository>();
+        services.AddScoped<IManualPaymentAccessTokenService, ManualPaymentAccessTokenService>();
+        services.AddScoped<IInvitationTokenService, InvitationTokenService>();
+        services.AddScoped<IManualPaymentEvidenceStorage, AzureManualPaymentEvidenceStorage>();
+        services.AddScoped<IManualPaymentEvidenceScanner, ClamAvManualPaymentEvidenceScanner>();
+        services.AddScoped<IPaymentProvider, ManualPaymentProvider>();
         services.AddScoped<IPlatformRoleRepository, PlatformRoleRepository>();
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IPlatformAuditLogRepository, PlatformAuditLogRepository>();

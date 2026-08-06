@@ -49,5 +49,21 @@ public class UserInvite : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void Cancel(DateTimeOffset now)
+    {
+        if (InviteStatus == "ACCEPTED") return;
+        InviteStatus = "CANCELLED";
+        CancelledAt = now;
+        UpdatedAt = now;
+    }
+
+    public void MarkSent(DateTimeOffset now)
+    {
+        InviteStatus = "SENT";
+        SentAt ??= now;
+        LastSentAt = now;
+        UpdatedAt = now;
+    }
 }
 

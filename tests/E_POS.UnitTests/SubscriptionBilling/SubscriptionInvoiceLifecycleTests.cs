@@ -46,6 +46,14 @@ public sealed class SubscriptionInvoiceLifecycleTests
         Assert.Throws<InvalidOperationException>(() => invoice.MarkPaid(Created, Created));
     }
 
+    [Fact]
+    public void CreateDraft_MissingCurrency_IsRejectedInsteadOfFallingBack()
+    {
+        Assert.Throws<ArgumentException>(() => SubscriptionInvoice.CreateDraft(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "INV-NO-CURRENCY", 125m, "MONTHLY",
+            Created.AddDays(14), " ", Created, Created.AddMonths(1), Created));
+    }
+
     private static SubscriptionInvoice Draft() => SubscriptionInvoice.CreateDraft(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "INV-TEST-1", 125m, "MONTHLY", Created.AddDays(14), "LKR", Created, Created.AddMonths(1), Created);
 }

@@ -77,6 +77,11 @@ public sealed class TenantFeatureEntitlementConfiguration : IEntityTypeConfigura
             .HasColumnName("revoked_reason")
             .HasColumnType("text");
 
+        builder.Property(x => x.OverrideReason)
+            .HasColumnName("override_reason")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500);
+
         builder.Property(x => x.CreatedByPlatformUserId)
             .HasColumnName("created_by_platform_user_id");
 
@@ -118,6 +123,8 @@ public sealed class TenantFeatureEntitlementConfiguration : IEntityTypeConfigura
             .HasDatabaseName("uq_tenant_feature_entitlements_tenant_id_platform_feature_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_tenant_feature_entitlements_entitlement_status", "entitlement_status IN ('ENABLED', 'DISABLED', 'EXPIRED')")); 
+        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_feature_entitlements_source_type", "source_type IN ('MANUAL', 'PLAN', 'ADDON', 'OVERRIDE')"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_tenant_feature_entitlements_override_reason", "source_type <> 'OVERRIDE' OR length(btrim(override_reason)) > 0"));
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_tenant_feature_entitlements_effective_dates",
             "effective_until IS NULL OR effective_until > effective_from"));

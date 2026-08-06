@@ -82,6 +82,7 @@ public sealed class SubscriptionBillingDomainPrimitivesTests
     {
         var id = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
+        var tenantSubscriptionId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
         var paymentLinkId = Guid.NewGuid();
         const string providerReference = "provider-ref-001";
@@ -89,6 +90,7 @@ public sealed class SubscriptionBillingDomainPrimitivesTests
         var transaction = SubscriptionPaymentTransaction.CreatePending(
             id,
             tenantId,
+            tenantSubscriptionId,
             invoiceId,
             paymentLinkId,
             120m,
@@ -240,6 +242,7 @@ public sealed class SubscriptionBillingDomainPrimitivesTests
 
     private static SubscriptionPaymentTransaction CreatePaymentTransaction() =>
         SubscriptionPaymentTransaction.CreatePending(
+            Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),

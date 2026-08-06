@@ -14,6 +14,8 @@ public class TenantProfile : AuditableEntity
     public string? WebsiteUrl { get; protected set; }
     public Guid? LogoMediaAssetId { get; protected set; }
     public string? Description { get; protected set; }
+    public string? RegistrationNumber { get; protected set; }
+    public string? TaxNumber { get; protected set; }
     public Guid? CreatedByPlatformUserId { get; protected set; }
     public Guid? UpdatedByPlatformUserId { get; protected set; }
 
@@ -30,7 +32,9 @@ public class TenantProfile : AuditableEntity
         string? description,
         Guid? createdByPlatformUserId,
         DateTimeOffset now,
-        Guid? logoMediaAssetId = null)
+        Guid? logoMediaAssetId = null,
+        string? registrationNumber = null,
+        string? taxNumber = null)
     {
         return new TenantProfile
         {
@@ -45,12 +49,17 @@ public class TenantProfile : AuditableEntity
             WebsiteUrl = websiteUrl?.Trim(),
             LogoMediaAssetId = logoMediaAssetId,
             Description = description?.Trim(),
+            RegistrationNumber = NormalizeOptional(registrationNumber),
+            TaxNumber = NormalizeOptional(taxNumber),
             CreatedByPlatformUserId = createdByPlatformUserId,
             UpdatedByPlatformUserId = createdByPlatformUserId,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
 
     public static TenantProfile Create(
