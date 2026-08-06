@@ -67,7 +67,13 @@ public interface IPlatformTenantRepository
 
     Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken);
+    /// <summary>
+    /// Returns active permission definition IDs keyed by permission code for the requested codes.
+    /// Missing/inactive codes are omitted from the dictionary.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, Guid>> GetActivePermissionIdMapByCodesAsync(
+        IReadOnlyList<string> permissionCodes,
+        CancellationToken cancellationToken);
 
     Task<Guid?> GetActiveBusinessTypeIdByCodeAsync(string businessCode, CancellationToken cancellationToken);
 

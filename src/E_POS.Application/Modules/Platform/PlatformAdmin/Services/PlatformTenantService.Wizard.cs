@@ -318,8 +318,57 @@ public sealed partial class PlatformTenantService
             null, // createdByTenantUserId: system-created during platform wizard; no tenant user exists yet
             now);
 
-        var bootstrapPermissionIds = await _repository.GetTenantAdminBootstrapPermissionIdsAsync(cancellationToken);
-        var rolePermissions = bootstrapPermissionIds
+        var resolvedFeaturesForPermissions = await _repository.ResolveActiveFeaturesAsync(
+            resolvedFeatureIds,
+            featureCodes: null,
+            cancellationToken);
+        var effectiveFeatureCodes = resolvedFeaturesForPermissions
+            .Select(feature => feature.FeatureCode)
+            .ToList();
+
+        var bootstrapPermissionPlan = TenantAdminBootstrapPermissionCatalog.Resolve(effectiveFeatureCodes);
+        if (bootstrapPermissionPlan.UnknownOrUnmappedEntitlements.Count > 0)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                new ApplicationError(
+                    "platform_tenants.bootstrap_permission_mapping_failed",
+                    $"Unknown or unmapped entitlements for bootstrap permissions: {string.Join(", ", bootstrapPermissionPlan.UnknownOrUnmappedEntitlements)}."));
+        }
+
+        var permissionIdMap = await _repository.GetActivePermissionIdMapByCodesAsync(
+            bootstrapPermissionPlan.PermissionCodes,
+            cancellationToken);
+
+        var missingRequiredBase = TenantAdminBootstrapPermissionCatalog.BasePermissionCodes
+            .Where(code => !permissionIdMap.ContainsKey(code))
+            .ToList();
+        if (missingRequiredBase.Count > 0)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                new ApplicationError(
+                    "platform_tenants.bootstrap_permission_mapping_failed",
+                    $"Required bootstrap base permissions are missing from the catalog: {string.Join(", ", missingRequiredBase)}."));
+        }
+
+        foreach (var entitlement in bootstrapPermissionPlan.EffectiveEntitlementCodes)
+        {
+            var mapped = TenantAdminBootstrapPermissionCatalog.GetMappedPermissions(entitlement);
+            if (mapped.Count == 0)
+            {
+                continue;
+            }
+
+            if (!mapped.Any(code => permissionIdMap.ContainsKey(code)))
+            {
+                return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                    new ApplicationError(
+                        "platform_tenants.bootstrap_permission_mapping_failed",
+                        $"No catalog permissions found for entitled feature '{entitlement}' (expected one of: {string.Join(", ", mapped)})."));
+            }
+        }
+
+        // Grant the intersection of planned codes and active catalog rows (never invent / never platform.*).
+        var rolePermissions = permissionIdMap.Values
             .Distinct()
             .Select(permissionId => TenantRolePermission.Create(
                 Guid.NewGuid(),

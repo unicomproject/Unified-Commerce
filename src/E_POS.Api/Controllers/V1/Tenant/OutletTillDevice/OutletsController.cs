@@ -125,6 +125,8 @@ public sealed class OutletsController : ControllerBase
             "outlet.permission_denied" or "outlet.feature_disabled" or "outlet.tenant_blocked" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "outlet.not_found" => NotFound(CreateError(error)),
             "outlet.duplicate_code" or "outlet.delete_conflict" => Conflict(CreateError(error)),
+            "subscription_limit_reached" => Conflict(CreateError(error)),
+            "subscription_limit_configuration_missing" or "subscription_limit_invalid" or "subscription_limit_evaluation_failed" or "subscription_limit_unknown_key" or "subscription_limit_not_enforced" => Conflict(CreateError(error)),
             "outlet.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
         };

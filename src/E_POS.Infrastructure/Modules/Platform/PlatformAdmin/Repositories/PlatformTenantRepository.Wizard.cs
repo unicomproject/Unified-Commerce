@@ -279,18 +279,38 @@ public sealed partial class PlatformTenantRepository
             .AnyAsync(user => user.Email == email, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyDictionary<string, Guid>> GetActivePermissionIdMapByCodesAsync(
+        IReadOnlyList<string> permissionCodes,
+        CancellationToken cancellationToken)
     {
-        var bootstrapCodes = TenantCreateWizardReferenceData.TenantAdminBootstrapPermissionCodes
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (permissionCodes.Count == 0)
+        {
+            return new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        }
 
-        return await _dbContext.PermissionDefinitions
+        var codes = permissionCodes
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (codes.Count == 0)
+        {
+            return new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var rows = await _dbContext.PermissionDefinitions
             .AsNoTracking()
             .Where(permission =>
                 permission.IsActive &&
-                bootstrapCodes.Contains(permission.PermissionCode))
-            .Select(permission => permission.Id)
+                codes.Contains(permission.PermissionCode))
+            .Select(permission => new { permission.PermissionCode, permission.Id })
             .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(
+            row => row.PermissionCode,
+            row => row.Id,
+            StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<Guid?> GetActiveBusinessTypeIdByCodeAsync(string businessCode, CancellationToken cancellationToken)

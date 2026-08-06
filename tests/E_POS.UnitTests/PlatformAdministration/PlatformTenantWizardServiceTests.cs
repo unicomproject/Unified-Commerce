@@ -1043,8 +1043,14 @@ public sealed class PlatformTenantWizardServiceTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<Guid>>([PermissionId]);
+        public Task<IReadOnlyDictionary<string, Guid>> GetActivePermissionIdMapByCodesAsync(
+            IReadOnlyList<string> permissionCodes,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<string, Guid>>(
+                permissionCodes
+                    .Where(code => !string.IsNullOrWhiteSpace(code))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(code => code, _ => Guid.NewGuid(), StringComparer.OrdinalIgnoreCase));
 
         public Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
             Guid tenantId,

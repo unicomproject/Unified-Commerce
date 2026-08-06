@@ -40,6 +40,7 @@ using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Infrastructure.Modules.Shared.Integration.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Services;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 using E_POS.Infrastructure.Persistence;
@@ -168,6 +169,9 @@ public static class DependencyInjection
                 section["ResetPath"] ?? "/reset-password");
         });
         services.AddScoped<IPlatformSubscriptionPlanRepository, PlatformSubscriptionPlanRepository>();
+        services.AddScoped<ITenantFeatureEntitlementEvaluator, TenantFeatureEntitlementEvaluator>();
+        services.AddScoped<ITenantSubscriptionLimitResolver, TenantSubscriptionLimitResolver>();
+        services.AddScoped<ITenantResourceLimitGuard, TenantResourceLimitGuard>();
         services.AddScoped<ITenantUsageCounterRepository, TenantUsageCounterRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();
         services.AddScoped<ITenantAdminContextRepository, TenantAdminContextRepository>();

@@ -1,9 +1,11 @@
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Services;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace E_POS.IntegrationTests.PlatformAdministration;
@@ -116,7 +118,7 @@ public sealed class TenantAdminContextRepositoryTests
 
         await dbContext.SaveChangesAsync();
 
-        var repository = new TenantAdminContextRepository(dbContext);
+        var repository = CreateRepository(dbContext);
         var result = await repository.GetContextDataAsync(tenantUserId, tenantId, CancellationToken.None);
 
         Assert.NotNull(result);
@@ -207,12 +209,19 @@ public sealed class TenantAdminContextRepositoryTests
         dbContext.TenantFeatureEntitlements.Add(entitlement);
         await dbContext.SaveChangesAsync();
 
-        var repository = new TenantAdminContextRepository(dbContext);
+        var repository = CreateRepository(dbContext);
         var result = await repository.GetContextDataAsync(tenantUserId, tenantId, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.DoesNotContain("feature_revoked", result!.EnabledFeatures);
     }
+
+    private static TenantAdminContextRepository CreateRepository(EPosDbContext dbContext) =>
+        new(
+            dbContext,
+            new TenantFeatureEntitlementEvaluator(
+                dbContext,
+                NullLogger<TenantFeatureEntitlementEvaluator>.Instance));
 
     private static EPosDbContext CreateDbContext()
     {

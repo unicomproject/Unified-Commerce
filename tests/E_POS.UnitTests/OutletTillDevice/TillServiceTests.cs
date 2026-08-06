@@ -6,6 +6,7 @@ using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.UnitTests.TestSupport;
 using Xunit;
 
 namespace E_POS.UnitTests.OutletTillDevice;
@@ -126,7 +127,7 @@ public sealed class TillServiceTests
 
     private static TillService CreateService(FakeTillRepository repository)
     {
-        return new TillService(repository, new TillRequestValidator(), new FakeDateTimeProvider());
+        return new TillService(repository, new TillRequestValidator(), new FakeDateTimeProvider(), new AllowingTenantResourceLimitGuard());
     }
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string>? permissions = null)

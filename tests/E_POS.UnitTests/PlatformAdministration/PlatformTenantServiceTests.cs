@@ -374,8 +374,11 @@ public sealed class PlatformTenantServiceTests
         public Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        public Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<Guid>>([]);
+        public Task<IReadOnlyDictionary<string, Guid>> GetActivePermissionIdMapByCodesAsync(
+            IReadOnlyList<string> permissionCodes,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<string, Guid>>(
+                new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase));
     }
 
     private sealed class FakePlatformPermissionRepository : IPlatformPermissionRepository
