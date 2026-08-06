@@ -1,7 +1,9 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 
@@ -15,12 +17,18 @@ public sealed class TillService : ITillService
     private readonly ITillRepository _repository;
     private readonly ITillRequestValidator _requestValidator;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ITenantResourceLimitGuard _resourceLimitGuard;
 
-    public TillService(ITillRepository repository, ITillRequestValidator requestValidator, IDateTimeProvider dateTimeProvider)
+    public TillService(
+        ITillRepository repository,
+        ITillRequestValidator requestValidator,
+        IDateTimeProvider dateTimeProvider,
+        ITenantResourceLimitGuard resourceLimitGuard)
     {
         _repository = repository;
         _requestValidator = requestValidator;
         _dateTimeProvider = dateTimeProvider;
+        _resourceLimitGuard = resourceLimitGuard;
     }
 
     public async Task<ApplicationResult<TillResponse>> CreateAsync(TenantRequestContext context, TillCreateRequest request, CancellationToken cancellationToken)
@@ -72,9 +80,28 @@ public sealed class TillService : ITillService
             request.Status,
             context.UserId,
             now);
-        await _repository.AddAsync(till, cancellationToken);
-        var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, cancellationToken);
-        return ApplicationResult<TillResponse>.Success(response!);
+
+        var guarded = await _resourceLimitGuard.ExecuteWithinCapacityAsync(
+            context.TenantId,
+            TenantSubscriptionLimitKeys.MaxTills,
+            requestedIncrease: 1,
+            async ct =>
+            {
+                await _repository.AddAsync(till, ct);
+                var response = await _repository.GetByIdAsync(context.TenantId, tillId, false, ct);
+                var result = ApplicationResult<TillResponse>.Success(response!);
+                return TenantResourceCapacityOperationResult<ApplicationResult<TillResponse>>.Succeeded(result);
+            },
+            cancellationToken);
+
+        if (!guarded.Allowed)
+        {
+            return ApplicationResult<TillResponse>.Failure(
+                guarded.Evaluation.ToApplicationError() ??
+                new ApplicationError(SubscriptionLimitErrorCodes.LimitReached, "Till subscription limit reached."));
+        }
+
+        return guarded.Value!;
     }
 
     public async Task<ApplicationResult<TillListResponse>> ListAsync(TenantRequestContext context, Guid? outletId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken)

@@ -1,3 +1,5 @@
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
+
 namespace E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 
 public static class OutletConstants
@@ -12,7 +14,12 @@ public static class OutletConstants
     public const string DefaultTimezone = "UTC";
     public const string ViewPermission = "tenant.outlets.view";
     public const string ManagePermission = "tenant.outlets.manage";
-    public const string ManagementFeatureCode = "tenant_admin.outlets";
+
+    /// <summary>
+    /// Canonical outlet management entitlement key.
+    /// Legacy alias <c>tenant_admin.outlets</c> is handled only by explicit compatibility logic.
+    /// </summary>
+    public const string ManagementFeatureCode = PlatformTenantFeatureCodes.OutletManagement;
 
     public static string NormalizeOutletCode(string outletCode) => outletCode.Trim().ToUpperInvariant();
     public static string NormalizeStatus(string status) => status.Trim().ToUpperInvariant();

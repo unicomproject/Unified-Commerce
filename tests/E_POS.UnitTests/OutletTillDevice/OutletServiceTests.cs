@@ -1,14 +1,17 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+using E_POS.UnitTests.TestSupport;
 using Xunit;
 
 namespace E_POS.UnitTests.OutletTillDevice;
@@ -370,6 +373,104 @@ public sealed class OutletServiceTests
     }
 
     [Fact]
+    public async Task ListAsync_WithoutEntitlement_ReturnsFeatureDisabled_AndDoesNotQueryList()
+    {
+        var repository = new FakeOutletRepository { OutletFeatureEnabled = false };
+        var service = CreateService(repository);
+
+        var result = await service.ListAsync(
+            CreateContext([OutletConstants.ViewPermission]),
+            1,
+            50,
+            null,
+            null,
+            null,
+            null,
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+        Assert.Equal(0, repository.ListCallCount);
+    }
+
+    [Fact]
+    public async Task ListAsync_WithoutPermission_ReturnsPermissionDenied()
+    {
+        var repository = new FakeOutletRepository();
+        var service = CreateService(repository);
+
+        var result = await service.ListAsync(CreateContext([]), 1, 50, null, null, null, null, null, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.ListCallCount);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithoutEntitlement_ReturnsFeatureDisabled_AndDoesNotQueryDetail()
+    {
+        var repository = new FakeOutletRepository { OutletFeatureEnabled = false };
+        var service = CreateService(repository);
+
+        var result = await service.GetByIdAsync(CreateContext([OutletConstants.ViewPermission]), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+        Assert.Equal(0, repository.GetByIdCallCount);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_WithoutEntitlement_ReturnsFeatureDisabled_AndDoesNotQuerySummary()
+    {
+        var repository = new FakeOutletRepository { OutletFeatureEnabled = false };
+        var service = CreateService(repository);
+
+        var result = await service.GetSummaryAsync(CreateContext([OutletConstants.ViewPermission]), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+        Assert.Equal(0, repository.GetSummaryCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithoutEntitlement_ReturnsFeatureDisabled_AndDoesNotMutate()
+    {
+        var outlet = Outlet.Create(Guid.NewGuid(), TenantId, "Main", "MAIN", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now);
+        var repository = new FakeOutletRepository
+        {
+            OutletFeatureEnabled = false,
+            EditAggregate = new OutletEditAggregate(outlet, null, [], null)
+        };
+        var service = CreateService(repository);
+
+        var result = await service.DeleteAsync(CreateContext(), outlet.Id, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+        Assert.Equal(0, repository.GetEditAggregateCallCount);
+        Assert.Equal(0, repository.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithoutPermission_ReturnsPermissionDenied()
+    {
+        var outlet = Outlet.Create(Guid.NewGuid(), TenantId, "Main", "MAIN", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now);
+        var repository = new FakeOutletRepository
+        {
+            EditAggregate = new OutletEditAggregate(outlet, null, [], null)
+        };
+        var service = CreateService(repository);
+
+        var result = await service.DeleteAsync(CreateContext([]), outlet.Id, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.GetEditAggregateCallCount);
+        Assert.Equal(0, repository.SaveChangesCallCount);
+    }
+
+    [Fact]
     public async Task CreateAsync_WithViewPermissionOnly_ReturnsPermissionDenied()
     {
         var service = CreateService(new FakeOutletRepository());
@@ -400,14 +501,29 @@ public sealed class OutletServiceTests
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly DateTimeOffset Now = new(2026, 7, 2, 10, 0, 0, TimeSpan.Zero);
 
-    private static OutletService CreateService(FakeOutletRepository repository)
+    [Fact]
+    public async Task CreateAsync_WhenSubscriptionLimitReached_ReturnsLimitError()
+    {
+        var service = CreateService(new FakeOutletRepository(), new DenyingTenantResourceLimitGuard());
+
+        var result = await service.CreateAsync(CreateContext(), CreateValidRequest(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(SubscriptionLimitErrorCodes.LimitReached, result.Error.Code);
+    }
+
+    private static OutletService CreateService(
+        FakeOutletRepository repository,
+        ITenantResourceLimitGuard? limitGuard = null)
     {
         return new OutletService(
             repository,
             new FakeCodeSequenceRepository(),
             new OutletRequestValidator(),
             new FakeOutletAuditLogger(),
-            new FakeDateTimeProvider());
+            new FakeDateTimeProvider(),
+            new FakeTenantFeatureEntitlementEvaluator { OutletFeatureEnabled = repository.OutletFeatureEnabled },
+            limitGuard ?? new AllowingTenantResourceLimitGuard());
     }
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string>? permissions = null)
@@ -486,12 +602,18 @@ public sealed class OutletServiceTests
         public string? TenantStatus { get; init; } = TenantAuthConstants.ActiveTenantStatus;
         public bool OutletFeatureEnabled { get; init; } = true;
         public bool ClickCollectFeatureEnabled { get; init; } = true;
+        public int ListCallCount { get; private set; }
+        public int GetByIdCallCount { get; private set; }
+        public int GetSummaryCallCount { get; private set; }
+        public int GetEditAggregateCallCount { get; private set; }
+        public int SaveChangesCallCount { get; private set; }
         private readonly List<Outlet> _outlets = [];
 
         public Task<bool> OutletCodeExistsAsync(Guid tenantId, string outletCode, Guid? excludeOutletId, CancellationToken cancellationToken) => Task.FromResult(DuplicateCode);
         public Task<Guid?> GetActivePickupFulfillmentMethodIdAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(PickupMethodId);
         public Task<OutletListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, string? outletType, string? status, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
         {
+            ListCallCount++;
             var query = _outlets.Where(x => x.TenantId == tenantId);
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -514,12 +636,21 @@ public sealed class OutletServiceTests
 
         public Task<OutletSummaryDashboardResponse> GetSummaryAsync(Guid tenantId, CancellationToken cancellationToken)
         {
+            GetSummaryCallCount++;
             return Task.FromResult(new OutletSummaryDashboardResponse(1, 1, 0, null));
         }
 
-        public Task<OutletResponse?> GetByIdAsync(Guid tenantId, Guid outletId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<OutletResponse?>(null);
+        public Task<OutletResponse?> GetByIdAsync(Guid tenantId, Guid outletId, bool includeDeleted, CancellationToken cancellationToken)
+        {
+            GetByIdCallCount++;
+            return Task.FromResult<OutletResponse?>(null);
+        }
 
-        public Task<OutletEditAggregate?> GetEditAggregateAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(EditAggregate);
+        public Task<OutletEditAggregate?> GetEditAggregateAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken)
+        {
+            GetEditAggregateCallCount++;
+            return Task.FromResult(EditAggregate);
+        }
         public Task<bool> HasActiveTillOrDeviceAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) => Task.FromResult(HasActiveTillOrDevice);
         public Task<bool> AllOutletsBelongToTenantAsync(Guid tenantId, Guid[] outletIds, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(TenantStatus);
@@ -540,7 +671,11 @@ public sealed class OutletServiceTests
             return Task.FromResult(true);
         }
         public Task<bool> SaveUpdatedAsync(OutletEditAggregate aggregate, OutletAddress address, IReadOnlyCollection<OutletBusinessHour> businessHours, FulfillmentMethodOutlet? newPickupMapping, CancellationToken cancellationToken) => Task.FromResult(true);
-        public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            SaveChangesCallCount++;
+            return Task.CompletedTask;
+        }
 
         private static OutletResponse CreateResponse(Guid outletId)
         {
@@ -565,5 +700,77 @@ public sealed class OutletServiceTests
                 Now,
                 UserId);
         }
+    }
+
+    private sealed class FakeTenantFeatureEntitlementEvaluator : ITenantFeatureEntitlementEvaluator
+    {
+        public bool OutletFeatureEnabled { get; init; } = true;
+
+        public Task<TenantFeatureEntitlementEvaluation> EvaluateAsync(
+            Guid tenantId,
+            string featureCode,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            var canonical = PlatformTenantFeatureCodes.NormalizeToCanonicalOrSelf(featureCode);
+            if (string.Equals(canonical, PlatformTenantFeatureCodes.OutletManagement, StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(OutletFeatureEnabled
+                    ? TenantFeatureEntitlementEvaluation.Allowed(featureCode, canonical, false, true, false)
+                    : TenantFeatureEntitlementEvaluation.Denied(
+                        TenantFeatureEntitlementDecision.Disabled,
+                        featureCode,
+                        canonical,
+                        false,
+                        true,
+                        false,
+                        "disabled"));
+            }
+
+            return Task.FromResult(TenantFeatureEntitlementEvaluation.Allowed(featureCode, canonical, false, true, false));
+        }
+
+        public Task<bool> IsEnabledAsync(
+            Guid tenantId,
+            string featureCode,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            EvaluateAsync(tenantId, featureCode, now, cancellationToken).ContinueWith(t => t.Result.IsAllowed, cancellationToken);
+    }
+
+    private sealed class DenyingTenantResourceLimitGuard : ITenantResourceLimitGuard
+    {
+        public Task<TenantResourceLimitEvaluation> EvaluateAsync(
+            Guid tenantId,
+            string limitKey,
+            int requestedIncrease,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantResourceLimitEvaluation(
+                limitKey,
+                "outlets",
+                3,
+                requestedIncrease,
+                3,
+                0,
+                false,
+                false,
+                false,
+                SubscriptionLimitErrorCodes.LimitReached,
+                "Outlets subscription limit reached."));
+
+        public Task<TenantResourceLimitGuardResult<T>> ExecuteWithinCapacityAsync<T>(
+            Guid tenantId,
+            string limitKey,
+            int requestedIncrease,
+            Func<CancellationToken, Task<TenantResourceCapacityOperationResult<T>>> operation,
+            CancellationToken cancellationToken) =>
+            EvaluateAsync(tenantId, limitKey, requestedIncrease, cancellationToken)
+                .ContinueWith(task => TenantResourceLimitGuardResult<T>.Denied(task.Result), cancellationToken);
+
+        public Task<TenantResourceCapacitySnapshot> GetCapacitySnapshotAsync(
+            Guid tenantId,
+            string limitKey,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantResourceCapacitySnapshot(limitKey, "outlets", 3, 3, 0, false, false, false));
     }
 }

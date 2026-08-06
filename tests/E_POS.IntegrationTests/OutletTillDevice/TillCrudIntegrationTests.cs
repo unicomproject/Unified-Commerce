@@ -7,6 +7,7 @@ using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Persistence;
+using E_POS.IntegrationTests.TestSupport;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -100,7 +101,7 @@ public sealed class TillCrudIntegrationTests
 
     private static TillService CreateService(EPosDbContext dbContext, DateTimeOffset now)
     {
-        return new TillService(new TillRepository(dbContext), new TillRequestValidator(), new FakeDateTimeProvider(now));
+        return new TillService(new TillRepository(dbContext), new TillRequestValidator(), new FakeDateTimeProvider(now), new AllowingTenantResourceLimitGuard());
     }
 
     private static TenantRequestContext CreateContext(Guid tenantId)

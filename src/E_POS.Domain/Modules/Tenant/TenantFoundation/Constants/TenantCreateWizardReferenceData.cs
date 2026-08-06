@@ -25,6 +25,11 @@ public static class TenantCreateWizardReferenceData
         ("US", "United States")
     ];
 
+    /// <summary>
+    /// Historical fixed bootstrap grant list (pre-Phase 2).
+    /// New provisioning uses <see cref="TenantAdminBootstrapPermissionCatalog.Resolve"/>.
+    /// Kept for audit/discovery and obsolete seed comparison only.
+    /// </summary>
     public static readonly IReadOnlyList<string> TenantAdminBootstrapPermissionCodes =
     [
         "tenant.dashboard.view",
