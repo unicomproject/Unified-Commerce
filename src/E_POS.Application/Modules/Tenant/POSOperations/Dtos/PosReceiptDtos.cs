@@ -118,7 +118,8 @@ public sealed record PosReceiptDetailDto(
     PosReceiptCopyPolicyDto? CopyPolicy = null,
     string? TaxRegistrationNumber = null,
     string? TaxInvoiceLabel = null,
-    JsonElement? HistoricalSnapshot = null);
+    JsonElement? HistoricalSnapshot = null,
+    string? ReceiptDataJson = null);
 
 public sealed record PosReceiptReprintAuthorizationRequestDto(
     string? ReasonCode,
@@ -132,3 +133,7 @@ public sealed record PosReceiptReprintAuthorizationResponseDto(
     string DecisionCode,
     string Message,
     DateTimeOffset AuthorizedAt);
+
+public sealed record ResolvedReceiptTemplateDto(
+    Guid TemplateVersionId,
+    string TemplateData);

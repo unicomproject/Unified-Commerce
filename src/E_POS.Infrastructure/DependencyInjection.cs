@@ -185,6 +185,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
+        services.AddScoped<IReceiptTemplateResolutionService, ReceiptTemplateResolutionService>();
         services.AddScoped<ICardPaymentGateway, UnavailableCardPaymentGateway>();
         services.AddScoped<IPosSaleLinePricingCalculator, PosSaleLinePricingCalculator>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();

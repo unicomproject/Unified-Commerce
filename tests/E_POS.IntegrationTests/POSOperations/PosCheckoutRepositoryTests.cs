@@ -532,7 +532,7 @@ public sealed class PosCheckoutRepositoryTests
             new CodeSequenceRepository(dbContext),
             NullLogger<PosTillSessionRepository>.Instance);
 
-        return new PosCheckoutRepository(dbContext, tillSessionRepository, cardGateway);
+        return new PosCheckoutRepository(dbContext, tillSessionRepository, new StubReceiptTemplateResolutionService(), cardGateway);
     }
 
     private sealed class StubCardGateway(CardPaymentCaptureResult result) : ICardPaymentGateway
@@ -540,6 +540,13 @@ public sealed class PosCheckoutRepositoryTests
         public Task<CardPaymentCaptureResult> CaptureAsync(
             CardPaymentCaptureRequest request,
             CancellationToken cancellationToken) => Task.FromResult(result);
+    }
+
+    private sealed class StubReceiptTemplateResolutionService : E_POS.Application.Modules.Tenant.POSOperations.Contracts.IReceiptTemplateResolutionService
+    {
+        public Task<E_POS.Application.Modules.Tenant.POSOperations.Dtos.ResolvedReceiptTemplateDto?> ResolveTemplateAsync(
+            Guid tenantId, Guid outletId, Guid tillId, Guid deviceId, CancellationToken cancellationToken) =>
+            Task.FromResult<E_POS.Application.Modules.Tenant.POSOperations.Dtos.ResolvedReceiptTemplateDto?>(null);
     }
 
     private static void SeedDeviceContext(
