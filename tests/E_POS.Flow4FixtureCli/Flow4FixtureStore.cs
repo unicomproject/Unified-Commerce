@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
@@ -222,20 +224,38 @@ public sealed class Flow4FixtureStore(
             {
                 evidenceId = Id("evidence");
                 var scan = scenario == Flow4FixtureScenario.UNCLEAN_EVIDENCE ? "INFECTED" : ManualPaymentConstants.ScanClean;
+                var (container, storageKey, size, sha) = await SeedEvidenceBlobAsync(
+                    runId, tenantId, paymentId, evidenceId.Value, cancellationToken);
                 db.SubscriptionPaymentEvidence.Add(SubscriptionPaymentEvidence.Create(evidenceId.Value, tenantId, paymentId,
-                    invoiceId, "flow4-test-metadata-only", $"flow4/{runId:D}/{evidenceId:D}.pdf", "proof.pdf", "proof.pdf",
-                    "application/pdf", 100, new string('1', 64), 1, scan, now));
+                    invoiceId, container, storageKey, "proof.pdf", "proof.pdf",
+                    "application/pdf", size, sha, 1, scan, now));
             }
         }
-        if (scenario is Flow4FixtureScenario.ACTION_REQUIRED or Flow4FixtureScenario.REQUEST_INFORMATION_ELIGIBLE)
+        if (scenario is Flow4FixtureScenario.ACTION_REQUIRED)
         { payment.BeginReview(now); payment.RequestInformation(reviewerId, "MORE_INFO", "Controlled fixture request", now); operation.MarkPaymentReviewOutcome(ManualPaymentConstants.ActionRequired, now); }
+        else if (scenario is Flow4FixtureScenario.REQUEST_INFORMATION_ELIGIBLE)
+        { payment.BeginReview(now); }
         else if (scenario is Flow4FixtureScenario.REJECTED)
         { payment.BeginReview(now); payment.Reject(reviewerId, "NO_MATCH", "Controlled fixture rejection", now); operation.MarkPaymentReviewOutcome(ManualPaymentConstants.Rejected, now); }
         else if (scenario is Flow4FixtureScenario.PAID_PENDING_ACTIVATION or Flow4FixtureScenario.ACTIVE_INVITATION_READY or Flow4FixtureScenario.COMPLETE_HAPPY_PATH)
-        { payment.BeginReview(now); payment.Approve(reviewerId, 125m, "Controlled fixture approval", now); operation.MarkPaymentReviewOutcome(ManualPaymentConstants.Paid, now); }
+        {
+            payment.BeginReview(now);
+            payment.Approve(reviewerId, 125m, "Controlled fixture approval", now);
+            operation.MarkPaymentReviewOutcome(ManualPaymentConstants.Paid, now);
+            if (scenario == Flow4FixtureScenario.PAID_PENDING_ACTIVATION)
+                tenant.MarkPendingActivation(reviewerId, now);
+        }
         else if (scenario == Flow4FixtureScenario.CONCURRENT_REVIEW) payment.BeginReview(now);
         if (scenario == Flow4FixtureScenario.RETRYABLE_OPERATION)
+        {
             operation.MarkRetryable("CONTROLLED_TEST_FAILURE", "Controlled fixture failure", now.AddMinutes(1), now);
+            var retryOutbox = IntegrationOutboxMessage.Create(Id("outbox"), "tenant_onboarding.delivery_failed",
+                "tenant_onboarding", operationId, 1, tenantId, operationId, null, "{}",
+                $"flow4-retry:{runId:D}:{operationId:D}", now);
+            retryOutbox.TryAcquire("flow4-fixture", now, TimeSpan.FromMinutes(1));
+            retryOutbox.MarkFailed("CONTROLLED_TEST_FAILURE", "Controlled fixture outbox failure", false, now.AddMinutes(1), now);
+            db.IntegrationOutboxMessages.Add(retryOutbox);
+        }
 
         var recipient = $"billing-{suffix}@example.test";
         rawPayment = paymentTokens.GenerateToken();
@@ -287,10 +307,12 @@ public sealed class Flow4FixtureStore(
             crossPayment.SubmitManual(125m, "LKR", "BANK_TRANSFER", $"BANK-X-{suffix}", now, null,
                 new string('a', 64), new string('b', 64), "PAYMENT_RECIPIENT", null, now);
             db.SubscriptionPaymentTransactions.Add(crossPayment);
+            var (crossContainer, crossKey, crossSize, crossSha) = await SeedEvidenceBlobAsync(
+                runId, secondaryTenantId.Value, secondaryPaymentId.Value, evidenceId.Value, cancellationToken);
             db.SubscriptionPaymentEvidence.Add(SubscriptionPaymentEvidence.Create(evidenceId.Value,
-                secondaryTenantId.Value, secondaryPaymentId.Value, secondaryInvoiceId.Value, "flow4-test-metadata-only",
-                $"flow4/{runId:D}/{evidenceId:D}.pdf", "proof.pdf", "proof.pdf", "application/pdf", 100,
-                new string('1', 64), 1, ManualPaymentConstants.ScanClean, now));
+                secondaryTenantId.Value, secondaryPaymentId.Value, secondaryInvoiceId.Value, crossContainer,
+                crossKey, "proof.pdf", "proof.pdf", "application/pdf", crossSize,
+                crossSha, 1, ManualPaymentConstants.ScanClean, now));
         }
         return new(scenario, tenantId, planId, subscriptionId, invoiceId, paymentId, draftId, operationId, accessId,
             adminId, roleId, userRoleId, evidenceId, inviteId, secondaryTenantId, secondarySubscriptionId,
@@ -336,6 +358,36 @@ public sealed class Flow4FixtureStore(
     private static string NewSecret() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     private static string HashCleanup(Guid runId, string value) => Convert.ToHexString(SHA256.HashData(
         Encoding.UTF8.GetBytes($"flow4-cleanup-v1:{runId:D}:{value}"))).ToLowerInvariant();
+
+    /// <summary>
+    /// Seeds a minimal PDF into Azurite/Azure when a connection string is configured so private proof
+    /// preview works for fixture-backed evidence. Falls back to metadata-only keys when unavailable.
+    /// </summary>
+    private static async Task<(string Container, string StorageKey, long Size, string Sha256)> SeedEvidenceBlobAsync(
+        Guid runId, Guid tenantId, Guid paymentId, Guid evidenceId, CancellationToken cancellationToken)
+    {
+        var pdf = Encoding.ASCII.GetBytes("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+        var sha = Convert.ToHexString(SHA256.HashData(pdf)).ToLowerInvariant();
+        var storageKey = $"manual-payments/{tenantId:D}/{paymentId:D}/{evidenceId:D}/proof.pdf";
+        var connection = Environment.GetEnvironmentVariable("AzureBlobStorage__ConnectionString")?.Trim()
+            ?? Environment.GetEnvironmentVariable("Flow4TestHost__EvidenceConnectionString")?.Trim()
+            ?? string.Empty;
+        var container = Environment.GetEnvironmentVariable("AzureBlobStorage__ContainerName")?.Trim();
+        if (string.IsNullOrWhiteSpace(container)) container = "tenant-media";
+        if (string.IsNullOrWhiteSpace(connection))
+            return ("flow4-test-metadata-only", $"flow4/{runId:D}/{evidenceId:D}.pdf", pdf.Length, sha);
+
+        var containerClient = new BlobContainerClient(connection, container);
+        await containerClient.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
+        var blob = containerClient.GetBlobClient(storageKey);
+        await using var stream = new MemoryStream(pdf, writable: false);
+        await blob.UploadAsync(stream, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders { ContentType = "application/pdf" },
+            Conditions = null
+        }, cancellationToken);
+        return (container, storageKey, pdf.Length, sha);
+    }
 
     private static readonly (string, string)[] CleanupStatements =
     [
