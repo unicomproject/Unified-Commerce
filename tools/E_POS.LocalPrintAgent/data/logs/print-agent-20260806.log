@@ -1,0 +1,5 @@
+﻿2026-08-06T05:15:50.8664891+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=2
+2026-08-06T05:15:50.9076529+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-08-06T05:15:50.9090628+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-08-06T05:15:50.9096094+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-08-06T05:15:50.9105255+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent

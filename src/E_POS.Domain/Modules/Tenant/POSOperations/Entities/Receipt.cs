@@ -166,5 +166,10 @@ public class Receipt : AuditableEntity
             CreatedAt = now,
             UpdatedAt = now
         };
+
+    public void AssignTemplateVersion(Guid? templateVersionId)
+    {
+        ReceiptTemplateVersionId = templateVersionId;
+    }
 }
 

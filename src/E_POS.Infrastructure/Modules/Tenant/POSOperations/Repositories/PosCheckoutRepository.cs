@@ -18,6 +18,7 @@ using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using E_POS.Application.Common.Models;
 
 namespace E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 
@@ -28,14 +29,17 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
     private readonly EPosDbContext _dbContext;
     private readonly IPosTillSessionRepository _tillSessionRepository;
     private readonly ICardPaymentGateway _cardPaymentGateway;
+    private readonly IReceiptTemplateResolutionService _receiptTemplateResolutionService;
 
     public PosCheckoutRepository(
         EPosDbContext dbContext,
         IPosTillSessionRepository tillSessionRepository,
+        IReceiptTemplateResolutionService receiptTemplateResolutionService,
         ICardPaymentGateway? cardPaymentGateway = null)
     {
         _dbContext = dbContext;
         _tillSessionRepository = tillSessionRepository;
+        _receiptTemplateResolutionService = receiptTemplateResolutionService;
         _cardPaymentGateway = cardPaymentGateway ?? new
             E_POS.Infrastructure.Modules.Tenant.Payment.UnavailableCardPaymentGateway();
     }
@@ -862,27 +866,109 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         var receiptCopyPolicy = await ResolveReceiptCopyPolicyAsync(
             tenantId, session.OutletId, request.DeviceId, cancellationToken);
 
+        var receiptDisplay = await (
+            from tenant in _dbContext.Tenants.AsNoTracking()
+            join user in _dbContext.TenantUsers.AsNoTracking()
+                on tenantUserId equals user.Id
+            join till in _dbContext.Tills.AsNoTracking()
+                on session.TillId equals till.Id
+            where tenant.Id == tenantId &&
+                  user.TenantId == tenantId &&
+                  till.TenantId == tenantId
+            select new
+            {
+                MerchantName = tenant.DisplayName,
+                CashierName = string.IsNullOrWhiteSpace(user.DisplayName)
+                    ? user.FullName
+                    : user.DisplayName,
+                TillName = till.TillName
+            }).FirstOrDefaultAsync(cancellationToken);
+
+        var templateResolution = await _receiptTemplateResolutionService.ResolveTemplateAsync(
+            tenantId, session.OutletId, session.TillId, request.DeviceId, cancellationToken);
+
+        Guid? templateVersionId = templateResolution?.TemplateVersionId == Guid.Empty
+            ? null
+            : templateResolution?.TemplateVersionId;
+
+        var tenantProfile = await _dbContext.Tenants
+            .AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => new { x.DisplayName })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var outletProfile = await _dbContext.Outlets
+            .AsNoTracking()
+            .Where(x => x.Id == session.OutletId)
+            .Select(x => new { x.OutletName, x.Phone, x.Email })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        object? presentationData = null;
+        if (!string.IsNullOrWhiteSpace(templateResolution?.TemplateData))
+        {
+            try
+            {
+                presentationData = JsonSerializer.Deserialize<object>(templateResolution.TemplateData);
+            }
+            catch { }
+        }
+
         var receiptDataJson = JsonSerializer.Serialize(new
         {
             contractVersion = 2,
-            saleId,
-            orderNumber,
-            receiptNumber,
-            paymentMethod = request.PaymentMethod.Trim().ToLowerInvariant(),
+            templateVersionId = templateVersionId,
+            paperSize = "80mm",
+            branding = new
+            {
+                merchantName = tenantProfile?.DisplayName,
+                outletName = outletProfile?.OutletName,
+                addressLines = Array.Empty<string>(),
+                phone = outletProfile?.Phone,
+                email = outletProfile?.Email
+            },
+            receiptIdentity = new
+            {
+                receiptId = receiptId,
+                receiptNumber = receiptNumber,
+                saleId = saleId,
+                saleNumber = orderNumber,
+                receiptType = "SALE",
+                issuedAt = now,
+                businessDate = businessDate
+            },
+            @operator = new
+            {
+                cashierId = tenantUserId,
+                cashierName = receiptDisplay?.CashierName,
+                tillId = session.TillId,
+                posDeviceId = request.DeviceId
+            },
             items = responseLines.Select(item => new
             {
-                name = item.Name,
-                qty = item.Qty,
-                unitPrice = item.UnitPrice,
-                lineTotal = item.LineTotal,
+                productName = item.Name,
                 sku = item.Sku,
-                saleLineId = item.SaleLineId,
-                discountAmount = item.DiscountAmount,
-                lineNote = item.LineNote
+                quantity = item.Qty,
+                unitPrice = item.UnitPrice,
+                discount = item.DiscountAmount,
+                tax = 0,
+                lineTotal = item.LineTotal
             }),
+            totals = new
+            {
+                subtotal = ToMoney(subtotal),
+                discount = ToMoney(discountTotal),
+                tax = ToMoney(taxTotal),
+                charges = 0,
+                rounding = 0,
+                total = ToMoney(grandTotal),
+                paid = ToMoney(grandTotal),
+                cashReceived = ToMoney(cashReceived),
+                changeDue = ToMoney(changeDue)
+            },
             tenders = receiptTenders,
             discountLines = receiptDiscountLines,
             taxLines = receiptTaxLines,
+            presentation = presentationData,
             copyPolicy = receiptCopyPolicy
         });
 
@@ -905,6 +991,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             changeDue,
             receiptDataJson,
             now);
+
+        receipt.AssignTemplateVersion(templateVersionId);
 
         _dbContext.Receipts.Add(receipt);
         if (discountApplication is not null)
@@ -941,24 +1029,6 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             return new PosCheckoutStartPaymentResult("pos_checkout.idempotency_conflict", null);
         }
 
-        var receiptDisplay = await (
-            from tenant in _dbContext.Tenants.AsNoTracking()
-            join user in _dbContext.TenantUsers.AsNoTracking()
-                on tenantUserId equals user.Id
-            join till in _dbContext.Tills.AsNoTracking()
-                on session.TillId equals till.Id
-            where tenant.Id == tenantId &&
-                  user.TenantId == tenantId &&
-                  till.TenantId == tenantId
-            select new
-            {
-                MerchantName = tenant.DisplayName,
-                CashierName = string.IsNullOrWhiteSpace(user.DisplayName)
-                    ? user.FullName
-                    : user.DisplayName,
-                TillName = till.TillName
-            }).FirstOrDefaultAsync(cancellationToken);
-
         var response = new PosCheckoutStartPaymentResponseDto(
             saleId,
             saleId,
@@ -988,7 +1058,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             receiptTenders,
             receiptDiscountLines,
             receiptTaxLines,
-            receiptCopyPolicy);
+            receiptCopyPolicy,
+            ReceiptDataJson: receiptDataJson);
 
         return new PosCheckoutStartPaymentResult(null, response);
     }
@@ -1541,9 +1612,10 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
 
         var order = await _dbContext.SalesOrders.AsNoTracking().FirstAsync(
             x => x.TenantId == tenantId && x.Id == payment.SalesOrderId, cancellationToken);
-        var receiptNumber = await _dbContext.Receipts.AsNoTracking()
+        var receipt = await _dbContext.Receipts.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.SalesOrderId == order.Id)
-            .Select(x => x.ReceiptNumber).FirstAsync(cancellationToken);
+            .Select(x => new { x.ReceiptNumber, x.ReceiptDataJson })
+            .FirstAsync(cancellationToken);
         var methodCode = await _dbContext.PaymentMethods.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Id == payment.PaymentMethodId)
             .Select(x => x.MethodCode).FirstAsync(cancellationToken);
@@ -1556,11 +1628,12 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             .ToListAsync(cancellationToken);
 
         return new(true, new PosCheckoutStartPaymentResponseDto(
-            order.Id, order.Id, order.OrderNumber, receiptNumber, receiptNumber,
+            order.Id, order.Id, order.OrderNumber, receipt.ReceiptNumber, receipt.ReceiptNumber,
             ToMoney(order.SubtotalAmount), ToMoney(order.DiscountAmount), ToMoney(order.TaxAmount),
             ToMoney(order.TotalAmount), ToMoney(payment.TenderedAmount ?? payment.PaidAmount),
             ToMoney(payment.ChangeAmount), methodCode.ToLowerInvariant(), order.CurrencyCode,
-            "completed", "completed", payment.PaidAt ?? payment.InitiatedAt, payment.Id, lines));
+            "completed", "completed", payment.PaidAt ?? payment.InitiatedAt, payment.Id, lines,
+            ReceiptDataJson: receipt.ReceiptDataJson));
     }
 
     private async Task<PosReceiptCopyPolicyDto> ResolveReceiptCopyPolicyAsync(
@@ -1628,4 +1701,15 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
     private sealed record DiscountApplicationResolution(
         string? ErrorCode,
         PosDiscountApplication? Application);
+
+    public static string ClassifyPersistenceFailure(string? sqlState, string? constraintName)
+    {
+        if (sqlState == "23505" && 
+           (constraintName == "ux_sales_payments_3aae300c" || 
+            constraintName == "ux_sales_payment_transactions_e759526b"))
+        {
+            return "pos_checkout.idempotency_conflict";
+        }
+        return "pos_checkout.persistence_failed";
+    }
 }
