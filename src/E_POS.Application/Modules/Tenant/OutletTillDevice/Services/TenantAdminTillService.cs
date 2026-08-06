@@ -5,6 +5,8 @@ using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Options;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
+using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
+using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
 using Microsoft.Extensions.Options;
 
 namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
@@ -20,15 +22,21 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
         "Outlet was not found for this tenant.");
 
     private readonly ITenantAdminTillRepository _repository;
+    private readonly ITenantAdminHardwareRepository _hardwareRepository;
+    private readonly ITillDeviceAssignmentRepository _assignmentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IOptionsSnapshot<TillMonitoringOptions> _options;
 
     public TenantAdminTillService(
         ITenantAdminTillRepository repository,
+        ITenantAdminHardwareRepository hardwareRepository,
+        ITillDeviceAssignmentRepository assignmentRepository,
         IDateTimeProvider dateTimeProvider,
         IOptionsSnapshot<TillMonitoringOptions> options)
     {
         _repository = repository;
+        _hardwareRepository = hardwareRepository;
+        _assignmentRepository = assignmentRepository;
         _dateTimeProvider = dateTimeProvider;
         _options = options;
     }
@@ -171,6 +179,7 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             request.OutletId,
             tillAreaName,
             cancellationToken);
+
         var till = Till.Create(
             tillId,
             context.TenantId,
@@ -180,12 +189,13 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             tillNumber,
             normalizedTillCode,
             TillConstants.StandardTillType,
-            0m,
+            request.DefaultOpeningFloatAmount,
             TillConstants.DefaultCurrencyCode,
             true,
             request.Status,
             actingUserId,
             now,
+            request.DefaultCashierTenantUserId,
             request.DeviceName,
             request.PrinterName,
             request.ScannerName,
@@ -193,7 +203,56 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             request.CardReaderName,
             request.InternalNote);
 
-        await _repository.AddAsync(till, cancellationToken);
+        await _repository.ExecuteInTransactionAsync(async () =>
+        {
+            await _repository.AddAsync(till, cancellationToken);
+
+            if (request.PosDeviceId.HasValue)
+            {
+                var device = await _hardwareRepository.GetPosDeviceAsync(context.TenantId, request.PosDeviceId.Value, cancellationToken);
+                if (device != null)
+                {
+                    var existingAssignment = await _assignmentRepository.GetActiveByTillAndDeviceAsync(context.TenantId, tillId, device.Id, cancellationToken);
+                    if (existingAssignment == null)
+                    {
+                        var assignment = TillDeviceAssignment.Create(
+                            Guid.NewGuid(),
+                            context.TenantId,
+                            till.OutletId,
+                            tillId,
+                            device.Id,
+                            actingUserId,
+                            now);
+                        await _assignmentRepository.AddAsync(assignment, cancellationToken);
+                    }
+                }
+            }
+
+            if (request.HardwareAssignments != null && request.HardwareAssignments.Any())
+            {
+                foreach (var hw in request.HardwareAssignments)
+                {
+                    var hardwareDevice = await _hardwareRepository.GetEditableDeviceAsync(context.TenantId, hw.HardwareDeviceId, cancellationToken);
+                    if (hardwareDevice != null)
+                    {
+                        var assignment = HardwareDeviceAssignment.Create(
+                            Guid.NewGuid(),
+                            context.TenantId,
+                            hardwareDevice.OutletId,
+                            hardwareDevice.Id,
+                            tillId,
+                            null,
+                            hw.IsPrimary,
+                            actingUserId,
+                            now);
+                        await _hardwareRepository.AddAssignmentAsync(assignment, cancellationToken);
+                    }
+                }
+            }
+            
+            await _repository.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
         var model = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
         return model is null
             ? ApplicationResult<TenantAdminTillDetailResponse>.Failure(NotFound)
@@ -279,6 +338,7 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             request.Status,
             actingUserId,
             _dateTimeProvider.UtcNow,
+            till.DefaultCashierTenantUserId,
             request.DeviceName,
             request.PrinterName,
             request.ScannerName,
@@ -364,6 +424,23 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
 
         var options = await _repository.GetOutletOptionsAsync(context.TenantId, cancellationToken);
         return ApplicationResult<IReadOnlyList<TenantAdminOutletOptionResponse>>.Success(options);
+    }
+
+    public async Task<ApplicationResult<TenantAdminTillCreateOptionsResponse>> GetCreateOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccessAny(
+            context,
+            TenantAdminTillPermissions.Create,
+            TenantAdminTillPermissions.Manage);
+        if (accessError is not null)
+        {
+            return ApplicationResult<TenantAdminTillCreateOptionsResponse>.Failure(accessError);
+        }
+
+        var options = await _repository.GetCreateOptionsAsync(context.TenantId, cancellationToken);
+        return ApplicationResult<TenantAdminTillCreateOptionsResponse>.Success(options);
     }
 
     public async Task<ApplicationResult<TenantAdminTillHardwareReadinessResponse>> GetHardwareReadinessAsync(
@@ -682,6 +759,11 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             model.Till.CashDrawerName,
             model.Till.CardReaderName,
             model.Till.InternalNote,
+            model.Till.DefaultOpeningFloatAmount,
+            model.Till.CurrencyCode,
+            null, // DefaultCashier
+            null, // PosDevice
+            null, // HardwareAssignments
             model.Till.CreatedAt,
             model.Till.UpdatedAt ?? model.Till.CreatedAt
         );

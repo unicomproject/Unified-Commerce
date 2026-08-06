@@ -13,6 +13,7 @@ public class Till : AuditableEntity
     public int TillNumber { get; protected set; }
     public string TillType { get; protected set; } = string.Empty;
     public decimal DefaultOpeningFloatAmount { get; protected set; }
+    public Guid? DefaultCashierTenantUserId { get; protected set; }
     public string CurrencyCode { get; protected set; } = string.Empty;
     public bool IsCashManaged { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
@@ -40,6 +41,7 @@ public class Till : AuditableEntity
         string status,
         Guid? createdByTenantUserId,
         DateTimeOffset now,
+        Guid? defaultCashierTenantUserId = null,
         string? deviceName = null,
         string? printerName = null,
         string? scannerName = null,
@@ -58,6 +60,7 @@ public class Till : AuditableEntity
             TillCode = TillConstants.NormalizeTillCode(tillCode),
             TillType = TillConstants.NormalizeTillType(tillType),
             DefaultOpeningFloatAmount = defaultOpeningFloatAmount,
+            DefaultCashierTenantUserId = defaultCashierTenantUserId,
             CurrencyCode = TillConstants.NormalizeCurrencyCode(currencyCode),
             IsCashManaged = isCashManaged,
             Status = TillConstants.NormalizeStatus(status),
@@ -87,6 +90,7 @@ public class Till : AuditableEntity
         string status,
         Guid? updatedByTenantUserId,
         DateTimeOffset now,
+        Guid? defaultCashierTenantUserId = null,
         string? deviceName = null,
         string? printerName = null,
         string? scannerName = null,
@@ -101,6 +105,7 @@ public class Till : AuditableEntity
         TillCode = TillConstants.NormalizeTillCode(tillCode);
         TillType = TillConstants.NormalizeTillType(tillType);
         DefaultOpeningFloatAmount = defaultOpeningFloatAmount;
+        DefaultCashierTenantUserId = defaultCashierTenantUserId;
         CurrencyCode = TillConstants.NormalizeCurrencyCode(currencyCode);
         IsCashManaged = isCashManaged;
         Status = TillConstants.NormalizeStatus(status);

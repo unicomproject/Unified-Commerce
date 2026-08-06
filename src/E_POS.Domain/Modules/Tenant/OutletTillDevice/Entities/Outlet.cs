@@ -14,6 +14,7 @@ public class Outlet : AuditableEntity
     public string Timezone { get; protected set; } = string.Empty;
     public bool IsDefaultOutlet { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
+    public Guid? MediaAssetId { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
@@ -70,6 +71,13 @@ public class Outlet : AuditableEntity
         IsDefaultOutlet = isDefaultOutlet;
         Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
         Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void SetMediaAssetId(Guid? mediaAssetId, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        MediaAssetId = mediaAssetId;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

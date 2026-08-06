@@ -45,10 +45,7 @@ public partial class SeedPosReceiptReprintPermission : Migration
                 now()
             FROM permission_definitions
             WHERE permission_code = 'receipts.reprint'
-            ON CONFLICT (tenant_id, role_id, permission_id) DO UPDATE
-            SET revoked_at = NULL,
-                revoked_by_tenant_user_id = NULL,
-                notes = EXCLUDED.notes;
+            ON CONFLICT DO NOTHING;
             """);
     }
 

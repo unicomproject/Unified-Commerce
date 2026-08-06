@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260804120044_AddOutletManagerAndMediaMapping")]
+    partial class AddOutletManagerAndMediaMapping
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -934,98 +937,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAddress", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AddressLine1")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("address_line1");
-
-                    b.Property<string>("AddressLine2")
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("address_line2");
-
-                    b.Property<string>("AddressType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("address_type");
-
-                    b.Property<string>("City")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("city");
-
-                    b.Property<string>("ContactName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("varchar(150)")
-                        .HasColumnName("contact_name");
-
-                    b.Property<string>("ContactPhone")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("contact_phone");
-
-                    b.Property<string>("CountryCode")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("varchar(2)")
-                        .HasColumnName("country_code");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("customer_id");
-
-                    b.Property<bool>("IsDefaultBilling")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_default_billing");
-
-                    b.Property<bool>("IsDefaultShipping")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_default_shipping");
-
-                    b.Property<string>("PostalCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("postal_code");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("state");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("TenantId", "CustomerId");
-
-                    b.ToTable("customer_addresses", (string)null);
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1279,91 +1190,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_customer_consents_consent_status", "consent_status IN ('GRANTED', 'WITHDRAWN', 'EXPIRED')");
 
                             t.HasCheckConstraint("ck_customer_consents_consent_type", "consent_type IN ('MARKETING_EMAIL', 'MARKETING_SMS', 'MARKETING_WHATSAPP', 'TERMS', 'PRIVACY')");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerExternalAuthAccount", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CustomerAuthAccountId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("customer_auth_account_id");
-
-                    b.Property<DateTimeOffset?>("LastLoginAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_login_at");
-
-                    b.Property<DateTimeOffset>("LinkedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("linked_at");
-
-                    b.Property<string>("ProviderCode")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("provider_code");
-
-                    b.Property<string>("ProviderEmail")
-                        .HasMaxLength(150)
-                        .HasColumnType("varchar(150)")
-                        .HasColumnName("provider_email");
-
-                    b.Property<bool>("ProviderEmailVerified")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("provider_email_verified");
-
-                    b.Property<string>("ProviderSubject")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)")
-                        .HasColumnName("provider_subject");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_customer_external_auth_accounts");
-
-                    b.HasIndex("TenantId", "Id")
-                        .IsUnique()
-                        .HasDatabaseName("uq_customer_ext_auth_tenant_id");
-
-                    b.HasIndex("TenantId", "CustomerAuthAccountId", "ProviderCode")
-                        .IsUnique()
-                        .HasDatabaseName("uq_customer_ext_auth_tenant_account_provider");
-
-                    b.HasIndex("TenantId", "ProviderCode", "ProviderSubject")
-                        .IsUnique()
-                        .HasDatabaseName("uq_customer_ext_auth_tenant_provider_subject");
-
-                    b.ToTable("customer_external_auth_accounts", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_customer_ext_auth_provider_code", "provider_code IN ('GOOGLE')");
-
-                            t.HasCheckConstraint("ck_customer_ext_auth_provider_subject", "length(trim(provider_subject)) > 0");
-
-                            t.HasCheckConstraint("ck_customer_ext_auth_status", "status IN ('ACTIVE', 'DISABLED', 'DELETED')");
                         });
                 });
 
@@ -3256,282 +3082,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_settings", (string)null);
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingDraft", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AdminEmailNormalized")
-                        .HasMaxLength(320)
-                        .HasColumnType("varchar(320)")
-                        .HasColumnName("admin_email_normalized");
-
-                    b.Property<short>("CompletedStepsMask")
-                        .HasColumnType("smallint")
-                        .HasColumnName("completed_steps_mask");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CreatedByPlatformUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_platform_user_id");
-
-                    b.Property<Guid?>("CreatedTenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_tenant_id");
-
-                    b.Property<short>("CurrentStep")
-                        .HasColumnType("smallint")
-                        .HasColumnName("current_step");
-
-                    b.Property<DateTimeOffset?>("DiscardedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("discarded_at");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<string>("FinalizeIdempotencyKeyHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("char(64)")
-                        .HasColumnName("finalize_idempotency_key_hash");
-
-                    b.Property<string>("FinalizeRequestHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("char(64)")
-                        .HasColumnName("finalize_request_hash");
-
-                    b.Property<DateTimeOffset?>("FinalizedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("finalized_at");
-
-                    b.Property<string>("LastErrorCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("last_error_code");
-
-                    b.Property<Guid>("OwnerPlatformUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_platform_user_id");
-
-                    b.Property<string>("PayloadJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("payload_json");
-
-                    b.Property<short>("ProgressPercent")
-                        .HasColumnType("smallint")
-                        .HasColumnName("progress_percent");
-
-                    b.Property<string>("RequestedDomainNormalized")
-                        .HasMaxLength(253)
-                        .HasColumnType("varchar(253)")
-                        .HasColumnName("requested_domain_normalized");
-
-                    b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("schema_version");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("varchar(24)")
-                        .HasColumnName("status");
-
-                    b.Property<string>("TenantCodeNormalized")
-                        .HasMaxLength(60)
-                        .HasColumnType("varchar(60)")
-                        .HasColumnName("tenant_code_normalized");
-
-                    b.Property<string>("TenantSlugNormalized")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("tenant_slug_normalized");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UpdatedByPlatformUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by_platform_user_id");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id")
-                        .HasName("pk_platform_tenant_onboarding_drafts");
-
-                    b.HasIndex("CreatedByPlatformUserId");
-
-                    b.HasIndex("CreatedTenantId");
-
-                    b.HasIndex("RequestedDomainNormalized")
-                        .HasDatabaseName("ix_onboarding_drafts_requested_domain");
-
-                    b.HasIndex("TenantCodeNormalized")
-                        .HasDatabaseName("ix_onboarding_drafts_tenant_code");
-
-                    b.HasIndex("TenantSlugNormalized")
-                        .HasDatabaseName("ix_onboarding_drafts_tenant_slug");
-
-                    b.HasIndex("UpdatedByPlatformUserId");
-
-                    b.HasIndex("OwnerPlatformUserId", "Status", "UpdatedAt")
-                        .HasDatabaseName("ix_onboarding_drafts_owner_status_updated");
-
-                    b.ToTable("platform_tenant_onboarding_drafts", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_platform_tenant_onboarding_drafts_completed_mask", "completed_steps_mask BETWEEN 0 AND 127");
-
-                            t.HasCheckConstraint("ck_platform_tenant_onboarding_drafts_current_step", "current_step BETWEEN 1 AND 7");
-
-                            t.HasCheckConstraint("ck_platform_tenant_onboarding_drafts_progress", "progress_percent BETWEEN 0 AND 100");
-
-                            t.HasCheckConstraint("ck_platform_tenant_onboarding_drafts_schema", "schema_version > 0");
-
-                            t.HasCheckConstraint("ck_platform_tenant_onboarding_drafts_status", "status IN ('in_progress','finalizing','completed','discarded','expired')");
-
-                            t.HasCheckConstraint("ck_platform_tenant_onboarding_drafts_version", "version > 0");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingOperation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("attempt_count");
-
-                    b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("DraftId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("draft_id");
-
-                    b.Property<string>("FailureCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("failure_code");
-
-                    b.Property<string>("IdempotencyKeyHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("char(64)")
-                        .HasColumnName("idempotency_key_hash");
-
-                    b.Property<string>("InvitationStatus")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("varchar(24)")
-                        .HasColumnName("invitation_status");
-
-                    b.Property<DateTimeOffset?>("NextRetryAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_retry_at");
-
-                    b.Property<string>("OperationType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("operation_type");
-
-                    b.Property<string>("PaymentStatus")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("varchar(24)")
-                        .HasColumnName("payment_status");
-
-                    b.Property<string>("ProvisioningStatus")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("varchar(32)")
-                        .HasColumnName("provisioning_status");
-
-                    b.Property<string>("RequestHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("char(64)")
-                        .HasColumnName("request_hash");
-
-                    b.Property<string>("ResultReference")
-                        .HasMaxLength(160)
-                        .HasColumnType("varchar(160)")
-                        .HasColumnName("result_reference");
-
-                    b.Property<string>("SanitizedFailureDetails")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("sanitized_failure_details");
-
-                    b.Property<DateTimeOffset>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("varchar(32)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id")
-                        .HasName("pk_platform_tenant_onboarding_operations");
-
-                    b.HasIndex("DraftId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_onboarding_operations_draft");
-
-                    b.HasIndex("TenantId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_onboarding_operations_tenant");
-
-                    b.HasIndex("Status", "NextRetryAt")
-                        .HasDatabaseName("ix_onboarding_operations_retry");
-
-                    b.ToTable("platform_tenant_onboarding_operations", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_onboarding_operations_attempts", "attempt_count >= 0");
-
-                            t.HasCheckConstraint("ck_onboarding_operations_invitation_status", "invitation_status IN ('NOT_ELIGIBLE','PENDING_ACTIVATION','PENDING','SENT','FAILED','ACCEPTED','EXPIRED')");
-
-                            t.HasCheckConstraint("ck_onboarding_operations_payment_status", "payment_status IN ('NOT_REQUIRED','PENDING','CONFIRMED','FAILED','WAIVED','AWAITING_PAYMENT','PAYMENT_SUBMITTED','UNDER_REVIEW','ACTION_REQUIRED','PAID','REJECTED','EXPIRED','CANCELLED','DEFERRED')");
-
-                            t.HasCheckConstraint("ck_onboarding_operations_provisioning_status", "provisioning_status IN ('PROCESSING','SUCCEEDED','FAILED_RETRYABLE','FAILED_FINAL')");
-
-                            t.HasCheckConstraint("ck_onboarding_operations_status", "status IN ('PROCESSING','SUCCEEDED','FAILED_RETRYABLE','FAILED_FINAL')");
-                        });
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4789,144 +4339,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentEvidence", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("BlobContainer")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("blob_container");
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("content_type");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("EvidenceType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("evidence_type");
-
-                    b.Property<long>("FileSize")
-                        .HasColumnType("bigint")
-                        .HasColumnName("file_size");
-
-                    b.Property<Guid>("InvoiceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("invoice_id");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("OriginalFileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("original_file_name");
-
-                    b.Property<Guid>("PaymentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("payment_id");
-
-                    b.Property<string>("SafeFileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("safe_file_name");
-
-                    b.Property<string>("ScanFailureCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("scan_failure_code");
-
-                    b.Property<string>("ScanStatus")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("scan_status");
-
-                    b.Property<string>("Sha256")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("sha256");
-
-                    b.Property<string>("StorageKey")
-                        .IsRequired()
-                        .HasMaxLength(700)
-                        .HasColumnType("character varying(700)")
-                        .HasColumnName("storage_key");
-
-                    b.Property<long>("SubmissionVersion")
-                        .HasColumnType("bigint")
-                        .HasColumnName("submission_version");
-
-                    b.Property<DateTimeOffset?>("SupersededAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("superseded_at");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid?>("UploadedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("uploaded_by_id");
-
-                    b.Property<string>("UploadedByType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("uploaded_by_type");
-
-                    b.HasKey("Id")
-                        .HasName("pk_subscription_payment_evidence");
-
-                    b.HasIndex("InvoiceId");
-
-                    b.HasIndex("StorageKey")
-                        .IsUnique()
-                        .HasDatabaseName("uq_subscription_payment_evidence_storage_key");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("PaymentId", "SubmissionVersion")
-                        .HasDatabaseName("ix_subscription_payment_evidence_payment_submission");
-
-                    b.ToTable("subscription_payment_evidence", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_subscription_payment_evidence_file_size", "file_size > 0");
-                        });
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentLink", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<string>("AllowedActions")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("allowed_actions");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -4944,10 +4362,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("invoice_id");
 
-                    b.Property<DateTimeOffset?>("LastAccessedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_accessed_at");
-
                     b.Property<DateTimeOffset?>("LastReminderAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_reminder_at");
@@ -4959,15 +4373,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("link_status");
 
                     b.Property<string>("PaymentLinkTokenHash")
+                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
                         .HasColumnName("payment_link_token_hash");
 
-                    b.Property<Guid?>("PaymentTransactionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("payment_transaction_id");
-
                     b.Property<string>("PaymentUrl")
+                        .IsRequired()
                         .HasMaxLength(700)
                         .HasColumnType("varchar(700)")
                         .HasColumnName("payment_url");
@@ -4981,23 +4393,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
                         .HasColumnName("provider_payment_link_id");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)")
-                        .HasColumnName("purpose");
-
-                    b.Property<string>("RecipientIdentifierHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("recipient_identifier_hash");
-
-                    b.Property<string>("RecipientType")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)")
-                        .HasColumnName("recipient_type");
 
                     b.Property<int>("ReminderCount")
                         .ValueGeneratedOnAdd()
@@ -5027,13 +4422,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("tenant_id");
 
                     b.Property<string>("TokenHash")
+                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
                         .HasColumnName("token_hash");
-
-                    b.Property<DateTimeOffset?>("TokenProvisionedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("token_provisioned_at");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -5042,13 +4434,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("UsedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("used_at");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasDefaultValue(1L)
-                        .HasColumnName("version");
 
                     b.HasKey("Id")
                         .HasName("pk_subscription_payment_links");
@@ -5062,23 +4447,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_subscription_payment_links_payment_link_token_hash");
 
-                    b.HasIndex("PaymentTransactionId")
-                        .HasDatabaseName("ix_subscription_payment_links_payment_transaction_id");
-
                     b.HasIndex("SubscriptionInvoiceId");
 
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_subscription_payment_links_tenant_id");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("uq_subscription_payment_links_token_hash")
-                        .HasFilter("token_hash IS NOT NULL");
-
-                    b.HasIndex("PaymentTransactionId", "Purpose")
-                        .IsUnique()
-                        .HasDatabaseName("uq_subscription_payment_links_active_purpose")
-                        .HasFilter("payment_transaction_id IS NOT NULL AND revoked_at IS NULL AND link_status IN ('PENDING_DELIVERY','ACTIVE')");
 
                     b.ToTable("subscription_payment_links", null, t =>
                         {
@@ -5086,133 +4458,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_subscription_payment_links_reminder_count", "reminder_count IS NULL OR reminder_count >= 0");
                         });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentReview", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("action");
-
-                    b.Property<Guid?>("ActorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_id");
-
-                    b.Property<string>("ActorType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("actor_type");
-
-                    b.Property<Guid>("CorrelationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("correlation_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("CurrencySnapshot")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasColumnName("currency_snapshot");
-
-                    b.Property<Guid?>("EvidenceIdSnapshot")
-                        .HasColumnType("uuid")
-                        .HasColumnName("evidence_id_snapshot");
-
-                    b.Property<long?>("EvidenceVersionSnapshot")
-                        .HasColumnType("bigint")
-                        .HasColumnName("evidence_version_snapshot");
-
-                    b.Property<decimal>("ExpectedAmountSnapshot")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("expected_amount_snapshot");
-
-                    b.Property<string>("IdempotencyKeyHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("idempotency_key_hash");
-
-                    b.Property<Guid>("InvoiceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("invoice_id");
-
-                    b.Property<Guid>("PaymentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("payment_id");
-
-                    b.Property<long>("PaymentVersion")
-                        .HasColumnType("bigint")
-                        .HasColumnName("payment_version");
-
-                    b.Property<string>("ReasonCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("reason_code");
-
-                    b.Property<string>("RequestHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("request_hash");
-
-                    b.Property<string>("ReviewNote")
-                        .HasColumnType("text")
-                        .HasColumnName("review_note");
-
-                    b.Property<string>("StatusAfter")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("status_after");
-
-                    b.Property<string>("StatusBefore")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("status_before");
-
-                    b.Property<decimal?>("SubmittedAmountSnapshot")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("submitted_amount_snapshot");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_subscription_payment_reviews");
-
-                    b.HasIndex("ActorId");
-
-                    b.HasIndex("InvoiceId");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("PaymentId", "CreatedAt")
-                        .HasDatabaseName("ix_subscription_payment_reviews_payment_created");
-
-                    b.HasIndex("PaymentId", "IdempotencyKeyHash")
-                        .IsUnique()
-                        .HasDatabaseName("uq_subscription_payment_reviews_payment_idempotency");
-
-                    b.ToTable("subscription_payment_reviews", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentTransaction", b =>
@@ -5227,11 +4472,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("amount");
 
-                    b.Property<decimal?>("ApprovedAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("approved_amount");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -5242,19 +4482,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("char(3)")
                         .HasColumnName("currency_code");
 
-                    b.Property<decimal>("ExpectedAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("expected_amount");
-
                     b.Property<DateTimeOffset?>("FailedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("failed_at");
-
-                    b.Property<string>("FailureCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("failure_code");
 
                     b.Property<string>("FailureReason")
                         .HasColumnType("text")
@@ -5269,26 +4499,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("invoice_id");
 
-                    b.Property<string>("LastCommandIdempotencyKeyHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("last_command_idempotency_key_hash");
-
-                    b.Property<string>("LastCommandRequestHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("last_command_request_hash");
-
-                    b.Property<string>("ManualReference")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("manual_reference");
-
-                    b.Property<string>("ManualReferenceNormalized")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("manual_reference_normalized");
-
                     b.Property<decimal>("NetAmount")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
@@ -5298,41 +4508,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("paid_at");
 
-                    b.Property<string>("PayerNote")
-                        .HasColumnType("text")
-                        .HasColumnName("payer_note");
-
-                    b.Property<DateTimeOffset?>("PaymentDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("payment_date");
-
                     b.Property<Guid?>("PaymentLinkId")
                         .HasColumnType("uuid")
                         .HasColumnName("payment_link_id");
-
-                    b.Property<string>("PaymentMethod")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("payment_method");
-
-                    b.Property<string>("ProviderCallbackReceiptJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("provider_callback_receipt_json");
-
-                    b.Property<string>("ProviderCheckoutUrl")
-                        .HasMaxLength(700)
-                        .HasColumnType("character varying(700)")
-                        .HasColumnName("provider_checkout_url");
-
-                    b.Property<string>("ProviderCustomerReferenceId")
-                        .HasMaxLength(180)
-                        .HasColumnType("character varying(180)")
-                        .HasColumnName("provider_customer_reference_id");
-
-                    b.Property<string>("ProviderEventId")
-                        .HasMaxLength(180)
-                        .HasColumnType("character varying(180)")
-                        .HasColumnName("provider_event_id");
 
                     b.Property<decimal>("ProviderFee")
                         .HasPrecision(18, 4)
@@ -5349,12 +4527,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("provider_response_json");
 
-                    b.Property<string>("ProviderStatus")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("provider_status");
-
                     b.Property<string>("ProviderTransactionId")
+                        .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
                         .HasColumnName("provider_transaction_id");
@@ -5365,54 +4539,17 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(255)")
                         .HasColumnName("provider_transaction_reference");
 
-                    b.Property<string>("RejectionReasonCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("rejection_reason_code");
-
-                    b.Property<string>("ReviewNote")
-                        .HasColumnType("text")
-                        .HasColumnName("review_note");
-
-                    b.Property<long>("SubmissionVersion")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasDefaultValue(0L)
-                        .HasColumnName("submission_version");
-
-                    b.Property<decimal?>("SubmittedAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("submitted_amount");
-
-                    b.Property<DateTimeOffset?>("SubmittedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("submitted_at");
-
-                    b.Property<Guid?>("SubmittedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("submitted_by_id");
-
-                    b.Property<string>("SubmittedByType")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("submitted_by_type");
-
                     b.Property<Guid>("SubscriptionInvoiceId")
                         .HasColumnType("uuid")
                         .HasColumnName("subscription_invoice_id");
 
-                    b.Property<Guid?>("SubscriptionPaymentLinkId")
+                    b.Property<Guid>("SubscriptionPaymentLinkId")
                         .HasColumnType("uuid")
                         .HasColumnName("subscription_payment_link_id");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
-
-                    b.Property<Guid>("TenantSubscriptionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_subscription_id");
 
                     b.Property<string>("TransactionStatus")
                         .IsRequired()
@@ -5430,28 +4567,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<DateTimeOffset?>("VerifiedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("verified_at");
-
-                    b.Property<Guid?>("VerifiedByPlatformUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("verified_by_platform_user_id");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasDefaultValue(1L)
-                        .HasColumnName("version");
-
                     b.HasKey("Id")
                         .HasName("pk_subscription_payment_transactions");
-
-                    b.HasIndex("IdempotencyKey")
-                        .IsUnique()
-                        .HasDatabaseName("uq_subscription_payment_transactions_idempotency_key")
-                        .HasFilter("idempotency_key IS NOT NULL");
 
                     b.HasIndex("InvoiceId")
                         .HasDatabaseName("ix_subscription_payment_transactions_invoice_id");
@@ -5470,29 +4587,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_subscription_payment_transactions_tenant_id");
 
-                    b.HasIndex("TenantSubscriptionId")
-                        .HasDatabaseName("ix_subscription_payment_transactions_tenant_subscription_id");
-
-                    b.HasIndex("ProviderName", "ProviderEventId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_subscription_payment_transactions_provider_event")
-                        .HasFilter("provider_event_id IS NOT NULL");
-
-                    b.HasIndex("TenantId", "InvoiceId", "ManualReferenceNormalized")
-                        .HasDatabaseName("ix_subscription_payment_transactions_manual_reference")
-                        .HasFilter("manual_reference_normalized IS NOT NULL");
-
                     b.ToTable("subscription_payment_transactions", null, t =>
                         {
                             t.HasCheckConstraint("ck_subscription_payment_transactions_amount", "amount >= 0");
 
-                            t.HasCheckConstraint("ck_subscription_payment_transactions_expected_amount", "expected_amount >= 0");
-
                             t.HasCheckConstraint("ck_subscription_payment_transactions_net_amount", "net_amount IS NULL OR net_amount >= 0");
 
                             t.HasCheckConstraint("ck_subscription_payment_transactions_provider_fee", "provider_fee IS NULL OR provider_fee >= 0");
-
-                            t.HasCheckConstraint("ck_subscription_payment_transactions_submitted_amount", "submitted_amount IS NULL OR submitted_amount > 0");
                         });
                 });
 
@@ -5847,11 +4948,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_enabled");
 
-                    b.Property<string>("OverrideReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("override_reason");
-
                     b.Property<Guid>("PlatformFeatureId")
                         .HasColumnType("uuid")
                         .HasColumnName("platform_feature_id");
@@ -5910,10 +5006,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_tenant_feature_entitlements_effective_dates", "effective_until IS NULL OR effective_until > effective_from");
 
                             t.HasCheckConstraint("ck_tenant_feature_entitlements_entitlement_status", "entitlement_status IN ('ENABLED', 'DISABLED', 'EXPIRED')");
-
-                            t.HasCheckConstraint("ck_tenant_feature_entitlements_override_reason", "source_type <> 'OVERRIDE' OR length(btrim(override_reason)) > 0");
-
-                            t.HasCheckConstraint("ck_tenant_feature_entitlements_source_type", "source_type IN ('MANUAL', 'PLAN', 'ADDON', 'OVERRIDE')");
                         });
                 });
 
@@ -5936,8 +5028,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("BillingCycle")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
+                        .HasDefaultValue("monthly")
                         .HasColumnName("billing_cycle");
 
                     b.Property<DateTimeOffset?>("BillingStartAt")
@@ -6396,133 +5490,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_tenant_usage_counters_limit_value", "limit_value IS NULL OR limit_value >= 0");
 
                             t.HasCheckConstraint("ck_tenant_usage_counters_used_quantity", "used_quantity >= 0");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AggregateId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("aggregate_id");
-
-                    b.Property<long>("AggregateSequence")
-                        .HasColumnType("bigint")
-                        .HasColumnName("aggregate_sequence");
-
-                    b.Property<string>("AggregateType")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)")
-                        .HasColumnName("aggregate_type");
-
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("attempt_count");
-
-                    b.Property<DateTimeOffset>("AvailableAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("available_at");
-
-                    b.Property<Guid?>("CausationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("causation_id");
-
-                    b.Property<Guid>("CorrelationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("correlation_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DeduplicationKey")
-                        .IsRequired()
-                        .HasMaxLength(180)
-                        .HasColumnType("varchar(180)")
-                        .HasColumnName("deduplication_key");
-
-                    b.Property<string>("LastErrorCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("last_error_code");
-
-                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("lease_expires_at");
-
-                    b.Property<string>("LeaseOwner")
-                        .HasMaxLength(120)
-                        .HasColumnType("varchar(120)")
-                        .HasColumnName("lease_owner");
-
-                    b.Property<string>("MessageType")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("varchar(120)")
-                        .HasColumnName("message_type");
-
-                    b.Property<string>("PayloadJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("payload_json");
-
-                    b.Property<int>("PayloadSchemaVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("payload_schema_version");
-
-                    b.Property<DateTimeOffset?>("ProcessedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("processed_at");
-
-                    b.Property<string>("SanitizedLastError")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("sanitized_last_error");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("varchar(24)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_integration_outbox_messages");
-
-                    b.HasIndex("DeduplicationKey")
-                        .IsUnique()
-                        .HasDatabaseName("uq_integration_outbox_deduplication_key");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("Status", "AvailableAt")
-                        .HasDatabaseName("ix_integration_outbox_claim");
-
-                    b.HasIndex("AggregateType", "AggregateId", "AggregateSequence")
-                        .IsUnique()
-                        .HasDatabaseName("uq_integration_outbox_aggregate_sequence");
-
-                    b.ToTable("integration_outbox_messages", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_integration_outbox_attempts", "attempt_count >= 0");
-
-                            t.HasCheckConstraint("ck_integration_outbox_schema", "payload_schema_version > 0");
-
-                            t.HasCheckConstraint("ck_integration_outbox_sequence", "aggregate_sequence > 0");
-
-                            t.HasCheckConstraint("ck_integration_outbox_status", "status IN ('PENDING','PROCESSING','DELIVERED','FAILED_RETRYABLE','FAILED_FINAL')");
                         });
                 });
 
@@ -9746,12 +8713,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<bool>("IsPrimaryManager")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_primary_manager");
-
                     b.Property<Guid>("OutletId")
                         .HasColumnType("uuid")
                         .HasColumnName("outlet_id");
@@ -9788,11 +8749,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantRoleId");
 
                     b.HasIndex("TenantUserId");
-
-                    b.HasIndex("TenantId", "OutletId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_outlet_user_roles_tenant_outlet_primary_manager")
-                        .HasFilter("is_primary_manager = true AND revoked_at IS NULL");
 
                     b.HasIndex("TenantId", "OutletId", "TenantUserId", "TenantRoleId")
                         .IsUnique()
@@ -13085,9 +12041,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid")
                         .HasColumnName("customer_id");
-
-                    b.Property<bool?>("IsRecommended")
-                        .HasColumnType("boolean");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid")
@@ -19097,9 +18050,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_sales_orders_discount_amount", "discount_amount >= 0");
 
-                            t.HasCheckConstraint("ck_sales_orders_fulfillment_status", "fulfillment_status IN ('NOT_REQUIRED', 'PENDING', 'ACCEPTED', 'PREPARING', 'READY', 'READY_FOR_PICKUP', 'READY_FOR_COLLECTION', 'PARTIALLY_FULFILLED', 'FULFILLED', 'COLLECTED', 'CANCELLED')");
+                            t.HasCheckConstraint("ck_sales_orders_fulfillment_status", "fulfillment_status IN ('NOT_REQUIRED', 'PENDING', 'READY_FOR_PICKUP', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CANCELLED')");
 
-                            t.HasCheckConstraint("ck_sales_orders_order_status", "order_status IN ('DRAFT', 'PLACED', 'CONFIRMED', 'ACCEPTED', 'COMPLETED', 'CANCELLED', 'VOIDED')");
+                            t.HasCheckConstraint("ck_sales_orders_order_status", "order_status IN ('DRAFT', 'PLACED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'VOIDED')");
 
                             t.HasCheckConstraint("ck_sales_orders_order_type", "order_type IN ('POS_SALE', 'CLICK_AND_COLLECT', 'EXCHANGE_ORDER', 'MANUAL_ORDER')");
 
@@ -20126,10 +19079,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_default_outlet");
 
-                    b.Property<Guid?>("MediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("media_asset_id");
-
                     b.Property<string>("OutletCode")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -20192,9 +19141,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "Id")
                         .IsUnique()
                         .HasDatabaseName("uq_outlets_tenant_id_id");
-
-                    b.HasIndex("TenantId", "MediaAssetId")
-                        .HasDatabaseName("ix_outlets_tenant_id_media_asset_id");
 
                     b.HasIndex("TenantId", "OutletCode")
                         .IsUnique()
@@ -24124,85 +23070,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantContact", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("ContactName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("contact_name");
-
-                    b.Property<string>("ContactType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("contact_type");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CreatedByPlatformUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_platform_user_id");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)")
-                        .HasColumnName("email");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("phone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UpdatedByPlatformUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by_platform_user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_tenant_contacts");
-
-                    b.HasIndex("CreatedByPlatformUserId");
-
-                    b.HasIndex("UpdatedByPlatformUserId");
-
-                    b.HasIndex("TenantId", "ContactType")
-                        .IsUnique()
-                        .HasDatabaseName("uq_tenant_contacts_active_type")
-                        .HasFilter("status = 'ACTIVE'");
-
-                    b.ToTable("tenant_contacts", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_tenant_contacts_billing_email", "contact_type <> 'BILLING' OR email IS NOT NULL");
-
-                            t.HasCheckConstraint("ck_tenant_contacts_reachable", "contact_type <> 'SUPPORT' OR email IS NOT NULL OR phone IS NOT NULL");
-
-                            t.HasCheckConstraint("ck_tenant_contacts_status", "status IN ('ACTIVE','INACTIVE')");
-
-                            t.HasCheckConstraint("ck_tenant_contacts_type", "contact_type IN ('BILLING','SUPPORT')");
-                        });
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantDomain", b =>
                 {
                     b.Property<Guid>("Id")
@@ -24353,16 +23220,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(40)")
                         .HasColumnName("primary_phone");
 
-                    b.Property<string>("RegistrationNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("registration_number");
-
-                    b.Property<string>("TaxNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("tax_number");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -24387,12 +23244,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_tenant_profiles");
-
-                    b.HasIndex("RegistrationNumber")
-                        .HasDatabaseName("ix_tenant_profiles_registration_number");
-
-                    b.HasIndex("TaxNumber")
-                        .HasDatabaseName("ix_tenant_profiles_tax_number");
 
                     b.HasIndex("TenantId")
                         .IsUnique()
@@ -24693,17 +23544,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customers_tenant_id_tenants");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAddress", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
@@ -24763,24 +23603,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_customer_consents_sales_channel_id_sales_channels");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerExternalAuthAccount", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_external_auth_accounts_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerAuthAccount", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "CustomerAuthAccountId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_customer_external_auth_accounts_auth_account");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Customer.Entities.CustomerPasswordResetToken", b =>
@@ -25337,53 +24159,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_platform_settings_updated_by_platform_user_id_platform_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingDraft", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedByPlatformUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_onboarding_drafts_created_by_platform_users");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedTenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_onboarding_drafts_created_tenant");
-
-                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
-                        .WithMany()
-                        .HasForeignKey("OwnerPlatformUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_onboarding_drafts_owner_platform_users");
-
-                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedByPlatformUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_onboarding_drafts_updated_by_platform_users");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingOperation", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingDraft", null)
-                        .WithMany()
-                        .HasForeignKey("DraftId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_onboarding_operations_draft");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_onboarding_operations_tenant");
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
@@ -25621,30 +24396,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_subscription_invoice_lines_subscription_invoice_id_subscription_invoices");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentEvidence", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
-                        .WithMany()
-                        .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_subscription_payment_evidence_invoice");
-
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentTransaction", null)
-                        .WithMany()
-                        .HasForeignKey("PaymentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_subscription_payment_evidence_payment");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_subscription_payment_evidence_tenant");
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentLink", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
@@ -25660,12 +24411,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_subscription_payment_links_invoice_id_subscription_invoices");
 
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentTransaction", null)
-                        .WithMany()
-                        .HasForeignKey("PaymentTransactionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_subscription_payment_links_payment_transaction_id");
-
                     b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionInvoiceId")
@@ -25679,36 +24424,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_payment_links_tenant_id_tenants");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentReview", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
-                        .WithMany()
-                        .HasForeignKey("ActorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_subscription_payment_reviews_actor");
-
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionInvoice", null)
-                        .WithMany()
-                        .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_subscription_payment_reviews_invoice");
-
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentTransaction", null)
-                        .WithMany()
-                        .HasForeignKey("PaymentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_subscription_payment_reviews_payment");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_subscription_payment_reviews_tenant");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPaymentTransaction", b =>
@@ -25737,6 +24452,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("SubscriptionPaymentLinkId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
                         .HasConstraintName("fk_subscription_payment_transactions_subscription_payment_link_id_subscription_payment_links");
 
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
@@ -25745,13 +24461,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_payment_transactions_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.TenantSubscription", null)
-                        .WithMany()
-                        .HasForeignKey("TenantSubscriptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_subscription_payment_transactions_tenant_subscription_id");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.Subscription.Entities.SubscriptionPlan", b =>
@@ -25983,15 +24692,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_usage_counters_tenant_id_tenants");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_integration_outbox_tenant");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Shared.Integration.Entities.PlatformIntegration", b =>
@@ -30494,13 +29194,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedByTenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outlets_updated_by_tenant_user_id_tenant_users");
-
-                    b.HasOne("E_POS.Domain.Modules.Shared.Media.Entities.MediaAsset", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "MediaAssetId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_outlets_media_asset_tenant");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.OutletAddress", b =>
@@ -31708,30 +30401,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_addresses_tenant_id_tenants");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantContact", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedByPlatformUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_tenant_contacts_created_by");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_tenant_contacts_tenant");
-
-                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedByPlatformUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_tenant_contacts_updated_by");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.TenantDomain", b =>

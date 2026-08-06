@@ -1,6 +1,7 @@
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -22,6 +23,7 @@ public sealed class OutletConfiguration : IEntityTypeConfiguration<Outlet>
         builder.Property(x => x.Timezone).HasColumnName("timezone").HasColumnType("varchar(80)").HasMaxLength(80).IsRequired();
         builder.Property(x => x.IsDefaultOutlet).HasColumnName("is_default_outlet").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
+        builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id").IsRequired(false);
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(x => x.CreatedByTenantUserId).HasColumnName("created_by_tenant_user_id").IsRequired(false);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
@@ -31,10 +33,18 @@ public sealed class OutletConfiguration : IEntityTypeConfiguration<Outlet>
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_outlets_tenant_id_tenants");
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.CreatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_outlets_created_by_tenant_user_id_tenant_users");
         builder.HasOne<TenantUser>().WithMany().HasForeignKey(x => x.UpdatedByTenantUserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_outlets_updated_by_tenant_user_id_tenant_users");
+        builder.HasOne<MediaAsset>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.MediaAssetId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_outlets_media_asset_tenant");
         builder.HasIndex(x => new { x.TenantId, x.OutletCode }).IsUnique().HasDatabaseName("uq_outlets_tenant_id_outlet_code");
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_outlets_tenant_id_id");
+        builder.HasIndex(x => new { x.TenantId, x.MediaAssetId })
+            .HasDatabaseName("ix_outlets_tenant_id_media_asset_id");
         builder.HasIndex(x => x.TenantId)
             .HasDatabaseName("uq_outlets_tenant_id_default_outlet")
             .IsUnique()
