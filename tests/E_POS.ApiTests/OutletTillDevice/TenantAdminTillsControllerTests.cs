@@ -103,6 +103,11 @@ public sealed class TenantAdminTillsControllerTests
             "Offline",
             DateTimeOffset.UtcNow,
             false,
+            "ONLINE",
+            "Online",
+            null,
+            null,
+            false,
             null,
             null,
             null,
@@ -176,6 +181,26 @@ public sealed class TenantAdminTillsControllerTests
             TenantRequestContext context,
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<IReadOnlyList<TenantAdminOutletOptionResponse>>.Success([]));
+            
+        public Task<ApplicationResult<TenantAdminTillHardwareReadinessResponse>> GetHardwareReadinessAsync(
+            TenantRequestContext context,
+            Guid tillId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<TenantAdminTillHardwareReadinessResponse>.Success(
+                new TenantAdminTillHardwareReadinessResponse(
+                    tillId,
+                    "Till",
+                    "Code",
+                    Guid.NewGuid(),
+                    "Outlet",
+                    [],
+                    "Active",
+                    "ONLINE",
+                    null,
+                    null,
+                    null,
+                    [],
+                    0)));
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory

@@ -20,5 +20,24 @@ public class NotificationChannel : AuditableEntity
     public DateTimeOffset? ArchivedAt { get; protected set; }
     public Guid? ArchivedByPlatformUserId { get; protected set; }
     public Guid? ArchivedByTenantUserId { get; protected set; }
-}
 
+    public static NotificationChannel CreateSystem(
+        string channelCode,
+        string channelName,
+        string channelType,
+        DateTimeOffset now)
+    {
+        return new NotificationChannel
+        {
+            Id = Guid.NewGuid(),
+            TenantId = null,
+            ChannelCode = channelCode.Trim().ToUpperInvariant(),
+            ChannelName = channelName.Trim(),
+            ChannelType = channelType.Trim().ToUpperInvariant(),
+            IsSystemChannel = true,
+            IsEnabled = true,
+            Status = "ACTIVE",
+            CreatedAt = now
+        };
+    }
+}

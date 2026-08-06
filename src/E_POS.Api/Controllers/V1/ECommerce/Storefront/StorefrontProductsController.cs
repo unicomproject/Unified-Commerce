@@ -42,6 +42,17 @@ public class StorefrontProductsController : ControllerBase
         return Ok(products);
     }
 
+    [HttpGet("/api/v1/ecommerce/storefront/catalog/autocomplete")]
+    public IActionResult Autocomplete([FromHeader(Name = "X-Tenant-Id")] Guid tenantId, [FromQuery] string q, [FromQuery] int limit = 10)
+    {
+        if (tenantId == Guid.Empty) return BadRequest(new { Error = "X-Tenant-Id header is required" });
+        if (string.IsNullOrWhiteSpace(q)) return BadRequest(new { Error = "q (query) is required" });
+        
+        var autocompleteService = HttpContext.RequestServices.GetRequiredService<E_POS.Application.Modules.ECommerce.Storefront.Contracts.IStorefrontAutocompleteService>();
+        var results = autocompleteService.GetSuggestions(tenantId, q, limit);
+        return Ok(results);
+    }
+
     [HttpGet("/api/v1/ecommerce/storefront/catalog/search")]
     public async Task<IActionResult> Search([FromHeader(Name = "X-Tenant-Id")] Guid tenantId, [FromQuery] StorefrontSearchRequest request, CancellationToken cancellationToken)
     {

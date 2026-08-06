@@ -170,6 +170,7 @@ app.UseMiddleware<PaymentAccessRequestRedactionMiddleware>();
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.UseCors("AllowAll");
+app.UseStaticFiles();
 
 if (app.Environment.IsDevelopment())
 {

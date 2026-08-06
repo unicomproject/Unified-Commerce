@@ -50,6 +50,7 @@ public sealed class StorefrontCheckoutLineReadModel
     public Guid? ProductVariantId { get; set; }
     public string? Sku { get; set; }
     public string ProductName { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal Subtotal { get; set; }

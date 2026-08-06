@@ -207,6 +207,18 @@ public sealed class BrandCollectionControllerTests
             Context = context;
             return Task.FromResult(DeleteResult);
         }
+
+        public Task<ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>> GetPopularProductsAsync(TenantRequestContext context, CancellationToken cancellationToken)
+        {
+            Context = context;
+            return Task.FromResult(ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Success([]));
+        }
+
+        public Task<ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>> ReplacePopularProductsAsync(TenantRequestContext context, List<Guid> productIds, CancellationToken cancellationToken)
+        {
+            Context = context;
+            return Task.FromResult(ApplicationResult<IReadOnlyList<CollectionProductResponseDto>>.Success([]));
+        }
     }
 }
 

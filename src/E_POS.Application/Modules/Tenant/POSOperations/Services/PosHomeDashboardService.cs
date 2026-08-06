@@ -132,7 +132,10 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     CashDrawer: new PosHomeCardDto(
                         canViewCashDrawer,
                         Balance: snapshot.CashDrawerBalance)),
-                Cashier: new PosHomeCashierDto(snapshot.CashierTenantUserId, snapshot.CashierDisplayName),
+                Cashier: new PosHomeCashierDto(
+                    snapshot.CashierTenantUserId,
+                    snapshot.CashierDisplayName,
+                    snapshot.CashierProfileImageUrl),
                 Device: new PosHomeDeviceDto(
                     snapshot.DeviceId,
                     snapshot.DeviceCode,

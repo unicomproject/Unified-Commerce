@@ -84,17 +84,41 @@ public sealed class CollectionsController : ControllerBase
         return result.IsSuccess ? NoContent() : ToErrorResult(result.Error);
     }
 
+    [HttpGet("pos-popular/products")]
+    [ProducesResponseType(typeof(IReadOnlyList<CollectionProductResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetPopularProducts(CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized(CreateError(new ApplicationError("collection.invalid_tenant_context", "Invalid tenant context.")));
+        var result = await _collectionService.GetPopularProductsAsync(context, cancellationToken);
+        return result.IsSuccess && result.Value is not null ? Ok(result.Value) : ToErrorResult(result.Error);
+    }
+
+    [HttpPut("pos-popular/products")]
+    [ProducesResponseType(typeof(IReadOnlyList<CollectionProductResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ReplacePopularProducts([FromBody] List<Guid> productIds, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized(CreateError(new ApplicationError("collection.invalid_tenant_context", "Invalid tenant context.")));
+        var result = await _collectionService.ReplacePopularProductsAsync(context, productIds, cancellationToken);
+        return result.IsSuccess && result.Value is not null ? Ok(result.Value) : ToErrorResult(result.Error);
+    }
+
     private IActionResult ToErrorResult(ApplicationError error)
     {
         return error.Code switch
         {
             "collection.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "collection.not_found" => NotFound(CreateError(error)),
-            "collection.duplicate_code" or "collection.delete_conflict" => Conflict(CreateError(error)),
+            "collection.duplicate_code" or "collection.delete_conflict" or "collection.cannot_delete_reserved_collection" or "collection.reserved_modification_denied" => Conflict(CreateError(error)),
             "collection.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
         };
     }
+
 
     private object CreateError(ApplicationError error)
     {

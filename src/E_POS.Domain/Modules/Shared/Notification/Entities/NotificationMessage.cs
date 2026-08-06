@@ -30,5 +30,55 @@ public class NotificationMessage : AuditableEntity
     public DateTimeOffset? DeliveredAt { get; protected set; }
     public DateTimeOffset? FailedAt { get; protected set; }
     public string? FailureReason { get; protected set; }
-}
 
+    public static NotificationMessage Create(
+        Guid tenantId,
+        Guid notificationEventId,
+        Guid notificationChannelId,
+        string messageNumber,
+        string messageType,
+        string channelType,
+        string recipientType,
+        Guid? platformUserId,
+        Guid? tenantUserId,
+        Guid? customerId,
+        string? recipientName,
+        string? recipientEmail,
+        string? recipientPhone,
+        string? titleText,
+        string? bodyText,
+        string? actionUrl,
+        string priority,
+        string messageStatus,
+        DateTimeOffset createdAt,
+        DateTimeOffset? deliveredAt)
+    {
+        return new NotificationMessage
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            NotificationEventId = notificationEventId,
+            NotificationChannelId = notificationChannelId,
+            MessageNumber = messageNumber.Trim().ToUpperInvariant(),
+            MessageType = messageType.Trim().ToUpperInvariant(),
+            ChannelType = channelType.Trim().ToUpperInvariant(),
+            RecipientType = recipientType.Trim().ToUpperInvariant(),
+            PlatformUserId = platformUserId,
+            TenantUserId = tenantUserId,
+            CustomerId = customerId,
+            RecipientName = TrimToNull(recipientName),
+            RecipientEmail = TrimToNull(recipientEmail),
+            RecipientPhone = TrimToNull(recipientPhone),
+            TitleText = TrimToNull(titleText),
+            BodyTextMapped = TrimToNull(bodyText),
+            ActionUrlMapped = TrimToNull(actionUrl),
+            Priority = priority.Trim().ToUpperInvariant(),
+            MessageStatus = messageStatus.Trim().ToUpperInvariant(),
+            CreatedAt = createdAt,
+            DeliveredAt = deliveredAt
+        };
+    }
+
+    private static string? TrimToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

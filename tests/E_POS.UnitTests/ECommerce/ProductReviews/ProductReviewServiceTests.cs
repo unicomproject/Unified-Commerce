@@ -20,7 +20,7 @@ public sealed class ProductReviewServiceTests
         var service = CreateService(repository);
 
         var result = await service.GetAsync(
-            TenantId, ProductId, 0, 51, "newest", CancellationToken.None);
+            TenantId, null, ProductId, 0, 51, "newest", CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("product_reviews.invalid_paging", result.Error.Code);
@@ -38,7 +38,7 @@ public sealed class ProductReviewServiceTests
         var service = CreateService(repository);
 
         var result = await service.GetAsync(
-            TenantId, ProductId, 2, 20, " HIGHEST ", CancellationToken.None);
+            TenantId, null, ProductId, 2, 20, " HIGHEST ", CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Same(page, result.Value);
@@ -151,6 +151,10 @@ public sealed class ProductReviewServiceTests
             ProductReviewPageRepositoryResult.Success(new ProductReviewsPageReadModel());
         public ProductReviewMutationRepositoryResult CreateResult { get; init; } =
             ProductReviewMutationRepositoryResult.Success(new ProductReviewItemReadModel());
+        public CustomerReviewPageRepositoryResult CustomerReviewsResult { get; init; } =
+            CustomerReviewPageRepositoryResult.Success(new CustomerReviewsPageReadModel());
+        public EligibleReviewsPageRepositoryResult EligibleReviewsResult { get; init; } =
+            EligibleReviewsPageRepositoryResult.Success(new EligibleReviewsPageReadModel());
         public ProductReviewMutationRepositoryResult UpdateResult { get; init; } =
             ProductReviewMutationRepositoryResult.Success(new ProductReviewItemReadModel());
         public ProductReviewDeleteRepositoryResult DeleteResult { get; init; } =
@@ -166,16 +170,37 @@ public sealed class ProductReviewServiceTests
         public CreateProductReviewRequest? CreateRequest { get; private set; }
 
         public Task<ProductReviewPageRepositoryResult> GetAsync(
-            Guid tenantId, Guid productId, int page, int pageSize, string sort,
+            Guid tenantId, Guid? customerId, Guid productId, int page, int pageSize, string sort,
             DateTimeOffset now, CancellationToken cancellationToken)
         {
-            Capture(tenantId, null, productId, now);
+            Capture(tenantId, customerId, productId, now);
             Page = page;
             PageSize = pageSize;
             Sort = sort;
             return Task.FromResult(GetResult);
         }
 
+
+        public Task<CustomerReviewPageRepositoryResult> GetCustomerReviewsAsync(
+            Guid tenantId, Guid customerId, int page, int pageSize, string sort,
+            DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            Capture(tenantId, customerId, Guid.Empty, now);
+            Page = page;
+            PageSize = pageSize;
+            Sort = sort;
+            return Task.FromResult(CustomerReviewsResult);
+        }
+
+        public Task<EligibleReviewsPageRepositoryResult> GetEligibleProductsForReviewAsync(
+            Guid tenantId, Guid customerId, int page, int pageSize,
+            DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            Capture(tenantId, customerId, Guid.Empty, now);
+            Page = page;
+            PageSize = pageSize;
+            return Task.FromResult(EligibleReviewsResult);
+        }
         public Task<ProductReviewMutationRepositoryResult> CreateAsync(
             Guid tenantId, Guid customerId, Guid productId,
             CreateProductReviewRequest request, DateTimeOffset now,

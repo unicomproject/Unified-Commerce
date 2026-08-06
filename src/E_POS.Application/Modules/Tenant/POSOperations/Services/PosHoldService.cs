@@ -109,6 +109,8 @@ public sealed class PosHoldService : IPosHoldService
         if (request.Lines is null || request.Lines.Count == 0 ||
             request.Lines.Any(x => x.VariantId == Guid.Empty || x.Qty <= 0))
             return Failure("pos_holds.invalid_lines", "A hold requires at least one valid cart line.");
+        if (request.Lines.Any(x => (x.LineNote?.Trim().Length ?? 0) > 500))
+            return Failure("pos_holds.line_note_too_long", "Line note cannot exceed 500 characters.");
         if (string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.IdempotencyKey.Trim().Length > 100)
             return Failure("pos_holds.invalid_idempotency_key",
                 "A valid idempotency key of at most 100 characters is required.");

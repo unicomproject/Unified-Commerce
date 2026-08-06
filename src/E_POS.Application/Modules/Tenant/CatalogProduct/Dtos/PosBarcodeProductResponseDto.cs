@@ -11,4 +11,5 @@ public sealed record PosBarcodeProductResponseDto(
     decimal QuantityPerScan,
     int Price,
     decimal? AvailableQuantity,
-    string StockStatus);
+    string StockStatus,
+    string? ImageUrl = null);

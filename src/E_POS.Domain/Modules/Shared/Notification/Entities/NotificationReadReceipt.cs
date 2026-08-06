@@ -14,5 +14,35 @@ public class NotificationReadReceipt : AuditableEntity
     public DateTimeOffset ReadAt { get; protected set; }
     public string? IpAddress { get; protected set; }
     public string? UserAgent { get; protected set; }
-}
 
+    public static NotificationReadReceipt Create(
+        Guid tenantId,
+        Guid notificationInboxItemId,
+        Guid notificationMessageId,
+        string recipientType,
+        Guid? platformUserId,
+        Guid? tenantUserId,
+        Guid? customerId,
+        DateTimeOffset readAt,
+        string? ipAddress,
+        string? userAgent)
+    {
+        return new NotificationReadReceipt
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            NotificationInboxItemId = notificationInboxItemId,
+            NotificationMessageId = notificationMessageId,
+            RecipientType = recipientType.Trim().ToUpperInvariant(),
+            PlatformUserId = platformUserId,
+            TenantUserId = tenantUserId,
+            CustomerId = customerId,
+            ReadAt = readAt,
+            IpAddress = TrimToNull(ipAddress),
+            UserAgent = TrimToNull(userAgent)
+        };
+    }
+
+    private static string? TrimToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

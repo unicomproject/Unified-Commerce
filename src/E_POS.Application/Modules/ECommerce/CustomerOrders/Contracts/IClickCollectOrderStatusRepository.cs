@@ -16,13 +16,16 @@ public interface IClickCollectOrderStatusRepository
 public sealed record ClickCollectOrderStatusUpdateRepositoryResult(
     string? ErrorCode,
     string? ErrorMessage,
-    ClickCollectOrderStatusUpdateResponse? Response)
+    ClickCollectOrderStatusUpdateResponse? Response,
+    CustomerOrderNotificationContext? NotificationContext)
 {
     public bool IsSuccess => ErrorCode is null && Response is not null;
 
-    public static ClickCollectOrderStatusUpdateRepositoryResult Success(ClickCollectOrderStatusUpdateResponse response) =>
-        new(null, null, response);
+    public static ClickCollectOrderStatusUpdateRepositoryResult Success(
+        ClickCollectOrderStatusUpdateResponse response,
+        CustomerOrderNotificationContext? notificationContext = null) =>
+        new(null, null, response, notificationContext);
 
     public static ClickCollectOrderStatusUpdateRepositoryResult Failure(string errorCode, string? errorMessage = null) =>
-        new(errorCode, errorMessage, null);
+        new(errorCode, errorMessage, null, null);
 }

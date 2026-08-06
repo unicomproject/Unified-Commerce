@@ -95,6 +95,86 @@ public sealed class CollectionRepository : ICollectionRepository
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public Task<Collection?> GetByCodeAsync(Guid tenantId, string collectionCode, CancellationToken cancellationToken)
+    {
+        return _dbContext.Collections
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.CollectionCode == collectionCode && x.Status != CollectionConstants.DeletedStatus, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CollectionProductResponseDto>> GetCollectionProductsAsync(Guid tenantId, Guid collectionId, CancellationToken cancellationToken)
+    {
+        var query = from pc in _dbContext.ProductCollections.AsNoTracking()
+                    join p in _dbContext.Products.AsNoTracking() on pc.ProductId equals p.Id
+                    where pc.TenantId == tenantId && pc.CollectionId == collectionId && p.Status != "DELETED"
+                    orderby pc.SortOrder
+                    select new
+                    {
+                        p.Id,
+                        p.ProductName,
+                        p.Status,
+                        pc.SortOrder,
+                        Sku = _dbContext.ProductVariants
+                            .Where(v => v.ProductId == p.Id && v.Status != "DELETED")
+                            .OrderByDescending(v => v.IsDefaultVariant)
+                            .Select(v => v.Sku)
+                            .FirstOrDefault()
+                    };
+
+        var items = await query.ToListAsync(cancellationToken);
+
+        return items.Select(x => new CollectionProductResponseDto(
+            x.Id,
+            x.ProductName,
+            x.Sku,
+            x.Status,
+            x.SortOrder
+        )).ToList();
+    }
+
+    public async Task ReplaceCollectionProductsAsync(Guid tenantId, Guid collectionId, List<Guid> productIds, Guid? userId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var existing = await _dbContext.ProductCollections
+                .Where(x => x.TenantId == tenantId && x.CollectionId == collectionId)
+                .ToListAsync(cancellationToken);
+
+            _dbContext.ProductCollections.RemoveRange(existing);
+
+            for (int i = 0; i < productIds.Count; i++)
+            {
+                var pc = ProductCollection.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    productIds[i],
+                    collectionId,
+                    i,
+                    userId,
+                    now);
+                _dbContext.ProductCollections.Add(pc);
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<bool> AllProductsExistAndNotDeletedAsync(Guid tenantId, List<Guid> productIds, CancellationToken cancellationToken)
+    {
+        var count = await _dbContext.Products
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id) && x.Status != "DELETED")
+            .CountAsync(cancellationToken);
+
+        return count == productIds.Distinct().Count();
+    }
 }
 
 

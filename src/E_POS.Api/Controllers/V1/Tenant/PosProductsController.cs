@@ -33,7 +33,8 @@ public sealed class PosProductsController : ControllerBase
         [FromQuery] Guid? deviceId,
         [FromQuery] Guid? categoryId,
         [FromQuery] string? search,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] string? segment = null)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))
         {
@@ -46,7 +47,8 @@ public sealed class PosProductsController : ControllerBase
             deviceId,
             categoryId,
             search,
-            cancellationToken);
+            cancellationToken,
+            segment: segment);
 
         if (!result.IsSuccess)
         {
@@ -147,6 +149,22 @@ public sealed class PosProductsController : ControllerBase
         }
 
         return Ok(new { data = result.Value });
+    }
+
+    [HttpGet("products/{productId:guid}/recommendations")]
+    public async Task<IActionResult> GetRecommendations(
+        Guid productId, [FromQuery] Guid? deviceId, [FromQuery] Guid? sourceVariantId,
+        [FromQuery] string? type = "frequently-bought-together", [FromQuery] int limit = 3,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "pos_products.invalid_tenant_context", "Invalid tenant context.")));
+        var result = await _posProductCatalogService.GetRecommendationsAsync(
+            context, deviceId, productId, sourceVariantId, type, limit, cancellationToken);
+        return result.IsSuccess
+            ? Ok(new { data = result.Value ?? Array.Empty<PosProductRecommendationResponseDto>() })
+            : ToErrorResult(result.Error);
     }
 
     private IActionResult ToErrorResult(ApplicationError error)

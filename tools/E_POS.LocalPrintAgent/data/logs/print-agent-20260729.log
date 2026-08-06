@@ -1,0 +1,112 @@
+﻿2026-07-29T04:47:22.8520311+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=1
+2026-07-29T04:47:22.8869896+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-07-29T04:47:22.8876815+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-07-29T04:47:22.8880229+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-07-29T04:47:22.8885073+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent
+2026-07-29T04:47:27.7467125+00:00	Information	0	Microsoft.Hosting.Lifetime	Application is shutting down...
+2026-07-29T04:47:27.7475742+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent shutdown started.
+2026-07-29T04:47:27.7539398+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent stopped.
+2026-07-29T04:48:01.9885975+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=1
+2026-07-29T04:48:02.0232790+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-07-29T04:48:02.0238943+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-07-29T04:48:02.0242173+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-07-29T04:48:02.0245630+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent
+2026-07-29T04:51:31.2027672+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=66f1243a-2a9f-407b-87c0-ef7966986be7 printer=POSPrinter POS80
+2026-07-29T04:51:31.2364850+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=66f1243a-2a9f-407b-87c0-ef7966986be7 printer=POSPrinter POS80
+2026-07-29T04:51:31.4004316+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=66f1243a-2a9f-407b-87c0-ef7966986be7 result=printed elapsedMs=184
+2026-07-29T04:53:00.6279357+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=cb626780-f21e-4dc1-9302-c6b15bd8f254 printer=POSPrinter POS80
+2026-07-29T04:53:00.6339182+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=cb626780-f21e-4dc1-9302-c6b15bd8f254 printer=POSPrinter POS80
+2026-07-29T04:53:00.7311275+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=cb626780-f21e-4dc1-9302-c6b15bd8f254 result=printed elapsedMs=85
+2026-07-29T05:08:54.7660875+00:00	Warning	0	E_POS.LocalPrintAgent.Security.LocalApiKeyAuthenticator	Local Print Agent authentication failed for remote address 127.0.0.1; rateLimited=False.
+2026-07-29T05:11:34.9677814+00:00	Information	0	Microsoft.Hosting.Lifetime	Application is shutting down...
+2026-07-29T05:11:34.9688324+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent shutdown started.
+2026-07-29T05:11:34.9755099+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent stopped.
+2026-07-29T05:12:01.7235320+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=1
+2026-07-29T05:12:01.7630569+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-07-29T05:12:01.7639572+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-07-29T05:12:01.7646291+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-07-29T05:12:01.7652597+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent
+2026-07-29T05:15:37.2448262+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=7c835b1e-04d4-407a-8bc7-2300cd005eea printer=POSPrinter POS80
+2026-07-29T05:15:37.2868609+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=7c835b1e-04d4-407a-8bc7-2300cd005eea printer=POSPrinter POS80
+2026-07-29T05:15:37.4091753+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=7c835b1e-04d4-407a-8bc7-2300cd005eea result=printed elapsedMs=149
+2026-07-29T05:16:08.5085633+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=77893b7c-af33-42ee-9887-d755f8c7dba3 printer=POSPrinter POS80
+2026-07-29T05:16:08.5140546+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=77893b7c-af33-42ee-9887-d755f8c7dba3 printer=POSPrinter POS80
+2026-07-29T05:16:08.6037748+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=77893b7c-af33-42ee-9887-d755f8c7dba3 result=printed elapsedMs=90
+2026-07-29T05:50:09.4628706+00:00	Information	0	Microsoft.Hosting.Lifetime	Application is shutting down...
+2026-07-29T05:50:09.4638381+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent shutdown started.
+2026-07-29T05:50:09.4691275+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent stopped.
+2026-07-29T07:21:59.2194020+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=2
+2026-07-29T07:21:59.3332355+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-07-29T07:21:59.3341342+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-07-29T07:21:59.3348107+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-07-29T07:21:59.3353965+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent
+2026-07-29T07:55:57.6512639+00:00	Information	0	Microsoft.Hosting.Lifetime	Application is shutting down...
+2026-07-29T07:55:57.6522860+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent shutdown started.
+2026-07-29T07:55:57.6617004+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent stopped.
+2026-07-29T09:32:45.7354034+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=2
+2026-07-29T09:32:45.7708758+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-07-29T09:32:45.7713859+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-07-29T09:32:45.7717384+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-07-29T09:32:45.7722426+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent
+2026-07-29T09:33:22.3769677+00:00	Warning	0	E_POS.LocalPrintAgent.Security.LocalApiKeyAuthenticator	Local Print Agent authentication failed for remote address 127.0.0.1; rateLimited=False.
+2026-07-29T09:35:17.4788042+00:00	Information	0	Microsoft.Hosting.Lifetime	Application is shutting down...
+2026-07-29T09:35:17.4796583+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent shutdown started.
+2026-07-29T09:35:17.4856961+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent stopped.
+2026-07-29T09:35:27.1749379+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=2
+2026-07-29T09:35:27.2341837+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-07-29T09:35:27.2349647+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-07-29T09:35:27.2353981+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-07-29T09:35:27.2358961+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent
+2026-07-29T09:40:11.3531935+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=b73a67c7-f262-4a03-a174-b22ad23ec4e3 printer=POSPrinter POS80
+2026-07-29T09:40:11.3873165+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=b73a67c7-f262-4a03-a174-b22ad23ec4e3 printer=POSPrinter POS80
+2026-07-29T09:40:11.5325589+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=b73a67c7-f262-4a03-a174-b22ad23ec4e3 result=printed elapsedMs=163
+2026-07-29T09:40:18.2668958+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=a793245e-e6b3-4307-91cb-7de88b41b48d printer=POSPrinter POS80
+2026-07-29T09:40:18.2717201+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=a793245e-e6b3-4307-91cb-7de88b41b48d printer=POSPrinter POS80
+2026-07-29T09:40:18.3353121+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=a793245e-e6b3-4307-91cb-7de88b41b48d result=printed elapsedMs=62
+2026-07-29T09:40:27.4207032+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=201266e4-c6bd-46c9-9da8-cb9a1fed207e printer=POSPrinter POS80
+2026-07-29T09:40:27.4251817+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=201266e4-c6bd-46c9-9da8-cb9a1fed207e printer=POSPrinter POS80
+2026-07-29T09:40:27.4850282+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=201266e4-c6bd-46c9-9da8-cb9a1fed207e result=printed elapsedMs=59
+2026-07-29T09:44:12.8472050+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=47662f10-aac5-45ca-ae8a-b31083881f75 printer=POSPrinter POS80
+2026-07-29T09:44:12.8541762+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=47662f10-aac5-45ca-ae8a-b31083881f75 printer=POSPrinter POS80
+2026-07-29T09:44:12.9285779+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=47662f10-aac5-45ca-ae8a-b31083881f75 result=printed elapsedMs=75
+2026-07-29T09:49:57.5706098+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=294f9072-babe-41b3-ae7f-dcaed866e8ba printer=POSPrinter POS80
+2026-07-29T09:49:57.5781985+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=294f9072-babe-41b3-ae7f-dcaed866e8ba printer=POSPrinter POS80
+2026-07-29T09:49:57.6526633+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=294f9072-babe-41b3-ae7f-dcaed866e8ba result=printed elapsedMs=76
+2026-07-29T09:52:57.2898908+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=35822109-965a-462a-a8a4-7997f24015d9 printer=POSPrinter POS80
+2026-07-29T09:52:57.2947159+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=35822109-965a-462a-a8a4-7997f24015d9 printer=POSPrinter POS80
+2026-07-29T09:52:57.3796988+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=35822109-965a-462a-a8a4-7997f24015d9 result=printed elapsedMs=83
+2026-07-29T10:03:32.7968806+00:00	Information	0	Microsoft.Hosting.Lifetime	Application is shutting down...
+2026-07-29T10:03:32.7977703+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent shutdown started.
+2026-07-29T10:03:32.8035590+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent stopped.
+2026-07-29T12:23:23.6431971+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=2
+2026-07-29T12:23:23.6932942+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-07-29T12:23:23.6940651+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-07-29T12:23:23.6946200+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-07-29T12:23:23.6952900+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent
+2026-07-29T12:29:27.3979820+00:00	Information	0	Microsoft.Hosting.Lifetime	Application is shutting down...
+2026-07-29T12:29:27.3996229+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent shutdown started.
+2026-07-29T12:29:27.4080493+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent stopped.
+2026-07-29T12:48:03.6162024+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent started. version=1.0.0.0 apiVersion=1 receiptContractVersion=2
+2026-07-29T12:48:04.0345416+00:00	Information	14	Microsoft.Hosting.Lifetime	Now listening on: http://0.0.0.0:9101
+2026-07-29T12:48:04.0353791+00:00	Information	0	Microsoft.Hosting.Lifetime	Application started. Press Ctrl+C to shut down.
+2026-07-29T12:48:04.0359553+00:00	Information	0	Microsoft.Hosting.Lifetime	Hosting environment: Production
+2026-07-29T12:48:04.0364137+00:00	Information	0	Microsoft.Hosting.Lifetime	Content root path: C:\Users\User\Downloads\EPOS\POS Backend\Unified-Commerce\tools\E_POS.LocalPrintAgent
+2026-07-29T12:51:56.0420855+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=85acb63e-ca55-4999-8e12-28a9381983eb printer=POSPrinter POS80
+2026-07-29T12:51:56.0896236+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=85acb63e-ca55-4999-8e12-28a9381983eb printer=POSPrinter POS80
+2026-07-29T12:51:56.2883766+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=85acb63e-ca55-4999-8e12-28a9381983eb result=printed elapsedMs=230
+2026-07-29T12:52:35.0355076+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=32b8c723-cd66-44ca-a48b-2a058d5951a1 printer=POSPrinter POS80
+2026-07-29T12:52:35.0467983+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=32b8c723-cd66-44ca-a48b-2a058d5951a1 printer=POSPrinter POS80
+2026-07-29T12:52:35.1178300+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=32b8c723-cd66-44ca-a48b-2a058d5951a1 result=printed elapsedMs=77
+2026-07-29T12:53:50.8562815+00:00	Information	0	E_POS.LocalPrintAgent	Print request received. requestId=21c99dfd-b415-45d2-a948-a09b7b8951a9 printer=POSPrinter POS80
+2026-07-29T12:53:50.8659613+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission started. requestId=21c99dfd-b415-45d2-a948-a09b7b8951a9 printer=POSPrinter POS80
+2026-07-29T12:53:50.9456638+00:00	Information	0	E_POS.LocalPrintAgent	Spooler submission accepted. requestId=21c99dfd-b415-45d2-a948-a09b7b8951a9 result=printed elapsedMs=78
+2026-07-29T12:57:00.0184069+00:00	Warning	0	E_POS.LocalPrintAgent.Security.LocalApiKeyAuthenticator	Local Print Agent authentication failed for remote address 127.0.0.1; rateLimited=False.
+2026-07-29T12:59:14.8290055+00:00	Warning	0	E_POS.LocalPrintAgent.Security.LocalApiKeyAuthenticator	Local Print Agent authentication failed for remote address 127.0.0.1; rateLimited=False.
+2026-07-29T12:59:45.0381956+00:00	Warning	0	E_POS.LocalPrintAgent.Security.LocalApiKeyAuthenticator	Local Print Agent authentication failed for remote address 127.0.0.1; rateLimited=False.
+2026-07-29T13:03:08.2944332+00:00	Information	0	E_POS.LocalPrintAgent	Drawer pulse submission started. requestId=1ced0ffd-adc0-4af1-973e-3bf5202fb125 operationId=3bb065bb-6913-458b-87f5-19ee1e7bd061 purpose=hardwareTest printer=POSPrinter POS80
+2026-07-29T13:04:41.7086538+00:00	Information	0	E_POS.LocalPrintAgent	Drawer pulse submission started. requestId=61a250a8-3546-4af2-a3ea-d5449d004b53 operationId=afbcd7e2-138f-44e5-94a4-bc26fefa43e5 purpose=hardwareTest printer=POSPrinter POS80
+2026-07-29T13:05:18.7524719+00:00	Information	0	E_POS.LocalPrintAgent	Drawer pulse submission started. requestId=ba5833c0-fc76-4006-a9d1-0ae9668432c4 operationId=5f331bc3-27b3-4411-b6f5-36ef32ba1694 purpose=hardwareTest printer=POSPrinter POS80
+2026-07-29T13:05:50.5086606+00:00	Information	0	E_POS.LocalPrintAgent	Drawer pulse submission started. requestId=96a5d771-4163-44c5-9d48-db5bdf8a71dd operationId=0a7ddd39-a6df-4f86-a9f8-53bb4fe61dbb purpose=hardwareTest printer=POSPrinter POS80
+2026-07-29T13:10:55.4776936+00:00	Information	0	Microsoft.Hosting.Lifetime	Application is shutting down...
+2026-07-29T13:10:55.4785362+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent shutdown started.
+2026-07-29T13:10:55.4867144+00:00	Information	0	E_POS.LocalPrintAgent	E_POS Local Print Agent stopped.

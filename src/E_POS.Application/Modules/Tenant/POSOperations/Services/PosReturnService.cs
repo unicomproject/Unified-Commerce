@@ -5,6 +5,9 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.POSOperations.Access;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
+using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
+using System.Text.Json;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
 
 namespace E_POS.Application.Modules.Tenant.POSOperations.Services;
@@ -32,19 +35,25 @@ public sealed class PosReturnService : IPosReturnService
     private readonly IPosProductCatalogRepository _productCatalogRepository;
     private readonly IReturnInspectionMediaStorage _inspectionMediaStorage;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IPosDrawerService? _drawerService;
+    private readonly IPosDrawerRepository? _drawerRepository;
 
     public PosReturnService(
         IPosReturnRepository repository,
         IPosTillSessionRepository tillSessionRepository,
         IPosProductCatalogRepository productCatalogRepository,
         IReturnInspectionMediaStorage inspectionMediaStorage,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IPosDrawerService? drawerService = null,
+        IPosDrawerRepository? drawerRepository = null)
     {
         _repository = repository;
         _tillSessionRepository = tillSessionRepository;
         _productCatalogRepository = productCatalogRepository;
         _inspectionMediaStorage = inspectionMediaStorage;
         _dateTimeProvider = dateTimeProvider;
+        _drawerService = drawerService;
+        _drawerRepository = drawerRepository;
     }
 
     public async Task<ApplicationResult<PosReturnReceiptDto>> CompleteReturnAsync(
@@ -222,7 +231,38 @@ public sealed class PosReturnService : IPosReturnService
             cancellationToken);
         if (result.Receipt is not null)
         {
-            return ApplicationResult<PosReturnReceiptDto>.Success(result.Receipt);
+            var receipt = result.Receipt;
+            var isCashRefund = string.Equals(settlementCode, "CASH_REFUND", StringComparison.OrdinalIgnoreCase);
+
+            if (isCashRefund && _drawerService != null && _drawerRepository != null)
+            {
+                var registerResult = await _drawerService.RegisterOperationAsync(
+                    context,
+                    new RegisterDrawerOperationRequest(
+                        Guid.NewGuid(),
+                        deviceId.Value,
+                        null,
+                        "cashRefund",
+                        "Cash Refund Open",
+                        "RETURN",
+                        receipt.ReturnId),
+                    cancellationToken);
+
+                if (registerResult.IsSuccess && registerResult.Value is not null)
+                {
+                    var drawerOperationId = registerResult.Value.OperationId;
+                    // Fetch drawer settings to return them via Repository
+                    var cashDrawerSettings = await _drawerRepository.GetActiveDrawerSettingsAsync(
+                        context.TenantId, deviceId.Value, cancellationToken);
+
+                    receipt = receipt with {
+                        DrawerOperationId = drawerOperationId,
+                        CashDrawerSettings = cashDrawerSettings
+                    };
+                }
+            }
+
+            return ApplicationResult<PosReturnReceiptDto>.Success(receipt);
         }
 
         return result.ErrorCode switch

@@ -24,4 +24,9 @@ public static class PosPermissions
     {
         public const string View = "notifications.view";
     }
+
+    public static class Hardware
+    {
+        public const string Settings = "pos.hardware.settings";
+    }
 }

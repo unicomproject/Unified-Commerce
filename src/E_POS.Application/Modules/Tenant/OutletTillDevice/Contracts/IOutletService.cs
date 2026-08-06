@@ -7,7 +7,8 @@ public interface IOutletService
 {
     Task<ApplicationResult<OutletCreateOptionsResponse>> GetCreateOptionsAsync(TenantRequestContext context, CancellationToken cancellationToken);
     Task<ApplicationResult<OutletResponse>> CreateAsync(TenantRequestContext context, OutletCreateRequest request, CancellationToken cancellationToken);
-    Task<ApplicationResult<OutletListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken);
+    Task<ApplicationResult<OutletSummaryDashboardResponse>> GetSummaryAsync(TenantRequestContext context, CancellationToken cancellationToken);
+    Task<ApplicationResult<OutletListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, string? outletType, string? status, string? sortBy, string? sortDirection, CancellationToken cancellationToken);
     Task<ApplicationResult<OutletResponse>> GetByIdAsync(TenantRequestContext context, Guid outletId, CancellationToken cancellationToken);
     Task<ApplicationResult<OutletResponse>> UpdateAsync(TenantRequestContext context, Guid outletId, OutletUpdateRequest request, CancellationToken cancellationToken);
     Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid outletId, CancellationToken cancellationToken);

@@ -38,6 +38,50 @@ public class CustomerAuthAccount : AuditableEntity
         };
     }
 
+    public static CustomerAuthAccount CreateExternal(
+        Guid id,
+        Guid tenantId,
+        Guid customerId,
+        DateTimeOffset now)
+    {
+        return new CustomerAuthAccount
+        {
+            Id = id,
+            TenantId = tenantId,
+            CustomerId = customerId,
+            PasswordHash = null,
+            EmailVerifiedAt = now,
+            Status = "ACTIVE",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    public void MarkEmailVerified(DateTimeOffset now)
+    {
+        EmailVerifiedAt ??= now;
+        if (string.Equals(Status, "DISABLED", StringComparison.OrdinalIgnoreCase))
+        {
+            Status = "ACTIVE";
+        }
+
+        UpdatedAt = now;
+    }
+
+    public void SetPasswordHash(string passwordHash, DateTimeOffset now)
+    {
+        PasswordHash = passwordHash;
+        FailedLoginCount = 0;
+        LastFailedLoginAt = null;
+        LockedUntil = null;
+        LastPasswordChangedAt = now;
+        if (!string.Equals(Status, "DELETED", StringComparison.OrdinalIgnoreCase))
+        {
+            Status = "ACTIVE";
+        }
+
+        UpdatedAt = now;
+    }
     public bool IsLocked(DateTimeOffset now) =>
         string.Equals(Status, "LOCKED", StringComparison.OrdinalIgnoreCase) &&
         (!LockedUntil.HasValue || LockedUntil > now);

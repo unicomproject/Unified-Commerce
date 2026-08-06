@@ -38,6 +38,25 @@ function Stop-ExistingApi {
     Start-Sleep -Seconds 1
 }
 
+function Clear-RunBuildArtifacts {
+    if (-not (Test-Path -LiteralPath $runRoot)) {
+        return
+    }
+
+    Write-Host 'Cleaning run build artifacts...'
+    $resolvedRunRoot = (Resolve-Path -LiteralPath $runRoot).Path
+    Get-ChildItem -LiteralPath $resolvedRunRoot -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+        Where-Object {
+            ($_.Name -eq 'bin' -or $_.Name -eq 'obj') -and
+            $_.FullName.StartsWith($resolvedRunRoot, [StringComparison]::OrdinalIgnoreCase)
+        } |
+        Sort-Object FullName -Descending |
+        ForEach-Object {
+            Get-ChildItem -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue |
+                ForEach-Object { $_.Attributes = 'Normal' }
+            Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+        }
+}
 Write-Host 'Nytroz POS API launcher'
 Write-Host "  Source: $repoRoot"
 Write-Host "  Run at: $runRoot"
@@ -55,6 +74,8 @@ if ($LASTEXITCODE -ge 8) {
 
 Get-ChildItem -Path $runRoot -Recurse -File -ErrorAction SilentlyContinue |
     Unblock-File -ErrorAction SilentlyContinue
+
+Clear-RunBuildArtifacts
 
 if ($SyncOnly) {
     Write-Host 'Sync complete.'

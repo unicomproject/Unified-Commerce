@@ -7,9 +7,14 @@ public sealed record TenantAdminTillListItemResponse(
     Guid OutletId,
     string OutletName,
     string Status,
-    string DeviceStatus,
+    string? DeviceStatus,
     DateTimeOffset? LastActiveAt,
-    bool NeedsAttention);
+    bool NeedsAttention,
+    string OperationalStatus,
+    string DisplayStatus,
+    string? CurrentCashierName,
+    DateTimeOffset? LastDeviceSeenAt,
+    bool HasActiveAssignment);
 
 public sealed record TenantAdminTillListResponse(
     IReadOnlyList<TenantAdminTillListItemResponse> Items,
@@ -56,9 +61,14 @@ public sealed record TenantAdminTillDetailResponse(
     string OutletName,
     string OutletCode,
     string Status,
-    string DeviceStatus,
+    string? DeviceStatus,
     DateTimeOffset? LastActiveAt,
     bool NeedsAttention,
+    string OperationalStatus,
+    string DisplayStatus,
+    string? CurrentCashierName,
+    DateTimeOffset? LastDeviceSeenAt,
+    bool HasActiveAssignment,
     string? DeviceName,
     string? PrinterName,
     string? ScannerName,
@@ -73,3 +83,58 @@ public sealed record TenantAdminOutletOptionResponse(
     string OutletName,
     string OutletCode,
     string Status);
+
+public sealed record TenantAdminTillHardwareReadinessResponse(
+    Guid TillId,
+    string TillName,
+    string TillCode,
+    Guid OutletId,
+    string OutletName,
+    IReadOnlyList<TenantAdminHardwareConnectionResponse> Connections,
+    string TillStatus,
+    string OperationalStatus,
+    TenantAdminTillCashierResponse? Cashier,
+    DateTimeOffset? LastActivityAt,
+    TenantAdminTillPosDeviceResponse? PosDevice,
+    IReadOnlyList<TenantAdminTillAttentionReasonResponse> AttentionReasons,
+    int AlertCount);
+
+public sealed record TenantAdminTillCashierResponse(
+    Guid TenantUserId,
+    string DisplayName);
+
+public sealed record TenantAdminTillPosDeviceResponse(
+    Guid PosDeviceId,
+    string DeviceCode,
+    string DeviceName,
+    string DeviceStatus,
+    bool IsTrusted,
+    DateTimeOffset? LastSeenAt);
+
+public sealed record TenantAdminTillAttentionReasonResponse(
+    string Code,
+    string Severity,
+    string Message,
+    Guid? HardwareDeviceId,
+    string? HardwareType,
+    DateTimeOffset? ObservedAt);
+
+public sealed record TenantAdminHardwareConnectionResponse(
+    Guid HardwareDeviceId,
+    string HardwareDeviceName,
+    string HardwareDeviceType,
+    string HardwareDeviceCode,
+    string OperationalStatus,
+    string ConnectionStatus,
+    string? LastTestStatus,
+    DateTimeOffset? LastTestAt,
+    DateTimeOffset? LastSeenAt,
+    Guid? AssignmentId = null,
+    string? ConnectionType = null,
+    string? Manufacturer = null,
+    string? Model = null,
+    string? HealthStatus = null,
+    string? WarningCode = null,
+    string? WarningMessage = null,
+    bool IsPrimary = false,
+    string? AssignmentSource = null);

@@ -50,6 +50,42 @@ public class Customer : AuditableEntity
         };
     }
 
+    public static Customer CreateECommerceCustomer(
+        Guid id,
+        Guid tenantId,
+        string customerCode,
+        string email,
+        string? firstName,
+        string? lastName,
+        DateTimeOffset now)
+    {
+        var trimmedEmail = email.Trim();
+        var trimmedFirstName = firstName?.Trim();
+        var trimmedLastName = lastName?.Trim();
+        var displayName = $"{trimmedFirstName} {trimmedLastName}".Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = trimmedEmail;
+        }
+
+        return new Customer
+        {
+            Id = id,
+            TenantId = tenantId,
+            CustomerCode = customerCode.Trim().ToUpperInvariant(),
+            Name = displayName,
+            FirstName = string.IsNullOrWhiteSpace(trimmedFirstName) ? null : trimmedFirstName,
+            LastName = string.IsNullOrWhiteSpace(trimmedLastName) ? null : trimmedLastName,
+            Email = trimmedEmail,
+            NormalizedEmail = NormalizeEmail(trimmedEmail),
+            Phone = null,
+            NormalizedPhone = null,
+            SourceType = "ECOMMERCE",
+            Status = "ACTIVE",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
     public static string NormalizePhone(string phone)
     {
         var trimmed = phone.Trim();

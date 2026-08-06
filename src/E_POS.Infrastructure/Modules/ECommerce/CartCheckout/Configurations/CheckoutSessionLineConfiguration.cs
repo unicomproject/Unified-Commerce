@@ -58,6 +58,11 @@ public sealed class CheckoutSessionLineConfiguration : IEntityTypeConfiguration<
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(x => x.LineNote)
+            .HasColumnName("line_note")
+            .HasColumnType("varchar(500)")
+            .HasMaxLength(500);
+
         builder.Property(x => x.Quantity)
             .HasColumnName("quantity")
             .HasColumnType("numeric(18,4)")

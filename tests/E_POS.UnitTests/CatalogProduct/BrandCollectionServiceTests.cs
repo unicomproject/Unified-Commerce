@@ -260,6 +260,26 @@ public sealed class BrandCollectionServiceTests
         {
             return Task.CompletedTask;
         }
+
+        public Task<Collection?> GetByCodeAsync(Guid tenantId, string collectionCode, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Collection?>(null);
+        }
+
+        public Task<IReadOnlyList<CollectionProductResponseDto>> GetCollectionProductsAsync(Guid tenantId, Guid collectionId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<CollectionProductResponseDto>>([]);
+        }
+
+        public Task ReplaceCollectionProductsAsync(Guid tenantId, Guid collectionId, List<Guid> productIds, Guid? userId, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> AllProductsExistAndNotDeletedAsync(Guid tenantId, List<Guid> productIds, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(true);
+        }
     }
 }
 

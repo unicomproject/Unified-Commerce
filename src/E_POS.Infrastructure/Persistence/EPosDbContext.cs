@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Platform.PlatformFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
@@ -130,6 +130,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<HardwareDevice> HardwareDevices => Set<HardwareDevice>();
     public DbSet<HardwareDeviceAssignment> HardwareDeviceAssignments => Set<HardwareDeviceAssignment>();
     public DbSet<HardwareTestLog> HardwareTestLogs => Set<HardwareTestLog>();
+    public DbSet<HardwareConfigurationChangeAudit> HardwareConfigurationChangeAudits => Set<HardwareConfigurationChangeAudit>();
+    public DbSet<CashDrawerOperation> CashDrawerOperations => Set<CashDrawerOperation>();
     public DbSet<TillSession> TillSessions => Set<TillSession>();
 
     // Catalog and Product
@@ -161,6 +163,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<ProductOptionTemplate> ProductOptionTemplates => Set<ProductOptionTemplate>();
     public DbSet<ProductOptionTemplateValue> ProductOptionTemplateValues => Set<ProductOptionTemplateValue>();
     public DbSet<ProductOptionValue> ProductOptionValues => Set<ProductOptionValue>();
+    public DbSet<ProductRecommendationLink> ProductRecommendationLinks => Set<ProductRecommendationLink>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<ProductVariantOptionValue> ProductVariantOptionValues => Set<ProductVariantOptionValue>();
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
@@ -225,7 +228,9 @@ public sealed class EPosDbContext : DbContext
 
     // Customer
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
     public DbSet<CustomerAuthAccount> CustomerAuthAccounts => Set<CustomerAuthAccount>();
+    public DbSet<CustomerExternalAuthAccount> CustomerExternalAuthAccounts => Set<CustomerExternalAuthAccount>();
     public DbSet<CustomerAuthSession> CustomerAuthSessions => Set<CustomerAuthSession>();
     public DbSet<CustomerConsent> CustomerConsents => Set<CustomerConsent>();
     public DbSet<CustomerPasswordResetToken> CustomerPasswordResetTokens => Set<CustomerPasswordResetToken>();

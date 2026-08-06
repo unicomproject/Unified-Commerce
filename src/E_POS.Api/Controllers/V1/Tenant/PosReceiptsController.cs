@@ -23,6 +23,56 @@ public sealed class PosReceiptsController : ControllerBase
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }
 
+    [HttpGet]
+    [ProducesResponseType(typeof(PosReceiptSearchResponseDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Search(
+        [FromQuery] PosReceiptSearchRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "pos_receipts.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _posReceiptService.SearchAsync(context, request, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { data = result.Value })
+            : ToErrorResult(result.Error);
+    }
+
+    [HttpGet("{receiptId:guid}")]
+    [ProducesResponseType(typeof(PosReceiptDetailDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDetail(
+        Guid receiptId,
+        CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "pos_receipts.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _posReceiptService.GetDetailAsync(context, receiptId, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { data = result.Value })
+            : ToErrorResult(result.Error);
+    }
+
+    [HttpPost("{receiptId:guid}/reprint/authorize")]
+    [ProducesResponseType(typeof(PosReceiptReprintAuthorizationResponseDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> AuthorizeReprint(
+        Guid receiptId,
+        [FromBody] PosReceiptReprintAuthorizationRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "pos_receipts.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _posReceiptService.AuthorizeReprintAsync(
+            context, receiptId, request, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { data = result.Value })
+            : ToErrorResult(result.Error);
+    }
+
     [HttpPost("{saleId:guid}/print")]
     [ProducesResponseType(typeof(PosReceiptPrintResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -59,11 +109,22 @@ public sealed class PosReceiptsController : ControllerBase
         return error.Code switch
         {
             "pos_receipts.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+            "pos_receipts.reprint_permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "pos_receipts.receipt_not_found" => NotFound(CreateError(error)),
             "pos_receipts.receipt_not_completed" => UnprocessableEntity(CreateError(error)),
+            "pos_receipts.reprint_not_allowed" => UnprocessableEntity(CreateError(error)),
+            "pos_receipts.reprint_not_authorized" => UnprocessableEntity(CreateError(error)),
+            "pos_receipts.duplicate_reprint_operation" => Conflict(CreateError(error)),
             "pos_receipts.invalid_sale_id" or
             "pos_receipts.invalid_copies" or
-            "pos_receipts.invalid_print_status"
+            "pos_receipts.invalid_print_status" or
+            "pos_receipts.invalid_receipt_id" or
+            "pos_receipts.invalid_search" or
+            "pos_receipts.invalid_reprint_reason" or
+            "pos_receipts.invalid_reprint_audit"
+            or "pos_receipts.invalid_receipt_purpose"
+            or "pos_receipts.invalid_printer_configuration"
+            or "pos_receipts.invalid_copy_identity"
                 => BadRequest(CreateError(error)),
             "pos_receipts.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))

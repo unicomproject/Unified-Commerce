@@ -343,7 +343,7 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
     {
         var items = await _dbContext.Set<ShoppingCartItem>().AsNoTracking()
             .Where(x => x.TenantId == cart.TenantId && x.ShoppingCartId == cart.Id && x.LineStatus == Active)
-            .OrderBy(x => x.LineNumber)
+            .OrderByDescending(x => x.LineNumber)
             .ToListAsync(cancellationToken);
         var productIds = items.Select(x => x.ProductId).Distinct().ToList();
         var variantIds = items.Where(x => x.ProductVariantId.HasValue)

@@ -10,7 +10,8 @@ public interface IPosProductCatalogService
         Guid? deviceId,
         Guid? categoryId,
         string? search,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? segment = null);
 
     Task<ApplicationResult<IReadOnlyList<PosCatalogCategoryResponseDto>>> ListCategoriesAsync(
         TenantRequestContext context,
@@ -28,4 +29,10 @@ public interface IPosProductCatalogService
         Guid? deviceId,
         string? barcode,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>> GetRecommendationsAsync(
+        TenantRequestContext context, Guid? deviceId, Guid productId, Guid? sourceVariantId,
+        string? type, int limit, CancellationToken cancellationToken) =>
+        Task.FromResult(ApplicationResult<IReadOnlyList<PosProductRecommendationResponseDto>>.Success(
+            Array.Empty<PosProductRecommendationResponseDto>()));
 }

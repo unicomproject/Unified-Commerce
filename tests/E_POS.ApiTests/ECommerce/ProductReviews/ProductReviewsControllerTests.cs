@@ -170,6 +170,10 @@ public sealed class ProductReviewsControllerTests
             ApplicationResult<ProductReviewsPageReadModel>.Success(new ProductReviewsPageReadModel());
         public ApplicationResult<ProductReviewItemReadModel> CreateResult { get; init; } =
             ApplicationResult<ProductReviewItemReadModel>.Success(new ProductReviewItemReadModel());
+        public ApplicationResult<CustomerReviewsPageReadModel> CustomerReviewsResult { get; init; } =
+            ApplicationResult<CustomerReviewsPageReadModel>.Success(new CustomerReviewsPageReadModel());
+        public ApplicationResult<EligibleReviewsPageReadModel> EligibleReviewsResult { get; init; } =
+            ApplicationResult<EligibleReviewsPageReadModel>.Success(new EligibleReviewsPageReadModel());
         public ApplicationResult<ProductReviewItemReadModel> UpdateResult { get; init; } =
             ApplicationResult<ProductReviewItemReadModel>.Success(new ProductReviewItemReadModel());
         public ApplicationResult DeleteResult { get; init; } = ApplicationResult.Success();
@@ -183,16 +187,37 @@ public sealed class ProductReviewsControllerTests
         public CreateProductReviewRequest? CreateRequest { get; private set; }
 
         public Task<ApplicationResult<ProductReviewsPageReadModel>> GetAsync(
-            Guid tenantId, Guid productId, int page, int pageSize, string? sort,
+            Guid tenantId, Guid? customerId, Guid productId, int page, int pageSize, string? sort,
             CancellationToken cancellationToken)
         {
-            Capture(tenantId, null, productId);
+            Capture(tenantId, customerId, productId);
             Page = page;
             PageSize = pageSize;
             Sort = sort;
             return Task.FromResult(GetResult);
         }
 
+
+        public Task<ApplicationResult<CustomerReviewsPageReadModel>> GetCustomerReviewsAsync(
+            Guid tenantId, Guid customerId, int page, int pageSize, string sort,
+            CancellationToken cancellationToken)
+        {
+            Capture(tenantId, customerId, Guid.Empty);
+            Page = page;
+            PageSize = pageSize;
+            Sort = sort;
+            return Task.FromResult(CustomerReviewsResult);
+        }
+
+        public Task<ApplicationResult<EligibleReviewsPageReadModel>> GetEligibleProductsForReviewAsync(
+            Guid tenantId, Guid customerId, int page, int pageSize,
+            CancellationToken cancellationToken)
+        {
+            Capture(tenantId, customerId, Guid.Empty);
+            Page = page;
+            PageSize = pageSize;
+            return Task.FromResult(EligibleReviewsResult);
+        }
         public Task<ApplicationResult<ProductReviewItemReadModel>> CreateAsync(
             Guid tenantId, Guid customerId, Guid productId,
             CreateProductReviewRequest request, CancellationToken cancellationToken)

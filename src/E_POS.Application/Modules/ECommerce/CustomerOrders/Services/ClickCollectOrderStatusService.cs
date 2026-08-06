@@ -2,6 +2,9 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Notifications;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
+using E_POS.Application.Modules.Shared.Notification.Services;
 
 namespace E_POS.Application.Modules.ECommerce.CustomerOrders.Services;
 
@@ -10,13 +13,22 @@ public sealed class ClickCollectOrderStatusService : IClickCollectOrderStatusSer
     private const string ManageFulfillmentOrdersPermission = "fulfillment.orders.manage";
 
     private readonly IClickCollectOrderStatusRepository _repository;
+    private readonly INotificationService _notificationService;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public ClickCollectOrderStatusService(
         IClickCollectOrderStatusRepository repository,
         IDateTimeProvider dateTimeProvider)
+        : this(repository, NoopNotificationService.Instance, dateTimeProvider)
+    {
+    }
+    public ClickCollectOrderStatusService(
+        IClickCollectOrderStatusRepository repository,
+        INotificationService notificationService,
+        IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
+        _notificationService = notificationService;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -54,9 +66,25 @@ public sealed class ClickCollectOrderStatusService : IClickCollectOrderStatusSer
             _dateTimeProvider.UtcNow,
             cancellationToken);
 
-        return result.IsSuccess
-            ? ApplicationResult<ClickCollectOrderStatusUpdateResponse>.Success(result.Response!)
-            : Failure(result.ErrorCode!, result.ErrorMessage ?? MapErrorMessage(result.ErrorCode!));
+        if (!result.IsSuccess)
+        {
+            return Failure(result.ErrorCode!, result.ErrorMessage ?? MapErrorMessage(result.ErrorCode!));
+        }
+
+        if (result.NotificationContext is not null)
+        {
+            await _notificationService.CreateAsync(
+                ECommerceOrderNotificationFactory.OrderStatusChanged(
+                    result.NotificationContext.TenantId,
+                    result.NotificationContext.CustomerId,
+                    result.NotificationContext.OrderId,
+                    result.NotificationContext.OrderNumber,
+                    result.Response!.Status,
+                    context.UserId),
+                cancellationToken);
+        }
+
+        return ApplicationResult<ClickCollectOrderStatusUpdateResponse>.Success(result.Response!);
     }
 
     private static bool TryNormalizeStatus(string? status, out string targetStatus)

@@ -4,27 +4,34 @@ using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
+using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.AccessControl.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Tenant.Payment.Contracts;
 using E_POS.Application.Modules.Shared.Media.Contracts;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Infrastructure.Common;
 using E_POS.Infrastructure.Common.Security;
+using E_POS.Infrastructure.Integrations.Google;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
+using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services;
 using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Application.Common.Email;
 using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
@@ -49,10 +56,13 @@ using E_POS.Application.Modules.ECommerce.Customer.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Options;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Repositories;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Services;
+using E_POS.Infrastructure.Modules.ECommerce.Storefront.Services.Autocomplete;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerOrders.Repositories;
@@ -66,6 +76,7 @@ using E_POS.Application.Modules.Shared.Storage.Contracts;
 using E_POS.Infrastructure.Modules.Shared.Storage.Services;
 using E_POS.Infrastructure.Modules.Shared.Media.Options;
 using E_POS.Infrastructure.Modules.Shared.Media.Services;
+using E_POS.Infrastructure.Modules.Shared.Notification.Repositories;
 
 
 namespace E_POS.Infrastructure;
@@ -80,12 +91,13 @@ public static class DependencyInjection
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.Configure<TenantJwtOptions>(configuration.GetSection(TenantJwtOptions.SectionName));
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
+        services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
         services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
-        services.Configure<AzureBlobStorageOptions>(
-            configuration.GetSection(AzureBlobStorageOptions.SectionName));
+        services.Configure<E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions>(
+            configuration.GetSection(E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions.SectionName));
         services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
@@ -107,6 +119,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenFactory, JwtTokenFactory>();
         services.AddScoped<IRefreshTokenGenerator, RefreshTokenGenerator>();
         services.AddScoped<ITokenHashService, TokenHashService>();
+        services.AddScoped<IGoogleIdentityVerifier, GoogleIdentityVerifier>();
         services.AddScoped<IAuthSessionValidator, AuthSessionValidator>();
         services.AddScoped<IPlatformPermissionRepository, PlatformPermissionRepository>();
         services.AddScoped<IPlatformAuthRepository, PlatformAuthRepository>();
@@ -136,6 +149,15 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(AzureCommunicationEmailOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<IApplicationEmailSender, AzureCommunicationEmailSender>();
+        services.AddScoped<ICustomerPasswordResetLinkBuilder, CustomerPasswordResetLinkBuilder>();
+        services.AddScoped(static provider =>
+        {
+            var configuration = provider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var section = configuration.GetSection("CustomerPasswordReset");
+            return new CustomerPasswordResetSettings(
+                section["PublicStorefrontBaseUrl"] ?? "http://localhost:4200",
+                section["ResetPath"] ?? "/reset-password");
+        });
         services.AddScoped<IPlatformPasswordResetDeliveryService, AcsPlatformPasswordResetDeliveryService>();
         services.AddScoped(static provider =>
         {
@@ -167,6 +189,8 @@ public static class DependencyInjection
         services.AddScoped<IOutletAuditLogger, OutletAuditLogger>();
         services.AddScoped<ITenantAdminOutletRepository, TenantAdminOutletRepository>();
         services.AddScoped<ITenantAdminTillRepository, TenantAdminTillRepository>();
+        services.AddScoped<ITenantAdminHardwareRepository, TenantAdminHardwareRepository>();
+        services.AddScoped<ITenantAdminHardwareAuditLogger, TenantAdminHardwareAuditLogger>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();
@@ -182,6 +206,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
+        services.AddScoped<ICardPaymentGateway, UnavailableCardPaymentGateway>();
         services.AddScoped<IPosSaleLinePricingCalculator, PosSaleLinePricingCalculator>();
         services.AddScoped<IPosReceiptRepository, PosReceiptRepository>();
         services.AddScoped<IPosReturnRepository, PosReturnRepository>();
@@ -191,8 +216,11 @@ public static class DependencyInjection
         services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
+        services.AddScoped<IPosHardwareRepository, PosHardwareRepository>();
+        services.AddScoped<IPosDrawerRepository, PosDrawerRepository>();
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
         services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
@@ -217,15 +245,40 @@ public static class DependencyInjection
         // ECommerce Storefront
         services.AddScoped<IStorefrontBannerRepository, StorefrontBannerRepository>();
         services.AddScoped<IStorefrontCategoryRepository, StorefrontCategoryRepository>();
-        services.AddScoped<IStorefrontProductRepository, StorefrontProductRepository>();
+        services.AddScoped<IStorefrontProductListingRepository, StorefrontProductListingRepository>();
+        services.AddScoped<IStorefrontProductDetailRepository, StorefrontProductDetailRepository>();
+        services.AddScoped<IStorefrontProductSearchRepository, StorefrontProductSearchRepository>();
+        services.AddScoped<IStorefrontProductBestSellerRepository, StorefrontProductBestSellerRepository>();
+        services.AddScoped<IStorefrontProductRepository>(provider => new StorefrontProductRepository(
+            provider.GetRequiredService<IStorefrontProductListingRepository>(),
+            provider.GetRequiredService<IStorefrontProductDetailRepository>(),
+            provider.GetRequiredService<IStorefrontProductSearchRepository>(),
+            provider.GetRequiredService<IStorefrontProductBestSellerRepository>()));
         services.AddScoped<IStorefrontFulfillmentRepository, StorefrontFulfillmentRepository>();
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
         services.AddScoped<IStorefrontCartRepository, StorefrontCartRepository>();
-        services.AddScoped<IStorefrontCheckoutRepository, StorefrontCheckoutRepository>();
-        services.AddScoped<ICustomerAuthRepository, CustomerAuthRepository>();
+        services.AddScoped<IStorefrontCheckoutSessionRepository, StorefrontCheckoutSessionRepository>();
+        services.AddScoped<IStorefrontCheckoutConfirmationRepository, StorefrontCheckoutConfirmationRepository>();
+        services.AddScoped<IStorefrontCheckoutRepository>(provider => new StorefrontCheckoutRepository(
+            provider.GetRequiredService<IStorefrontCheckoutSessionRepository>(),
+            provider.GetRequiredService<IStorefrontCheckoutConfirmationRepository>()));
+        services.AddSingleton<IStorefrontAutocompleteService, StorefrontAutocompleteService>();
+        services.AddHostedService<AutocompleteInitializationHostedService>();
+        services.AddScoped<ICustomerRegistrationRepository, CustomerRegistrationRepository>();
+        services.AddScoped<ICustomerEmailVerificationRepository, CustomerEmailVerificationRepository>();
+        services.AddScoped<ICustomerPasswordResetRepository, CustomerPasswordResetRepository>();
+        services.AddScoped<ICustomerLoginRepository, CustomerLoginRepository>();
+        services.AddScoped<ICustomerExternalAuthRepository, CustomerExternalAuthRepository>();
+        services.AddScoped<ICustomerSessionRepository, CustomerSessionRepository>();
+        services.AddScoped<ICustomerProfileRepository, CustomerProfileRepository>();
+        services.AddScoped<ICustomerAddressRepository, CustomerAddressRepository>();
         services.AddScoped<ICustomerWishlistRepository, CustomerWishlistRepository>();
-        services.AddScoped<ICustomerOrderRepository, CustomerOrderRepository>();
+        services.AddScoped<ICustomerOrderReadRepository, CustomerOrderReadRepository>();
+        services.AddScoped<ICustomerOrderCancelRepository, CustomerOrderCancelRepository>();
+        services.AddScoped<ICustomerOrderRepository>(provider => new CustomerOrderRepository(
+            provider.GetRequiredService<ICustomerOrderReadRepository>(),
+            provider.GetRequiredService<ICustomerOrderCancelRepository>()));
         services.AddScoped<IClickCollectOrderStatusRepository, ClickCollectOrderStatusRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
 

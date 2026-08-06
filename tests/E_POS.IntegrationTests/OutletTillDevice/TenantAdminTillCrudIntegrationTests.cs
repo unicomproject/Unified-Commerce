@@ -1,6 +1,7 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Options;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
@@ -103,9 +104,23 @@ public sealed class TenantAdminTillCrudIntegrationTests
 
     private static TenantAdminTillService CreateService(EPosDbContext dbContext, DateTimeOffset now)
     {
+        var options = new FakeTillMonitoringOptionsSnapshot(new TillMonitoringOptions { HeartbeatTimeoutSeconds = 300 });
+        var dateTimeProvider = new FakeDateTimeProvider(now);
         return new TenantAdminTillService(
-            new TenantAdminTillRepository(dbContext),
-            new FakeDateTimeProvider(now));
+            new TenantAdminTillRepository(dbContext, options, dateTimeProvider),
+            dateTimeProvider,
+            options);
+    }
+
+    private sealed class FakeTillMonitoringOptionsSnapshot : Microsoft.Extensions.Options.IOptionsSnapshot<TillMonitoringOptions>
+    {
+        public FakeTillMonitoringOptionsSnapshot(TillMonitoringOptions value)
+        {
+            Value = value;
+        }
+
+        public TillMonitoringOptions Value { get; }
+        public TillMonitoringOptions Get(string? name) => Value;
     }
 
     private static TenantRequestContext CreateContext(Guid tenantId)

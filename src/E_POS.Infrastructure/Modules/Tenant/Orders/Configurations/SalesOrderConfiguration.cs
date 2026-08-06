@@ -355,9 +355,9 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
             t.HasCheckConstraint("ck_sales_orders_paid_amount", "paid_amount >= 0");
             t.HasCheckConstraint("ck_sales_orders_refunded_amount", "refunded_amount >= 0");
             t.HasCheckConstraint("ck_sales_orders_order_type", "order_type IN ('POS_SALE', 'CLICK_AND_COLLECT', 'EXCHANGE_ORDER', 'MANUAL_ORDER')");
-            t.HasCheckConstraint("ck_sales_orders_order_status", "order_status IN ('DRAFT', 'PLACED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'VOIDED')");
+            t.HasCheckConstraint("ck_sales_orders_order_status", "order_status IN ('DRAFT', 'PLACED', 'CONFIRMED', 'ACCEPTED', 'COMPLETED', 'CANCELLED', 'VOIDED')");
             t.HasCheckConstraint("ck_sales_orders_payment_status", "payment_status IN ('UNPAID', 'PARTIALLY_PAID', 'PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'FAILED')");
-            t.HasCheckConstraint("ck_sales_orders_fulfillment_status", "fulfillment_status IN ('NOT_REQUIRED', 'PENDING', 'READY_FOR_PICKUP', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CANCELLED')");
+            t.HasCheckConstraint("ck_sales_orders_fulfillment_status", "fulfillment_status IN ('NOT_REQUIRED', 'PENDING', 'ACCEPTED', 'PREPARING', 'READY', 'READY_FOR_PICKUP', 'READY_FOR_COLLECTION', 'PARTIALLY_FULFILLED', 'FULFILLED', 'COLLECTED', 'CANCELLED')");
         });
     }
 }

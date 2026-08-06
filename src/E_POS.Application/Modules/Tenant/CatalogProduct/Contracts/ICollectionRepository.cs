@@ -12,5 +12,10 @@ public interface ICollectionRepository
     Task<Collection?> GetEditableAsync(Guid tenantId, Guid collectionId, CancellationToken cancellationToken);
     Task AddAsync(Collection collection, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
+    Task<Collection?> GetByCodeAsync(Guid tenantId, string collectionCode, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CollectionProductResponseDto>> GetCollectionProductsAsync(Guid tenantId, Guid collectionId, CancellationToken cancellationToken);
+    Task ReplaceCollectionProductsAsync(Guid tenantId, Guid collectionId, List<Guid> productIds, Guid? userId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<bool> AllProductsExistAndNotDeletedAsync(Guid tenantId, List<Guid> productIds, CancellationToken cancellationToken);
 }
+
 
