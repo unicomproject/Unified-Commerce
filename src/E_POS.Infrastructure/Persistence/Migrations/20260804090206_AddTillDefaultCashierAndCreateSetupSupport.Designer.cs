@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260804090206_AddTillDefaultCashierAndCreateSetupSupport")]
+    partial class AddTillDefaultCashierAndCreateSetupSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -8710,12 +8713,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<bool>("IsPrimaryManager")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_primary_manager");
-
                     b.Property<Guid>("OutletId")
                         .HasColumnType("uuid")
                         .HasColumnName("outlet_id");
@@ -8752,11 +8749,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantRoleId");
 
                     b.HasIndex("TenantUserId");
-
-                    b.HasIndex("TenantId", "OutletId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_outlet_user_roles_tenant_outlet_primary_manager")
-                        .HasFilter("is_primary_manager = true AND revoked_at IS NULL");
 
                     b.HasIndex("TenantId", "OutletId", "TenantUserId", "TenantRoleId")
                         .IsUnique()
@@ -19087,10 +19079,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_default_outlet");
 
-                    b.Property<Guid?>("MediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("media_asset_id");
-
                     b.Property<string>("OutletCode")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -19153,9 +19141,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "Id")
                         .IsUnique()
                         .HasDatabaseName("uq_outlets_tenant_id_id");
-
-                    b.HasIndex("TenantId", "MediaAssetId")
-                        .HasDatabaseName("ix_outlets_tenant_id_media_asset_id");
 
                     b.HasIndex("TenantId", "OutletCode")
                         .IsUnique()
@@ -29209,13 +29194,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedByTenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outlets_updated_by_tenant_user_id_tenant_users");
-
-                    b.HasOne("E_POS.Domain.Modules.Shared.Media.Entities.MediaAsset", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "MediaAssetId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_outlets_media_asset_tenant");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.OutletAddress", b =>

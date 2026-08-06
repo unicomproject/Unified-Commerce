@@ -29,11 +29,19 @@ public sealed record TenantAdminTillSummaryResponse(
     int InactiveTills,
     int NeedsAttentionTills);
 
+public sealed record TenantAdminTillHardwareSelectionRequest(
+    Guid HardwareDeviceId,
+    bool IsPrimary = false);
+
 public sealed record TenantAdminTillCreateRequest(
     string TillName,
     string TillCode,
     Guid OutletId,
     string Status,
+    decimal DefaultOpeningFloatAmount = 0m,
+    Guid? DefaultCashierTenantUserId = null,
+    Guid? PosDeviceId = null,
+    IReadOnlyList<TenantAdminTillHardwareSelectionRequest>? HardwareAssignments = null,
     string? DeviceName = null,
     string? PrinterName = null,
     string? ScannerName = null,
@@ -75,8 +83,36 @@ public sealed record TenantAdminTillDetailResponse(
     string? CashDrawerName,
     string? CardReaderName,
     string? InternalNote,
+    decimal DefaultOpeningFloatAmount,
+    string CurrencyCode,
+    TenantAdminTillCashierResponse? DefaultCashier,
+    TenantAdminTillPosDeviceResponse? PosDevice,
+    IReadOnlyList<TenantAdminHardwareConnectionResponse>? HardwareAssignments,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+public sealed record TenantAdminTillCreateOptionsResponse(
+    IReadOnlyList<TenantAdminOutletOptionResponse> Outlets,
+    IReadOnlyList<TenantAdminTillCashierOptionResponse> Cashiers,
+    IReadOnlyList<TenantAdminTillPosDeviceOptionResponse> PosDevices,
+    IReadOnlyList<TenantAdminTillHardwareOptionResponse> HardwareDevices,
+    IReadOnlyList<string> Statuses,
+    string CurrencyCode);
+
+public sealed record TenantAdminTillCashierOptionResponse(
+    Guid TenantUserId,
+    string DisplayName);
+
+public sealed record TenantAdminTillPosDeviceOptionResponse(
+    Guid PosDeviceId,
+    string DeviceCode,
+    string DeviceName);
+
+public sealed record TenantAdminTillHardwareOptionResponse(
+    Guid HardwareDeviceId,
+    string HardwareDeviceCode,
+    string HardwareDeviceName,
+    string HardwareType);
 
 public sealed record TenantAdminOutletOptionResponse(
     Guid OutletId,

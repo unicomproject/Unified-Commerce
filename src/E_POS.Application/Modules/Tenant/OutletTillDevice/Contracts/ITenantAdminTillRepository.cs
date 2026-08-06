@@ -77,11 +77,17 @@ public interface ITenantAdminTillRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
+    Task<TenantAdminTillCreateOptionsResponse> GetCreateOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<TillHardwareReadinessReadModel>> GetHardwareReadinessDataAsync(
         Guid tenantId,
         Guid tillId,
         Guid? activePosDeviceId,
         CancellationToken cancellationToken);
+
+    Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken);
 }
 
 public sealed record TillMonitoringReadModel(

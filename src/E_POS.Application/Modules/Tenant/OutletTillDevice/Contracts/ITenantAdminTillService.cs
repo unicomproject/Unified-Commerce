@@ -45,6 +45,10 @@ public interface ITenantAdminTillService
         TenantRequestContext context,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<TenantAdminTillCreateOptionsResponse>> GetCreateOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<TenantAdminTillHardwareReadinessResponse>> GetHardwareReadinessAsync(
         TenantRequestContext context,
         Guid tillId,

@@ -81,10 +81,7 @@ public static class TenantPermissionSeedSqlBuilder
                 now()
             FROM permission_definitions
             WHERE permission_definitions.permission_code IN ({{FormatPermissionCodeInList(permissionCodes)}})
-            ON CONFLICT (tenant_id, role_id, permission_id) DO UPDATE
-            SET revoked_at = NULL,
-                revoked_by_tenant_user_id = NULL,
-                notes = EXCLUDED.notes;
+            ON CONFLICT DO NOTHING;
             """;
     }
 

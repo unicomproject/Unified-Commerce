@@ -469,6 +469,12 @@ public sealed class OutletServiceTests
         {
             CreatedCount++;
         }
+
+        public void LogManagerAssigned(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid assignedTenantUserId) { }
+        public void LogManagerRemoved(Guid tenantId, Guid actorTenantUserId, Guid outletId) { }
+        public void LogImageAssociated(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid mediaAssetId) { }
+        public void LogImageRemoved(Guid tenantId, Guid actorTenantUserId, Guid outletId) { }
+        public void LogStatusChanged(Guid tenantId, Guid actorTenantUserId, Guid outletId, string status) { }
     }
 
     private sealed class FakeOutletRepository : IOutletRepository

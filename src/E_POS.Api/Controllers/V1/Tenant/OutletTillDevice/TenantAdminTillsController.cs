@@ -71,6 +71,21 @@ public sealed class TenantAdminTillsController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpGet("create-options")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCreateOptions(CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "till.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminTillService.GetCreateOptionsAsync(context, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     public async Task<IActionResult> Create(

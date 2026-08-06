@@ -12,6 +12,7 @@ public class OutletUserRole : AuditableEntity
     public Guid? RevokedByTenantUserId { get; protected set; }
     public DateTimeOffset? AssignedAt { get; protected set; }
     public DateTimeOffset? RevokedAt { get; protected set; }
+    public bool IsPrimaryManager { get; protected set; }
 
     public static OutletUserRole Create(
         Guid id,
@@ -20,7 +21,8 @@ public class OutletUserRole : AuditableEntity
         Guid tenantUserId,
         Guid tenantRoleId,
         Guid? assignedByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool isPrimaryManager = false)
     {
         return new OutletUserRole
         {
@@ -31,15 +33,23 @@ public class OutletUserRole : AuditableEntity
             TenantRoleId = tenantRoleId,
             AssignedByTenantUserId = assignedByTenantUserId,
             AssignedAt = now,
+            IsPrimaryManager = isPrimaryManager,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public void SetPrimaryManager(bool isPrimaryManager, DateTimeOffset now)
+    {
+        IsPrimaryManager = isPrimaryManager;
+        UpdatedAt = now;
     }
 
     public void Revoke(Guid revokedByTenantUserId, DateTimeOffset now)
     {
         RevokedByTenantUserId = revokedByTenantUserId;
         RevokedAt = now;
+        IsPrimaryManager = false;
         UpdatedAt = now;
     }
 }

@@ -8,6 +8,7 @@ using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Xunit;
 
 namespace E_POS.IntegrationTests.OutletTillDevice;
@@ -98,6 +99,7 @@ public sealed class TenantAdminTillCrudIntegrationTests
     {
         var options = new DbContextOptionsBuilder<EPosDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(x => x.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
         return new EPosDbContext(options);
     }
@@ -108,6 +110,8 @@ public sealed class TenantAdminTillCrudIntegrationTests
         var dateTimeProvider = new FakeDateTimeProvider(now);
         return new TenantAdminTillService(
             new TenantAdminTillRepository(dbContext, options, dateTimeProvider),
+            new E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories.TenantAdminHardwareRepository(dbContext),
+            new TillDeviceAssignmentRepository(dbContext),
             dateTimeProvider,
             options);
     }
@@ -146,6 +150,10 @@ public sealed class TenantAdminTillCrudIntegrationTests
             tillCode,
             outletId,
             TillConstants.ActiveStatus,
+            0m,
+            null,
+            null,
+            null,
             deviceName,
             printerName,
             scannerName,

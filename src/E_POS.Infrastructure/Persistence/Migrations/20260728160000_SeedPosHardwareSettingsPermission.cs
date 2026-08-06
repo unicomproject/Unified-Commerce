@@ -17,9 +17,9 @@ public sealed class SeedPosHardwareSettingsPermission : Migration
     {
         migrationBuilder.Sql(
             DevelopmentPosHardwareSettingsPermissionSeedData.UpSql);
-        migrationBuilder.Sql(
-            DevelopmentPosHardwareSettingsPermissionSeedData
-                .CashierAssignmentUpSql);
+        // migrationBuilder.Sql(
+        //     DevelopmentPosHardwareSettingsPermissionSeedData
+        //         .CashierAssignmentUpSql);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)

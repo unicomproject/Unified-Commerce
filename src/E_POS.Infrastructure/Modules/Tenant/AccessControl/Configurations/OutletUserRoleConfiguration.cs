@@ -59,6 +59,11 @@ public sealed class OutletUserRoleConfiguration : IEntityTypeConfiguration<Outle
             .HasColumnType("timestamp with time zone")
             .IsRequired(false);
 
+        builder.Property(x => x.IsPrimaryManager)
+            .HasColumnName("is_primary_manager")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -98,5 +103,10 @@ public sealed class OutletUserRoleConfiguration : IEntityTypeConfiguration<Outle
         builder.HasIndex(x => new { x.TenantId, x.OutletId, x.TenantUserId, x.TenantRoleId })
             .IsUnique()
             .HasDatabaseName("uq_outlet_user_roles_tenant_outlet_user_role");
+
+        builder.HasIndex(x => new { x.TenantId, x.OutletId })
+            .IsUnique()
+            .HasDatabaseName("uq_outlet_user_roles_tenant_outlet_primary_manager")
+            .HasFilter("is_primary_manager = true AND revoked_at IS NULL");
     }
 }

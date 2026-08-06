@@ -9,4 +9,32 @@ public interface IOutletAuditLogger
         string outletCode,
         string outletType,
         string status);
+
+    void LogManagerAssigned(
+        Guid tenantId,
+        Guid actorTenantUserId,
+        Guid outletId,
+        Guid managerTenantUserId);
+
+    void LogManagerRemoved(
+        Guid tenantId,
+        Guid actorTenantUserId,
+        Guid outletId);
+
+    void LogImageAssociated(
+        Guid tenantId,
+        Guid actorTenantUserId,
+        Guid outletId,
+        Guid mediaAssetId);
+
+    void LogImageRemoved(
+        Guid tenantId,
+        Guid actorTenantUserId,
+        Guid outletId);
+
+    void LogStatusChanged(
+        Guid tenantId,
+        Guid actorTenantUserId,
+        Guid outletId,
+        string status);
 }

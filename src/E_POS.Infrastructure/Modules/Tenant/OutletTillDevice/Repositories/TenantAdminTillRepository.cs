@@ -274,7 +274,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                   hw.Status != "DELETED" &&
                   (
                       assignment.TillId == tillId ||
-                      (activePosDeviceId.HasValue && assignment.PosDeviceId == activePosDeviceId.Value)
+                      (activePosDeviceId != null && assignment.PosDeviceId == activePosDeviceId)
                   )
             select new { Hardware = hw, Assignment = assignment }
         ).ToListAsync(cancellationToken);
@@ -413,6 +413,49 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<TenantAdminTillCreateOptionsResponse> GetCreateOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var outlets = await GetOutletOptionsAsync(tenantId, cancellationToken);
+        
+        var statuses = new List<string> { TillConstants.ActiveStatus, TillConstants.InactiveStatus, TillConstants.MaintenanceStatus };
+        
+        var tenant = await _dbContext.Tenants
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == tenantId, cancellationToken);
+        var currencyCode = tenant?.BaseCurrencyCode ?? TillConstants.DefaultCurrencyCode;
+
+        var cashiers = await _dbContext.TenantUsers
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.AccountStatus == "ACTIVE")
+            .OrderBy(x => string.IsNullOrWhiteSpace(x.DisplayName) ? x.FullName : x.DisplayName)
+            .Select(x => new TenantAdminTillCashierOptionResponse(x.Id, string.IsNullOrWhiteSpace(x.DisplayName) ? x.FullName : x.DisplayName!))
+            .ToListAsync(cancellationToken);
+
+        var posDevices = await _dbContext.PosDevices
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status == PosDeviceConstants.ActiveStatus)
+            .OrderBy(x => x.DeviceName)
+            .Select(x => new TenantAdminTillPosDeviceOptionResponse(x.Id, x.DeviceCode, x.DeviceName))
+            .ToListAsync(cancellationToken);
+
+        var hardwareDevices = await _dbContext.HardwareDevices
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status == "ACTIVE")
+            .OrderBy(x => x.HardwareDeviceName)
+            .Select(x => new TenantAdminTillHardwareOptionResponse(x.Id, x.HardwareDeviceCode, x.HardwareDeviceName, x.HardwareDeviceType))
+            .ToListAsync(cancellationToken);
+
+        return new TenantAdminTillCreateOptionsResponse(
+            outlets,
+            cashiers,
+            posDevices,
+            hardwareDevices,
+            statuses,
+            currencyCode);
+    }
+
     private sealed class TillMonitoringProjection
     {
         public Till Till { get; set; } = null!;
@@ -453,5 +496,16 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                    ActiveSession = activeSession,
                    CashierUser = cashierUser
                };
+    }
+
+    public async Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken)
+    {
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await operation();
+            await transaction.CommitAsync(cancellationToken);
+        });
     }
 }

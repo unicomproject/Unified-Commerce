@@ -114,6 +114,11 @@ public sealed class TenantAdminTillsControllerTests
             null,
             null,
             null,
+            0m,
+            "USD",
+            null,
+            null,
+            null,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow);
     }
@@ -128,6 +133,13 @@ public sealed class TenantAdminTillsControllerTests
         public ApplicationResult<TenantAdminTillDetailResponse> CreateResult { get; }
         public TenantRequestContext? CreateContext { get; private set; }
         public TenantAdminTillCreateRequest? CreateRequest { get; private set; }
+
+        public Task<ApplicationResult<TenantAdminTillCreateOptionsResponse>> GetCreateOptionsAsync(
+            TenantRequestContext context,
+            CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
 
         public Task<ApplicationResult<TenantAdminTillListResponse>> ListAsync(
             TenantRequestContext context,
