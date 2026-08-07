@@ -1,4 +1,5 @@
 using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 
@@ -43,7 +44,7 @@ public class UserInvite : AuditableEntity
             InitialRoleId = initialRoleId,
             InvitedByPlatformUserId = invitedByPlatformUserId,
             InviteTokenHash = inviteTokenHash,
-            InviteStatus = "PENDING",
+            InviteStatus = UserInviteConstants.StatusPending,
             ExpiresAt = expiresAt,
             CreatedAt = now,
             UpdatedAt = now
@@ -52,18 +53,57 @@ public class UserInvite : AuditableEntity
 
     public void Cancel(DateTimeOffset now)
     {
-        if (InviteStatus == "ACCEPTED") return;
-        InviteStatus = "CANCELLED";
+        if (InviteStatus == UserInviteConstants.StatusAccepted) return;
+        InviteStatus = UserInviteConstants.StatusCancelled;
         CancelledAt = now;
         UpdatedAt = now;
     }
 
     public void MarkSent(DateTimeOffset now)
     {
-        InviteStatus = "SENT";
+        InviteStatus = UserInviteConstants.StatusSent;
         SentAt ??= now;
         LastSentAt = now;
         UpdatedAt = now;
     }
+
+    /// <summary>
+    /// Atomically consume a usable invitation. Call only after password/user activation is prepared
+    /// in the same transaction. Rejects cancelled, accepted, or expired invites.
+    /// </summary>
+    public void MarkAccepted(Guid acceptedTenantUserId, DateTimeOffset now)
+    {
+        if (AcceptedAt.HasValue || InviteStatus == UserInviteConstants.StatusAccepted)
+        {
+            throw new InvalidOperationException("Invitation has already been accepted.");
+        }
+
+        if (CancelledAt.HasValue ||
+            InviteStatus is UserInviteConstants.StatusCancelled or UserInviteConstants.StatusRevoked)
+        {
+            throw new InvalidOperationException("Invitation has been cancelled.");
+        }
+
+        if (InviteStatus is not (UserInviteConstants.StatusPending or UserInviteConstants.StatusSent))
+        {
+            throw new InvalidOperationException("Invitation is not in an acceptable state.");
+        }
+
+        if (ExpiresAt <= now)
+        {
+            throw new InvalidOperationException("Invitation has expired.");
+        }
+
+        InviteStatus = UserInviteConstants.StatusAccepted;
+        AcceptedAt = now;
+        AcceptedTenantUserId = acceptedTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public bool IsUsableAt(DateTimeOffset now) =>
+        !AcceptedAt.HasValue &&
+        !CancelledAt.HasValue &&
+        InviteStatus is UserInviteConstants.StatusPending or UserInviteConstants.StatusSent &&
+        ExpiresAt > now;
 }
 

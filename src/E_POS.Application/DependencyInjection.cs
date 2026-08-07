@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
         services.AddScoped<ITenantUsageCounterService, TenantUsageCounterService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
+        services.AddScoped<ITenantAdminInvitationAcceptanceService, TenantAdminInvitationAcceptanceService>();
         services.AddScoped<ITenantAdminContextService, TenantAdminContextService>();
         services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
         services.AddScoped<IDepartmentRequestValidator, DepartmentRequestValidator>();

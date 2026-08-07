@@ -97,6 +97,24 @@ public class TenantUser : AuditableEntity
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// Completes first-time invitation activation: sets a real password hash and ACTIVE status together.
+    /// </summary>
+    public void ActivateFromInvitation(string encryptedPassword, string passwordSalt, DateTimeOffset now)
+    {
+        if (!string.Equals(AccountStatus, TenantUserConstants.StatusInvited, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Only INVITED users can be activated from an invitation.");
+        }
+
+        EncryptedPassword = encryptedPassword;
+        PasswordSalt = passwordSalt;
+        AccountStatus = TenantUserConstants.StatusActive;
+        FailedLoginAttempts = 0;
+        LockedUntil = null;
+        UpdatedAt = now;
+    }
+
     public void UpdateAudit(Guid? updatedBy, DateTimeOffset now)
     {
         UpdatedByTenantUserId = updatedBy;
