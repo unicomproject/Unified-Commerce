@@ -45,6 +45,37 @@ public static class PlatformSalesChannelSeedData
             updated_at = now();
         """;
 
+    public const string CanonicalPosUpSql = """
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM platform_sales_channels
+                WHERE (channel_type = 'POS' OR channel_code = 'POS')
+                  AND id <> 'd0000000-0000-4000-8000-000000000003'
+            ) THEN
+                RAISE EXCEPTION 'Conflicting global POS platform sales channel exists.';
+            END IF;
+
+            INSERT INTO platform_sales_channels (
+                id, channel_code, default_name, channel_type, created_at, updated_at
+            )
+            VALUES (
+                'd0000000-0000-4000-8000-000000000003',
+                'POS',
+                'Point of Sale',
+                'POS',
+                now(),
+                now()
+            )
+            ON CONFLICT (id) DO UPDATE
+            SET channel_code = EXCLUDED.channel_code,
+                default_name = EXCLUDED.default_name,
+                channel_type = EXCLUDED.channel_type,
+                updated_at = now();
+        END $$;
+        """;
+
     public const string DownSql = """
         DELETE FROM sales_channels
         WHERE id = 'bbbbbbbb-000b-4000-8000-000000000001';

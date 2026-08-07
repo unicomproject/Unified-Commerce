@@ -4,12 +4,31 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using Xunit;
 
 namespace E_POS.ApiTests.Common;
 
 public sealed class GlobalExceptionHandlingMiddlewareTests
 {
+    [Fact]
+    public async Task InvokeAsync_WhenSystemPosChannelMissing_ReturnsSpecificSafeServiceError()
+    {
+        var context = CreateContext();
+        var middleware = new GlobalExceptionHandlingMiddleware(
+            _ => throw new MissingSystemPosSalesChannelException(Guid.NewGuid()),
+            NullLogger<GlobalExceptionHandlingMiddleware>.Instance);
+
+        await middleware.InvokeAsync(context);
+
+        var root = await ReadResponseAsync(context);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
+        Assert.Equal("pos_holds.system_pos_channel_unavailable", root.GetProperty("code").GetString());
+        Assert.Equal("Required POS sales channel configuration is unavailable.",
+            root.GetProperty("message").GetString());
+        Assert.DoesNotContain("TenantId", root.GetRawText(), StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task InvokeAsync_WhenUnhandledException_WritesSafeStandardError()
     {

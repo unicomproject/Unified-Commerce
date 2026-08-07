@@ -254,6 +254,7 @@ public sealed class EPosDbContext : DbContext
 
     // POS Operations
     public DbSet<PosOrderHold> PosOrderHolds => Set<PosOrderHold>();
+    public DbSet<PosOrderHoldEvent> PosOrderHoldEvents => Set<PosOrderHoldEvent>();
     public DbSet<Receipt> Receipts => Set<Receipt>();
     public DbSet<ReceiptPrintLog> ReceiptPrintLogs => Set<ReceiptPrintLog>();
     public DbSet<ReceiptTemplate> ReceiptTemplates => Set<ReceiptTemplate>();
