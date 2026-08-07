@@ -40,7 +40,8 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                 TenantId = tenant.Id,
                 TenantName = tenant.DisplayName,
                 TenantTimezone = tenant.DefaultTimezone,
-                CurrencyCode = tenant.BaseCurrencyCode
+                CurrencyCode = tenant.BaseCurrencyCode,
+                Locale = tenant.DefaultLocale
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -183,7 +184,7 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             TenantName: userInfo.TenantName,
             TenantTimezone: string.IsNullOrWhiteSpace(userInfo.TenantTimezone) ? "UTC" : userInfo.TenantTimezone,
             CurrencyCode: string.IsNullOrWhiteSpace(userInfo.CurrencyCode) ? "LKR" : userInfo.CurrencyCode,
-            Locale: "en-LK",
+            Locale: string.IsNullOrWhiteSpace(userInfo.Locale) ? "en-LK" : userInfo.Locale,
             UserId: userInfo.UserId,
             FirstName: userInfo.FirstName,
             LastName: userInfo.LastName,

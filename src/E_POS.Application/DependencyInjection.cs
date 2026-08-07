@@ -65,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformPermissionCatalogService, PlatformPermissionCatalogService>();
         services.AddScoped<IPlatformModulesCatalogService, PlatformModulesCatalogService>();
         services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
+        services.AddScoped<IDefaultTenantSettingsProvider, DefaultTenantSettingsProvider>();
         services.AddScoped<IPlatformBillingService, PlatformBillingService>();
         services.AddScoped<IManualPaymentService, ManualPaymentService>();
         services.AddScoped<IPlatformRoleService, PlatformRoleService>();

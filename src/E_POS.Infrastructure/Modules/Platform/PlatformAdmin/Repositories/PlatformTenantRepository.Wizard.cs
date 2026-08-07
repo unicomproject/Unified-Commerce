@@ -391,6 +391,11 @@ public sealed partial class PlatformTenantRepository
                 _dbContext.TenantDomains.Add(model.Domain);
             }
 
+            if (model.TenantSettings.Count > 0)
+            {
+                _dbContext.TenantSettings.AddRange(model.TenantSettings);
+            }
+
             _dbContext.TenantSubscriptions.Add(model.Subscription);
 
             _dbContext.TenantSubscriptionHistory.Add(TenantSubscriptionHistory.CreateEvent(

@@ -2,6 +2,8 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Application.Modules.Tenant.TenantFoundation.Dtos;
+using E_POS.Application.Modules.Tenant.TenantFoundation.Exceptions;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
@@ -210,18 +212,67 @@ public sealed partial class PlatformTenantService
 
         var now = _dateTimeProvider.UtcNow;
         var tenantId = Guid.NewGuid();
+
+        var resolvedFeaturesForPermissions = await _repository.ResolveActiveFeaturesAsync(
+            resolvedFeatureIds,
+            featureCodes: null,
+            cancellationToken);
+        var effectiveFeatureCodes = resolvedFeaturesForPermissions
+            .Select(feature => feature.FeatureCode)
+            .ToList();
+
+        DefaultTenantSettingsProvisionResult settingsProvision;
+        try
+        {
+            settingsProvision = await _defaultTenantSettingsProvider.BuildAsync(
+                new DefaultTenantSettingsProvisionRequest(
+                    TenantId: tenantId,
+                    PlatformUserId: platformUserId,
+                    Now: now,
+                    RequestCurrency: NormalizeOptionalText(request.BaseCurrency),
+                    RequestTimezone: NormalizeOptionalText(request.DefaultTimezone),
+                    RequestLocale: NormalizeOptionalText(request.DefaultLocale),
+                    PlanCurrency: plan.BaseCurrency,
+                    EffectiveFeatureKeys: effectiveFeatureCodes),
+                cancellationToken);
+        }
+        catch (MissingMandatoryTenantSettingDefinitionException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Mandatory tenant setting definition '{ex.SettingKey}' is missing or inactive."
+                });
+        }
+        catch (MissingPlatformGeneralDefaultException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Required platform general default '{ex.SettingKey}' is missing."
+                });
+        }
+        catch (InvalidTenantSettingDefaultValueException ex)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = $"Invalid default value for tenant setting '{ex.SettingKey}'."
+                });
+        }
+
         var tenant = E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant.Create(
             tenantId,
             code,
             NormalizeOptionalText(request.TenantSlug)?.ToLowerInvariant() ?? code.ToLowerInvariant(),
             name,
             initialLifecycleStatus,
-            NormalizeOptionalText(request.BaseCurrency) ?? plan.BaseCurrency,
-            NormalizeOptionalText(request.DefaultTimezone) ?? TenantCreateWizardReferenceData.Timezones[0].Value,
+            settingsProvision.ResolvedCurrency,
+            settingsProvision.ResolvedTimezone,
             null, // dataRegion
             platformUserId,
             now,
-            NormalizeOptionalText(request.DefaultLocale),
+            settingsProvision.ResolvedLocale,
             NormalizeOptionalText(request.OperatingMode));
 
         // Trial/Demo: create (DRAFT) then activate separately in the same orchestration → ACTIVE.
@@ -317,14 +368,6 @@ public sealed partial class PlatformTenantService
             true, // isActive
             null, // createdByTenantUserId: system-created during platform wizard; no tenant user exists yet
             now);
-
-        var resolvedFeaturesForPermissions = await _repository.ResolveActiveFeaturesAsync(
-            resolvedFeatureIds,
-            featureCodes: null,
-            cancellationToken);
-        var effectiveFeatureCodes = resolvedFeaturesForPermissions
-            .Select(feature => feature.FeatureCode)
-            .ToList();
 
         var bootstrapPermissionPlan = TenantAdminBootstrapPermissionCatalog.Resolve(effectiveFeatureCodes);
         if (bootstrapPermissionPlan.UnknownOrUnmappedEntitlements.Count > 0)
@@ -522,7 +565,8 @@ public sealed partial class PlatformTenantService
             OnboardingFinalizeContext = onboardingContext,
             OnboardingOperation = onboardingOperation,
             OnboardingContacts = onboardingContacts,
-            OnboardingOutboxMessages = onboardingMessages
+            OnboardingOutboxMessages = onboardingMessages,
+            TenantSettings = settingsProvision.SettingsToInsert
         };
 
         try
