@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="E_POS.UnitTests" />
+    <InternalsVisibleTo Include="E_POS.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Communication.Email" Version="1.1.0" />
