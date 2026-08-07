@@ -8,6 +8,7 @@ namespace E_POS.Application.Modules.Tenant.POSOperations.Services;
 
 public sealed class PosHoldService : IPosHoldService
 {
+    private const int MaxPageSize = 100;
     private static readonly ApplicationError PermissionDenied = new(
         "pos_holds.permission_denied",
         "You do not have permission to view parked POS sales.");
@@ -32,12 +33,17 @@ public sealed class PosHoldService : IPosHoldService
                 "You do not have permission to cancel parked POS sales.");
         if (holdId == Guid.Empty)
             return CancelFailure("pos_holds.invalid_hold_id", "Hold id is required.");
-        if (reason?.Trim().Length > 250)
+
+        var trimmedReason = reason?.Trim();
+        if (string.IsNullOrEmpty(trimmedReason))
+            return CancelFailure("pos_holds.invalid_reason",
+                "Cancellation reason is required.");
+        if (trimmedReason.Length > 250)
             return CancelFailure("pos_holds.invalid_reason",
                 "Cancellation reason cannot exceed 250 characters.");
 
         var result = await _repository.CancelHoldAsync(
-            context.TenantId, context.UserId, holdId, reason,
+            context.TenantId, context.UserId, holdId, trimmedReason,
             _dateTimeProvider.UtcNow, cancellationToken);
         if (!result.IsSuccess)
         {
@@ -116,18 +122,22 @@ public sealed class PosHoldService : IPosHoldService
                 "A valid idempotency key of at most 100 characters is required.");
         if (request.Reason?.Trim().Length > 250)
             return Failure("pos_holds.invalid_reason", "Hold reason cannot exceed 250 characters.");
-        if (request.ExpiresAt.HasValue && request.ExpiresAt <= _dateTimeProvider.UtcNow)
-            return Failure("pos_holds.invalid_expiry", "Hold expiry must be in the future.");
+        var heldAt = _dateTimeProvider.UtcNow;
+        // Server-derived expiry is authoritative; request.ExpiresAt (obsolete) is never
+        // forwarded to the repository, so a client can never extend/shorten a Park hold.
+        var expiresAt = heldAt.AddHours(24);
 
         var result = await _repository.CreateHoldAsync(
             context.TenantId, context.UserId, context.Permissions, request,
-            _dateTimeProvider.UtcNow, cancellationToken);
+            heldAt, expiresAt, cancellationToken);
         if (!result.IsSuccess || result.Hold is null)
         {
             var code = result.ErrorCode ?? "pos_holds.create_failed";
             return Failure(code, code switch
             {
                 "pos_holds.idempotency_conflict" => "The idempotency key was used for another hold.",
+                "pos_holds.sale_partially_paid_cannot_be_parked" =>
+                    "This sale already has a payment recorded and cannot be parked.",
                 "pos_checkout.device_not_found" => "POS device could not be found.",
                 "pos_checkout.till_session_not_open" or "till_session.not_found" =>
                     "An open till session is required before parking a sale.",
@@ -144,21 +154,66 @@ public sealed class PosHoldService : IPosHoldService
 
     public async Task<ApplicationResult<PosHoldListResponseDto>> GetHoldsAsync(
         TenantRequestContext context,
+        PosHoldListQueryDto query,
         CancellationToken cancellationToken)
     {
         if (!context.HasPermission(SalesPermissions.Park.View))
         {
             return ApplicationResult<PosHoldListResponseDto>.Failure(PermissionDenied);
         }
+        if (query.DeviceId == Guid.Empty)
+        {
+            return ApplicationResult<PosHoldListResponseDto>.Failure(new ApplicationError(
+                "pos_holds.invalid_device_id", "Device id is required."));
+        }
+        var normalizedScope = query.Scope?.Trim().ToLowerInvariant();
+        if (normalizedScope is not (PosHoldListScopes.Today or
+            PosHoldListScopes.CurrentShift or PosHoldListScopes.AllActive))
+        {
+            return ApplicationResult<PosHoldListResponseDto>.Failure(new ApplicationError(
+                "pos_holds.invalid_scope",
+                "Scope must be today, current-shift, or all-active."));
+        }
+        if (query.Page < 1)
+        {
+            return ApplicationResult<PosHoldListResponseDto>.Failure(new ApplicationError(
+                "pos_holds.invalid_page", "Page must be at least 1."));
+        }
+        if (query.PageSize is < 1 or > MaxPageSize)
+        {
+            return ApplicationResult<PosHoldListResponseDto>.Failure(new ApplicationError(
+                "pos_holds.invalid_page_size",
+                $"Page size must be between 1 and {MaxPageSize}."));
+        }
 
-        var holds = await _repository.GetActiveHoldsAsync(
+        var result = await _repository.GetActiveHoldsAsync(
             context.TenantId,
             context.UserId,
+            query with { Scope = normalizedScope },
             _dateTimeProvider.UtcNow,
             cancellationToken);
+        if (!result.IsSuccess || result.Holds is null)
+        {
+            var code = result.ErrorCode ?? "pos_holds.get_failed";
+            return ApplicationResult<PosHoldListResponseDto>.Failure(new ApplicationError(code, code switch
+            {
+                "till_session.device_not_found" => "POS device could not be found.",
+                "till_session.device_not_trusted" => "This device is not trusted for POS operations.",
+                "till_session.till_not_assigned" => "This device is not assigned to a till.",
+                "pos_checkout.till_session_not_open" or "till_session.not_found" =>
+                    "An open till session is required to view parked sales.",
+                _ => "Parked sales could not be retrieved."
+            }));
+        }
 
         return ApplicationResult<PosHoldListResponseDto>.Success(
-            new PosHoldListResponseDto(holds, holds.Count));
+            new PosHoldListResponseDto(
+                result.Holds,
+                result.TotalCount,
+                result.TotalValue,
+                result.Currency!,
+                query.Page,
+                query.PageSize));
     }
 
     private static ApplicationResult<PosHoldListItemDto> Failure(string code, string message) =>
