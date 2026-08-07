@@ -159,7 +159,8 @@ public sealed class PlatformTenantServiceTests
             new FakePlatformPermissionRepository(permissions ?? new HashSet<string>(StringComparer.Ordinal)),
             new FakeDateTimeProvider(),
             new FakePasswordHashService(),
-            new FakeTenantUsageCounterService());
+            new FakeTenantUsageCounterService(),
+            new PassingDefaultTenantSettingsProvider());
     }
 
     private static PlatformTenantListResponse CreateListResponse()

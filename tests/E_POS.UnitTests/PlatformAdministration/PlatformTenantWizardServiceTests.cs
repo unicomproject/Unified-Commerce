@@ -6,6 +6,8 @@ using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Dtos;
+using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
+using E_POS.Application.Modules.Tenant.TenantFoundation.Exceptions;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
@@ -93,6 +95,45 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.Null(repository.LastWriteModel.TenantAdminInvite);
         Assert.Equal(TenantStatusConstants.Active, repository.LastWriteModel.Tenant.Status);
         Assert.NotNull(repository.LastWriteModel.Tenant.ActivatedAt);
+        Assert.Equal("LKR", repository.LastWriteModel.Tenant.BaseCurrencyCode);
+        Assert.Equal("Asia/Colombo", repository.LastWriteModel.Tenant.DefaultTimezone);
+        Assert.Equal("en-LK", repository.LastWriteModel.Tenant.DefaultLocale);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_MissingMandatorySettingDefinition_FailsClosedWithoutPersist()
+    {
+        var repository = new FakeWizardTenantRepository();
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate },
+            defaultTenantSettingsProvider: new PassingDefaultTenantSettingsProvider
+            {
+                ExceptionToThrow = new MissingMandatoryTenantSettingDefinitionException(TenantSettingKeys.TaxPricingMode)
+            });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-WIZ-S11",
+                Name = "Scenario Eleven",
+                SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada.s11@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains("tax.pricing_mode", result.Error.Message, StringComparison.Ordinal);
+        Assert.False(repository.CreateWizardCalled);
+        Assert.Null(repository.LastWriteModel);
     }
 
     [Fact]
@@ -811,7 +852,8 @@ public sealed class PlatformTenantWizardServiceTests
         FakeWizardTenantRepository repository,
         IReadOnlySet<string> permissions,
         IPasswordHashService? passwordHashService = null,
-        FakeTenantUsageCounterService? tenantUsageCounterService = null)
+        FakeTenantUsageCounterService? tenantUsageCounterService = null,
+        IDefaultTenantSettingsProvider? defaultTenantSettingsProvider = null)
     {
         var subscriptionRepository = new FakePlatformSubscriptionPlanRepository
         {
@@ -835,7 +877,8 @@ public sealed class PlatformTenantWizardServiceTests
             new FakePermissionRepository(permissions),
             new FakeDateTimeProvider(),
             passwordHashService ?? new FakePasswordHashService(),
-            tenantUsageCounterService ?? new FakeTenantUsageCounterService());
+            tenantUsageCounterService ?? new FakeTenantUsageCounterService(),
+            defaultTenantSettingsProvider ?? new PassingDefaultTenantSettingsProvider());
     }
 
     private static PlatformTenantDetailResponse CreateDetail(Guid tenantId) =>
