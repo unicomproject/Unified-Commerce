@@ -130,7 +130,7 @@ public sealed partial class TenantAdminProductRepository
             .AsNoTracking()
             .Where(x =>
                 x.TenantId == tenantId &&
-                x.Status != ProductConstants.DeletedStatus &&
+                x.Status != ProductConstants.ArchivedStatus &&
                 x.CreatedAt <= asOf)
             .CountAsync(cancellationToken);
     }

@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.PricingTax.Contracts;
@@ -163,8 +163,10 @@ public sealed class ProductTaxAssignmentServiceTests
         public Task<Guid?> GetDefaultPriceListIdAsync(Guid tenantId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<ProductVariant?> GetDefaultVariantAsync(Guid productId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<PriceListItem?> GetPriceListItemAsync(Guid priceListId, Guid variantId, CancellationToken cancellationToken) => throw new NotImplementedException();
-        public Task<ProductBarcode?> GetBarcodeAsync(Guid variantId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task<bool> ProductIsPriceableAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ProductExists);
+        public Task<bool> ProductVariantIsPriceableAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task<ProductBarcode?> GetBarcodeAsync(Guid variantId, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }
 

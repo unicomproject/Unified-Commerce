@@ -221,6 +221,11 @@ public sealed class ProductService : IProductService
         var product = await _repository.GetEditableAsync(context.TenantId, productId, cancellationToken);
         if (product is null) return ApplicationResult<ProductResponse>.Failure(NotFound);
 
+        if (!await _repository.ProductIsPriceableAsync(context.TenantId, productId, cancellationToken))
+        {
+            return ApplicationResult<ProductResponse>.Failure(new ApplicationError("product.archived", "Product is archived and cannot be updated."));
+        }
+
         var normalizedCode = ProductConstants.NormalizeCode(request.ProductCode);
         if (await _repository.ProductCodeExistsAsync(context.TenantId, normalizedCode, productId, cancellationToken))
         {

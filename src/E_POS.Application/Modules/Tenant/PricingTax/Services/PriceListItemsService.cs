@@ -53,16 +53,16 @@ public sealed class PriceListItemsService : IPriceListItemsService
             return ApplicationResult<PriceListItemResponse>.Failure(new ApplicationError("pricing.price_list_item.invalid_price_list", "Price list does not exist."));
         }
 
-        if (!await _productRepository.ProductExistsAsync(context.TenantId, request.ProductId, cancellationToken))
+        if (!await _productRepository.ProductIsPriceableAsync(context.TenantId, request.ProductId, cancellationToken))
         {
-            return ApplicationResult<PriceListItemResponse>.Failure(new ApplicationError("pricing.price_list_item.invalid_product", "Product does not exist."));
+            return ApplicationResult<PriceListItemResponse>.Failure(new ApplicationError("pricing.price_list_item.invalid_product", "Product does not exist or is archived."));
         }
 
         if (request.ProductVariantId.HasValue && request.ProductVariantId.Value != Guid.Empty)
         {
-            if (!await _productRepository.ProductVariantExistsAsync(context.TenantId, request.ProductId, request.ProductVariantId.Value, cancellationToken))
+            if (!await _productRepository.ProductVariantIsPriceableAsync(context.TenantId, request.ProductId, request.ProductVariantId.Value, cancellationToken))
             {
-                return ApplicationResult<PriceListItemResponse>.Failure(new ApplicationError("pricing.price_list_item.invalid_variant", "Product variant does not exist."));
+                return ApplicationResult<PriceListItemResponse>.Failure(new ApplicationError("pricing.price_list_item.invalid_variant", "Product variant does not exist or is archived."));
             }
         }
 

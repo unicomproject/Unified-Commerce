@@ -203,18 +203,51 @@ public sealed record TenantAdminProductDetailResponse(
 
 public sealed record TenantAdminProductListItemResponse(
     Guid Id,
+    string ProductCode,
     string Name,
-    string? CategoryName,
+    string? ImageUrl,
     string Sku,
-    string? Barcode,
-    decimal? SellingPrice,
-    string Status,
-    int OutletCount,
-    string? ImageUrl);
+    string? PrimaryBarcode,
+    Guid CategoryId,
+    string? CategoryName,
+    Guid? BrandId,
+    string? BrandName,
+    int VariantCount,
+    decimal? PriceFrom,
+    decimal? PriceTo,
+    string? CurrencyCode,
+    decimal? StockQuantity,
+    string ProductStatus,
+    string? StockStatus,
+    int RowVersion,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
 
 public sealed record TenantAdminProductListResponse(
-    TenantAdminProductSummaryResponse Summary,
     IReadOnlyList<TenantAdminProductListItemResponse> Items,
-    int Page,
+    int PageNumber,
     int PageSize,
-    int TotalCount);
+    int TotalCount,
+    int TotalPages,
+    bool HasPreviousPage,
+    bool HasNextPage,
+    int CatalogTotalCount,
+    TenantAdminProductSummaryResponse? Summary = null);
+
+public sealed record TenantAdminProductFilterCategoryOptionResponse(
+    Guid Id,
+    string CategoryName,
+    string CategoryCode);
+
+public sealed record TenantAdminProductFilterBrandOptionResponse(
+    Guid Id,
+    string BrandName,
+    string BrandCode);
+
+public sealed record TenantAdminProductFilterOptionsResponse(
+    IReadOnlyList<TenantAdminProductFilterCategoryOptionResponse> Categories,
+    IReadOnlyList<TenantAdminProductFilterBrandOptionResponse> Brands,
+    IReadOnlyList<string> ProductStatuses,
+    IReadOnlyList<string> StockStatuses);
+
+

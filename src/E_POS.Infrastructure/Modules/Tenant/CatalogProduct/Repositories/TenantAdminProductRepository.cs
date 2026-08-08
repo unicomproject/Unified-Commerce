@@ -27,7 +27,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
     {
         var products = _dbContext.Products
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.DeletedStatus);
+            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus);
 
         var totalProducts = await products.CountAsync(cancellationToken);
         var activeProducts = await products.CountAsync(
@@ -243,6 +243,41 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             variantOptionTemplates);
     }
 
+    public async Task<TenantAdminProductFilterOptionsResponse> GetFilterOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var categories = await _dbContext.Categories
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status == CategoryConstants.ActiveStatus)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CategoryName)
+            .Select(x => new TenantAdminProductFilterCategoryOptionResponse(
+                x.Id,
+                x.CategoryName,
+                x.CategoryCode))
+            .ToListAsync(cancellationToken);
+
+        var brands = await _dbContext.Brands
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status == BrandConstants.ActiveStatus)
+            .OrderBy(x => x.BrandName)
+            .Select(x => new TenantAdminProductFilterBrandOptionResponse(
+                x.Id,
+                x.BrandName,
+                x.BrandCode))
+            .ToListAsync(cancellationToken);
+
+        var productStatuses = new List<string> { "DRAFT", "ACTIVE", "INACTIVE" };
+        var stockStatuses = new List<string> { "NOT_TRACKED", "IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK" };
+
+        return new TenantAdminProductFilterOptionsResponse(
+            categories,
+            brands,
+            productStatuses,
+            stockStatuses);
+    }
+
     public async Task<Guid?> ResolveUnitIdAsync(
         Guid tenantId,
         string unitType,
@@ -348,7 +383,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .FirstOrDefaultAsync(
                 x => x.TenantId == tenantId &&
                      x.Id == productId &&
-                     x.Status != ProductConstants.DeletedStatus,
+                     x.Status != ProductConstants.ArchivedStatus,
                 cancellationToken);
 
         if (product is null)
@@ -647,7 +682,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 x => x.TenantId == tenantId &&
                      x.Sku == sku &&
                      x.ProductId != productId &&
-                     x.Status != ProductConstants.DeletedStatus,
+                     x.Status != ProductConstants.ArchivedStatus,
                 cancellationToken);
     }
 
@@ -679,7 +714,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .FirstOrDefaultAsync(
                 x => x.TenantId == tenantId &&
                      x.Id == productId &&
-                     x.Status != ProductConstants.DeletedStatus,
+                     x.Status != ProductConstants.ArchivedStatus,
                 cancellationToken);
 
         if (product is null)
@@ -1072,7 +1107,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .FirstOrDefaultAsync(
                 x => x.TenantId == tenantId &&
                      x.Id == productId &&
-                     x.Status != ProductConstants.DeletedStatus,
+                     x.Status != ProductConstants.ArchivedStatus,
                 cancellationToken);
 
         if (product is null)
@@ -1146,7 +1181,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .FirstOrDefaultAsync(
                 x => x.TenantId == tenantId &&
                      x.Id == productId &&
-                     x.Status != ProductConstants.DeletedStatus,
+                     x.Status != ProductConstants.ArchivedStatus,
                 cancellationToken);
 
         if (product is null)
@@ -1184,7 +1219,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .FirstOrDefaultAsync(
                 x => x.TenantId == tenantId &&
                      x.Id == productId &&
-                     x.Status != ProductConstants.DeletedStatus,
+                     x.Status != ProductConstants.ArchivedStatus,
                 cancellationToken);
 
         if (product is null)
@@ -1210,7 +1245,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             return new TenantAdminProductDeleteOperationResult(null, "product.not_found");
         }
 
-        if (product.Status == ProductConstants.DeletedStatus)
+        if (product.Status == ProductConstants.ArchivedStatus)
         {
             return new TenantAdminProductDeleteOperationResult(null, "product.delete_blocked");
         }
@@ -1226,15 +1261,15 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.ProductId == productId &&
-                x.Status != ProductConstants.DeletedStatus)
+                x.Status != ProductConstants.ArchivedStatus)
             .ToListAsync(cancellationToken);
 
         if (hasHistory)
         {
-            product.UpdateStatus(ProductConstants.InactiveStatus, userId, now);
+            product.Archive(userId, now);
             foreach (var variant in variants)
             {
-                variant.UpdateStatus(ProductConstants.InactiveStatus, userId, now);
+                variant.Archive(userId, now);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -1243,14 +1278,14 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 new TenantAdminProductDeleteResponse(
                     productId,
                     "Archived",
-                    ProductConstants.InactiveStatus),
+                    ProductConstants.ArchivedStatus),
                 null);
         }
 
-        product.SoftDelete(userId, now);
+        product.Archive(userId, now);
         foreach (var variant in variants)
         {
-            variant.SoftDelete(userId, now);
+            variant.Archive(userId, now);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -1259,7 +1294,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             new TenantAdminProductDeleteResponse(
                 productId,
                 "Deleted",
-                ProductConstants.DeletedStatus),
+                ProductConstants.ArchivedStatus),
             null);
     }
 
@@ -1614,6 +1649,240 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         }
 
         return $"{normalizedName}-{code.ToLowerInvariant()}";
+    }
+
+    public async Task<TenantAdminProductListResponse> GetPagedListAsync(
+        Guid tenantId,
+        string? search,
+        Guid? categoryId,
+        Guid? brandId,
+        string? productStatus,
+        string? stockStatus,
+        int pageNumber,
+        int pageSize,
+        string? sortBy,
+        string? sortDirection,
+        bool canViewStock,
+        CancellationToken cancellationToken)
+    {
+        var productsQuery = _dbContext.Products
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var cleanSearch = search.Trim();
+            productsQuery = productsQuery.Where(p =>
+                EF.Functions.Like(p.ProductName, $"%{cleanSearch}%") ||
+                EF.Functions.Like(p.ProductCode, $"%{cleanSearch}%") ||
+                _dbContext.ProductVariants.Any(v => v.ProductId == p.Id && v.Status != ProductConstants.ArchivedStatus && EF.Functions.Like(v.Sku, $"%{cleanSearch}%")) ||
+                _dbContext.ProductBarcodes.Any(b => b.ProductId == p.Id && EF.Functions.Like(b.Barcode, $"%{cleanSearch}%")));
+        }
+
+        if (categoryId.HasValue)
+        {
+            productsQuery = productsQuery.Where(p =>
+                _dbContext.ProductCategories.Any(pc => pc.ProductId == p.Id && pc.CategoryId == categoryId.Value));
+        }
+
+        if (brandId.HasValue)
+        {
+            productsQuery = productsQuery.Where(p => p.BrandId == brandId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(productStatus))
+        {
+            var normStatus = productStatus.Trim().ToUpperInvariant();
+            productsQuery = productsQuery.Where(p => p.Status == normStatus);
+        }
+
+        var defaultPriceListId = await GetDefaultPriceListIdAsync(tenantId, cancellationToken);
+
+        var catalogTotalCount = await _dbContext.Products
+            .AsNoTracking()
+            .CountAsync(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
+
+        var sortCol = sortBy?.Trim().ToUpperInvariant() ?? "PRODUCTNAME";
+        var sortDir = sortDirection?.Trim().ToUpperInvariant() ?? "ASC";
+
+        if (sortDir == "DESC")
+        {
+            productsQuery = sortCol == "CREATEDAT" ? productsQuery.OrderByDescending(x => x.CreatedAt) : productsQuery.OrderByDescending(x => x.ProductName);
+        }
+        else
+        {
+            productsQuery = sortCol == "CREATEDAT" ? productsQuery.OrderBy(x => x.CreatedAt) : productsQuery.OrderBy(x => x.ProductName);
+        }
+
+        var totalCount = await productsQuery.CountAsync(cancellationToken);
+
+        var pagedProducts = await productsQuery
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var productIds = pagedProducts.Select(x => x.Id).ToList();
+
+        var categoryLinks = productIds.Count == 0
+            ? new List<ProductCategory>()
+            : await _dbContext.ProductCategories
+                .AsNoTracking()
+                .Where(pc => productIds.Contains(pc.ProductId))
+                .ToListAsync(cancellationToken);
+
+        var categoryIds = categoryLinks.Select(pc => pc.CategoryId).Distinct().ToList();
+        var categoryMap = categoryIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.Categories
+                .AsNoTracking()
+                .Where(c => categoryIds.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.CategoryName, cancellationToken);
+
+        var productCategories = categoryLinks
+            .GroupBy(pc => pc.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var top = g.OrderBy(x => x.IsPrimaryCategory ? 0 : 1).ThenBy(x => x.SortOrder).First();
+                    categoryMap.TryGetValue(top.CategoryId, out var cName);
+                    return (CategoryId: top.CategoryId, CategoryName: cName);
+                });
+
+        var brandIds = pagedProducts.Where(p => p.BrandId.HasValue).Select(p => p.BrandId!.Value).Distinct().ToList();
+        var brands = brandIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.Brands
+                .AsNoTracking()
+                .Where(b => brandIds.Contains(b.Id))
+                .ToDictionaryAsync(b => b.Id, b => b.BrandName, cancellationToken);
+
+        var variantsByProduct = productIds.Count == 0
+            ? new List<ProductVariant>()
+            : await _dbContext.ProductVariants
+                .AsNoTracking()
+                .Where(v => productIds.Contains(v.ProductId) && v.Status != ProductConstants.ArchivedStatus)
+                .ToListAsync(cancellationToken);
+
+        var defaultVariants = variantsByProduct
+            .GroupBy(v => v.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(v => v.IsDefaultVariant).ThenBy(v => v.VariantCode).FirstOrDefault());
+
+        var variantCounts = variantsByProduct
+            .GroupBy(v => v.ProductId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var priceListItems = productIds.Count == 0 || defaultPriceListId == null
+            ? new List<PriceListItem>()
+            : await _dbContext.PriceListItems
+                .AsNoTracking()
+                .Where(pli => productIds.Contains(pli.ProductId) && pli.PriceListId == defaultPriceListId && pli.Status != "DELETED")
+                .ToListAsync(cancellationToken);
+
+        var pricesByProduct = priceListItems
+            .GroupBy(pli => pli.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => (MinPrice: (decimal?)g.Min(x => x.SellingPrice), MaxPrice: (decimal?)g.Max(x => x.SellingPrice)));
+
+        var inventoryBalances = productIds.Count == 0
+            ? new List<InventoryBalance>()
+            : await _dbContext.InventoryBalances
+                .AsNoTracking()
+                .Where(ib => productIds.Contains(ib.ProductId))
+                .ToListAsync(cancellationToken);
+
+        var balancesByProduct = inventoryBalances
+            .GroupBy(ib => ib.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => (Available: (decimal?)g.Sum(x => x.AvailableQuantity), OnHand: (decimal?)g.Sum(x => x.OnHandQuantity)));
+
+        var reorderRules = productIds.Count == 0
+            ? new List<InventoryReorderRule>()
+            : await _dbContext.InventoryReorderRules
+                .AsNoTracking()
+                .Where(rr => productIds.Contains(rr.ProductId) && rr.Status == "ACTIVE")
+                .ToListAsync(cancellationToken);
+
+        var rulesByProduct = reorderRules
+            .GroupBy(rr => rr.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(rr => rr.CreatedAt).FirstOrDefault());
+
+        var imageUrls = productIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await GetPrimaryImageUrlsAsync(tenantId, productIds, cancellationToken);
+
+        var barcodesByVariant = productIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.ProductBarcodes
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId))
+                .GroupBy(x => x.ProductId)
+                .ToDictionaryAsync(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.IsPrimaryBarcode).ThenBy(x => x.CreatedAt).Select(x => x.Barcode).FirstOrDefault() ?? string.Empty,
+                    cancellationToken);
+
+        var items = pagedProducts.Select(product =>
+        {
+            productCategories.TryGetValue(product.Id, out var catInfo);
+            var brandName = product.BrandId.HasValue && brands.TryGetValue(product.BrandId.Value, out var bName) ? bName : null;
+            defaultVariants.TryGetValue(product.Id, out var defVariant);
+            variantCounts.TryGetValue(product.Id, out var vCount);
+            pricesByProduct.TryGetValue(product.Id, out var prices);
+            balancesByProduct.TryGetValue(product.Id, out var balances);
+            rulesByProduct.TryGetValue(product.Id, out var rule);
+            imageUrls.TryGetValue(product.Id, out var imageUrl);
+            barcodesByVariant.TryGetValue(product.Id, out var primaryBarcode);
+
+            var threshold = rule != null ? (rule.MinStockQuantity ?? rule.ReorderPointQuantity) : (decimal?)null;
+            var isTracked = balances.Available != null || rule != null;
+            var computedStockStatus = !isTracked ? "NOT_TRACKED" :
+                                      (balances.Available == null || balances.Available.Value <= 0) ? "OUT_OF_STOCK" :
+                                      (threshold != null && balances.Available.Value <= threshold.Value) ? "LOW_STOCK" : "IN_STOCK";
+
+            var finalStockQty = canViewStock ? balances.Available : null;
+            var finalStockStatus = canViewStock ? computedStockStatus : null;
+
+            return new TenantAdminProductListItemResponse(
+                product.Id,
+                product.ProductCode,
+                product.ProductName,
+                imageUrl,
+                defVariant?.Sku ?? string.Empty,
+                primaryBarcode,
+                catInfo.CategoryId,
+                catInfo.CategoryName,
+                product.BrandId,
+                brandName,
+                vCount,
+                prices.MinPrice,
+                prices.MaxPrice,
+                "LKR",
+                finalStockQty,
+                product.Status,
+                finalStockStatus,
+                1,
+                product.CreatedAt,
+                product.UpdatedAt ?? product.CreatedAt);
+        }).ToList();
+
+        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+        return new TenantAdminProductListResponse(
+            items,
+            pageNumber,
+            pageSize,
+            totalCount,
+            totalPages,
+            pageNumber > 1,
+            pageNumber < totalPages,
+            catalogTotalCount);
     }
 
     private sealed record VariantDefinition(

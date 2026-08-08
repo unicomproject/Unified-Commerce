@@ -37,6 +37,74 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             fieldErrors);
     }
 
+    public ApplicationError? ValidateListQuery(
+        string? productStatus,
+        string? stockStatus,
+        int pageNumber,
+        int pageSize,
+        string? sortBy,
+        string? sortDirection)
+    {
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (pageNumber < 1)
+        {
+            fieldErrors.Add(new ApplicationFieldError("pageNumber", "Page number must be 1 or greater."));
+        }
+
+        var allowedPageSizes = new[] { 6, 8, 10, 25, 50 };
+        if (!allowedPageSizes.Contains(pageSize))
+        {
+            fieldErrors.Add(new ApplicationFieldError("pageSize", "Page size must be 6, 8, 10, 25, or 50."));
+        }
+
+        if (productStatus != null)
+        {
+            var allowedStatuses = new[] { "ACTIVE", "INACTIVE", "DRAFT" };
+            if (!allowedStatuses.Contains(productStatus.ToUpperInvariant()))
+            {
+                fieldErrors.Add(new ApplicationFieldError("productStatus", "Product status must be ACTIVE, INACTIVE, or DRAFT."));
+            }
+        }
+
+        if (stockStatus != null)
+        {
+            var allowedStockStatuses = new[] { "NOT_TRACKED", "IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK" };
+            if (!allowedStockStatuses.Contains(stockStatus.ToUpperInvariant()))
+            {
+                fieldErrors.Add(new ApplicationFieldError("stockStatus", "Stock status must be NOT_TRACKED, IN_STOCK, LOW_STOCK, or OUT_OF_STOCK."));
+            }
+        }
+
+        if (sortBy != null)
+        {
+            var allowedSortFields = new[] { "PRODUCTNAME", "SKU", "CREATEDAT" };
+            if (!allowedSortFields.Contains(sortBy.ToUpperInvariant()))
+            {
+                fieldErrors.Add(new ApplicationFieldError("sortBy", "Sort by field must be productName, sku, or createdAt."));
+            }
+        }
+
+        if (sortDirection != null)
+        {
+            var allowedDirections = new[] { "ASC", "DESC" };
+            if (!allowedDirections.Contains(sortDirection.ToUpperInvariant()))
+            {
+                fieldErrors.Add(new ApplicationFieldError("sortDirection", "Sort direction must be asc or desc."));
+            }
+        }
+
+        if (fieldErrors.Count == 0)
+        {
+            return null;
+        }
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product list query validation failed.",
+            fieldErrors);
+    }
+
     private static ApplicationError? ValidateWrite(TenantAdminProductCreateRequest request, bool isCreate)
     {
         var fieldErrors = new List<ApplicationFieldError>();

@@ -10,4 +10,12 @@ public interface ITenantAdminProductRequestValidator
     ApplicationError? ValidateUpdate(TenantAdminProductCreateRequest request);
 
     ApplicationError? ValidateStatusUpdate(TenantAdminProductStatusUpdateRequest request);
+
+    ApplicationError? ValidateListQuery(
+        string? productStatus,
+        string? stockStatus,
+        int pageNumber,
+        int pageSize,
+        string? sortBy,
+        string? sortDirection);
 }

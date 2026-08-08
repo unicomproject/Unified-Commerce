@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806072011_AddLatestChanges")]
+    partial class AddLatestChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -11496,14 +11499,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset?>("ArchivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("archived_at");
-
-                    b.Property<Guid?>("ArchivedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("archived_by_tenant_user_id");
-
                     b.Property<Guid?>("BrandId")
                         .HasColumnType("uuid")
                         .HasColumnName("brand_id");
@@ -11519,16 +11514,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CreatedByTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_tenant_user_id");
-
-                    b.Property<int>("CurrentSetupStep")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("current_setup_step");
-
-                    b.Property<DateTimeOffset?>("DraftSavedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("draft_saved_at");
 
                     b.Property<bool>("IsSellable")
                         .ValueGeneratedOnAdd()
@@ -11576,24 +11561,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(40)")
                         .HasColumnName("product_type");
 
-                    b.Property<DateTimeOffset?>("PublishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("published_at");
-
-                    b.Property<Guid?>("PublishedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("published_by_tenant_user_id");
-
                     b.Property<Guid?>("ReturnPolicyId")
                         .HasColumnType("uuid")
                         .HasColumnName("return_policy_id");
-
-                    b.Property<long>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasDefaultValue(1L)
-                        .HasColumnName("row_version");
 
                     b.Property<string>("ShortDescription")
                         .HasColumnType("text")
@@ -11620,8 +11590,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_products");
 
-                    b.HasIndex("TenantId", "ArchivedByTenantUserId");
-
                     b.HasIndex("TenantId", "Id")
                         .IsUnique()
                         .HasDatabaseName("uq_products_tenant_id_id");
@@ -11634,13 +11602,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_products_tenant_id_product_slug");
 
-                    b.HasIndex("TenantId", "PublishedByTenantUserId");
-
                     b.ToTable("products", null, t =>
                         {
-                            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 8");
-
-                            t.HasCheckConstraint("ck_products_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
+                            t.HasCheckConstraint("ck_products_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
                         });
                 });
 
@@ -13303,7 +13267,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("product_variants", null, t =>
                         {
-                            t.HasCheckConstraint("ck_product_variants_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
+                            t.HasCheckConstraint("ck_product_variants_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
                         });
                 });
 
@@ -27579,20 +27543,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_products_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "ArchivedByTenantUserId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_products_tenant_users_archived_by");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "PublishedByTenantUserId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_products_tenant_users_published_by");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductAttributeDefinition", b =>
