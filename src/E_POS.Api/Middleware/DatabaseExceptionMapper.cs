@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 
 namespace E_POS.Api.Middleware;
 
@@ -10,6 +11,14 @@ public static class DatabaseExceptionMapper
 
     public static MappedDatabaseError Map(Exception exception)
     {
+        if (exception is MissingSystemPosSalesChannelException)
+        {
+            return new MappedDatabaseError(
+                StatusCodes.Status503ServiceUnavailable,
+                "pos_holds.system_pos_channel_unavailable",
+                "Required POS sales channel configuration is unavailable.");
+        }
+
         var postgres = FindPostgresException(exception);
         if (postgres is not null)
         {

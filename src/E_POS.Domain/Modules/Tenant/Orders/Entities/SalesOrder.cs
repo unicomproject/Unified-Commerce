@@ -260,7 +260,7 @@ public class SalesOrder : AuditableEntity
         bool isTaxInclusive,
         decimal subtotalAmount, decimal discountAmount, decimal taxAmount,
         decimal totalAmount, string? reason, Guid createdByTenantUserId,
-        DateTimeOffset now)
+        DateOnly businessDate, DateTimeOffset now)
     {
         return new SalesOrder
         {
@@ -274,6 +274,7 @@ public class SalesOrder : AuditableEntity
             CustomerNameSnapshot = customerNameSnapshot?.Trim(),
             TillId = tillId,
             TillSessionId = tillSessionId,
+            BusinessDate = businessDate,
             PriceListId = priceListId,
             CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
             IsTaxInclusive = isTaxInclusive,

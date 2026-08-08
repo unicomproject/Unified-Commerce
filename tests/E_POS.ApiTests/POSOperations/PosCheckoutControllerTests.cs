@@ -144,7 +144,8 @@ public sealed class PosCheckoutControllerTests
             "completed",
             now,
             paymentId,
-            [new PosCheckoutStartPaymentLineResponseDto("Team Jersey", 2, 1250, 2500, "JER-SKU")]);
+            [new PosCheckoutStartPaymentLineResponseDto("Team Jersey", 2, 1250, 2500, "JER-SKU")],
+            ReceiptDataJson: "{}");
 
         var service = new FakePosCheckoutService
         {

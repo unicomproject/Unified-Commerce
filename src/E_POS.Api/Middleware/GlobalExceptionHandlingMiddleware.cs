@@ -1,4 +1,5 @@
 using System.Text.Json;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 
 namespace E_POS.Api.Middleware;
 
@@ -37,7 +38,20 @@ public sealed class GlobalExceptionHandlingMiddleware
     private async Task WriteSafeErrorResponseAsync(HttpContext context, Exception exception)
     {
         // Return a safe standard error without leaking stack traces or infrastructure details.
-        _logger.LogError(exception, "Unhandled exception while processing request. TraceId: {TraceId}", context.TraceIdentifier);
+        if (exception is MissingSystemPosSalesChannelException configurationException)
+        {
+            _logger.LogError(
+                exception,
+                "Required system configuration unavailable. TenantId: {TenantId}; Operation: {Operation}; ConfigurationType: {ConfigurationType}; TraceId: {TraceId}",
+                configurationException.TenantId,
+                configurationException.Operation,
+                configurationException.ConfigurationType,
+                context.TraceIdentifier);
+        }
+        else
+        {
+            _logger.LogError(exception, "Unhandled exception while processing request. TraceId: {TraceId}", context.TraceIdentifier);
+        }
 
         var mapped = DatabaseExceptionMapper.Map(exception);
 

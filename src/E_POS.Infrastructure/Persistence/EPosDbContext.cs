@@ -254,6 +254,7 @@ public sealed class EPosDbContext : DbContext
 
     // POS Operations
     public DbSet<PosOrderHold> PosOrderHolds => Set<PosOrderHold>();
+    public DbSet<PosOrderHoldEvent> PosOrderHoldEvents => Set<PosOrderHoldEvent>();
     public DbSet<Receipt> Receipts => Set<Receipt>();
     public DbSet<ReceiptPrintLog> ReceiptPrintLogs => Set<ReceiptPrintLog>();
     public DbSet<ReceiptTemplate> ReceiptTemplates => Set<ReceiptTemplate>();
@@ -277,6 +278,10 @@ public sealed class EPosDbContext : DbContext
 
     // Shared Media
     public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+
+    // Shared Idempotency & Audit
+    public DbSet<E_POS.Domain.Modules.Shared.Idempotency.Entities.IdempotencyRequest> IdempotencyRequests => Set<E_POS.Domain.Modules.Shared.Idempotency.Entities.IdempotencyRequest>();
+    public DbSet<E_POS.Domain.Modules.Shared.Audit.Entities.AuditLog> AuditLogs => Set<E_POS.Domain.Modules.Shared.Audit.Entities.AuditLog>();
 
     // Fulfilment and Pickup
     public DbSet<FulfillmentMethod> FulfillmentMethods => Set<FulfillmentMethod>();

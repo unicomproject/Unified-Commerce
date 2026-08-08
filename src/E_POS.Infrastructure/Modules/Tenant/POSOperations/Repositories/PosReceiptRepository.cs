@@ -181,7 +181,8 @@ public sealed class PosReceiptRepository : IPosReceiptRepository
             snapshot.CopyPolicy,
             snapshot.TaxRegistrationNumber,
             snapshot.TaxInvoiceLabel,
-            ParseHistoricalSnapshot(row.Receipt.ReceiptDataJson));
+            ParseHistoricalSnapshot(row.Receipt.ReceiptDataJson),
+            row.Receipt.ReceiptDataJson);
     }
 
     public async Task<PosReceiptReprintAuthorizationResponseDto?> AuthorizeReprintAsync(

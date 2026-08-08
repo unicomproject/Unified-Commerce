@@ -1,8 +1,10 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Options;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
@@ -26,19 +28,22 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
     private readonly ITillDeviceAssignmentRepository _assignmentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IOptionsSnapshot<TillMonitoringOptions> _options;
+    private readonly ITenantResourceLimitGuard _resourceLimitGuard;
 
     public TenantAdminTillService(
         ITenantAdminTillRepository repository,
         ITenantAdminHardwareRepository hardwareRepository,
         ITillDeviceAssignmentRepository assignmentRepository,
         IDateTimeProvider dateTimeProvider,
-        IOptionsSnapshot<TillMonitoringOptions> options)
+        IOptionsSnapshot<TillMonitoringOptions> options,
+        ITenantResourceLimitGuard resourceLimitGuard)
     {
         _repository = repository;
         _hardwareRepository = hardwareRepository;
         _assignmentRepository = assignmentRepository;
         _dateTimeProvider = dateTimeProvider;
         _options = options;
+        _resourceLimitGuard = resourceLimitGuard;
     }
 
     public async Task<ApplicationResult<TenantAdminTillListResponse>> ListAsync(
@@ -203,60 +208,81 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             request.CardReaderName,
             request.InternalNote);
 
-        await _repository.ExecuteInTransactionAsync(async () =>
+        var guarded = await _resourceLimitGuard.ExecuteWithinCapacityAsync(
+            context.TenantId,
+            TenantSubscriptionLimitKeys.MaxTills,
+            requestedIncrease: 1,
+            async ct =>
+            {
+                await _repository.ExecuteInTransactionAsync(async () =>
+                {
+                    await _repository.AddAsync(till, ct);
+
+                    if (request.PosDeviceId.HasValue)
+                    {
+                        var device = await _hardwareRepository.GetPosDeviceAsync(context.TenantId, request.PosDeviceId.Value, ct);
+                        if (device != null)
+                        {
+                            var existingAssignment = await _assignmentRepository.GetActiveByTillAndDeviceAsync(context.TenantId, tillId, device.Id, ct);
+                            if (existingAssignment == null)
+                            {
+                                var assignment = TillDeviceAssignment.Create(
+                                    Guid.NewGuid(),
+                                    context.TenantId,
+                                    till.OutletId,
+                                    tillId,
+                                    device.Id,
+                                    actingUserId,
+                                    now);
+                                await _assignmentRepository.AddAsync(assignment, ct);
+                            }
+                        }
+                    }
+
+                    if (request.HardwareAssignments != null && request.HardwareAssignments.Any())
+                    {
+                        foreach (var hw in request.HardwareAssignments)
+                        {
+                            var hardwareDevice = await _hardwareRepository.GetEditableDeviceAsync(context.TenantId, hw.HardwareDeviceId, ct);
+                            if (hardwareDevice != null)
+                            {
+                                var assignment = HardwareDeviceAssignment.Create(
+                                    Guid.NewGuid(),
+                                    context.TenantId,
+                                    hardwareDevice.OutletId,
+                                    hardwareDevice.Id,
+                                    tillId,
+                                    null,
+                                    hw.IsPrimary,
+                                    actingUserId,
+                                    now);
+                                await _hardwareRepository.AddAssignmentAsync(assignment, ct);
+                            }
+                        }
+                    }
+
+                    await _repository.SaveChangesAsync(ct);
+                }, ct);
+
+                var model = await _repository.GetDetailAsync(context.TenantId, tillId, ct);
+                var result = model is null
+                    ? ApplicationResult<TenantAdminTillDetailResponse>.Failure(NotFound)
+                    : ApplicationResult<TenantAdminTillDetailResponse>.Success(MapToDetailResponse(model));
+
+                return result.IsSuccess
+                    ? TenantResourceCapacityOperationResult<ApplicationResult<TenantAdminTillDetailResponse>>.Succeeded(result)
+                    : TenantResourceCapacityOperationResult<ApplicationResult<TenantAdminTillDetailResponse>>.Aborted(result);
+            },
+            cancellationToken);
+
+        if (!guarded.Allowed)
         {
-            await _repository.AddAsync(till, cancellationToken);
+            return ApplicationResult<TenantAdminTillDetailResponse>.Failure(
+                guarded.Evaluation.ToApplicationError() ??
+                new ApplicationError(SubscriptionLimitErrorCodes.LimitReached, "Till subscription limit reached."));
+        }
 
-            if (request.PosDeviceId.HasValue)
-            {
-                var device = await _hardwareRepository.GetPosDeviceAsync(context.TenantId, request.PosDeviceId.Value, cancellationToken);
-                if (device != null)
-                {
-                    var existingAssignment = await _assignmentRepository.GetActiveByTillAndDeviceAsync(context.TenantId, tillId, device.Id, cancellationToken);
-                    if (existingAssignment == null)
-                    {
-                        var assignment = TillDeviceAssignment.Create(
-                            Guid.NewGuid(),
-                            context.TenantId,
-                            till.OutletId,
-                            tillId,
-                            device.Id,
-                            actingUserId,
-                            now);
-                        await _assignmentRepository.AddAsync(assignment, cancellationToken);
-                    }
-                }
-            }
-
-            if (request.HardwareAssignments != null && request.HardwareAssignments.Any())
-            {
-                foreach (var hw in request.HardwareAssignments)
-                {
-                    var hardwareDevice = await _hardwareRepository.GetEditableDeviceAsync(context.TenantId, hw.HardwareDeviceId, cancellationToken);
-                    if (hardwareDevice != null)
-                    {
-                        var assignment = HardwareDeviceAssignment.Create(
-                            Guid.NewGuid(),
-                            context.TenantId,
-                            hardwareDevice.OutletId,
-                            hardwareDevice.Id,
-                            tillId,
-                            null,
-                            hw.IsPrimary,
-                            actingUserId,
-                            now);
-                        await _hardwareRepository.AddAssignmentAsync(assignment, cancellationToken);
-                    }
-                }
-            }
-            
-            await _repository.SaveChangesAsync(cancellationToken);
-        }, cancellationToken);
-
-        var model = await _repository.GetDetailAsync(context.TenantId, tillId, cancellationToken);
-        return model is null
-            ? ApplicationResult<TenantAdminTillDetailResponse>.Failure(NotFound)
-            : ApplicationResult<TenantAdminTillDetailResponse>.Success(MapToDetailResponse(model));
+        return guarded.Value!;
     }
 
     public async Task<ApplicationResult<TenantAdminTillDetailResponse>> GetByIdAsync(

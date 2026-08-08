@@ -17,10 +17,23 @@ public class PosOrderHold : AuditableEntity
     public DateTimeOffset? CancelledAt { get; protected set; }
     public string? CancellationReason { get; protected set; }
 
+    /// <summary>Client-supplied park idempotency key (tenant-unique when present).</summary>
+    public string? IdempotencyKey { get; protected set; }
+
+    /// <summary>Hash of the create request payload used with <see cref="IdempotencyKey"/>.</summary>
+    public string? RequestFingerprint { get; protected set; }
+
     public static PosOrderHold Create(
-        Guid id, Guid tenantId, string holdNumber, Guid salesOrderId,
-        string? reason, Guid heldByTenantUserId, DateTimeOffset heldAt,
-        DateTimeOffset? expiresAt)
+        Guid id,
+        Guid tenantId,
+        string holdNumber,
+        Guid salesOrderId,
+        string? reason,
+        Guid heldByTenantUserId,
+        DateTimeOffset heldAt,
+        DateTimeOffset? expiresAt,
+        string? idempotencyKey = null,
+        string? requestFingerprint = null)
     {
         return new PosOrderHold
         {
@@ -33,9 +46,14 @@ public class PosOrderHold : AuditableEntity
             HeldByTenantUserId = heldByTenantUserId,
             HeldAt = heldAt,
             ExpiresAt = expiresAt,
+            IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey)
+                ? null
+                : idempotencyKey.Trim(),
+            RequestFingerprint = string.IsNullOrWhiteSpace(requestFingerprint)
+                ? null
+                : requestFingerprint.Trim(),
             CreatedAt = heldAt,
             UpdatedAt = heldAt
         };
     }
 }
-

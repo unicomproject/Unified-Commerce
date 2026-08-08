@@ -88,9 +88,15 @@ public sealed class PlatformTenantOnboardingRepository : IPlatformTenantOnboardi
             .SingleOrDefaultAsync(ct);
         if (tenant is null) return new(TenantInvitationResendOutcome.NotFound);
         if (tenant.Status != TenantStatusConstants.Active) return new(TenantInvitationResendOutcome.InvalidTransition);
+        // Invitation resend is for first-time setup only — not a password-reset path.
+        var hasInvitedAdmin = await _db.TenantUsers.AsNoTracking().AnyAsync(x =>
+            x.TenantId == tenantId && x.AccountStatus == "INVITED", ct);
+        if (!hasInvitedAdmin) return new(TenantInvitationResendOutcome.InvalidTransition);
         var operation = await _db.PlatformTenantOnboardingOperations.Where(x => x.TenantId == tenantId)
             .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
         if (operation is null) return new(TenantInvitationResendOutcome.NotFound);
+        if (string.Equals(operation.InvitationStatus, "ACCEPTED", StringComparison.OrdinalIgnoreCase))
+            return new(TenantInvitationResendOutcome.InvalidTransition);
         var type = "tenant_admin.invitation_resend_requested";
         var dedupe = $"{type}:{tenantId:D}:{keyHash}";
         var existing = await _db.IntegrationOutboxMessages.AsNoTracking()

@@ -14,7 +14,7 @@ public class Outlet : AuditableEntity
     public string Timezone { get; protected set; } = string.Empty;
     public bool IsDefaultOutlet { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
-    public Guid? MediaAssetId { get; protected set; }
+    public Guid? PrimaryImageMediaAssetId { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
@@ -75,9 +75,9 @@ public class Outlet : AuditableEntity
         UpdatedAt = now;
     }
 
-    public void SetMediaAssetId(Guid? mediaAssetId, Guid? updatedByTenantUserId, DateTimeOffset now)
+    public void SetPrimaryImageMediaAssetId(Guid? primaryImageMediaAssetId, Guid? updatedByTenantUserId, DateTimeOffset now)
     {
-        MediaAssetId = mediaAssetId;
+        PrimaryImageMediaAssetId = primaryImageMediaAssetId;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

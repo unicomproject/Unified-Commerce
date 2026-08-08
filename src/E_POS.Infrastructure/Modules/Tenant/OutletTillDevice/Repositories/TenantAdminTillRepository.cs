@@ -500,6 +500,13 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
 
     public async Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken)
     {
+        // Join ambient capacity-guard transaction when present (Phase 3).
+        if (_dbContext.Database.CurrentTransaction is not null)
+        {
+            await operation();
+            return;
+        }
+
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {

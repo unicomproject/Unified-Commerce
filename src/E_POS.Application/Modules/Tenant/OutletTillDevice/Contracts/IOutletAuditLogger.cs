@@ -32,6 +32,21 @@ public interface IOutletAuditLogger
         Guid actorTenantUserId,
         Guid outletId);
 
+    void LogImageUploaded(Guid tenantId, Guid actorTenantUserId, Guid mediaAssetId);
+
+    void LogImageReplaced(
+        Guid tenantId,
+        Guid actorTenantUserId,
+        Guid outletId,
+        Guid previousMediaAssetId,
+        Guid newMediaAssetId);
+
+    void LogImageDetached(
+        Guid tenantId,
+        Guid actorTenantUserId,
+        Guid outletId,
+        Guid detachedMediaAssetId);
+
     void LogStatusChanged(
         Guid tenantId,
         Guid actorTenantUserId,

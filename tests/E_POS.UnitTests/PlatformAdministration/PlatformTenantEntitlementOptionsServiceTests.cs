@@ -113,7 +113,8 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             new FakePlatformPermissionRepository(permissions),
             new FakeDateTimeProvider(),
             new FakePasswordHashService(),
-            new FakeTenantUsageCounterService());
+            new FakeTenantUsageCounterService(),
+            new PassingDefaultTenantSettingsProvider());
     }
 
     private static HashSet<string> AllTenantPermissions() =>
@@ -320,8 +321,11 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
         public Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        public Task<IReadOnlyList<Guid>> GetTenantAdminBootstrapPermissionIdsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<Guid>>([]);
+        public Task<IReadOnlyDictionary<string, Guid>> GetActivePermissionIdMapByCodesAsync(
+            IReadOnlyList<string> permissionCodes,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<string, Guid>>(
+                new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase));
 
         public Task<PlatformTenantAuditLogListResponse> GetTenantAuditLogsAsync(
             Guid tenantId,

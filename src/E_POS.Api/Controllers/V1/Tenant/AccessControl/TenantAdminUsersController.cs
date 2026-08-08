@@ -165,6 +165,7 @@ public sealed class TenantAdminUsersController : ControllerBase
                 CreateError(error)),
             "user.not_found" or "user.role_not_found" or "user.outlet_not_found" => NotFound(CreateError(error)),
             "user.duplicate_email" or "user.delete_conflict" or "user.cannot_delete_self" => Conflict(CreateError(error)),
+            "subscription_limit_reached" or "subscription_limit_configuration_missing" or "subscription_limit_invalid" or "subscription_limit_evaluation_failed" or "subscription_limit_unknown_key" or "subscription_limit_not_enforced" => Conflict(CreateError(error)),
             "user.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error)),
         };
@@ -176,7 +177,9 @@ public sealed class TenantAdminUsersController : ControllerBase
         {
             code = error.Code,
             message = error.Message,
-            details = Array.Empty<string>(),
+            details = error.FieldErrors?
+                .Select(item => new { field = item.Field, message = item.Message })
+                .ToArray<object>() ?? Array.Empty<object>(),
             traceId = HttpContext.TraceIdentifier,
             timestamp = DateTimeOffset.UtcNow,
         };

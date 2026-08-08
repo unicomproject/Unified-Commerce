@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Common.Entities;
 
 namespace E_POS.Domain.Modules.Shared.Media.Entities;
 
@@ -18,6 +18,9 @@ public sealed class MediaAsset : AuditableEntity
     public string AssetType { get; private set; } = string.Empty;
     public string AssetPurpose { get; private set; } = string.Empty;
     public string Status { get; private set; } = string.Empty;
+    public int DeletionRetryCount { get; private set; }
+    public DateTimeOffset? NextRetryAt { get; private set; }
+    public string? LastDeletionError { get; private set; }
     public Guid? CreatedByTenantUserId { get; private set; }
     public Guid? UpdatedByTenantUserId { get; private set; }
 
@@ -57,6 +60,9 @@ public sealed class MediaAsset : AuditableEntity
             AssetType = assetType.Trim().ToUpperInvariant(),
             AssetPurpose = assetPurpose.Trim().ToUpperInvariant(),
             Status = status.Trim().ToUpperInvariant(),
+            DeletionRetryCount = 0,
+            NextRetryAt = null,
+            LastDeletionError = null,
             CreatedByTenantUserId = createdByTenantUserId,
             UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
@@ -72,6 +78,29 @@ public sealed class MediaAsset : AuditableEntity
         }
 
         Status = "INACTIVE";
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void MarkDeleted(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = "DELETED";
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void MarkDeletePending(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = "DELETE_PENDING";
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void RecordDeletionFailure(string error, DateTimeOffset nextRetryAt, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        DeletionRetryCount++;
+        NextRetryAt = nextRetryAt;
+        LastDeletionError = error;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

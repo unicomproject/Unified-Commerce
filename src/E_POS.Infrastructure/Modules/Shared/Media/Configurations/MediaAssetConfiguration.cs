@@ -1,4 +1,4 @@
-﻿using E_POS.Domain.Modules.Shared.Media.Entities;
+using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -104,6 +104,21 @@ public sealed class MediaAssetConfiguration : IEntityTypeConfiguration<MediaAsse
             .HasMaxLength(40)
             .IsRequired();
 
+        builder.Property(x => x.DeletionRetryCount)
+            .HasColumnName("deletion_retry_count")
+            .HasDefaultValue(0)
+            .IsRequired();
+
+        builder.Property(x => x.NextRetryAt)
+            .HasColumnName("next_retry_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.LastDeletionError)
+            .HasColumnName("last_deletion_error")
+            .HasColumnType("text")
+            .IsRequired(false);
+
         builder.Property(x => x.CreatedByTenantUserId)
             .HasColumnName("created_by_tenant_user_id")
             .IsRequired(false);
@@ -132,6 +147,6 @@ public sealed class MediaAssetConfiguration : IEntityTypeConfiguration<MediaAsse
         builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_width_px", "width_px IS NULL OR width_px > 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_height_px", "height_px IS NULL OR height_px > 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_asset_type", "asset_type IN ('IMAGE')"));
-        builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETE_PENDING', 'DELETED')"));
     }
 }

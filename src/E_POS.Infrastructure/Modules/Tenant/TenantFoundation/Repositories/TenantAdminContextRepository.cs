@@ -1,6 +1,7 @@
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Dtos;
-using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -10,10 +11,14 @@ namespace E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly ITenantFeatureEntitlementEvaluator _featureEntitlementEvaluator;
 
-    public TenantAdminContextRepository(EPosDbContext dbContext)
+    public TenantAdminContextRepository(
+        EPosDbContext dbContext,
+        ITenantFeatureEntitlementEvaluator featureEntitlementEvaluator)
     {
         _dbContext = dbContext;
+        _featureEntitlementEvaluator = featureEntitlementEvaluator;
     }
 
     public async Task<TenantAdminContextData?> GetContextDataAsync(
@@ -35,7 +40,8 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                 TenantId = tenant.Id,
                 TenantName = tenant.DisplayName,
                 TenantTimezone = tenant.DefaultTimezone,
-                CurrencyCode = tenant.BaseCurrencyCode
+                CurrencyCode = tenant.BaseCurrencyCode,
+                Locale = tenant.DefaultLocale
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -116,7 +122,11 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             .OrderBy(x => x)
             .ToListAsync(cancellationToken);
 
-        // Enabled feature codes from tenant feature entitlements joined to PlatformFeature
+        // Enabled feature codes from tenant feature entitlements joined to PlatformFeature.
+        // Outlet management uses Strategy B via ITenantFeatureEntitlementEvaluator so that:
+        // - disabled/expired canonical never falls through to enabled legacy
+        // - legacy-only enabled projects as canonical outlet_management
+        // - clients never see both canonical and legacy as independently enabled
         var now = DateTimeOffset.UtcNow;
         var entitlementRows = await (
             from ent in _dbContext.TenantFeatureEntitlements.AsNoTracking()
@@ -143,8 +153,22 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                 item.EffectiveUntil,
                 now))
             .Select(item => item.FeatureCode)
+            .Where(code => !PlatformTenantFeatureCodes.IsOutletManagementFeatureCode(code))
             .Distinct()
-            .OrderBy(x => x)
+            .ToList();
+
+        var outletEntitled = await _featureEntitlementEvaluator.IsEnabledAsync(
+            tenantId,
+            PlatformTenantFeatureCodes.OutletManagement,
+            now,
+            cancellationToken);
+        if (outletEntitled)
+        {
+            enabledFeatures.Add(PlatformTenantFeatureCodes.OutletManagement);
+        }
+
+        enabledFeatures = enabledFeatures
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         // Subscription status (most recent active one, or first found)
@@ -160,7 +184,7 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             TenantName: userInfo.TenantName,
             TenantTimezone: string.IsNullOrWhiteSpace(userInfo.TenantTimezone) ? "UTC" : userInfo.TenantTimezone,
             CurrencyCode: string.IsNullOrWhiteSpace(userInfo.CurrencyCode) ? "LKR" : userInfo.CurrencyCode,
-            Locale: "en-LK",
+            Locale: string.IsNullOrWhiteSpace(userInfo.Locale) ? "en-LK" : userInfo.Locale,
             UserId: userInfo.UserId,
             FirstName: userInfo.FirstName,
             LastName: userInfo.LastName,

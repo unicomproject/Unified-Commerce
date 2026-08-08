@@ -7,6 +7,7 @@ using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Persistence;
+using E_POS.IntegrationTests.TestSupport;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Xunit;
@@ -113,7 +114,8 @@ public sealed class TenantAdminTillCrudIntegrationTests
             new E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories.TenantAdminHardwareRepository(dbContext),
             new TillDeviceAssignmentRepository(dbContext),
             dateTimeProvider,
-            options);
+            options,
+            new AllowingTenantResourceLimitGuard());
     }
 
     private sealed class FakeTillMonitoringOptionsSnapshot : Microsoft.Extensions.Options.IOptionsSnapshot<TillMonitoringOptions>

@@ -54,7 +54,7 @@ public sealed class PlatformSalesChannelConfiguration : IEntityTypeConfiguration
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_platform_sales_channels_channel_type", "channel_type IN ('PHYSICAL', 'ONLINE', 'AGGREGATOR', 'B2B', 'OTHER')");
+            t.HasCheckConstraint("ck_platform_sales_channels_channel_type", "channel_type IN ('PHYSICAL', 'ONLINE', 'POS', 'AGGREGATOR', 'B2B', 'OTHER')");
         });
     }
 }

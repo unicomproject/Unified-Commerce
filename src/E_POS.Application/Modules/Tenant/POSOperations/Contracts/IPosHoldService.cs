@@ -24,5 +24,6 @@ public interface IPosHoldService
 
     Task<ApplicationResult<PosHoldListResponseDto>> GetHoldsAsync(
         TenantRequestContext context,
+        PosHoldListQueryDto query,
         CancellationToken cancellationToken);
 }

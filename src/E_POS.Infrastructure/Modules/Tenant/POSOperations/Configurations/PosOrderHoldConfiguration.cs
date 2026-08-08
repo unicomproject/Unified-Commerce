@@ -85,6 +85,16 @@ public sealed class PosOrderHoldConfiguration : IEntityTypeConfiguration<PosOrde
             .HasColumnType("varchar(250)")
             .HasMaxLength(250);
 
+        builder.Property(x => x.IdempotencyKey)
+            .HasColumnName("idempotency_key")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100);
+
+        builder.Property(x => x.RequestFingerprint)
+            .HasColumnName("request_fingerprint")
+            .HasColumnType("varchar(64)")
+            .HasMaxLength(64);
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -117,6 +127,14 @@ public sealed class PosOrderHoldConfiguration : IEntityTypeConfiguration<PosOrde
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_pos_order_holds_tenant_id_id");
+
+        // Idempotency authority for Park creation: a client-supplied key is unique per
+        // tenant only while present. NULL keys (legacy/optional) are excluded from the
+        // uniqueness guarantee via the filtered index predicate.
+        builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("uq_pos_order_holds_tenant_id_idempotency_key")
+            .HasFilter("idempotency_key IS NOT NULL");
 
         builder.ToTable(t =>
         {
