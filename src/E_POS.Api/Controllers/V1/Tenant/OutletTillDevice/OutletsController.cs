@@ -150,8 +150,6 @@ public sealed class OutletsController : ControllerBase
             "outlet.not_found" or "outlet.image_not_found" => NotFound(CreateError(error)),
             "outlet.duplicate_code" or "outlet.delete_conflict" or "outlet.image_attached" => Conflict(CreateError(error)),
             "outlet.image_delete_unavailable" => StatusCode(StatusCodes.Status503ServiceUnavailable, CreateError(error)),
-            "outlet.not_found" => NotFound(CreateError(error)),
-            "outlet.duplicate_code" or "outlet.delete_conflict" => Conflict(CreateError(error)),
             "subscription_limit_reached" => Conflict(CreateError(error)),
             "subscription_limit_configuration_missing" or "subscription_limit_invalid" or "subscription_limit_evaluation_failed" or "subscription_limit_unknown_key" or "subscription_limit_not_enforced" => Conflict(CreateError(error)),
             "outlet.invalid_tenant_context" => Unauthorized(CreateError(error)),

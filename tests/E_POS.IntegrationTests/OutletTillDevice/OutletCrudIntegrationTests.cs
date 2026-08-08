@@ -555,13 +555,11 @@ public sealed class OutletCrudIntegrationTests
             new OutletRepository(dbContext),
             new CodeSequenceRepository(dbContext),
             new OutletRequestValidator(),
-            new OutletAuditLogger(Microsoft.Extensions.Logging.Abstractions.NullLogger<OutletAuditLogger>.Instance, dbContext),
-            new FakeDateTimeProvider(now));
             new FakeOutletAuditLogger(),
             new FakeDateTimeProvider(now),
             new TenantFeatureEntitlementEvaluator(
                 dbContext,
-                NullLogger<TenantFeatureEntitlementEvaluator>.Instance),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<TenantFeatureEntitlementEvaluator>.Instance),
             new AllowingTenantResourceLimitGuard());
     }
 
