@@ -13,4 +13,5 @@ public sealed record OutletCreateRequest(
     bool CollectionEnabled,
     int? PreparationLeadMinutes = null,
     int? PickupWindowMinutes = null,
-    TimeOnly? CollectionCutoffTime = null);
+    TimeOnly? CollectionCutoffTime = null,
+    Guid? ImageMediaAssetId = null);

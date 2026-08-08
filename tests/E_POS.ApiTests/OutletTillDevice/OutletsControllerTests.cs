@@ -5,6 +5,7 @@ using E_POS.Api.Controllers;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
+using E_POS.Application.Modules.Shared.Media.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -105,7 +106,7 @@ public sealed class OutletsControllerTests
 
     private static OutletsController CreateController(FakeOutletService service)
     {
-        var controller = new OutletsController(service, new TenantRequestContextFactory());
+        var controller = new OutletsController(service, new FakeOutletImageService(), new TenantRequestContextFactory());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         return controller;
     }
@@ -131,7 +132,7 @@ public sealed class OutletsControllerTests
             true,
             null,
             null,
-            new OutletAddressRequest("1 Main Street", null, "Colombo", null, null, "LK", null, null),
+            new OutletAddressRequest("1 Main Street", null, "Colombo", null, null, "LK", null, null, null),
             [],
             false);
     }
@@ -148,9 +149,10 @@ public sealed class OutletsControllerTests
             true,
             null,
             null,
-            new OutletAddressResponse(Guid.NewGuid(), "PHYSICAL", "1 Main Street", null, "Colombo", null, null, "LK", null, null, true, "ACTIVE"),
+            new OutletAddressResponse(Guid.NewGuid(), "PHYSICAL", "1 Main Street", null, "Colombo", null, null, "LK", null, null, null, true, "ACTIVE"),
             [],
             false,
+            null,
             null,
             null,
             null,
@@ -211,6 +213,12 @@ public sealed class OutletsControllerTests
         {
             return Task.FromResult(ApplicationResult.Success());
         }
+    }
+
+    private sealed class FakeOutletImageService : IOutletImageService
+    {
+        public Task<ApplicationResult<OutletImageUploadResponse>> UploadAsync(TenantRequestContext context, MediaUploadFile file, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<OutletImageUploadResponse>.Failure(new ApplicationError("test", "Not configured.")));
+        public Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid mediaAssetId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
     }
 }
 

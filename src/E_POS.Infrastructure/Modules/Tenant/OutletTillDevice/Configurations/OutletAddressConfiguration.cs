@@ -24,6 +24,7 @@ public sealed class OutletAddressConfiguration : IEntityTypeConfiguration<Outlet
         builder.Property(x => x.CountryCode).HasColumnName("country_code").HasColumnType("char(2)").HasMaxLength(2).IsRequired();
         builder.Property(x => x.ContactName).HasColumnName("contact_name").HasColumnType("varchar(150)").HasMaxLength(150).IsRequired(false);
         builder.Property(x => x.ContactPhone).HasColumnName("contact_phone").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired(false);
+        builder.Property(x => x.ContactEmail).HasColumnName("contact_email").HasColumnType("varchar(255)").HasMaxLength(255).IsRequired(false);
         builder.Property(x => x.IsPrimary).HasColumnName("is_primary").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").IsRequired();

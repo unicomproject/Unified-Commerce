@@ -53,7 +53,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
                 Type = outlet.OutletType,
                 Status = outlet.Status,
                 ImageUrl = _dbContext.MediaAssets
-                    .Where(media => media.TenantId == tenantId && media.Id == outlet.MediaAssetId)
+                    .Where(media => media.TenantId == tenantId && media.Id == outlet.PrimaryImageMediaAssetId)
                     .Select(media => media.PublicUrl)
                     .FirstOrDefault(),
                 ManagerId = _dbContext.OutletUserRoles
@@ -618,7 +618,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
                 .Where(x => x.AddressType == OutletConstants.PhysicalAddressType)
                 .DefaultIfEmpty()
             join media in _dbContext.MediaAssets.AsNoTracking()
-                on new { TenantId = outlet.TenantId, Id = outlet.MediaAssetId }
+                on new { TenantId = outlet.TenantId, Id = outlet.PrimaryImageMediaAssetId }
                 equals new { TenantId = media.TenantId, Id = (Guid?)media.Id } into mediaJoin
             from media in mediaJoin.DefaultIfEmpty()
             where outlet.TenantId == tenantId &&
@@ -633,7 +633,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
                 media != null ? media.PublicUrl : null,
                 address != null ? address.AddressLine1 : null,
                 address != null ? address.City : null,
-                outlet.MediaAssetId))
+                outlet.PrimaryImageMediaAssetId))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -939,7 +939,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
             return false;
         }
 
-        outlet.SetMediaAssetId(mediaAssetId, updatedByTenantUserId, now);
+        outlet.SetPrimaryImageMediaAssetId(mediaAssetId, updatedByTenantUserId, now);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -962,7 +962,7 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
             return false;
         }
 
-        outlet.SetMediaAssetId(null, updatedByTenantUserId, now);
+        outlet.SetPrimaryImageMediaAssetId(null, updatedByTenantUserId, now);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }

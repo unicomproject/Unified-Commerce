@@ -112,6 +112,13 @@ public sealed class OutletService : IOutletService
                 request.Email,
                 context.UserId,
                 now);
+
+            // Attach staged image when provided on create.
+            if (request.ImageMediaAssetId.HasValue)
+            {
+                outlet.SetPrimaryImageMediaAssetId(request.ImageMediaAssetId, context.UserId, now);
+            }
+
             var address = CreateAddress(context.TenantId, outletId, request.Address, context.UserId, now);
             var hours = CreateBusinessHours(context.TenantId, outletId, request.BusinessHours, now);
             var pickupMapping = await CreatePickupMappingAsync(
@@ -140,6 +147,10 @@ public sealed class OutletService : IOutletService
                 outlet.OutletCode,
                 outlet.OutletType,
                 outlet.Status);
+            if (request.ImageMediaAssetId.HasValue)
+            {
+                _auditLogger.LogImageAssociated(context.TenantId, context.UserId, outletId, request.ImageMediaAssetId.Value);
+            }
 
             var response = await _repository.GetByIdAsync(context.TenantId, outletId, false, cancellationToken);
             return ApplicationResult<OutletResponse>.Success(response!);
@@ -216,6 +227,7 @@ public sealed class OutletService : IOutletService
         }
 
         var now = _dateTimeProvider.UtcNow;
+        var previousImageMediaAssetId = aggregate.Outlet.PrimaryImageMediaAssetId;
         aggregate.Outlet.UpdateProfile(
             request.OutletName,
             normalizedOutletCode,
@@ -227,6 +239,20 @@ public sealed class OutletService : IOutletService
             request.Email,
             context.UserId,
             now);
+
+        // Apply image operation matrix: null defaults to KEEP.
+        var imageOperation = request.ImageOperation ?? OutletImageOperation.KEEP;
+        switch (imageOperation)
+        {
+            case OutletImageOperation.REPLACE:
+                aggregate.Outlet.SetPrimaryImageMediaAssetId(request.ImageMediaAssetId, context.UserId, now);
+                break;
+            case OutletImageOperation.REMOVE:
+                aggregate.Outlet.SetPrimaryImageMediaAssetId(null, context.UserId, now);
+                break;
+            // KEEP: leave PrimaryImageMediaAssetId unchanged.
+        }
+
         var address = UpdateOrCreateAddress(context.TenantId, aggregate.PhysicalAddress, outletId, request.Address, context.UserId, now);
         var hours = CreateBusinessHours(context.TenantId, outletId, request.BusinessHours, now);
         var enableCollection = aggregate.Outlet.Status != OutletConstants.DeletedStatus && request.CollectionEnabled;
@@ -249,6 +275,21 @@ public sealed class OutletService : IOutletService
 
         var includeDeleted = aggregate.Outlet.Status == OutletConstants.DeletedStatus;
         var response = await _repository.GetByIdAsync(context.TenantId, outletId, includeDeleted, cancellationToken);
+        if (imageOperation == OutletImageOperation.REPLACE && request.ImageMediaAssetId.HasValue)
+        {
+            if (previousImageMediaAssetId.HasValue)
+            {
+                _auditLogger.LogImageReplaced(context.TenantId, context.UserId, outletId, previousImageMediaAssetId.Value, request.ImageMediaAssetId.Value);
+            }
+            else
+            {
+                _auditLogger.LogImageAssociated(context.TenantId, context.UserId, outletId, request.ImageMediaAssetId.Value);
+            }
+        }
+        else if (imageOperation == OutletImageOperation.REMOVE && previousImageMediaAssetId.HasValue)
+        {
+            _auditLogger.LogImageDetached(context.TenantId, context.UserId, outletId, previousImageMediaAssetId.Value);
+        }
         return response is null ? ApplicationResult<OutletResponse>.Failure(NotFound) : ApplicationResult<OutletResponse>.Success(response);
     }
 
@@ -415,6 +456,7 @@ public sealed class OutletService : IOutletService
             request.CountryCode,
             request.ContactName,
             request.ContactPhone,
+            request.ContactEmail,
             createdByTenantUserId,
             now);
 
@@ -430,6 +472,7 @@ public sealed class OutletService : IOutletService
             request.CountryCode,
             request.ContactName,
             request.ContactPhone,
+            request.ContactEmail,
             updatedByTenantUserId,
             now);
         return currentAddress;

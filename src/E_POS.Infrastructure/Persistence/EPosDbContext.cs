@@ -278,6 +278,10 @@ public sealed class EPosDbContext : DbContext
     // Shared Media
     public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
 
+    // Shared Idempotency & Audit
+    public DbSet<E_POS.Domain.Modules.Shared.Idempotency.Entities.IdempotencyRequest> IdempotencyRequests => Set<E_POS.Domain.Modules.Shared.Idempotency.Entities.IdempotencyRequest>();
+    public DbSet<E_POS.Domain.Modules.Shared.Audit.Entities.AuditLog> AuditLogs => Set<E_POS.Domain.Modules.Shared.Audit.Entities.AuditLog>();
+
     // Fulfilment and Pickup
     public DbSet<FulfillmentMethod> FulfillmentMethods => Set<FulfillmentMethod>();
     public DbSet<FulfillmentMethodOutlet> FulfillmentMethodOutlets => Set<FulfillmentMethodOutlet>();

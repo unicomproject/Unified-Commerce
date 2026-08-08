@@ -186,6 +186,7 @@ public static class DependencyInjection
         services.AddScoped<IReturnPolicyRepository, ReturnPolicyRepository>();
         services.AddScoped<ICodeSequenceRepository, CodeSequenceRepository>();
         services.AddScoped<IOutletRepository, OutletRepository>();
+        services.AddScoped<IOutletImageRepository, OutletImageRepository>();
         services.AddScoped<IOutletAuditLogger, OutletAuditLogger>();
         services.AddScoped<ITenantAdminOutletRepository, TenantAdminOutletRepository>();
         services.AddScoped<ITenantAdminTillRepository, TenantAdminTillRepository>();
@@ -215,6 +216,7 @@ public static class DependencyInjection
         services.AddScoped<IAzureSasTokenProvider, AzureBlobSasTokenProvider>();
         services.AddScoped<IReturnInspectionMediaStorage, LocalReturnInspectionMediaStorage>();
         services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
+        services.AddHostedService<OutletMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
         services.AddScoped<IPosHardwareRepository, PosHardwareRepository>();

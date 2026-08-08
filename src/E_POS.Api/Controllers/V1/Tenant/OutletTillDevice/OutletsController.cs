@@ -2,6 +2,7 @@ using E_POS.Api.Common;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
+using E_POS.Application.Modules.Shared.Media.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,11 +15,34 @@ public sealed class OutletsController : ControllerBase
 {
     private readonly IOutletService _outletService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
+    private readonly IOutletImageService _outletImageService;
 
-    public OutletsController(IOutletService outletService, ITenantRequestContextFactory tenantRequestContextFactory)
+    public OutletsController(IOutletService outletService, IOutletImageService outletImageService, ITenantRequestContextFactory tenantRequestContextFactory)
     {
         _outletService = outletService;
+        _outletImageService = outletImageService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
+    }
+
+    [HttpPost("image-uploads")]
+    [RequestSizeLimit(2 * 1024 * 1024)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(OutletImageUploadResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UploadImage([FromForm] IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized(CreateError(new ApplicationError("outlet.invalid_tenant_context", "Invalid tenant context.")));
+        if (file is null) return BadRequest(CreateError(new ApplicationError("outlet.image_invalid", "Image file is required.", [new ApplicationFieldError("file", "Image file is required.")])));
+        await using var stream = file.OpenReadStream();
+        var result = await _outletImageService.UploadAsync(context, new MediaUploadFile(stream, file.FileName, file.ContentType, file.Length), cancellationToken);
+        return result.IsSuccess && result.Value is not null ? Ok(result.Value) : ToErrorResult(result.Error);
+    }
+
+    [HttpDelete("image-uploads/{mediaAssetId:guid}")]
+    public async Task<IActionResult> DeleteImage(Guid mediaAssetId, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized(CreateError(new ApplicationError("outlet.invalid_tenant_context", "Invalid tenant context.")));
+        var result = await _outletImageService.DeleteAsync(context, mediaAssetId, cancellationToken);
+        return result.IsSuccess ? NoContent() : ToErrorResult(result.Error);
     }
 
     [HttpGet("create-options")]
@@ -123,8 +147,9 @@ public sealed class OutletsController : ControllerBase
         return error.Code switch
         {
             "outlet.permission_denied" or "outlet.feature_disabled" or "outlet.tenant_blocked" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
-            "outlet.not_found" => NotFound(CreateError(error)),
-            "outlet.duplicate_code" or "outlet.delete_conflict" => Conflict(CreateError(error)),
+            "outlet.not_found" or "outlet.image_not_found" => NotFound(CreateError(error)),
+            "outlet.duplicate_code" or "outlet.delete_conflict" or "outlet.image_attached" => Conflict(CreateError(error)),
+            "outlet.image_delete_unavailable" => StatusCode(StatusCodes.Status503ServiceUnavailable, CreateError(error)),
             "outlet.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
         };

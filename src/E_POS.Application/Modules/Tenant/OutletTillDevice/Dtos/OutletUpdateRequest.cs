@@ -13,4 +13,6 @@ public sealed record OutletUpdateRequest(
     bool CollectionEnabled,
     int? PreparationLeadMinutes = null,
     int? PickupWindowMinutes = null,
-    TimeOnly? CollectionCutoffTime = null);
+    TimeOnly? CollectionCutoffTime = null,
+    OutletImageOperation? ImageOperation = null,
+    Guid? ImageMediaAssetId = null);
