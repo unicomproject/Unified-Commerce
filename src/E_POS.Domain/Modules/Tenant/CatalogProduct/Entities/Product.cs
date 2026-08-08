@@ -22,6 +22,14 @@ public class Product : AuditableEntity
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
+    public int CurrentSetupStep { get; protected set; } = 1;
+    public DateTimeOffset? DraftSavedAt { get; protected set; }
+    public DateTimeOffset? PublishedAt { get; protected set; }
+    public Guid? PublishedByTenantUserId { get; protected set; }
+    public DateTimeOffset? ArchivedAt { get; protected set; }
+    public Guid? ArchivedByTenantUserId { get; protected set; }
+    public long RowVersion { get; protected set; } = 1;
+
     public static Product Create(
         Guid id,
         Guid tenantId,
@@ -61,7 +69,12 @@ public class Product : AuditableEntity
             CreatedByTenantUserId = createdByTenantUserId,
             UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            CurrentSetupStep = status == ProductConstants.DraftStatus ? 1 : 8,
+            DraftSavedAt = status == ProductConstants.DraftStatus ? now : null,
+            PublishedAt = status != ProductConstants.DraftStatus ? now : null,
+            PublishedByTenantUserId = status != ProductConstants.DraftStatus ? createdByTenantUserId : null,
+            RowVersion = 1
         };
     }
 
@@ -97,6 +110,10 @@ public class Product : AuditableEntity
         Status = ProductConstants.NormalizeStatus(status);
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
+        if (status == ProductConstants.DraftStatus)
+        {
+            DraftSavedAt = now;
+        }
     }
 
     public void UpdateStatus(string status, Guid? updatedByTenantUserId, DateTimeOffset now)
@@ -108,9 +125,41 @@ public class Product : AuditableEntity
 
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
-        Status = ProductConstants.DeletedStatus;
+        Status = ProductConstants.ArchivedStatus;
+        ArchivedAt = now;
+        ArchivedByTenantUserId = updatedByTenantUserId;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
+    }
+
+    public void Archive(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = ProductConstants.ArchivedStatus;
+        ArchivedAt = now;
+        ArchivedByTenantUserId = updatedByTenantUserId;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void SetDraftSaved(int setupStep, DateTimeOffset now)
+    {
+        Status = ProductConstants.DraftStatus;
+        CurrentSetupStep = setupStep;
+        DraftSavedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void SetPublished(Guid? userId, DateTimeOffset now)
+    {
+        PublishedAt = now;
+        PublishedByTenantUserId = userId;
+        CurrentSetupStep = 8;
+        UpdatedAt = now;
+    }
+
+    public void IncrementRowVersion()
+    {
+        RowVersion++;
     }
 }
 

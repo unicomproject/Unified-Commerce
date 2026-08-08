@@ -5,6 +5,8 @@ public static class ProductConstants
     public const string ActiveStatus = "ACTIVE";
     public const string InactiveStatus = "INACTIVE";
     public const string DeletedStatus = "DELETED";
+    public const string DraftStatus = "DRAFT";
+    public const string ArchivedStatus = "ARCHIVED";
 
     public const string ViewPermission = "catalog.products.view";
     public const string CreatePermission = "catalog.products.create";
@@ -18,7 +20,8 @@ public static class ProductConstants
     public static bool IsValidWriteStatus(string status)
     {
         var normalized = NormalizeStatus(status);
-        return normalized is ActiveStatus or InactiveStatus;
+        return normalized is ActiveStatus or InactiveStatus or DraftStatus or ArchivedStatus;
     }
 }
+
 

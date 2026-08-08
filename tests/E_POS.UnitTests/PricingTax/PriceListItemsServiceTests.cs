@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
@@ -197,6 +197,8 @@ public sealed class PriceListItemsServiceTests
 
         public Task<bool> ProductExistsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ProductExists);
         public Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => Task.FromResult(VariantExists);
+        public Task<bool> ProductIsPriceableAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ProductExists);
+        public Task<bool> ProductVariantIsPriceableAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => Task.FromResult(VariantExists);
         
         public Task<bool> ProductCodeExistsAsync(Guid tenantId, string productCode, Guid? excludeProductId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductId, CancellationToken cancellationToken) => Task.FromResult(false);

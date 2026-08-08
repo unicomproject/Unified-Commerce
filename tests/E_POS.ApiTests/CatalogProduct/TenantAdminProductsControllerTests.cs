@@ -449,6 +449,42 @@ public sealed class TenantAdminProductsControllerTests
     }
 
     [Fact]
+    public async Task List_WithValidFilters_ReturnsOk()
+    {
+        var categoryId = Guid.NewGuid();
+        var brandId = Guid.NewGuid();
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), TenantAdminProductPermissions.View);
+
+        var result = await controller.List(
+            search: "Jersey",
+            categoryId: categoryId,
+            brandId: brandId,
+            productStatus: "ACTIVE",
+            stockStatus: "IN_STOCK",
+            page: 2,
+            pageSize: 10,
+            sortBy: "productName",
+            sortDirection: "asc",
+            cancellationToken: CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetFilterOptions_WithPermission_ReturnsOk()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), TenantAdminProductPermissions.View);
+
+        var result = await controller.GetFilterOptions(CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
     public async Task Delete_WithTenantProductsDelete_ReturnsOk()
     {
         var productId = Guid.NewGuid();
@@ -730,6 +766,12 @@ public sealed class TenantAdminProductsControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(CreateOptionsResult);
 
+        public Task<ApplicationResult<TenantAdminProductFilterOptionsResponse>> GetFilterOptionsAsync(
+            TenantRequestContext context,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<TenantAdminProductFilterOptionsResponse>.Success(
+                new TenantAdminProductFilterOptionsResponse([], [], [], [])));
+
         public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
             TenantRequestContext context,
             TenantAdminProductCreateRequest request,
@@ -765,16 +807,25 @@ public sealed class TenantAdminProductsControllerTests
         public Task<ApplicationResult<TenantAdminProductListResponse>> ListAsync(
             TenantRequestContext context,
             string? search,
-            int page,
+            Guid? categoryId,
+            Guid? brandId,
+            string? productStatus,
+            string? stockStatus,
+            int pageNumber,
             int pageSize,
+            string? sortBy,
+            string? sortDirection,
             CancellationToken cancellationToken) =>
             Task.FromResult(
                 ApplicationResult<TenantAdminProductListResponse>.Success(
                     new TenantAdminProductListResponse(
-                        new TenantAdminProductSummaryResponse(0, 0, 0, 0),
                         [],
-                        page,
+                        pageNumber,
                         pageSize,
+                        0,
+                        0,
+                        false,
+                        false,
                         0)));
     }
 

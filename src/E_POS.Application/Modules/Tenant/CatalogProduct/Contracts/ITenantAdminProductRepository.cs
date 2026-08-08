@@ -6,6 +6,20 @@ public interface ITenantAdminProductRepository
 {
     Task<TenantAdminProductSummaryResponse> GetSummaryAsync(Guid tenantId, CancellationToken cancellationToken);
 
+    Task<TenantAdminProductListResponse> GetPagedListAsync(
+        Guid tenantId,
+        string? search,
+        Guid? categoryId,
+        Guid? brandId,
+        string? productStatus,
+        string? stockStatus,
+        int pageNumber,
+        int pageSize,
+        string? sortBy,
+        string? sortDirection,
+        bool canViewStock,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyDictionary<Guid, string>> GetPrimaryCategoryNamesAsync(
         Guid tenantId,
         IReadOnlyCollection<Guid> productIds,
@@ -17,6 +31,10 @@ public interface ITenantAdminProductRepository
         CancellationToken cancellationToken);
 
     Task<TenantAdminProductCreateOptionsResponse> GetCreateOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task<TenantAdminProductFilterOptionsResponse> GetFilterOptionsAsync(
         Guid tenantId,
         CancellationToken cancellationToken);
 

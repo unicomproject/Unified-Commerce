@@ -175,7 +175,7 @@ public sealed class ProductServiceTests
         Assert.True(result.IsSuccess);
         var mediaAssetId = Assert.Single(repository.AddedMediaAssets).Id;
         Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
-        Assert.Equal(ProductConstants.DeletedStatus, repository.AddedProduct.Status);
+        Assert.Equal(ProductConstants.ArchivedStatus, repository.AddedProduct.Status);
     }
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string> permissions)
     {
@@ -336,6 +336,8 @@ public sealed class ProductServiceTests
 
         public Task<bool> ProductExistsAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> ProductIsPriceableAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> ProductVariantIsPriceableAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }
 

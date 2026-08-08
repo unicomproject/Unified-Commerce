@@ -26,7 +26,7 @@ public sealed class ProductRepository : IProductRepository
             .AnyAsync(
                 x => x.TenantId == tenantId &&
                      x.ProductCode == productCode &&
-                     x.Status != ProductConstants.DeletedStatus &&
+                     x.Status != ProductConstants.ArchivedStatus &&
                      (!excludeProductId.HasValue || x.Id != excludeProductId.Value),
                 cancellationToken);
     }
@@ -38,7 +38,7 @@ public sealed class ProductRepository : IProductRepository
             .AnyAsync(
                 x => x.TenantId == tenantId &&
                      x.Sku == sku &&
-                     x.Status != ProductConstants.DeletedStatus &&
+                     x.Status != ProductConstants.ArchivedStatus &&
                      (!excludeProductVariantId.HasValue || x.Id != excludeProductVariantId.Value),
                 cancellationToken);
     }
@@ -58,7 +58,7 @@ public sealed class ProductRepository : IProductRepository
     {
         var products = _dbContext.Products
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.DeletedStatus);
+            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -82,7 +82,7 @@ public sealed class ProductRepository : IProductRepository
         var rows = await (from product in products
                           join variant in _dbContext.ProductVariants.AsNoTracking()
                               on product.Id equals variant.ProductId into variantJoin
-                          from variant in variantJoin.Where(v => v.Status != ProductConstants.DeletedStatus).DefaultIfEmpty()
+                          from variant in variantJoin.Where(v => v.Status != ProductConstants.ArchivedStatus).DefaultIfEmpty()
                           join barcode in _dbContext.ProductBarcodes.AsNoTracking()
                               on variant.Id equals barcode.ProductVariantId into barcodeJoin
                           from barcode in barcodeJoin.DefaultIfEmpty()
@@ -119,7 +119,7 @@ public sealed class ProductRepository : IProductRepository
     {
         var product = await _dbContext.Products
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == productId && (includeDeleted || x.Status != ProductConstants.DeletedStatus), cancellationToken);
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == productId && (includeDeleted || x.Status != ProductConstants.ArchivedStatus), cancellationToken);
 
         if (product is null) return null;
 
@@ -127,7 +127,7 @@ public sealed class ProductRepository : IProductRepository
 
         var variant = await _dbContext.ProductVariants
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ProductId == productId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ProductId == productId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
 
         var barcodeVal = variant != null
             ? await _dbContext.ProductBarcodes.AsNoTracking().Where(x => x.TenantId == tenantId && x.ProductVariantId == variant.Id).Select(x => x.Barcode).FirstOrDefaultAsync(cancellationToken)
@@ -192,7 +192,7 @@ public sealed class ProductRepository : IProductRepository
     public Task<Product?> GetEditableAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken)
     {
         return _dbContext.Products
-            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == productId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == productId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
     }
 
     public Task AddAsync(Product product, CancellationToken cancellationToken)
@@ -319,7 +319,7 @@ public sealed class ProductRepository : IProductRepository
     public async Task<ProductVariant?> GetDefaultVariantAsync(Guid productId, CancellationToken cancellationToken)
     {
         return await _dbContext.ProductVariants
-            .FirstOrDefaultAsync(x => x.ProductId == productId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
+            .FirstOrDefaultAsync(x => x.ProductId == productId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
     }
 
     public async Task<PriceListItem?> GetPriceListItemAsync(Guid priceListId, Guid variantId, CancellationToken cancellationToken)
@@ -338,14 +338,28 @@ public sealed class ProductRepository : IProductRepository
     {
         return _dbContext.Products
             .AsNoTracking()
-            .AnyAsync(x => x.TenantId == tenantId && x.Id == productId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
+            .AnyAsync(x => x.TenantId == tenantId && x.Id == productId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
     }
 
     public Task<bool> ProductVariantExistsAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken)
     {
         return _dbContext.ProductVariants
             .AsNoTracking()
-            .AnyAsync(x => x.TenantId == tenantId && x.ProductId == productId && x.Id == variantId && x.Status != ProductConstants.DeletedStatus, cancellationToken);
+            .AnyAsync(x => x.TenantId == tenantId && x.ProductId == productId && x.Id == variantId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
+    }
+
+    public Task<bool> ProductIsPriceableAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken)
+    {
+        return _dbContext.Products
+            .AsNoTracking()
+            .AnyAsync(x => x.TenantId == tenantId && x.Id == productId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
+    }
+
+    public Task<bool> ProductVariantIsPriceableAsync(Guid tenantId, Guid productId, Guid variantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.ProductVariants
+            .AsNoTracking()
+            .AnyAsync(x => x.TenantId == tenantId && x.ProductId == productId && x.Id == variantId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
     }
 }
 

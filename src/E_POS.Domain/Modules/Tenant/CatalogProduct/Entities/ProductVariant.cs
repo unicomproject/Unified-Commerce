@@ -98,7 +98,14 @@ public class ProductVariant : AuditableEntity
 
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
-        Status = ProductConstants.DeletedStatus;
+        Status = ProductConstants.ArchivedStatus;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void Archive(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = ProductConstants.ArchivedStatus;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

@@ -31,8 +31,15 @@ public sealed class TenantAdminProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromQuery] string? search = null,
-        [FromQuery] int page = 1,
+        [FromQuery] Guid? categoryId = null,
+        [FromQuery] Guid? brandId = null,
+        [FromQuery] string? productStatus = null,
+        [FromQuery] string? stockStatus = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageNumber = null,
         [FromQuery] int pageSize = 10,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = null,
         CancellationToken cancellationToken = default)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))
@@ -42,13 +49,36 @@ public sealed class TenantAdminProductsController : ControllerBase
                 "Invalid tenant context.")));
         }
 
+        var resolvedPageNumber = pageNumber ?? page ?? 1;
+
         var result = await _tenantAdminProductService.ListAsync(
             context,
             search,
-            page,
+            categoryId,
+            brandId,
+            productStatus,
+            stockStatus,
+            resolvedPageNumber,
             pageSize,
+            sortBy,
+            sortDirection,
             cancellationToken);
 
+        return ToActionResult(result);
+    }
+
+    [HttpGet("filter-options")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFilterOptions(CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.GetFilterOptionsAsync(context, cancellationToken);
         return ToActionResult(result);
     }
 

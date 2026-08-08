@@ -92,8 +92,42 @@ public sealed class TenantAdminProductServiceTests
                 20,
                 1),
         };
+        // Setup test values
+        var listResponse = new TenantAdminProductListResponse(
+            [
+                new TenantAdminProductListItemResponse(
+                    productId,
+                    "PROD-001",
+                    "Image Product",
+                    imageUrl,
+                    "SKU-001",
+                    null,
+                    Guid.NewGuid(),
+                    "CategoryName",
+                    Guid.NewGuid(),
+                    "BrandName",
+                    1,
+                    10m,
+                    12m,
+                    "LKR",
+                    5m,
+                    "ACTIVE",
+                    "IN_STOCK",
+                    1,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow)
+            ],
+            PageNumber: 1,
+            PageSize: 10,
+            TotalCount: 1,
+            TotalPages: 1,
+            HasPreviousPage: false,
+            HasNextPage: false,
+            CatalogTotalCount: 1);
+
         var tenantAdminRepository = new FakeTenantAdminProductRepository
         {
+            ListResponse = listResponse,
             PrimaryImageUrls = new Dictionary<Guid, string>
             {
                 [productId] = imageUrl,
@@ -104,9 +138,15 @@ public sealed class TenantAdminProductServiceTests
         var result = await service.ListAsync(
             CreateContext([TenantAdminProductPermissions.View]),
             search: null,
-            page: 1,
-            pageSize: 20,
-            CancellationToken.None);
+            categoryId: null,
+            brandId: null,
+            productStatus: null,
+            stockStatus: null,
+            pageNumber: 1,
+            pageSize: 10,
+            sortBy: null,
+            sortDirection: null,
+            cancellationToken: CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
@@ -516,7 +556,7 @@ public sealed class TenantAdminProductServiceTests
                 new TenantAdminProductDeleteResponse(
                     productId,
                     "Archived",
-                    ProductConstants.InactiveStatus),
+                    ProductConstants.ArchivedStatus),
                 null),
         };
         var service = CreateService(repository);
@@ -528,7 +568,7 @@ public sealed class TenantAdminProductServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Archived", result.Value!.Outcome);
-        Assert.Equal(ProductConstants.InactiveStatus, result.Value.Status);
+        Assert.Equal(ProductConstants.ArchivedStatus, result.Value.Status);
     }
 
     [Fact]
@@ -541,7 +581,7 @@ public sealed class TenantAdminProductServiceTests
                 new TenantAdminProductDeleteResponse(
                     productId,
                     "Deleted",
-                    ProductConstants.DeletedStatus),
+                    ProductConstants.ArchivedStatus),
                 null),
         };
         var service = CreateService(repository);
@@ -553,7 +593,7 @@ public sealed class TenantAdminProductServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Deleted", result.Value!.Outcome);
-        Assert.Equal(ProductConstants.DeletedStatus, result.Value.Status);
+        Assert.Equal(ProductConstants.ArchivedStatus, result.Value.Status);
     }
 
     [Fact]
@@ -566,7 +606,7 @@ public sealed class TenantAdminProductServiceTests
                 new TenantAdminProductDeleteResponse(
                     productId,
                     "Deleted",
-                    ProductConstants.DeletedStatus),
+                    ProductConstants.ArchivedStatus),
                 null),
         };
         var auditLogger = new FakeTenantAdminProductAuditLogger();
@@ -581,7 +621,7 @@ public sealed class TenantAdminProductServiceTests
         Assert.True(auditLogger.ProductDeletedLogged);
         Assert.Equal(productId, auditLogger.LastProductId);
         Assert.Equal("Deleted", auditLogger.LastOutcome);
-        Assert.Equal(ProductConstants.DeletedStatus, auditLogger.LastStatus);
+        Assert.Equal(ProductConstants.ArchivedStatus, auditLogger.LastStatus);
     }
 
     [Fact]
@@ -829,6 +869,29 @@ public sealed class TenantAdminProductServiceTests
             Guid tenantId,
             CancellationToken cancellationToken) =>
             Task.FromResult(CreateOptions);
+
+        public TenantAdminProductListResponse ListResponse { get; init; } =
+            new([], 1, 10, 0, 0, false, false, 0);
+
+        public Task<TenantAdminProductListResponse> GetPagedListAsync(
+            Guid tenantId,
+            string? search,
+            Guid? categoryId,
+            Guid? brandId,
+            string? productStatus,
+            string? stockStatus,
+            int pageNumber,
+            int pageSize,
+            string? sortBy,
+            string? sortDirection,
+            bool canViewStock,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ListResponse);
+
+        public Task<TenantAdminProductFilterOptionsResponse> GetFilterOptionsAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantAdminProductFilterOptionsResponse([], [], [], []));
 
         public Task<IReadOnlyDictionary<Guid, string>> GetPrimaryCategoryNamesAsync(
             Guid tenantId,
@@ -1145,6 +1208,19 @@ public sealed class TenantAdminProductServiceTests
             Task.FromResult(ExistingProductIds.Contains(productId));
 
         public Task<bool> ProductVariantExistsAsync(
+            Guid tenantId,
+            Guid productId,
+            Guid variantId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<bool> ProductIsPriceableAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ExistingProductIds.Contains(productId));
+
+        public Task<bool> ProductVariantIsPriceableAsync(
             Guid tenantId,
             Guid productId,
             Guid variantId,

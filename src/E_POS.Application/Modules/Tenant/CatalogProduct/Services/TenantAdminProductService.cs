@@ -439,11 +439,44 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         return ApplicationResult<TenantAdminProductCreateOptionsResponse>.Success(response);
     }
 
+    public async Task<ApplicationResult<TenantAdminProductFilterOptionsResponse>> GetFilterOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccess(context);
+        if (accessError is not null)
+        {
+            return ApplicationResult<TenantAdminProductFilterOptionsResponse>.Failure(accessError);
+        }
+
+        var response = await _tenantAdminProductRepository.GetFilterOptionsAsync(
+            context.TenantId,
+            cancellationToken);
+
+        var canViewStock = CanViewStock(context);
+        if (!canViewStock)
+        {
+            response = new TenantAdminProductFilterOptionsResponse(
+                response.Categories,
+                response.Brands,
+                response.ProductStatuses,
+                []);
+        }
+
+        return ApplicationResult<TenantAdminProductFilterOptionsResponse>.Success(response);
+    }
+
     public async Task<ApplicationResult<TenantAdminProductListResponse>> ListAsync(
         TenantRequestContext context,
         string? search,
-        int page,
+        Guid? categoryId,
+        Guid? brandId,
+        string? productStatus,
+        string? stockStatus,
+        int pageNumber,
         int pageSize,
+        string? sortBy,
+        string? sortDirection,
         CancellationToken cancellationToken)
     {
         var accessError = ValidateAccess(context);
@@ -452,54 +485,39 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             return ApplicationResult<TenantAdminProductListResponse>.Failure(accessError);
         }
 
-        var safePage = Math.Max(1, page);
-        var safePageSize = Math.Clamp(pageSize, 1, 100);
+        var canViewStock = CanViewStock(context);
+        if (!string.IsNullOrWhiteSpace(stockStatus) && !canViewStock)
+        {
+            return ApplicationResult<TenantAdminProductListResponse>.Failure(PermissionDenied);
+        }
 
-        var list = await _productRepository.ListAsync(
+        var validationError = _validator.ValidateListQuery(
+            productStatus,
+            stockStatus,
+            pageNumber,
+            pageSize,
+            sortBy,
+            sortDirection);
+        if (validationError is not null)
+        {
+            return ApplicationResult<TenantAdminProductListResponse>.Failure(validationError);
+        }
+
+        var list = await _tenantAdminProductRepository.GetPagedListAsync(
             context.TenantId,
-            safePage,
-            safePageSize,
             search,
+            categoryId,
+            brandId,
+            productStatus,
+            stockStatus,
+            pageNumber,
+            pageSize,
+            sortBy,
+            sortDirection,
+            canViewStock,
             cancellationToken);
 
-        var summary = await _tenantAdminProductRepository.GetSummaryAsync(context.TenantId, cancellationToken);
-
-        var productIds = list.Items.Select(x => x.Id).ToArray();
-        var categoryNames = productIds.Length == 0
-            ? new Dictionary<Guid, string>()
-            : await _tenantAdminProductRepository.GetPrimaryCategoryNamesAsync(
-                context.TenantId,
-                productIds,
-                cancellationToken);
-
-        var imageUrls = productIds.Length == 0
-            ? new Dictionary<Guid, string>()
-            : await _tenantAdminProductRepository.GetPrimaryImageUrlsAsync(
-                context.TenantId,
-                productIds,
-                cancellationToken);
-
-        var items = list.Items
-            .Select(item => new TenantAdminProductListItemResponse(
-                item.Id,
-                item.Name,
-                categoryNames.TryGetValue(item.Id, out var categoryName) ? categoryName : null,
-                item.Sku,
-                item.Barcode,
-                item.Price,
-                item.Status,
-                OutletCount: 0,
-                imageUrls.TryGetValue(item.Id, out var imageUrl) ? imageUrl : null))
-            .ToList();
-
-        var response = new TenantAdminProductListResponse(
-            summary,
-            items,
-            list.PageNumber,
-            list.PageSize,
-            list.TotalCount);
-
-        return ApplicationResult<TenantAdminProductListResponse>.Success(response);
+        return ApplicationResult<TenantAdminProductListResponse>.Success(list);
     }
 
     private static IEnumerable<string> GetSkuValues(TenantAdminProductCreateRequest request)

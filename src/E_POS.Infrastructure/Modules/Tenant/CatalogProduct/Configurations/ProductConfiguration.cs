@@ -109,11 +109,59 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasColumnName("updated_by_tenant_user_id")
             .IsRequired(false);
 
+        builder.Property(x => x.CurrentSetupStep)
+            .HasColumnName("current_setup_step")
+            .HasDefaultValue(1)
+            .IsRequired();
+
+        builder.Property(x => x.DraftSavedAt)
+            .HasColumnName("draft_saved_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.PublishedAt)
+            .HasColumnName("published_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.PublishedByTenantUserId)
+            .HasColumnName("published_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ArchivedAt)
+            .HasColumnName("archived_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.ArchivedByTenantUserId)
+            .HasColumnName("archived_by_tenant_user_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .HasDefaultValue(1)
+            .IsConcurrencyToken()
+            .IsRequired();
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_products_tenant_id_tenants");
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.PublishedByTenantUserId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_products_tenant_users_published_by");
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.ArchivedByTenantUserId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_products_tenant_users_archived_by");
 
         builder.HasIndex(x => new { x.TenantId, x.ProductCode })
             .IsUnique()
@@ -127,9 +175,10 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .IsUnique()
             .HasDatabaseName("uq_products_tenant_id_id");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_products_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
+        builder.ToTable(t => 
+        {
+            t.HasCheckConstraint("ck_products_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
+            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 8");
+        });
     }
 }
-
-
-

@@ -8,8 +8,14 @@ public interface ITenantAdminProductService
     Task<ApplicationResult<TenantAdminProductListResponse>> ListAsync(
         TenantRequestContext context,
         string? search,
-        int page,
+        Guid? categoryId,
+        Guid? brandId,
+        string? productStatus,
+        string? stockStatus,
+        int pageNumber,
         int pageSize,
+        string? sortBy,
+        string? sortDirection,
         CancellationToken cancellationToken);
 
     Task<ApplicationResult<TenantAdminProductSummaryCardsResponse>> GetSummaryAsync(
@@ -17,6 +23,10 @@ public interface ITenantAdminProductService
         CancellationToken cancellationToken);
 
     Task<ApplicationResult<TenantAdminProductCreateOptionsResponse>> GetCreateOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<TenantAdminProductFilterOptionsResponse>> GetFilterOptionsAsync(
         TenantRequestContext context,
         CancellationToken cancellationToken);
 
