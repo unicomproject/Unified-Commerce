@@ -443,24 +443,70 @@ public sealed class OutletRepository : IOutletRepository
 
     public async Task<bool> IsOutletManagementFeatureEnabledAsync(Guid tenantId, CancellationToken cancellationToken)
     {
-        var featureId = await _dbContext.PlatformFeatures
+        // Fail-closed compatibility shim for residual callers.
+        // Prefer ITenantFeatureEntitlementEvaluator from application services.
+        var now = DateTimeOffset.UtcNow;
+        var lookupCodes = PlatformTenantFeatureCodes.GetLookupFeatureCodes(PlatformTenantFeatureCodes.OutletManagement);
+        var featureRows = await _dbContext.PlatformFeatures
             .AsNoTracking()
-            .Where(x => x.FeatureCode == OutletConstants.ManagementFeatureCode && x.Status == OutletConstants.ActiveStatus)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+            .Where(x => lookupCodes.Contains(x.FeatureCode) && x.Status == OutletConstants.ActiveStatus)
+            .Select(x => new { x.Id, x.FeatureCode })
+            .ToListAsync(cancellationToken);
 
-        if (featureId is null)
+        if (featureRows.Count == 0)
         {
-            return true;
+            return false;
         }
 
-        return await _dbContext.TenantFeatureEntitlements
-            .AsNoTracking()
-            .AnyAsync(
-                x => x.TenantId == tenantId &&
-                     x.PlatformFeatureId == featureId.Value &&
-                     x.EntitlementStatus == TenantEntitlementStatusConstants.Enabled,
-                cancellationToken);
+        var canonicalFeature = featureRows.FirstOrDefault(x =>
+            string.Equals(x.FeatureCode, PlatformTenantFeatureCodes.OutletManagement, StringComparison.OrdinalIgnoreCase));
+        var legacyFeature = featureRows.FirstOrDefault(x =>
+            string.Equals(x.FeatureCode, PlatformTenantFeatureCodes.OutletManagementLegacyAlias, StringComparison.OrdinalIgnoreCase));
+
+        async Task<bool> IsEffectiveAsync(Guid platformFeatureId)
+        {
+            var rows = await _dbContext.TenantFeatureEntitlements
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.PlatformFeatureId == platformFeatureId)
+                .Select(x => new
+                {
+                    x.EntitlementStatus,
+                    x.IsEnabled,
+                    x.RevokedAt,
+                    x.EffectiveFrom,
+                    x.EffectiveUntil
+                })
+                .ToListAsync(cancellationToken);
+
+            return rows.Any(x => TenantEntitlementEffectivePredicate.IsEnabled(
+                x.EntitlementStatus,
+                x.IsEnabled,
+                x.RevokedAt,
+                x.EffectiveFrom,
+                x.EffectiveUntil,
+                now));
+        }
+
+        if (canonicalFeature is not null)
+        {
+            var hasCanonicalEntitlementRows = await _dbContext.TenantFeatureEntitlements
+                .AsNoTracking()
+                .AnyAsync(
+                    x => x.TenantId == tenantId && x.PlatformFeatureId == canonicalFeature.Id,
+                    cancellationToken);
+
+            if (hasCanonicalEntitlementRows)
+            {
+                return await IsEffectiveAsync(canonicalFeature.Id);
+            }
+        }
+
+        if (legacyFeature is not null)
+        {
+            return await IsEffectiveAsync(legacyFeature.Id);
+        }
+
+        return false;
     }
 
     public async Task<bool> IsClickCollectFeatureEnabledAsync(
@@ -554,7 +600,10 @@ public sealed class OutletRepository : IOutletRepository
         FulfillmentMethodOutlet? pickupMapping,
         CancellationToken cancellationToken)
     {
-        var transaction = _dbContext.Database.IsRelational()
+        // Reuse ambient transaction (e.g. Phase 3 capacity lock) when present.
+        var ownsTransaction = _dbContext.Database.CurrentTransaction is null &&
+                              _dbContext.Database.IsRelational();
+        var transaction = ownsTransaction
             ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
 

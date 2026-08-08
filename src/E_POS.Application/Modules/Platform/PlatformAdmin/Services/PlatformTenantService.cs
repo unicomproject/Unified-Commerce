@@ -6,6 +6,7 @@ using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Mappers;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
@@ -54,6 +55,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IPasswordHashService _passwordHashService;
     private readonly ITenantUsageCounterService _tenantUsageCounterService;
+    private readonly IDefaultTenantSettingsProvider _defaultTenantSettingsProvider;
 
     public PlatformTenantService(
         IPlatformTenantRepository repository,
@@ -62,7 +64,8 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         IPlatformPermissionRepository permissionRepository,
         IDateTimeProvider dateTimeProvider,
         IPasswordHashService passwordHashService,
-        ITenantUsageCounterService tenantUsageCounterService)
+        ITenantUsageCounterService tenantUsageCounterService,
+        IDefaultTenantSettingsProvider defaultTenantSettingsProvider)
     {
         _repository = repository;
         _subscriptionPlanRepository = subscriptionPlanRepository;
@@ -71,6 +74,7 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         _dateTimeProvider = dateTimeProvider;
         _passwordHashService = passwordHashService;
         _tenantUsageCounterService = tenantUsageCounterService;
+        _defaultTenantSettingsProvider = defaultTenantSettingsProvider;
     }
 
     public async Task<ApplicationResult<PlatformTenantListResponse>> GetTenantsAsync(

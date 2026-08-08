@@ -103,9 +103,16 @@ public sealed class PosHoldsController : ControllerBase
 
     [HttpGet]
     [ProducesResponseType(typeof(PosHoldListResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetHolds(CancellationToken cancellationToken)
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetHolds(
+        [FromQuery] Guid deviceId,
+        CancellationToken cancellationToken,
+        [FromQuery] string scope = PosHoldListScopes.Today,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))
         {
@@ -113,7 +120,10 @@ public sealed class PosHoldsController : ControllerBase
                 new ApplicationError("pos_holds.invalid_tenant_context", "Invalid tenant context.")));
         }
 
-        var result = await _service.GetHoldsAsync(context, cancellationToken);
+        var result = await _service.GetHoldsAsync(
+            context,
+            new PosHoldListQueryDto(deviceId, scope, page, pageSize),
+            cancellationToken);
         if (!result.IsSuccess || result.Value is null)
         {
             return ToErrorResult(result.Error);
@@ -128,9 +138,14 @@ public sealed class PosHoldsController : ControllerBase
         "pos_checkout.device_not_found" or "pos_checkout.variant_not_found" or
         "pos_checkout.customer_not_found" => NotFound(CreateError(error)),
         "pos_holds.not_found" => NotFound(CreateError(error)),
+        "till_session.device_not_found" or "till_session.till_not_assigned" or
+        "till_session.not_found" => NotFound(CreateError(error)),
+        "till_session.device_not_trusted" =>
+            StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
         "pos_holds.idempotency_conflict" or "pos_holds.expired" or
         "pos_holds.not_recallable" or "pos_holds.not_cancellable" or
-        "pos_holds.till_mismatch" => Conflict(CreateError(error)),
+        "pos_holds.till_mismatch" or "pos_holds.sale_partially_paid_cannot_be_parked" =>
+            Conflict(CreateError(error)),
         "pos_holds.invalid_tenant_context" => Unauthorized(CreateError(error)),
         _ => BadRequest(CreateError(error))
     };

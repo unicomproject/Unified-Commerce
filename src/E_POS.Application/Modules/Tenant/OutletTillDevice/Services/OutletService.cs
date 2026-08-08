@@ -1,8 +1,10 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
@@ -25,53 +27,63 @@ public sealed class OutletService : IOutletService
     private readonly IOutletRequestValidator _requestValidator;
     private readonly IOutletAuditLogger _auditLogger;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ITenantFeatureEntitlementEvaluator _featureEntitlementEvaluator;
+    private readonly ITenantResourceLimitGuard _resourceLimitGuard;
 
     public OutletService(
         IOutletRepository repository,
         ICodeSequenceRepository codeSequenceRepository,
         IOutletRequestValidator requestValidator,
         IOutletAuditLogger auditLogger,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        ITenantFeatureEntitlementEvaluator featureEntitlementEvaluator,
+        ITenantResourceLimitGuard resourceLimitGuard)
     {
         _repository = repository;
         _codeSequenceRepository = codeSequenceRepository;
         _requestValidator = requestValidator;
         _auditLogger = auditLogger;
         _dateTimeProvider = dateTimeProvider;
+        _featureEntitlementEvaluator = featureEntitlementEvaluator;
+        _resourceLimitGuard = resourceLimitGuard;
     }
 
     public async Task<ApplicationResult<OutletCreateOptionsResponse>> GetCreateOptionsAsync(
         TenantRequestContext context,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
-        if (accessError is not null)
+        var gateError = await ValidateOutletAccessAsync(context, requireManage: true, cancellationToken);
+        if (gateError is not null)
         {
-            return ApplicationResult<OutletCreateOptionsResponse>.Failure(accessError);
-        }
-
-        var operationalError = await ValidateOperationalAccessAsync(context, cancellationToken);
-        if (operationalError is not null)
-        {
-            return ApplicationResult<OutletCreateOptionsResponse>.Failure(operationalError);
+            return ApplicationResult<OutletCreateOptionsResponse>.Failure(gateError);
         }
 
         var response = await _repository.GetCreateOptionsAsync(context.TenantId, cancellationToken);
-        return ApplicationResult<OutletCreateOptionsResponse>.Success(response);
+        var capacity = await _resourceLimitGuard.GetCapacitySnapshotAsync(
+            context.TenantId,
+            TenantSubscriptionLimitKeys.MaxOutlets,
+            cancellationToken);
+
+        return ApplicationResult<OutletCreateOptionsResponse>.Success(
+            response with
+            {
+                Capacity = new OutletCapacityInfoResponse(
+                    capacity.LimitKey,
+                    capacity.CurrentUsage,
+                    capacity.EffectiveLimit,
+                    capacity.RemainingCapacity,
+                    capacity.IsUnlimited,
+                    capacity.CanCreate,
+                    capacity.OverrideApplied)
+            });
     }
 
     public async Task<ApplicationResult<OutletResponse>> CreateAsync(TenantRequestContext context, OutletCreateRequest request, CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
-        if (accessError is not null)
+        var gateError = await ValidateOutletAccessAsync(context, requireManage: true, cancellationToken);
+        if (gateError is not null)
         {
-            return ApplicationResult<OutletResponse>.Failure(accessError);
-        }
-
-        var operationalError = await ValidateOperationalAccessAsync(context, cancellationToken);
-        if (operationalError is not null)
-        {
-            return ApplicationResult<OutletResponse>.Failure(operationalError);
+            return ApplicationResult<OutletResponse>.Failure(gateError);
         }
 
         var validationError = _requestValidator.ValidateCreate(request);
@@ -89,6 +101,36 @@ public sealed class OutletService : IOutletService
             return ApplicationResult<OutletResponse>.Failure(ClickCollectFeatureDisabled);
         }
 
+        var guarded = await _resourceLimitGuard.ExecuteWithinCapacityAsync(
+            context.TenantId,
+            TenantSubscriptionLimitKeys.MaxOutlets,
+            requestedIncrease: 1,
+            async ct =>
+            {
+                var created = await CreateOutletInternalAsync(context, request, ct);
+                return created.IsSuccess
+                    ? TenantResourceCapacityOperationResult<ApplicationResult<OutletResponse>>.Succeeded(created)
+                    : TenantResourceCapacityOperationResult<ApplicationResult<OutletResponse>>.Aborted(created);
+            },
+            cancellationToken);
+
+        if (!guarded.Allowed)
+        {
+            return ApplicationResult<OutletResponse>.Failure(
+                guarded.Evaluation.ToApplicationError() ??
+                new ApplicationError(
+                    SubscriptionLimitErrorCodes.LimitReached,
+                    "Outlet subscription limit reached."));
+        }
+
+        return guarded.Value!;
+    }
+
+    private async Task<ApplicationResult<OutletResponse>> CreateOutletInternalAsync(
+        TenantRequestContext context,
+        OutletCreateRequest request,
+        CancellationToken cancellationToken)
+    {
         for (var attempt = 0; attempt < MaxCodeGenerationAttempts; attempt++)
         {
             var now = _dateTimeProvider.UtcNow;
@@ -161,8 +203,11 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletSummaryDashboardResponse>> GetSummaryAsync(TenantRequestContext context, CancellationToken cancellationToken)
     {
-        var accessError = ValidateReadAccess(context);
-        if (accessError is not null) return ApplicationResult<OutletSummaryDashboardResponse>.Failure(accessError);
+        var gateError = await ValidateOutletAccessAsync(context, requireManage: false, cancellationToken);
+        if (gateError is not null)
+        {
+            return ApplicationResult<OutletSummaryDashboardResponse>.Failure(gateError);
+        }
 
         var response = await _repository.GetSummaryAsync(context.TenantId, cancellationToken);
         return ApplicationResult<OutletSummaryDashboardResponse>.Success(response);
@@ -170,8 +215,11 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, string? outletType, string? status, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
     {
-        var accessError = ValidateReadAccess(context);
-        if (accessError is not null) return ApplicationResult<OutletListResponse>.Failure(accessError);
+        var gateError = await ValidateOutletAccessAsync(context, requireManage: false, cancellationToken);
+        if (gateError is not null)
+        {
+            return ApplicationResult<OutletListResponse>.Failure(gateError);
+        }
 
         var safePageNumber = Math.Max(1, pageNumber);
         var safePageSize = Math.Clamp(pageSize, 1, 100);
@@ -181,8 +229,11 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletResponse>> GetByIdAsync(TenantRequestContext context, Guid outletId, CancellationToken cancellationToken)
     {
-        var accessError = ValidateReadAccess(context);
-        if (accessError is not null) return ApplicationResult<OutletResponse>.Failure(accessError);
+        var gateError = await ValidateOutletAccessAsync(context, requireManage: false, cancellationToken);
+        if (gateError is not null)
+        {
+            return ApplicationResult<OutletResponse>.Failure(gateError);
+        }
 
         var response = await _repository.GetByIdAsync(context.TenantId, outletId, false, cancellationToken);
         return response is null ? ApplicationResult<OutletResponse>.Failure(NotFound) : ApplicationResult<OutletResponse>.Success(response);
@@ -190,13 +241,10 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletResponse>> UpdateAsync(TenantRequestContext context, Guid outletId, OutletUpdateRequest request, CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
-        if (accessError is not null) return ApplicationResult<OutletResponse>.Failure(accessError);
-
-        var operationalError = await ValidateOperationalAccessAsync(context, cancellationToken);
-        if (operationalError is not null)
+        var gateError = await ValidateOutletAccessAsync(context, requireManage: true, cancellationToken);
+        if (gateError is not null)
         {
-            return ApplicationResult<OutletResponse>.Failure(operationalError);
+            return ApplicationResult<OutletResponse>.Failure(gateError);
         }
 
         var validationError = _requestValidator.ValidateUpdate(request);
@@ -295,8 +343,11 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid outletId, CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
-        if (accessError is not null) return ApplicationResult.Failure(accessError);
+        var gateError = await ValidateOutletAccessAsync(context, requireManage: true, cancellationToken);
+        if (gateError is not null)
+        {
+            return ApplicationResult.Failure(gateError);
+        }
 
         var aggregate = await _repository.GetEditAggregateAsync(context.TenantId, outletId, cancellationToken);
         if (aggregate is null) return ApplicationResult.Failure(NotFound);
@@ -313,6 +364,32 @@ public sealed class OutletService : IOutletService
         return ApplicationResult.Success();
     }
 
+    /// <summary>
+    /// Shared outlet gate: tenant context → outlet_management entitlement → permission.
+    /// Permission never substitutes for entitlement.
+    /// </summary>
+    private async Task<ApplicationError?> ValidateOutletAccessAsync(
+        TenantRequestContext context,
+        bool requireManage,
+        CancellationToken cancellationToken)
+    {
+        var contextError = ValidateTenantContext(context);
+        if (contextError is not null)
+        {
+            return contextError;
+        }
+
+        var operationalError = await ValidateOperationalAccessAsync(context, cancellationToken);
+        if (operationalError is not null)
+        {
+            return operationalError;
+        }
+
+        return requireManage
+            ? ValidateManagePermission(context)
+            : ValidateReadPermission(context);
+    }
+
     private async Task<ApplicationError?> ValidateOperationalAccessAsync(
         TenantRequestContext context,
         CancellationToken cancellationToken)
@@ -323,7 +400,12 @@ public sealed class OutletService : IOutletService
             return TenantBlocked;
         }
 
-        if (!await _repository.IsOutletManagementFeatureEnabledAsync(context.TenantId, cancellationToken))
+        var entitlement = await _featureEntitlementEvaluator.EvaluateAsync(
+            context.TenantId,
+            PlatformTenantFeatureCodes.OutletManagement,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+        if (!entitlement.IsAllowed)
         {
             return FeatureDisabled;
         }
@@ -331,29 +413,13 @@ public sealed class OutletService : IOutletService
         return null;
     }
 
-    private static ApplicationError? ValidateReadAccess(TenantRequestContext context)
-    {
-        var contextError = ValidateTenantContext(context);
-        if (contextError is not null)
-        {
-            return contextError;
-        }
-
-        return context.HasPermission(OutletConstants.ViewPermission) || context.HasPermission(OutletConstants.ManagePermission)
+    private static ApplicationError? ValidateReadPermission(TenantRequestContext context) =>
+        context.HasPermission(OutletConstants.ViewPermission) || context.HasPermission(OutletConstants.ManagePermission)
             ? null
             : PermissionDenied;
-    }
 
-    private static ApplicationError? ValidateManageAccess(TenantRequestContext context)
-    {
-        var contextError = ValidateTenantContext(context);
-        if (contextError is not null)
-        {
-            return contextError;
-        }
-
-        return context.HasPermission(OutletConstants.ManagePermission) ? null : PermissionDenied;
-    }
+    private static ApplicationError? ValidateManagePermission(TenantRequestContext context) =>
+        context.HasPermission(OutletConstants.ManagePermission) ? null : PermissionDenied;
 
     private static ApplicationError? ValidateTenantContext(TenantRequestContext context)
     {

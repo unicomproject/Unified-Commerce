@@ -4,7 +4,17 @@ public sealed record OutletCreateOptionsResponse(
     IReadOnlyList<OutletLookupOptionResponse> OutletTypes,
     IReadOnlyList<OutletCountryOptionResponse> Countries,
     IReadOnlyList<OutletLookupOptionResponse> Timezones,
-    OutletCreateDefaultsResponse Defaults);
+    OutletCreateDefaultsResponse Defaults,
+    OutletCapacityInfoResponse? Capacity = null);
+
+public sealed record OutletCapacityInfoResponse(
+    string LimitKey,
+    int CurrentUsage,
+    int? EffectiveLimit,
+    int? RemainingCapacity,
+    bool IsUnlimited,
+    bool CanCreate,
+    bool OverrideApplied);
 
 public sealed record OutletLookupOptionResponse(string Value, string Label);
 

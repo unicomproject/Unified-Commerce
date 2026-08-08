@@ -14,9 +14,12 @@ using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Services;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Infrastructure.Persistence.Seed;
+using E_POS.IntegrationTests.TestSupport;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace E_POS.IntegrationTests.OutletTillDevice;
@@ -360,7 +363,120 @@ public sealed class OutletCrudIntegrationTests
         Assert.Equal(defaultMethod.Id, selectedMethodId);
     }
 
-    private static async Task SeedTenantAsync(EPosDbContext dbContext, Guid tenantId)
+    [Fact]
+    public async Task ListAsync_WithoutOutletEntitlement_ReturnsFeatureDisabled()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        await SeedTenantAsync(dbContext, tenantId, includeOutletEntitlement: false);
+        var now = new DateTimeOffset(2026, 7, 2, 10, 0, 0, TimeSpan.Zero);
+        var service = CreateService(dbContext, now);
+
+        var result = await service.ListAsync(
+            CreateContext(tenantId, permissions: [OutletConstants.ViewPermission, OutletConstants.ManagePermission]),
+            1,
+            20,
+            null,
+            null,
+            null,
+            null,
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithoutOutletEntitlement_ReturnsFeatureDisabled()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        await SeedTenantAsync(dbContext, tenantId, includeOutletEntitlement: false);
+        var service = CreateService(dbContext, new DateTimeOffset(2026, 7, 2, 10, 0, 0, TimeSpan.Zero));
+
+        var result = await service.GetByIdAsync(
+            CreateContext(tenantId, permissions: [OutletConstants.ViewPermission]),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_WithoutOutletEntitlement_ReturnsFeatureDisabled()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        await SeedTenantAsync(dbContext, tenantId, includeOutletEntitlement: false);
+        var service = CreateService(dbContext, new DateTimeOffset(2026, 7, 2, 10, 0, 0, TimeSpan.Zero));
+
+        var result = await service.GetSummaryAsync(
+            CreateContext(tenantId, permissions: [OutletConstants.ViewPermission]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithoutOutletEntitlement_ReturnsFeatureDisabled_AndDoesNotSoftDelete()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        await SeedTenantAsync(dbContext, tenantId, includeOutletEntitlement: true);
+        var now = new DateTimeOffset(2026, 7, 2, 10, 0, 0, TimeSpan.Zero);
+        dbContext.FulfillmentMethods.Add(FulfillmentMethod.Create(Guid.NewGuid(), tenantId, "PICKUP", "Pickup", null, "ACTIVE", "PICKUP", now));
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(dbContext, now);
+        var create = await service.CreateAsync(CreateContext(tenantId), CreateRequest(collectionEnabled: false), CancellationToken.None);
+        Assert.True(create.IsSuccess);
+        var outletId = create.Value!.Id;
+
+        var outletFeatureId = Guid.Parse("72000000-0000-0000-0000-0000000000A1");
+        var entitlement = await dbContext.TenantFeatureEntitlements
+            .SingleAsync(x => x.TenantId == tenantId && x.PlatformFeatureId == outletFeatureId);
+        entitlement.Disable(now.AddMinutes(1), null, "phase1-closure-test", null);
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+        service = CreateService(dbContext, now);
+
+        var result = await service.DeleteAsync(CreateContext(tenantId), outletId, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.feature_disabled", result.Error.Code);
+        var outlet = await dbContext.Outlets.SingleAsync(x => x.Id == outletId);
+        Assert.NotEqual(OutletConstants.DeletedStatus, outlet.Status);
+    }
+
+    [Fact]
+    public async Task ListAsync_WithEntitlementButWithoutPermission_ReturnsPermissionDenied()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        await SeedTenantAsync(dbContext, tenantId, includeOutletEntitlement: true);
+        var service = CreateService(dbContext, new DateTimeOffset(2026, 7, 2, 10, 0, 0, TimeSpan.Zero));
+
+        var result = await service.ListAsync(
+            CreateContext(tenantId, permissions: []),
+            1,
+            20,
+            null,
+            null,
+            null,
+            null,
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.permission_denied", result.Error.Code);
+    }
+
+    private static async Task SeedTenantAsync(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        bool includeOutletEntitlement = true)
     {
         var now = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
         dbContext.Tenants.Add(Tenant.Create(
@@ -385,12 +501,35 @@ public sealed class OutletCrudIntegrationTests
                 SubscriptionCatalogConstants.RecordStatus.Active,
                 now));
         }
+
+        var outletFeatureId = Guid.Parse("72000000-0000-0000-0000-0000000000A1");
+        if (!await dbContext.PlatformFeatures.AnyAsync(x => x.Id == outletFeatureId))
+        {
+            dbContext.PlatformFeatures.Add(PlatformFeature.Create(
+                outletFeatureId,
+                SubscriptionBillingCatalogSeedConstants.CoreCommerceModuleId,
+                PlatformTenantFeatureCodes.OutletManagement,
+                "Outlet Management",
+                SubscriptionCatalogConstants.RecordStatus.Active,
+                now));
+        }
+
         dbContext.TenantFeatureEntitlements.Add(TenantFeatureEntitlement.Create(
             Guid.NewGuid(),
             tenantId,
             SubscriptionBillingCatalogSeedConstants.ClickCollectFeatureId,
             TenantEntitlementStatusConstants.Enabled,
             now));
+        if (includeOutletEntitlement)
+        {
+            dbContext.TenantFeatureEntitlements.Add(TenantFeatureEntitlement.Create(
+                Guid.NewGuid(),
+                tenantId,
+                outletFeatureId,
+                TenantEntitlementStatusConstants.Enabled,
+                now));
+        }
+
         await dbContext.SaveChangesAsync();
     }
 
@@ -418,11 +557,23 @@ public sealed class OutletCrudIntegrationTests
             new OutletRequestValidator(),
             new OutletAuditLogger(Microsoft.Extensions.Logging.Abstractions.NullLogger<OutletAuditLogger>.Instance, dbContext),
             new FakeDateTimeProvider(now));
+            new FakeOutletAuditLogger(),
+            new FakeDateTimeProvider(now),
+            new TenantFeatureEntitlementEvaluator(
+                dbContext,
+                NullLogger<TenantFeatureEntitlementEvaluator>.Instance),
+            new AllowingTenantResourceLimitGuard());
     }
 
-    private static TenantRequestContext CreateContext(Guid tenantId, Guid? userId = null)
+    private static TenantRequestContext CreateContext(
+        Guid tenantId,
+        Guid? userId = null,
+        IReadOnlyCollection<string>? permissions = null)
     {
-        return new TenantRequestContext(tenantId, userId ?? Guid.NewGuid(), [OutletConstants.ManagePermission]);
+        return new TenantRequestContext(
+            tenantId,
+            userId ?? Guid.NewGuid(),
+            permissions ?? [OutletConstants.ManagePermission]);
     }
 
     private static OutletCreateRequest CreateRequest(bool collectionEnabled)

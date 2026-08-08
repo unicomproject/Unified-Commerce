@@ -2,8 +2,10 @@ using System.Net.Mail;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
@@ -29,15 +31,18 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
     private readonly ITenantAdminUserRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IPasswordHashService _passwordHashService;
+    private readonly ITenantResourceLimitGuard _resourceLimitGuard;
 
     public TenantAdminUserService(
         ITenantAdminUserRepository repository,
         IDateTimeProvider dateTimeProvider,
-        IPasswordHashService passwordHashService)
+        IPasswordHashService passwordHashService,
+        ITenantResourceLimitGuard resourceLimitGuard)
     {
         _repository = repository;
         _dateTimeProvider = dateTimeProvider;
         _passwordHashService = passwordHashService;
+        _resourceLimitGuard = resourceLimitGuard;
     }
 
     public async Task<ApplicationResult<TenantAdminUserListResponse>> ListAsync(
@@ -171,6 +176,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
 
         TenantUser user;
         UserInvite? invite = null;
+        var increasesCountedSeat = request.SendInviteEmail;
 
         if (request.SendInviteEmail)
         {
@@ -213,12 +219,41 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 now);
         }
 
-        await _repository.CreateAsync(user, request.RoleId, outletIds, overriddenPermissionIds, invite, now, cancellationToken);
+        async Task<ApplicationResult<TenantAdminUserDetailResponse>> PersistAsync(CancellationToken ct)
+        {
+            await _repository.CreateAsync(user, request.RoleId, outletIds, overriddenPermissionIds, invite, now, ct);
+            var response = await _repository.GetDetailAsync(context.TenantId, userId, ct);
+            return response is null
+                ? ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound)
+                : ApplicationResult<TenantAdminUserDetailResponse>.Success(response);
+        }
 
-        var response = await _repository.GetDetailAsync(context.TenantId, userId, cancellationToken);
-        return response is null
-            ? ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound)
-            : ApplicationResult<TenantAdminUserDetailResponse>.Success(response);
+        if (!increasesCountedSeat)
+        {
+            return await PersistAsync(cancellationToken);
+        }
+
+        var guarded = await _resourceLimitGuard.ExecuteWithinCapacityAsync(
+            context.TenantId,
+            TenantSubscriptionLimitKeys.MaxUsers,
+            requestedIncrease: 1,
+            async ct =>
+            {
+                var persisted = await PersistAsync(ct);
+                return persisted.IsSuccess
+                    ? TenantResourceCapacityOperationResult<ApplicationResult<TenantAdminUserDetailResponse>>.Succeeded(persisted)
+                    : TenantResourceCapacityOperationResult<ApplicationResult<TenantAdminUserDetailResponse>>.Aborted(persisted);
+            },
+            cancellationToken);
+
+        if (!guarded.Allowed)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(
+                guarded.Evaluation.ToApplicationError() ??
+                new ApplicationError(SubscriptionLimitErrorCodes.LimitReached, "User subscription limit reached."));
+        }
+
+        return guarded.Value!;
     }
 
     public async Task<ApplicationResult<TenantAdminUserDetailResponse>> GetByIdAsync(
@@ -310,25 +345,73 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         }
 
         var now = _dateTimeProvider.UtcNow;
-        user.UpdateProfile(request.FullName.Trim(), request.Email.Trim(), request.PhoneNumber?.Trim(), request.Status.Trim().ToUpperInvariant(), now);
+        var previousStatus = user.AccountStatus;
+        var nextStatus = request.Status.Trim().ToUpperInvariant();
+        var increasesSeat = !CountsTowardUserLimit(previousStatus) && CountsTowardUserLimit(nextStatus);
 
-        await _repository.ReplaceAssignmentsAsync(
-            context.TenantId,
-            userId,
-            request.RoleId,
-            outletIds,
-            permissionOverrideEnabled,
-            overriddenPermissionIds,
-            context.UserId,
-            now,
-            cancellationToken);
+        async Task PersistUpdateAsync(CancellationToken ct)
+        {
+            user.UpdateProfile(
+                request.FullName.Trim(),
+                request.Email.Trim(),
+                request.PhoneNumber?.Trim(),
+                nextStatus,
+                now);
 
-        await _repository.SaveChangesAsync(cancellationToken);
+            await _repository.ReplaceAssignmentsAsync(
+                context.TenantId,
+                userId,
+                request.RoleId,
+                outletIds,
+                permissionOverrideEnabled,
+                overriddenPermissionIds,
+                context.UserId,
+                now,
+                ct);
+
+            await _repository.SaveChangesAsync(ct);
+        }
+
+        if (increasesSeat)
+        {
+            var guarded = await _resourceLimitGuard.ExecuteWithinCapacityAsync(
+                context.TenantId,
+                TenantSubscriptionLimitKeys.MaxUsers,
+                requestedIncrease: 1,
+                async ct =>
+                {
+                    await PersistUpdateAsync(ct);
+                    return TenantResourceCapacityOperationResult<bool>.Succeeded(true);
+                },
+                cancellationToken);
+
+            if (!guarded.Allowed)
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(
+                    guarded.Evaluation.ToApplicationError() ??
+                    new ApplicationError(SubscriptionLimitErrorCodes.LimitReached, "User subscription limit reached."));
+            }
+        }
+        else
+        {
+            await PersistUpdateAsync(cancellationToken);
+        }
 
         var response = await _repository.GetDetailAsync(context.TenantId, userId, cancellationToken);
         return response is null
             ? ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound)
             : ApplicationResult<TenantAdminUserDetailResponse>.Success(response);
+    }
+
+    private static bool CountsTowardUserLimit(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return false;
+        }
+
+        var normalized = status.Trim().ToUpperInvariant();
+        return normalized is TenantUserConstants.StatusActive or TenantUserConstants.StatusInvited;
     }
 
     public async Task<ApplicationResult> DeleteAsync(

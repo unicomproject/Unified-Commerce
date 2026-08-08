@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using E_POS.Application.Common.Email;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Tenant.TenantAuth;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
@@ -134,10 +135,21 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
             now.AddHours(Math.Clamp(_options.InvitationExpiryHours, 1, 168)), now);
         db.UserInvites.Add(invite);
         await db.SaveChangesAsync(ct);
-        var url = $"{_options.TenantAdminAppBaseUrl.TrimEnd('/')}/setup-account?token={Uri.EscapeDataString(rawToken)}";
+        if (!TenantAdminInvitationUrlBuilder.TryValidateBaseUrl(
+                _options.TenantAdminAppBaseUrl,
+                requireHttps: false,
+                out var baseUrlError))
+        {
+            throw new RetryableDeliveryException("invitation_base_url_invalid", baseUrlError ?? "Tenant Admin application URL is invalid.");
+        }
+
+        var url = TenantAdminInvitationUrlBuilder.Build(_options.TenantAdminAppBaseUrl!, rawToken);
+        var expiresText = invite.ExpiresAt.ToString("u");
         var send = await sender.SendAsync(new ApplicationEmailMessage(user.Email, "Set up your Tenant Admin account",
-            $"<p>Your tenant is ready.</p><p><a href=\"{System.Net.WebUtility.HtmlEncode(url)}\">Set up account</a></p>",
-            "Your tenant is ready. Use the secure setup link in this email.", operationId.ToString("D")), ct);
+            $"<p>Your tenant <strong>{System.Net.WebUtility.HtmlEncode(tenant.DisplayName)}</strong> is ready.</p>" +
+            $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(url)}\">Set up your account</a></p>" +
+            $"<p>This invitation expires at {System.Net.WebUtility.HtmlEncode(expiresText)} (UTC). If you did not expect this email, ignore it.</p>",
+            $"Your tenant is ready. Open the secure setup link before {expiresText} UTC.", operationId.ToString("D")), ct);
         if (send.IsFailure) throw new RetryableDeliveryException(send.Error.Code, "Invitation provider rejected the message.");
         invite.MarkSent(DateTimeOffset.UtcNow);
         var operation = await db.PlatformTenantOnboardingOperations.SingleAsync(x => x.Id == operationId, ct);

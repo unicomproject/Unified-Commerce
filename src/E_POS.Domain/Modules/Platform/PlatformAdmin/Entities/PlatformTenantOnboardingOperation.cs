@@ -68,6 +68,13 @@ public sealed class PlatformTenantOnboardingOperation : AuditableEntity
         Version++;
     }
 
+    public void MarkInvitationAccepted(DateTimeOffset now)
+    {
+        InvitationStatus = "ACCEPTED";
+        UpdatedAt = now;
+        Version++;
+    }
+
     public void MarkPaymentSubmitted(DateTimeOffset now)
     {
         PaymentStatus = "PAYMENT_SUBMITTED";

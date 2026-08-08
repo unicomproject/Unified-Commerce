@@ -65,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformPermissionCatalogService, PlatformPermissionCatalogService>();
         services.AddScoped<IPlatformModulesCatalogService, PlatformModulesCatalogService>();
         services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
+        services.AddScoped<IDefaultTenantSettingsProvider, DefaultTenantSettingsProvider>();
         services.AddScoped<IPlatformBillingService, PlatformBillingService>();
         services.AddScoped<IManualPaymentService, ManualPaymentService>();
         services.AddScoped<IPlatformRoleService, PlatformRoleService>();
@@ -75,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
         services.AddScoped<ITenantUsageCounterService, TenantUsageCounterService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
+        services.AddScoped<ITenantAdminInvitationAcceptanceService, TenantAdminInvitationAcceptanceService>();
         services.AddScoped<ITenantAdminContextService, TenantAdminContextService>();
         services.AddScoped<IUnitOfMeasureService, UnitOfMeasureService>();
         services.AddScoped<IDepartmentRequestValidator, DepartmentRequestValidator>();

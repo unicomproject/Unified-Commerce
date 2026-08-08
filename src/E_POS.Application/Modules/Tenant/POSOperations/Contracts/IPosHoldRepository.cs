@@ -26,12 +26,14 @@ public interface IPosHoldRepository
         Guid tenantUserId,
         IReadOnlyCollection<string> permissions,
         PosCreateHoldRequestDto request,
-        DateTimeOffset now,
+        DateTimeOffset heldAt,
+        DateTimeOffset expiresAt,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<PosHoldListItemDto>> GetActiveHoldsAsync(
+    Task<PosGetActiveHoldsRepositoryResult> GetActiveHoldsAsync(
         Guid tenantId,
         Guid tenantUserId,
+        PosHoldListQueryDto query,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
@@ -53,4 +55,15 @@ public sealed record PosRecallHoldRepositoryResult(
 public sealed record PosCancelHoldRepositoryResult(string? ErrorCode)
 {
     public bool IsSuccess => ErrorCode is null;
+}
+
+public sealed record PosGetActiveHoldsRepositoryResult(
+    string? ErrorCode,
+    IReadOnlyList<PosHoldListItemDto>? Holds,
+    int TotalCount = 0,
+    int TotalValue = 0,
+    string? Currency = null)
+{
+    public bool IsSuccess => ErrorCode is null && Holds is not null &&
+        !string.IsNullOrWhiteSpace(Currency);
 }

@@ -92,6 +92,7 @@ public sealed class TillsController : ControllerBase
             "till.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "till.not_found" or "till.outlet_not_found" => NotFound(CreateError(error)),
             "till.duplicate_code" or "till.delete_conflict" => Conflict(CreateError(error)),
+            "subscription_limit_reached" or "subscription_limit_configuration_missing" or "subscription_limit_invalid" or "subscription_limit_evaluation_failed" or "subscription_limit_unknown_key" or "subscription_limit_not_enforced" => Conflict(CreateError(error)),
             "till.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
         };

@@ -38,8 +38,10 @@ using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Infrastructure.Modules.Shared.Integration;
 using E_POS.Infrastructure.Modules.Shared.Integration.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
+using E_POS.Infrastructure.Modules.Platform.Subscription.Services;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 using E_POS.Infrastructure.Persistence;
@@ -127,11 +129,17 @@ public static class DependencyInjection
         services.AddScoped<IPlatformDashboardHealthProbe, PlatformDashboardHealthProbe>();
         services.AddScoped<IPlatformTenantRepository, PlatformTenantRepository>();
         services.AddScoped<IPlatformTenantOnboardingRepository, PlatformTenantOnboardingRepository>();
-        services.Configure<TenantOnboardingOutboxOptions>(configuration.GetSection(TenantOnboardingOutboxOptions.SectionName));
+        services.AddSingleton<IValidateOptions<TenantOnboardingOutboxOptions>, TenantOnboardingOutboxOptionsValidator>();
+        services.AddSingleton<IValidateOptions<AzureCommunicationEmailOptions>, ProductionAzureCommunicationEmailOptionsValidator>();
+        services.AddOptions<TenantOnboardingOutboxOptions>()
+            .Bind(configuration.GetSection(TenantOnboardingOutboxOptions.SectionName))
+            .ValidateOnStart();
         services.AddHostedService<TenantOnboardingOutboxWorker>();
+        services.AddScoped<ITenantAdminInvitationAcceptanceRepository, TenantAdminInvitationAcceptanceRepository>();
         services.AddScoped<IPlatformPermissionCatalogRepository, PlatformPermissionCatalogRepository>();
         services.AddScoped<IPlatformModulesCatalogRepository, PlatformModulesCatalogRepository>();
         services.AddScoped<IPlatformSettingsRepository, PlatformSettingsRepository>();
+        services.AddScoped<ISettingDefinitionRepository, SettingDefinitionRepository>();
         services.AddScoped<IPlatformBillingRepository, PlatformBillingRepository>();
         services.AddScoped<IManualPaymentRepository, ManualPaymentRepository>();
         services.AddScoped<IManualPaymentAccessTokenService, ManualPaymentAccessTokenService>();
@@ -168,6 +176,9 @@ public static class DependencyInjection
                 section["ResetPath"] ?? "/reset-password");
         });
         services.AddScoped<IPlatformSubscriptionPlanRepository, PlatformSubscriptionPlanRepository>();
+        services.AddScoped<ITenantFeatureEntitlementEvaluator, TenantFeatureEntitlementEvaluator>();
+        services.AddScoped<ITenantSubscriptionLimitResolver, TenantSubscriptionLimitResolver>();
+        services.AddScoped<ITenantResourceLimitGuard, TenantResourceLimitGuard>();
         services.AddScoped<ITenantUsageCounterRepository, TenantUsageCounterRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();
         services.AddScoped<ITenantAdminContextRepository, TenantAdminContextRepository>();

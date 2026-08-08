@@ -31,6 +31,26 @@ public sealed class PosHoldsControllerTests
         Assert.IsType<NoContentResult>(result);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CancelHold_WithMissingReason_ReturnsBadRequest(string? reason)
+    {
+        var service = new FakePosHoldService
+        {
+            CancelResult = ApplicationResult<bool>.Failure(
+                new ApplicationError(
+                    "pos_holds.invalid_reason", "Cancellation reason is required."))
+        };
+        var controller = CreateController(service);
+        SetClaims(controller, Guid.NewGuid(), Guid.NewGuid(), SalesPermissions.Park.Create);
+
+        var result = await controller.CancelHold(Guid.NewGuid(), reason, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
     [Fact]
     public async Task CancelHold_WhenAlreadyRecalled_ReturnsConflict()
     {
@@ -57,12 +77,13 @@ public sealed class PosHoldsControllerTests
         {
             RecallResult = ApplicationResult<PosRecallHoldResponseDto>.Success(
                 new PosRecallHoldResponseDto(
-                    holdId, Guid.NewGuid(), "HOLD-000001", deviceId, null, null,
+                    holdId, Guid.NewGuid(), "PS-2026-00001", deviceId, null, null,
                     "NewSale", null, DateTimeOffset.UtcNow, [],
                     new PosCheckoutSummaryResponseDto(
                         new PosCheckoutBillingSummaryDto(0, 0, 0, 0, 0, "LKR"),
                         new PosCheckoutSaleDetailsDto("New Sale", 0, DateTimeOffset.UtcNow, "Cashier"),
-                        [], [])))
+                        [], []),
+                    []))
         };
         var controller = CreateController(service);
         SetClaims(controller, Guid.NewGuid(), Guid.NewGuid(), SalesPermissions.Park.Recall);
@@ -96,23 +117,49 @@ public sealed class PosHoldsControllerTests
     }
 
     [Fact]
+    public async Task CreateHold_WhenSourceSalePartiallyPaid_ReturnsConflict()
+    {
+        var service = new FakePosHoldService
+        {
+            CreateResult = ApplicationResult<PosHoldListItemDto>.Failure(
+                new ApplicationError(
+                    "pos_holds.sale_partially_paid_cannot_be_parked",
+                    "This sale already has a payment recorded and cannot be parked."))
+        };
+        var controller = CreateController(service);
+        SetClaims(controller, Guid.NewGuid(), Guid.NewGuid(), SalesPermissions.Park.Create);
+
+        var result = await controller.CreateHold(
+            new PosCreateHoldRequestDto(
+                Guid.NewGuid(), "NewSale", null,
+                [new PosCheckoutLineRequestDto(Guid.NewGuid(), 1)],
+                "Customer will return", null, "hold-key", null, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.IsType<ConflictObjectResult>(result);
+    }
+
+    [Fact]
     public async Task GetHolds_WithValidClaims_ReturnsOk()
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
         var service = new FakePosHoldService
         {
             Result = ApplicationResult<PosHoldListResponseDto>.Success(
-                new PosHoldListResponseDto(Array.Empty<PosHoldListItemDto>(), 0))
+                new PosHoldListResponseDto(
+                    Array.Empty<PosHoldListItemDto>(), 0, 0, "LKR", 1, 25))
         };
         var controller = CreateController(service);
         SetClaims(controller, tenantId, userId, SalesPermissions.Park.View);
 
-        var result = await controller.GetHolds(CancellationToken.None);
+        var result = await controller.GetHolds(deviceId, CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
         Assert.Equal(tenantId, service.Context?.TenantId);
         Assert.Equal(userId, service.Context?.UserId);
+        Assert.Equal(deviceId, service.DeviceId);
     }
 
     [Fact]
@@ -126,7 +173,7 @@ public sealed class PosHoldsControllerTests
         var controller = CreateController(service);
         SetClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "products.view");
 
-        var result = await controller.GetHolds(CancellationToken.None);
+        var result = await controller.GetHolds(Guid.NewGuid(), CancellationToken.None);
 
         var forbidden = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
@@ -137,9 +184,44 @@ public sealed class PosHoldsControllerTests
     {
         var controller = CreateController(new FakePosHoldService());
 
-        var result = await controller.GetHolds(CancellationToken.None);
+        var result = await controller.GetHolds(Guid.NewGuid(), CancellationToken.None);
 
         Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetHolds_WhenDeviceIdMissing_ReturnsBadRequest()
+    {
+        var service = new FakePosHoldService
+        {
+            Result = ApplicationResult<PosHoldListResponseDto>.Failure(
+                new ApplicationError("pos_holds.invalid_device_id", "Device id is required."))
+        };
+        var controller = CreateController(service);
+        SetClaims(controller, Guid.NewGuid(), Guid.NewGuid(), SalesPermissions.Park.View);
+
+        var result = await controller.GetHolds(Guid.Empty, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(Guid.Empty, service.DeviceId);
+    }
+
+    [Fact]
+    public async Task GetHolds_WhenTillSessionNotOpen_ReturnsBadRequest()
+    {
+        var service = new FakePosHoldService
+        {
+            Result = ApplicationResult<PosHoldListResponseDto>.Failure(
+                new ApplicationError(
+                    "pos_checkout.till_session_not_open",
+                    "An open till session is required to view parked sales."))
+        };
+        var controller = CreateController(service);
+        SetClaims(controller, Guid.NewGuid(), Guid.NewGuid(), SalesPermissions.Park.View);
+
+        var result = await controller.GetHolds(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
@@ -188,6 +270,7 @@ public sealed class PosHoldsControllerTests
             ApplicationResult<PosHoldListResponseDto>.Failure(
                 new ApplicationError("pos_holds.failed", "Failed."));
         public TenantRequestContext? Context { get; private set; }
+        public Guid? DeviceId { get; private set; }
 
         public Task<ApplicationResult<bool>> CancelHoldAsync(
             TenantRequestContext context,
@@ -220,15 +303,17 @@ public sealed class PosHoldsControllerTests
 
         public Task<ApplicationResult<PosHoldListResponseDto>> GetHoldsAsync(
             TenantRequestContext context,
+            PosHoldListQueryDto query,
             CancellationToken cancellationToken)
         {
             Context = context;
+            DeviceId = query.DeviceId;
             return Task.FromResult(Result);
         }
     }
 
     private static PosHoldListItemDto CreateHoldItem() => new(
-        Guid.NewGuid(), "HOLD-000001", Guid.NewGuid(), "SO-000001",
+        Guid.NewGuid(), "PS-2026-00001", Guid.NewGuid(), "SO-000001",
         Guid.NewGuid(), Guid.NewGuid(), null, null, "Customer will return",
         "held", 1, 100, 0, 0, 100, "LKR", DateTimeOffset.UtcNow, null,
         Array.Empty<PosHoldLineDto>());

@@ -359,11 +359,17 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 x.InboxStatus == "UNREAD")
             .CountAsync(cancellationToken);
 
+        // Mirrors the active-hold predicate used by PosHoldRepository.GetActiveHoldsAsync
+        // (HELD, not released/cancelled, not past its expiry, same till + holding user)
+        // so the dashboard tile and the Park list always agree on what is "active".
+        var dashboardNow = DateTimeOffset.UtcNow;
         var parkedSalesCount = await (from hold in _dbContext.PosOrderHolds.AsNoTracking()
                 join order in _dbContext.SalesOrders.AsNoTracking() on hold.SalesOrderId equals order.Id
                 where hold.TenantId == context.TenantId &&
                       hold.HoldStatus == "HELD" &&
                       hold.ReleasedAt == null &&
+                      hold.CancelledAt == null &&
+                      (!hold.ExpiresAt.HasValue || hold.ExpiresAt > dashboardNow) &&
                       hold.HeldByTenantUserId == context.UserId &&
                       order.TenantId == context.TenantId &&
                       order.TillId == till.Id

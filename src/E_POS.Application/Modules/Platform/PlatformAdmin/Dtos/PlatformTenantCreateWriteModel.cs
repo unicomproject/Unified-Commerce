@@ -50,6 +50,8 @@ public sealed class PlatformTenantCreateWriteModel
     public IReadOnlyList<TenantContact> OnboardingContacts { get; init; } = [];
 
     public IReadOnlyList<IntegrationOutboxMessage> OnboardingOutboxMessages { get; init; } = [];
+
+    public IReadOnlyList<TenantSetting> TenantSettings { get; init; } = [];
 }
 
 

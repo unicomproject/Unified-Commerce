@@ -181,7 +181,8 @@ public sealed class TenantOnboardingOutboxWorkerIntegrationTests
             var sent = fakeSender.SentMessages[0];
             Assert.Equal(ids.RecipientEmail, sent.ToAddress, ignoreCase: true);
             Assert.Contains("Set up your Tenant Admin account", sent.Subject);
-            Assert.Contains("http://localhost:4200/setup-account?token=", sent.HtmlBody);
+            Assert.Contains("http://localhost:4200/tenant-admin/setup/", sent.HtmlBody);
+            Assert.DoesNotContain("/setup-account?token=", sent.HtmlBody);
 
             // User invites table contains hashed token
             await using var db = CreateDb();

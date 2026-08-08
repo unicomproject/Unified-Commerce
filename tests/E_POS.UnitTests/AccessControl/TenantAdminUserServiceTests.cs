@@ -7,6 +7,7 @@ using E_POS.Application.Modules.Tenant.AccessControl.Services;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
+using E_POS.UnitTests.TestSupport;
 using Xunit;
 
 namespace E_POS.UnitTests.AccessControl;
@@ -242,7 +243,7 @@ public sealed class TenantAdminUserServiceTests
 
     private static TenantAdminUserService CreateService(FakeTenantAdminUserRepository repository)
     {
-        return new TenantAdminUserService(repository, new FakeDateTimeProvider(), new FakePasswordHashService());
+        return new TenantAdminUserService(repository, new FakeDateTimeProvider(), new FakePasswordHashService(), new AllowingTenantResourceLimitGuard());
     }
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string>? permissions = null)
