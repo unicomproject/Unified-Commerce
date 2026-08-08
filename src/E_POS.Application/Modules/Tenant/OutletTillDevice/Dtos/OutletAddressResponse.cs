@@ -11,5 +11,6 @@ public sealed record OutletAddressResponse(
     string CountryCode,
     string? ContactName,
     string? ContactPhone,
+    string? ContactEmail,
     bool IsPrimary,
     string Status);

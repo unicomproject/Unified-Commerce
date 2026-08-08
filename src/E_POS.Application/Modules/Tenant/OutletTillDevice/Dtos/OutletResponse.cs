@@ -16,6 +16,7 @@ public sealed record OutletResponse(
     int? PreparationLeadMinutes,
     int? PickupWindowMinutes,
     TimeOnly? CollectionCutoffTime,
+    OutletImageResponse? PrimaryImage,
     DateTimeOffset CreatedAt,
     Guid? CreatedByTenantUserId,
     DateTimeOffset? UpdatedAt,

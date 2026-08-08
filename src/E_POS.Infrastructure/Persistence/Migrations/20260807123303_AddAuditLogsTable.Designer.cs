@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260807123303_AddAuditLogsTable")]
+    partial class AddAuditLogsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3825,7 +3828,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("platform_sales_channels", null, t =>
                         {
-                            t.HasCheckConstraint("ck_platform_sales_channels_channel_type", "channel_type IN ('PHYSICAL', 'ONLINE', 'POS', 'AGGREGATOR', 'B2B', 'OTHER')");
+                            t.HasCheckConstraint("ck_platform_sales_channels_channel_type", "channel_type IN ('PHYSICAL', 'ONLINE', 'AGGREGATOR', 'B2B', 'OTHER')");
                         });
                 });
 
@@ -21012,11 +21015,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(40)")
                         .HasColumnName("hold_status");
 
-                    b.Property<string>("IdempotencyKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("idempotency_key");
-
                     b.Property<DateTimeOffset?>("ReleasedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("released_at");
@@ -21024,11 +21022,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ReleasedByTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("released_by_tenant_user_id");
-
-                    b.Property<string>("RequestFingerprint")
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)")
-                        .HasColumnName("request_fingerprint");
 
                     b.Property<Guid>("SalesOrderId")
                         .HasColumnType("uuid")
@@ -21057,105 +21050,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_pos_order_holds_tenant_id_id");
 
-                    b.HasIndex("TenantId", "IdempotencyKey")
-                        .IsUnique()
-                        .HasDatabaseName("uq_pos_order_holds_tenant_id_idempotency_key")
-                        .HasFilter("idempotency_key IS NOT NULL");
-
                     b.HasIndex("TenantId", "SalesOrderId");
 
                     b.ToTable("pos_order_holds", null, t =>
                         {
                             t.HasCheckConstraint("ck_pos_order_holds_hold_status", "hold_status IN ('HELD', 'RELEASED', 'EXPIRED', 'CANCELLED')");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.PosOrderHoldEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("CorrelationId")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("correlation_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset>("EventAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("event_at");
-
-                    b.Property<Guid?>("EventByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("event_by_tenant_user_id");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("event_type");
-
-                    b.Property<Guid>("HoldId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("hold_id");
-
-                    b.Property<string>("HoldNumber")
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)")
-                        .HasColumnName("hold_number");
-
-                    b.Property<string>("NewStatus")
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("new_status");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("notes");
-
-                    b.Property<Guid?>("OutletId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("outlet_id");
-
-                    b.Property<Guid?>("PosDeviceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("pos_device_id");
-
-                    b.Property<string>("PreviousStatus")
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("previous_status");
-
-                    b.Property<Guid?>("SalesOrderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("sales_order_id");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid?>("TillId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("till_id");
-
-                    b.Property<Guid?>("TillSessionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("till_session_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pos_order_hold_events");
-
-                    b.HasIndex("TenantId", "HoldId");
-
-                    b.ToTable("pos_order_hold_events", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pos_order_hold_events_event_type", "event_type IN ('PARK_CREATED', 'PARK_IDEMPOTENT_REPLAY', 'PARK_RECALLED', 'PARK_CANCELLED', 'PARK_EXPIRED')");
                         });
                 });
 
@@ -31008,24 +30907,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_pos_order_holds_sales_order_id_sales_orders");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.PosOrderHoldEvent", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pos_order_hold_events_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.POSOperations.Entities.PosOrderHold", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "HoldId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pos_order_hold_events_hold_id_pos_order_holds");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.POSOperations.Entities.Receipt", b =>

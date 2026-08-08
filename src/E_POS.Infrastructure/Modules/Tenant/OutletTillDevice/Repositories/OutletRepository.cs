@@ -268,6 +268,7 @@ public sealed class OutletRepository : IOutletRepository
                 x.CountryCode,
                 x.ContactName,
                 x.ContactPhone,
+                x.ContactEmail,
                 x.IsPrimary,
                 x.Status))
             .FirstOrDefaultAsync(cancellationToken);
@@ -315,6 +316,23 @@ public sealed class OutletRepository : IOutletRepository
             })
             .FirstOrDefaultAsync(cancellationToken);
 
+        OutletImageResponse? primaryImage = null;
+        if (outlet.PrimaryImageMediaAssetId.HasValue)
+        {
+            primaryImage = await _dbContext.MediaAssets
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.Id == outlet.PrimaryImageMediaAssetId.Value && x.Status == "ACTIVE")
+                .Select(x => new OutletImageResponse(
+                    x.Id,
+                    x.PublicUrl ?? string.Empty,
+                    x.MimeType,
+                    x.FileExtension,
+                    x.FileSizeBytes,
+                    x.WidthPx,
+                    x.HeightPx))
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         return new OutletResponse(
             outlet.Id,
             outlet.OutletCode,
@@ -333,6 +351,7 @@ public sealed class OutletRepository : IOutletRepository
             pickupMapping?.PreparationLeadMinutes,
             pickupMapping?.PickupWindowMinutes,
             pickupMapping?.CollectionCutoffTime,
+            primaryImage,
             outlet.CreatedAt,
             outlet.CreatedByTenantUserId,
             outlet.UpdatedAt,

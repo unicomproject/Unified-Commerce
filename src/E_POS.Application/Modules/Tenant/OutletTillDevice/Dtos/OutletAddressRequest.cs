@@ -8,4 +8,5 @@ public sealed record OutletAddressRequest(
     string? PostalCode,
     string CountryCode,
     string? ContactName,
-    string? ContactPhone);
+    string? ContactPhone,
+    string? ContactEmail);

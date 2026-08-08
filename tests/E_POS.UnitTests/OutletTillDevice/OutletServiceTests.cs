@@ -269,7 +269,7 @@ public sealed class OutletServiceTests
     {
         var aggregate = new OutletEditAggregate(
             Outlet.Create(Guid.NewGuid(), TenantId, "Main Outlet", "OUT001", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now),
-            OutletAddress.Create(Guid.NewGuid(), TenantId, Guid.NewGuid(), "1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null, UserId, Now),
+            OutletAddress.Create(Guid.NewGuid(), TenantId, Guid.NewGuid(), "1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null, null, UserId, Now),
             [],
             null);
         var service = CreateService(new FakeOutletRepository { EditAggregate = aggregate });
@@ -287,7 +287,7 @@ public sealed class OutletServiceTests
         var service = CreateService(new FakeOutletRepository());
         var request = CreateValidRequest() with
         {
-            Address = new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "ZZ", null, null)
+            Address = new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "ZZ", null, null, null)
         };
 
         var result = await service.CreateAsync(CreateContext(), request, CancellationToken.None);
@@ -541,7 +541,7 @@ public sealed class OutletServiceTests
             false,
             "+94770000000",
             "main@example.com",
-            new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null),
+            new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null, null),
             [new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null)],
             false);
     }
@@ -556,7 +556,7 @@ public sealed class OutletServiceTests
             false,
             "+94770000000",
             "updated@example.com",
-            new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null),
+            new OutletAddressRequest("1 Main Street", null, "Colombo", "Western", "00100", "LK", null, null, null),
             [new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null)],
             false);
     }
@@ -590,6 +590,9 @@ public sealed class OutletServiceTests
         public void LogManagerRemoved(Guid tenantId, Guid actorTenantUserId, Guid outletId) { }
         public void LogImageAssociated(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid mediaAssetId) { }
         public void LogImageRemoved(Guid tenantId, Guid actorTenantUserId, Guid outletId) { }
+        public void LogImageUploaded(Guid tenantId, Guid actorTenantUserId, Guid mediaAssetId) { }
+        public void LogImageReplaced(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid previousMediaAssetId, Guid newMediaAssetId) { }
+        public void LogImageDetached(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid detachedMediaAssetId) { }
         public void LogStatusChanged(Guid tenantId, Guid actorTenantUserId, Guid outletId, string status) { }
     }
 
@@ -689,9 +692,10 @@ public sealed class OutletServiceTests
                 false,
                 null,
                 null,
-                new OutletAddressResponse(Guid.NewGuid(), "PHYSICAL", "1 Main Street", null, "Colombo", null, null, "LK", null, null, true, "ACTIVE"),
+                new OutletAddressResponse(Guid.NewGuid(), "PHYSICAL", "1 Main Street", null, "Colombo", null, null, "LK", null, null, null, true, "ACTIVE"),
                 [],
                 false,
+                null,
                 null,
                 null,
                 null,

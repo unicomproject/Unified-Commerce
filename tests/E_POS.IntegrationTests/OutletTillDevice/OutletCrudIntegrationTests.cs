@@ -11,7 +11,9 @@ using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Services;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Infrastructure.Persistence.Seed;
@@ -59,6 +61,7 @@ public sealed class OutletCrudIntegrationTests
         Assert.Equal(1, await dbContext.OutletAddresses.CountAsync());
         Assert.Equal(2, await dbContext.OutletBusinessHours.CountAsync());
         Assert.Equal(1, await dbContext.FulfillmentMethodOutlets.CountAsync());
+        Assert.Equal(1, await dbContext.AuditLogs.CountAsync());
         var mapping = await dbContext.FulfillmentMethodOutlets.SingleAsync();
         Assert.Equal(tenantId, mapping.TenantId);
         Assert.Equal(30, mapping.PreparationLeadMinutes);
@@ -552,11 +555,11 @@ public sealed class OutletCrudIntegrationTests
             new OutletRepository(dbContext),
             new CodeSequenceRepository(dbContext),
             new OutletRequestValidator(),
-            new FakeOutletAuditLogger(),
+            new OutletAuditLogger(Microsoft.Extensions.Logging.Abstractions.NullLogger<OutletAuditLogger>.Instance, dbContext),
             new FakeDateTimeProvider(now),
             new TenantFeatureEntitlementEvaluator(
                 dbContext,
-                NullLogger<TenantFeatureEntitlementEvaluator>.Instance),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<TenantFeatureEntitlementEvaluator>.Instance),
             new AllowingTenantResourceLimitGuard());
     }
 
@@ -581,7 +584,7 @@ public sealed class OutletCrudIntegrationTests
             false,
             "+94770000000",
             "main@example.com",
-            new OutletAddressRequest("1 Main Street", "Level 1", "Colombo", "Western", "00100", "LK", null, null),
+            new OutletAddressRequest("1 Main Street", "Level 1", "Colombo", "Western", "00100", "LK", null, null, null),
             [
                 new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null),
                 new OutletBusinessHourRequest(2, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null)
@@ -602,7 +605,7 @@ public sealed class OutletCrudIntegrationTests
             false,
             "+94770000001",
             "updated@example.com",
-            new OutletAddressRequest("2 Main Street", "Level 2", "Colombo", "Western", "00100", "LK", null, null),
+            new OutletAddressRequest("2 Main Street", "Level 2", "Colombo", "Western", "00100", "LK", null, null, null),
             [
                 new OutletBusinessHourRequest(1, new TimeOnly(8, 0), new TimeOnly(18, 0), false, null, null),
                 new OutletBusinessHourRequest(2, new TimeOnly(8, 0), new TimeOnly(18, 0), false, null, null)
@@ -633,6 +636,9 @@ public sealed class OutletCrudIntegrationTests
         public void LogManagerRemoved(Guid tenantId, Guid actorTenantUserId, Guid outletId) { }
         public void LogImageAssociated(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid mediaAssetId) { }
         public void LogImageRemoved(Guid tenantId, Guid actorTenantUserId, Guid outletId) { }
+        public void LogImageUploaded(Guid tenantId, Guid actorTenantUserId, Guid mediaAssetId) { }
+        public void LogImageReplaced(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid previousMediaAssetId, Guid newMediaAssetId) { }
+        public void LogImageDetached(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid detachedMediaAssetId) { }
         public void LogStatusChanged(Guid tenantId, Guid actorTenantUserId, Guid outletId, string status) { }
     }
 }

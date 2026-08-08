@@ -102,6 +102,7 @@ public static class DependencyInjection
         services.AddScoped<ITillRequestValidator, TillRequestValidator>();
         services.AddScoped<IPosDeviceRequestValidator, PosDeviceRequestValidator>();
         services.AddScoped<IOutletService, OutletService>();
+        services.AddScoped<IOutletImageService, OutletImageService>();
         services.AddScoped<ITenantAdminOutletService, TenantAdminOutletService>();
         services.AddScoped<ITenantAdminTillService, TenantAdminTillService>();
         services.AddScoped<ITenantAdminHardwareService, TenantAdminHardwareService>();

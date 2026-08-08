@@ -28,11 +28,16 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
             request.CollectionEnabled,
             request.PreparationLeadMinutes,
             request.PickupWindowMinutes,
-            allowDeletedStatus: false);
+            allowDeletedStatus: false,
+            imageOperation: request.ImageMediaAssetId.HasValue ? OutletImageOperation.REPLACE : OutletImageOperation.KEEP,
+            imageMediaAssetId: request.ImageMediaAssetId);
     }
 
     public ApplicationError? ValidateUpdate(OutletUpdateRequest request)
     {
+        // Null ImageOperation defaults to KEEP (backward-compatible).
+        var resolvedOperation = request.ImageOperation ?? OutletImageOperation.KEEP;
+
         return ValidateWriteRequest(
             request.OutletName,
             request.Status,
@@ -45,7 +50,9 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
             request.CollectionEnabled,
             request.PreparationLeadMinutes,
             request.PickupWindowMinutes,
-            allowDeletedStatus: false);
+            allowDeletedStatus: false,
+            imageOperation: resolvedOperation,
+            imageMediaAssetId: request.ImageMediaAssetId);
     }
 
     private static ApplicationError? ValidateWriteRequest(
@@ -60,7 +67,9 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
         bool collectionEnabled,
         int? preparationLeadMinutes,
         int? pickupWindowMinutes,
-        bool allowDeletedStatus)
+        bool allowDeletedStatus,
+        OutletImageOperation imageOperation = OutletImageOperation.KEEP,
+        Guid? imageMediaAssetId = null)
     {
         var fieldErrors = new List<ApplicationFieldError>();
 
@@ -126,6 +135,7 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
         }
 
         ValidateAddress(address, fieldErrors);
+        ValidateImageOperation(imageOperation, imageMediaAssetId, fieldErrors);
         ValidateBusinessHours(businessHours, fieldErrors);
         ValidateCollectionConfiguration(
             collectionEnabled,
@@ -202,6 +212,55 @@ public sealed class OutletRequestValidator : IOutletRequestValidator
         if (!string.IsNullOrWhiteSpace(address.ContactPhone) && address.ContactPhone.Trim().Length > 40)
         {
             fieldErrors.Add(new ApplicationFieldError("address.contactPhone", "Contact phone must be 40 characters or less."));
+        }
+
+        if (!string.IsNullOrWhiteSpace(address.ContactEmail))
+        {
+            if (address.ContactEmail.Trim().Length > 255)
+            {
+                fieldErrors.Add(new ApplicationFieldError("address.contactEmail", "Contact email must be 255 characters or less."));
+            }
+            else if (!address.ContactEmail.Contains('@', StringComparison.Ordinal))
+            {
+                fieldErrors.Add(new ApplicationFieldError("address.contactEmail", "Contact email must be a valid email address."));
+            }
+        }
+    }
+
+    private static void ValidateImageOperation(
+        OutletImageOperation imageOperation,
+        Guid? imageMediaAssetId,
+        ICollection<ApplicationFieldError> fieldErrors)
+    {
+        switch (imageOperation)
+        {
+            case OutletImageOperation.KEEP:
+                // ImageMediaAssetId is ignored for KEEP; no ID required or validated.
+                break;
+
+            case OutletImageOperation.REPLACE:
+                if (!imageMediaAssetId.HasValue)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        "imageMediaAssetId",
+                        "ImageMediaAssetId is required when ImageOperation is REPLACE."));
+                }
+                break;
+
+            case OutletImageOperation.REMOVE:
+                if (imageMediaAssetId.HasValue)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        "imageMediaAssetId",
+                        "ImageMediaAssetId must be null when ImageOperation is REMOVE."));
+                }
+                break;
+
+            default:
+                fieldErrors.Add(new ApplicationFieldError(
+                    "imageOperation",
+                    "ImageOperation must be KEEP, REPLACE, or REMOVE."));
+                break;
         }
     }
 

@@ -306,6 +306,7 @@ public sealed class TenantResourceLimitPostgreSqlConcurrencyTests
                 null,
                 null,
                 null,
+                null,
                 Now));
             db.OutletBusinessHours.Add(OutletBusinessHour.Create(
                 Guid.NewGuid(),
@@ -352,7 +353,7 @@ public sealed class TenantResourceLimitPostgreSqlConcurrencyTests
             false,
             null,
             null,
-            new OutletAddressRequest("1 Street", null, "Colombo", "Western", "00100", "LK", null, null),
+            new OutletAddressRequest("1 Street", null, "Colombo", "Western", "00100", "LK", null, null, null),
             [new OutletBusinessHourRequest(1, new TimeOnly(9, 0), new TimeOnly(17, 0), false, null, null)],
             false);
 
@@ -445,6 +446,9 @@ public sealed class TenantResourceLimitPostgreSqlConcurrencyTests
         public void LogManagerRemoved(Guid tenantId, Guid actorTenantUserId, Guid outletId) { }
         public void LogImageAssociated(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid mediaAssetId) { }
         public void LogImageRemoved(Guid tenantId, Guid actorTenantUserId, Guid outletId) { }
+        public void LogImageUploaded(Guid tenantId, Guid actorTenantUserId, Guid mediaAssetId) { }
+        public void LogImageReplaced(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid previousMediaAssetId, Guid newMediaAssetId) { }
+        public void LogImageDetached(Guid tenantId, Guid actorTenantUserId, Guid outletId, Guid detachedMediaAssetId) { }
         public void LogStatusChanged(Guid tenantId, Guid actorTenantUserId, Guid outletId, string status) { }
     }
 }

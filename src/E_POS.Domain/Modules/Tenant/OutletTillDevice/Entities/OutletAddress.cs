@@ -16,6 +16,7 @@ public class OutletAddress : AuditableEntity
     public string CountryCode { get; protected set; } = string.Empty;
     public string? ContactName { get; protected set; }
     public string? ContactPhone { get; protected set; }
+    public string? ContactEmail { get; protected set; }
     public bool IsPrimary { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
@@ -33,6 +34,7 @@ public class OutletAddress : AuditableEntity
         string countryCode,
         string? contactName,
         string? contactPhone,
+        string? contactEmail,
         Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
@@ -50,6 +52,7 @@ public class OutletAddress : AuditableEntity
             CountryCode = countryCode.Trim().ToUpperInvariant(),
             ContactName = string.IsNullOrWhiteSpace(contactName) ? null : contactName.Trim(),
             ContactPhone = string.IsNullOrWhiteSpace(contactPhone) ? null : contactPhone.Trim(),
+            ContactEmail = string.IsNullOrWhiteSpace(contactEmail) ? null : contactEmail.Trim().ToLowerInvariant(),
             IsPrimary = true,
             Status = OutletConstants.ActiveStatus,
             CreatedByTenantUserId = createdByTenantUserId,
@@ -68,6 +71,7 @@ public class OutletAddress : AuditableEntity
         string countryCode,
         string? contactName,
         string? contactPhone,
+        string? contactEmail,
         Guid? updatedByTenantUserId,
         DateTimeOffset now)
     {
@@ -80,6 +84,7 @@ public class OutletAddress : AuditableEntity
         CountryCode = countryCode.Trim().ToUpperInvariant();
         ContactName = string.IsNullOrWhiteSpace(contactName) ? null : contactName.Trim();
         ContactPhone = string.IsNullOrWhiteSpace(contactPhone) ? null : contactPhone.Trim();
+        ContactEmail = string.IsNullOrWhiteSpace(contactEmail) ? null : contactEmail.Trim().ToLowerInvariant();
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
