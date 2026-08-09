@@ -172,8 +172,8 @@ public sealed class PosCustomerRepository : IPosCustomerRepository
 
         var totalCount = await query.CountAsync(cancellationToken);
         var pageRows = await query
-            .OrderBy(x => x.Name)
-            .ThenBy(x => x.Id)
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new
@@ -421,15 +421,20 @@ public sealed class PosCustomerRepository : IPosCustomerRepository
             .Select(x => x.TillId!.Value)
             .Distinct()
             .ToArray();
-        var outletNamesByTill = tillIds.Length == 0
-            ? new Dictionary<Guid, string?>()
+        var tillDetails = tillIds.Length == 0
+            ? new Dictionary<Guid, (string? OutletDisplayName, string? TillName)>()
             : await (
                 from till in _dbContext.Tills.AsNoTracking()
                 join outlet in _dbContext.Outlets.AsNoTracking()
                     on new { till.TenantId, till.OutletId } equals new { outlet.TenantId, OutletId = outlet.Id }
                 where till.TenantId == tenantId && tillIds.Contains(till.Id)
-                select new { till.Id, OutletName = outlet.OutletName })
-                .ToDictionaryAsync(x => x.Id, x => (string?)x.OutletName, cancellationToken);
+                select new { till.Id, OutletName = outlet.OutletName, till.TillName })
+                .ToDictionaryAsync(
+                    x => x.Id,
+                    x => (
+                        OutletDisplayName: (string?)x.OutletName,
+                        TillName: (string?)x.TillName),
+                    cancellationToken);
 
         var items = orderRows
             .Select(o => new PosCustomerOrderItemDto(
@@ -439,8 +444,11 @@ public sealed class PosCustomerRepository : IPosCustomerRepository
                 o.TotalAmount,
                 o.CurrencyCode,
                 o.Status,
-                o.TillId.HasValue && outletNamesByTill.TryGetValue(o.TillId.Value, out var name)
-                    ? name
+                o.TillId.HasValue && tillDetails.TryGetValue(o.TillId.Value, out var details)
+                    ? details.OutletDisplayName
+                    : null,
+                o.TillId.HasValue && tillDetails.TryGetValue(o.TillId.Value, out details)
+                    ? details.TillName
                     : null))
             .ToList();
 

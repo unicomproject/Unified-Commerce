@@ -822,18 +822,23 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 cardCapture?.AuthorizationReference,
                 cardCapture?.TerminalReference)
         };
+        Guid? discountSalesOrderLineId = null;
+        if (discountApplication?.DiscountScope == "LINE" &&
+            discountApplication.TargetProductVariantId.HasValue)
+        {
+            var targetLineIndex = builtLines.FindIndex(line =>
+                line.VariantId == discountApplication.TargetProductVariantId.Value);
+            if (targetLineIndex >= 0)
+                discountSalesOrderLineId = responseLines[targetLineIndex].SaleLineId;
+        }
+
         var receiptDiscountLines = discountApplication is null
             ? Array.Empty<PosReceiptDiscountLineDto>()
             : new[]
             {
                 new PosReceiptDiscountLineDto(
                     discountApplication.DiscountScope == "ORDER" ? "TRANSACTION" : "ITEM",
-                    discountApplication.DiscountScope == "ORDER"
-                        ? null
-                        : responseLines.FirstOrDefault(x =>
-                            builtLines.FirstOrDefault(line =>
-                                line.VariantId == discountApplication.TargetProductVariantId)
-                                ?.Variant.Sku == x.Sku)?.SaleLineId,
+                    discountSalesOrderLineId,
                     discountApplication.PolicyNameSnapshot,
                     discountApplication.PolicyCodeSnapshot,
                     null,
@@ -998,7 +1003,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         if (discountApplication is not null)
         {
             _dbContext.SalesOrderDiscounts.Add(SalesOrderDiscount.CreateForPosSale(
-                Guid.NewGuid(), tenantId, saleId, null, discountApplication.DiscountPolicyId,
+                Guid.NewGuid(), tenantId, saleId, discountSalesOrderLineId,
+                discountApplication.DiscountPolicyId,
                 discountApplication.DiscountTypeId, discountApplication.DiscountScope,
                 discountApplication.PolicyCodeSnapshot, discountApplication.PolicyNameSnapshot,
                 discountApplication.CalculationMethodSnapshot, discountApplication.RequestedValue,
