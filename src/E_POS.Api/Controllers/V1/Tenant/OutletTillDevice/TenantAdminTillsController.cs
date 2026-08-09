@@ -73,7 +73,9 @@ public sealed class TenantAdminTillsController : ControllerBase
 
     [HttpGet("create-options")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetCreateOptions(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetCreateOptions(
+        [FromQuery] Guid? outletId,
+        CancellationToken cancellationToken)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))
         {
@@ -82,7 +84,7 @@ public sealed class TenantAdminTillsController : ControllerBase
                 "Invalid tenant context.")));
         }
 
-        var result = await _tenantAdminTillService.GetCreateOptionsAsync(context, cancellationToken);
+        var result = await _tenantAdminTillService.GetCreateOptionsAsync(context, outletId, cancellationToken);
         return ToActionResult(result);
     }
 

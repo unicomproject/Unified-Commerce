@@ -24,6 +24,16 @@ public interface ITenantAdminTillRepository
         string tillAreaName,
         CancellationToken cancellationToken);
 
+    Task<string> GetTenantBaseCurrencyCodeAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task<bool> IsValidCashierAsync(
+        Guid tenantId,
+        Guid outletId,
+        Guid tenantUserId,
+        CancellationToken cancellationToken);
+
     Task<(IReadOnlyList<TillMonitoringReadModel> Items, int TotalCount)> ListAsync(
         Guid tenantId,
         string? search,
@@ -79,6 +89,7 @@ public interface ITenantAdminTillRepository
 
     Task<TenantAdminTillCreateOptionsResponse> GetCreateOptionsAsync(
         Guid tenantId,
+        Guid? outletId,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<TillHardwareReadinessReadModel>> GetHardwareReadinessDataAsync(

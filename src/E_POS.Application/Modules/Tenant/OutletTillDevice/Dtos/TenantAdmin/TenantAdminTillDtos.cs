@@ -100,19 +100,31 @@ public sealed record TenantAdminTillCreateOptionsResponse(
     string CurrencyCode);
 
 public sealed record TenantAdminTillCashierOptionResponse(
-    Guid TenantUserId,
-    string DisplayName);
+    Guid Id,
+    string DisplayName,
+    IReadOnlyList<Guid> OutletIds);
 
 public sealed record TenantAdminTillPosDeviceOptionResponse(
-    Guid PosDeviceId,
-    string DeviceCode,
-    string DeviceName);
+    Guid Id,
+    string Code,
+    string Name,
+    Guid OutletId,
+    string Status,
+    bool IsTrusted,
+    bool IsAssigned,
+    DateTimeOffset? LastSeenAt);
 
 public sealed record TenantAdminTillHardwareOptionResponse(
-    Guid HardwareDeviceId,
-    string HardwareDeviceCode,
-    string HardwareDeviceName,
-    string HardwareType);
+    Guid Id,
+    string Code,
+    string Name,
+    string Type,
+    Guid OutletId,
+    string Status,
+    bool IsAssigned,
+    string? ConnectionType,
+    DateTimeOffset? LastSeenAt,
+    string? ConnectionStatus);
 
 public sealed record TenantAdminOutletOptionResponse(
     Guid OutletId,

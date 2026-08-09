@@ -79,6 +79,36 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
         return (maxNumber ?? 0) + 1;
     }
 
+    public async Task<string> GetTenantBaseCurrencyCodeAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var tenant = await _dbContext.Tenants
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == tenantId, cancellationToken);
+            
+        return tenant?.BaseCurrencyCode ?? TillConstants.DefaultCurrencyCode;
+    }
+
+    public async Task<bool> IsValidCashierAsync(
+        Guid tenantId,
+        Guid outletId,
+        Guid tenantUserId,
+        CancellationToken cancellationToken)
+    {
+        var user = await _dbContext.TenantUsers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == tenantUserId && x.TenantId == tenantId && x.AccountStatus == "ACTIVE", cancellationToken);
+            
+        if (user == null) return false;
+        
+        if (user.UserType == "admin" || user.OutletId == outletId) return true;
+        
+        var hasOutletRole = await _dbContext.Set<E_POS.Domain.Modules.Tenant.AccessControl.Entities.OutletUserRole>()
+            .AsNoTracking()
+            .AnyAsync(x => x.TenantId == tenantId && x.TenantUserId == tenantUserId && x.OutletId == outletId && x.RevokedAt == null, cancellationToken);
+            
+        return hasOutletRole;
+    }
+
     public async Task<(IReadOnlyList<TillMonitoringReadModel> Items, int TotalCount)> ListAsync(
         Guid tenantId,
         string? search,
@@ -415,6 +445,7 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
 
     public async Task<TenantAdminTillCreateOptionsResponse> GetCreateOptionsAsync(
         Guid tenantId,
+        Guid? outletId,
         CancellationToken cancellationToken)
     {
         var outlets = await GetOutletOptionsAsync(tenantId, cancellationToken);
@@ -426,26 +457,97 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
             .FirstOrDefaultAsync(x => x.Id == tenantId, cancellationToken);
         var currencyCode = tenant?.BaseCurrencyCode ?? TillConstants.DefaultCurrencyCode;
 
-        var cashiers = await _dbContext.TenantUsers
+        // Cashiers
+        var cashiersQuery = _dbContext.TenantUsers
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.AccountStatus == "ACTIVE")
+            .Where(x => x.TenantId == tenantId && x.AccountStatus == "ACTIVE");
+
+        if (outletId.HasValue)
+        {
+            var validUserIds = await _dbContext.Set<E_POS.Domain.Modules.Tenant.AccessControl.Entities.OutletUserRole>()
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.OutletId == outletId.Value && x.RevokedAt == null)
+                .Select(x => x.TenantUserId)
+                .ToListAsync(cancellationToken);
+            
+            cashiersQuery = cashiersQuery.Where(x => x.OutletId == outletId.Value || validUserIds.Contains(x.Id) || x.UserType == "admin");
+        }
+
+        var users = await cashiersQuery
             .OrderBy(x => string.IsNullOrWhiteSpace(x.DisplayName) ? x.FullName : x.DisplayName)
-            .Select(x => new TenantAdminTillCashierOptionResponse(x.Id, string.IsNullOrWhiteSpace(x.DisplayName) ? x.FullName : x.DisplayName!))
             .ToListAsync(cancellationToken);
 
-        var posDevices = await _dbContext.PosDevices
+        var userIds = users.Select(u => u.Id).ToList();
+        var outletRoles = await _dbContext.Set<E_POS.Domain.Modules.Tenant.AccessControl.Entities.OutletUserRole>()
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status == PosDeviceConstants.ActiveStatus)
-            .OrderBy(x => x.DeviceName)
-            .Select(x => new TenantAdminTillPosDeviceOptionResponse(x.Id, x.DeviceCode, x.DeviceName))
+            .Where(r => r.TenantId == tenantId && userIds.Contains(r.TenantUserId) && r.RevokedAt == null)
             .ToListAsync(cancellationToken);
 
-        var hardwareDevices = await _dbContext.HardwareDevices
+        var cashiers = users.Select(u => {
+            var uRoles = outletRoles.Where(r => r.TenantUserId == u.Id).Select(r => r.OutletId).ToList();
+            if (u.OutletId.HasValue && !uRoles.Contains(u.OutletId.Value)) uRoles.Add(u.OutletId.Value);
+            return new TenantAdminTillCashierOptionResponse(u.Id, string.IsNullOrWhiteSpace(u.DisplayName) ? u.FullName : u.DisplayName!, uRoles);
+        }).ToList();
+
+        // POS Devices
+        var posQuery = _dbContext.PosDevices
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status == "ACTIVE")
-            .OrderBy(x => x.HardwareDeviceName)
-            .Select(x => new TenantAdminTillHardwareOptionResponse(x.Id, x.HardwareDeviceCode, x.HardwareDeviceName, x.HardwareDeviceType))
+            .Where(x => x.TenantId == tenantId && x.Status == PosDeviceConstants.ActiveStatus);
+            
+        if (outletId.HasValue)
+        {
+            posQuery = posQuery.Where(x => x.OutletId == outletId.Value);
+        }
+        
+        var posEntities = await posQuery.OrderBy(x => x.DeviceName).ToListAsync(cancellationToken);
+        var posIds = posEntities.Select(p => p.Id).ToList();
+        
+        var activePosAssignments = await _dbContext.Set<TillDeviceAssignment>()
+            .AsNoTracking()
+            .Where(a => a.TenantId == tenantId && posIds.Contains(a.PosDeviceId) && a.ReleasedAt == null)
+            .Select(a => a.PosDeviceId)
             .ToListAsync(cancellationToken);
+
+        var posDevices = posEntities.Select(x => new TenantAdminTillPosDeviceOptionResponse(
+            x.Id, 
+            x.DeviceCode, 
+            x.DeviceName, 
+            x.OutletId, 
+            x.Status, 
+            x.IsTrusted, 
+            activePosAssignments.Contains(x.Id), 
+            x.LastSeenAt)).ToList();
+
+        // Hardware Devices
+        var hwQuery = _dbContext.HardwareDevices
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status == "ACTIVE");
+            
+        if (outletId.HasValue)
+        {
+            hwQuery = hwQuery.Where(x => x.OutletId == outletId.Value);
+        }
+        
+        var hwEntities = await hwQuery.OrderBy(x => x.HardwareDeviceName).ToListAsync(cancellationToken);
+        var hwIds = hwEntities.Select(h => h.Id).ToList();
+        
+        var activeHwAssignments = await _dbContext.Set<HardwareDeviceAssignment>()
+            .AsNoTracking()
+            .Where(a => a.TenantId == tenantId && hwIds.Contains(a.HardwareDeviceId) && a.ReleasedAt == null)
+            .Select(a => a.HardwareDeviceId)
+            .ToListAsync(cancellationToken);
+
+        var hardwareDevices = hwEntities.Select(x => new TenantAdminTillHardwareOptionResponse(
+            x.Id, 
+            x.HardwareDeviceCode, 
+            x.HardwareDeviceName, 
+            x.HardwareDeviceType,
+            x.OutletId,
+            x.Status,
+            activeHwAssignments.Contains(x.Id),
+            x.ConnectionType,
+            x.LastSeenAt,
+            null)).ToList();
 
         return new TenantAdminTillCreateOptionsResponse(
             outlets,
