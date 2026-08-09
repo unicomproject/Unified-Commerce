@@ -258,6 +258,7 @@ public sealed class TenantAdminOutletsOverviewControllerTests
 
         public Task<ApplicationResult<TenantAdminTillCreateOptionsResponse>> GetCreateOptionsAsync(
             TenantRequestContext context,
+            Guid? outletId,
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
