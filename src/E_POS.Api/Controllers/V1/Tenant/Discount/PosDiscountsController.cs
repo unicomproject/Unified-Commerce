@@ -97,7 +97,8 @@ public sealed class PosDiscountsController : ControllerBase
                 "pos_discounts.discount_not_found" or "pos_discounts.device_not_found" => NotFound(Error(result.Error)),
                 "pos_discounts.device_not_trusted" => StatusCode(StatusCodes.Status403Forbidden, Error(result.Error)),
                 "pos_discounts.manual_configuration_not_found" or "pos_discounts.policy_not_applicable"
-                    or "pos_discounts.scope_mismatch" => UnprocessableEntity(Error(result.Error)),
+                    or "pos_discounts.scope_mismatch" or "pos_discounts.item_fixed_not_allowed"
+                    => UnprocessableEntity(Error(result.Error)),
                 _ => BadRequest(Error(result.Error))
             };
         }
@@ -125,9 +126,11 @@ public sealed class PosDiscountsController : ControllerBase
                 "pos_discounts.discount_not_found" or "pos_discounts.device_not_found" => NotFound(Error(result.Error)),
                 "pos_discounts.device_not_trusted" => StatusCode(StatusCodes.Status403Forbidden, Error(result.Error)),
                 "pos_discounts.idempotency_conflict" => Conflict(Error(result.Error)),
+                "pos_discounts.active_discount_exists" => Conflict(Error(result.Error)),
                 "pos_discounts.manual_configuration_not_found" or "pos_discounts.policy_not_applicable"
                     or "pos_discounts.scope_mismatch" or "pos_discounts.target_required"
-                    or "pos_discounts.target_not_in_cart" => UnprocessableEntity(Error(result.Error)),
+                    or "pos_discounts.target_not_in_cart" or "pos_discounts.item_fixed_not_allowed"
+                    => UnprocessableEntity(Error(result.Error)),
                 _ => BadRequest(Error(result.Error))
             };
         }

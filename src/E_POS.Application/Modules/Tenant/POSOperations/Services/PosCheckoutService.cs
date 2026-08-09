@@ -161,6 +161,25 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.customer_not_eligible" => CustomerNotEligible,
                     "pos_checkout.invalid_lines" => InvalidLines,
                     "pos_checkout.invalid_sale_type" => InvalidSaleType,
+                    "pos_checkout.discount_cart_changed" => new ApplicationError(
+                        "pos_checkout.discount_cart_changed",
+                        "The discount no longer matches this cart or customer. Re-apply the discount."),
+                    "pos_checkout.discount_context_mismatch" => new ApplicationError(
+                        "pos_checkout.discount_context_mismatch",
+                        "The discount belongs to a different till session or device. Re-apply the discount."),
+                    "pos_checkout.discount_application_not_found" => new ApplicationError(
+                        "pos_checkout.discount_application_not_found",
+                        "The applied discount could not be found. Re-apply the discount."),
+                    "pos_checkout.discount_application_expired" or
+                    "pos_checkout.discount_application_invalid" => new ApplicationError(
+                        result.ErrorCode!,
+                        "The applied discount is no longer valid. Re-apply the discount."),
+                    "pos_checkout.discount_approval_required" => new ApplicationError(
+                        "pos_checkout.discount_approval_required",
+                        "Manager approval is required before this discount can be used."),
+                    "pos_checkout.discount_policy_inactive" => new ApplicationError(
+                        "pos_checkout.discount_policy_inactive",
+                        "The discount policy is no longer active."),
                     _ => new ApplicationError(
                         result.ErrorCode ?? "pos_checkout.summary_failed",
                         "Checkout summary could not be calculated.")

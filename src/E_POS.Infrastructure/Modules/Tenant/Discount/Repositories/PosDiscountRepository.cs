@@ -35,10 +35,14 @@ public sealed class PosDiscountRepository : IPosDiscountRepository
             return new(context.ErrorCode, null);
         }
 
-        var candidates = await QueryAvailablePolicies(tenantId, context.OutletId, now)
+        // Materialize before ordering. QueryAvailablePolicies projects into the
+        // domain snapshot record, and Npgsql cannot translate ordering over a
+        // property of that constructed record.
+        var candidates = (await QueryAvailablePolicies(tenantId, context.OutletId, now)
+                .ToListAsync(cancellationToken))
             .OrderByDescending(x => x.Priority)
             .ThenBy(x => x.Name)
-            .ToListAsync(cancellationToken);
+            .ToList();
         var policies = new List<PosDiscountPolicySnapshot>();
         foreach (var policy in candidates)
         {
@@ -155,11 +159,15 @@ public sealed class PosDiscountRepository : IPosDiscountRepository
                                                activeApplication.ApplicationStatus == "PENDING_APPROVAL")
                                         select new { activeApplication.DiscountPolicyId, policy.IsStackable, policy.StackingGroupCode })
             .ToListAsync(cancellationToken);
-        if (activeApplications.Any(x => x.DiscountPolicyId == command.DiscountPolicyId) ||
+        // The current-release Flutter cashier flow is MANUAL and permits one
+        // active application for the logical cart, regardless of policy
+        // stacking metadata. POLICY keeps the broader deferred capability.
+        if ((command.DiscountSource == "MANUAL" && activeApplications.Count != 0) ||
+            activeApplications.Any(x => x.DiscountPolicyId == command.DiscountPolicyId) ||
             activeApplications.Any(x => !x.IsStackable || !command.IsStackable ||
                 (!string.IsNullOrWhiteSpace(command.StackingGroupCode) &&
                  x.StackingGroupCode == command.StackingGroupCode)))
-            return new("pos_discounts.stacking_not_allowed", Guid.Empty, "REJECTED", command.ExpiresAt, false);
+            return new("pos_discounts.active_discount_exists", Guid.Empty, "REJECTED", command.ExpiresAt, false);
 
         var commandValidationError = await ValidateApplicationCommandAsync(command, cancellationToken);
         if (commandValidationError is not null)

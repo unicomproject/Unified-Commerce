@@ -8,6 +8,7 @@ using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.Discount.Entities;
+using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 using E_POS.Application.Modules.Tenant.Discount.Services;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.Payment.Constants;
@@ -288,6 +289,7 @@ public sealed class PosCheckoutRepositoryTests
         Assert.Equal("completed", result.Payment.SaleStatus);
         Assert.Single(result.Payment.Items);
         Assert.Equal(1, await dbContext.SalesOrders.CountAsync());
+        Assert.Null((await dbContext.SalesOrders.SingleAsync()).CustomerId);
         Assert.Equal(1, await dbContext.SalesPayments.CountAsync());
         Assert.Equal(1, await dbContext.Receipts.CountAsync());
         Assert.Equal(1, await dbContext.SalesPaymentTransactions.CountAsync());
@@ -313,6 +315,95 @@ public sealed class PosCheckoutRepositoryTests
         Assert.Equal(1, await dbContext.SalesOrders.CountAsync());
         Assert.Equal(1, await dbContext.SalesPayments.CountAsync());
         Assert.Equal(1, await dbContext.StockMovements.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartPaymentAsync_WithActiveSameTenantCustomer_PersistsCustomerIdOnce()
+    {
+        await using var dbContext = CreateDbContext();
+        var fixture = await SeedCashCheckoutFixtureAsync(dbContext);
+        var customerId = Guid.NewGuid();
+        dbContext.Customers.Add(CustomerEntity.CreatePosCustomer(
+            customerId, fixture.TenantId, "CUS-STEP3", "Step 3 Customer",
+            "+94770000003", "step3@example.test", fixture.UserId, Now));
+        await dbContext.SaveChangesAsync();
+        var request = CashRequest(fixture, customerId, "customer-persist-key");
+        var repository = CreateRepository(dbContext);
+
+        var result = await repository.StartPaymentAsync(
+            fixture.TenantId, fixture.UserId, [PaymentPermissions.AcceptCash],
+            request, Now, CancellationToken.None);
+        var replay = await repository.StartPaymentAsync(
+            fixture.TenantId, fixture.UserId, [PaymentPermissions.AcceptCash],
+            request, Now.AddSeconds(1), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.ErrorCode);
+        Assert.True(replay.IsSuccess, replay.ErrorCode);
+        Assert.Equal(customerId, (await dbContext.SalesOrders.SingleAsync()).CustomerId);
+        Assert.Equal(result.Payment!.SaleId, replay.Payment!.SaleId);
+        Assert.Equal(1, await dbContext.SalesOrders.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartPaymentAsync_WithUnknownCustomer_RejectsWithoutOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var fixture = await SeedCashCheckoutFixtureAsync(dbContext);
+
+        var result = await CreateRepository(dbContext).StartPaymentAsync(
+            fixture.TenantId, fixture.UserId, [PaymentPermissions.AcceptCash],
+            CashRequest(fixture, Guid.NewGuid(), "unknown-customer-key"),
+            Now, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_checkout.customer_not_found", result.ErrorCode);
+        Assert.Empty(dbContext.SalesOrders);
+    }
+
+    [Fact]
+    public async Task StartPaymentAsync_WithCrossTenantCustomer_RejectsWithoutOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var fixture = await SeedCashCheckoutFixtureAsync(dbContext);
+        var customerId = Guid.NewGuid();
+        dbContext.Customers.Add(CustomerEntity.CreatePosCustomer(
+            customerId, Guid.NewGuid(), "CUS-OTHER", "Other Tenant Customer",
+            "+94770000004", null, fixture.UserId, Now));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateRepository(dbContext).StartPaymentAsync(
+            fixture.TenantId, fixture.UserId, [PaymentPermissions.AcceptCash],
+            CashRequest(fixture, customerId, "cross-tenant-key"),
+            Now, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_checkout.customer_not_found", result.ErrorCode);
+        Assert.Empty(dbContext.SalesOrders);
+    }
+
+    [Fact]
+    public async Task StartPaymentAsync_WithInactiveCustomer_RejectsWithoutOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var fixture = await SeedCashCheckoutFixtureAsync(dbContext);
+        var customerId = Guid.NewGuid();
+        var customer = CustomerEntity.CreatePosCustomer(
+            customerId, fixture.TenantId, "CUS-INACTIVE", "Inactive Customer",
+            "+94770000005", null, fixture.UserId, Now);
+        customer.UpdatePosProfile(
+            "Inactive Customer", "+94770000005", null, "INACTIVE",
+            fixture.UserId, Now);
+        dbContext.Customers.Add(customer);
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateRepository(dbContext).StartPaymentAsync(
+            fixture.TenantId, fixture.UserId, [PaymentPermissions.AcceptCash],
+            CashRequest(fixture, customerId, "inactive-customer-key"),
+            Now, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_checkout.customer_inactive", result.ErrorCode);
+        Assert.Empty(dbContext.SalesOrders);
     }
 
     [Fact]
@@ -458,7 +549,7 @@ public sealed class PosCheckoutRepositoryTests
     }
 
     [Fact]
-    public async Task StartPaymentAsync_WithApprovedDiscount_PersistsOrderDiscountAndAppliesApplication()
+    public async Task StartPaymentAsync_WithApprovedLineDiscount_PersistsTargetLineAndAppliesApplication()
     {
         var tenantId = Guid.NewGuid();
         var outletId = Guid.NewGuid();
@@ -487,7 +578,7 @@ public sealed class PosCheckoutRepositoryTests
         var sessionId = await dbContext.TillSessions.Select(x => x.Id).SingleAsync();
         var type = DiscountType.Create(Guid.NewGuid(), "TEST_PERCENT", "Test Percent", "PERCENTAGE", true, "ACTIVE", Now);
         var policy = DiscountPolicy.Create(
-            Guid.NewGuid(), tenantId, type.Id, "TEST10", "Test 10%", null, "ORDER",
+            Guid.NewGuid(), tenantId, type.Id, "TEST10", "Test 10%", null, "LINE",
             10m, null, null, null, null, false, false, null, 1, null, null,
             "ACTIVE", userId, Now);
         dbContext.DiscountTypes.Add(type);
@@ -498,7 +589,7 @@ public sealed class PosCheckoutRepositoryTests
             deviceId, "NewSale", null, lines, 2500, "LKR");
         var application = PosDiscountApplication.Create(
             Guid.NewGuid(), tenantId, policy.Id, type.Id, outletId, tillId, sessionId,
-            deviceId, userId, null, null, "test-key", "POLICY", "ORDER",
+            deviceId, userId, null, variantId, "test-key", "POLICY", "LINE",
             policy.DiscountPolicyCode, policy.DiscountPolicyName, "PERCENTAGE",
             10m, 10m, 10m, 2500m, 2500m, 250m, 2250m, "LKR",
             snapshot, PosDiscountCartFingerprint.Hash(snapshot), null, false,
@@ -518,7 +609,10 @@ public sealed class PosCheckoutRepositoryTests
         Assert.Equal(250, result.Payment!.DiscountTotal);
         Assert.Equal(2250, result.Payment.GrandTotal);
         Assert.Equal(250, result.Payment.ChangeDue);
-        Assert.Single(await dbContext.SalesOrderDiscounts.ToListAsync());
+        var orderLine = await dbContext.SalesOrderLines.SingleAsync();
+        var orderDiscount = await dbContext.SalesOrderDiscounts.SingleAsync();
+        Assert.Equal("LINE", orderDiscount.DiscountTargetScope);
+        Assert.Equal(orderLine.Id, orderDiscount.SalesOrderLineId);
         Assert.Equal("APPLIED", (await dbContext.PosDiscountApplications.SingleAsync()).ApplicationStatus);
         Assert.Contains(await dbContext.PosDiscountApplicationEvents.ToListAsync(), x => x.EventType == "APPLIED");
     }
@@ -534,6 +628,57 @@ public sealed class PosCheckoutRepositoryTests
 
         return new PosCheckoutRepository(dbContext, tillSessionRepository, new StubReceiptTemplateResolutionService(), cardGateway);
     }
+
+    private static PosCheckoutStartPaymentRequestDto CashRequest(
+        CashCheckoutFixture fixture,
+        Guid? customerId,
+        string idempotencyKey) => new(
+            fixture.DeviceId,
+            "NewSale",
+            customerId,
+            [new PosCheckoutLineRequestDto(fixture.VariantId, 1)],
+            "cash",
+            1500,
+            null,
+            idempotencyKey);
+
+    private static async Task<CashCheckoutFixture> SeedCashCheckoutFixtureAsync(
+        EPosDbContext dbContext)
+    {
+        var fixture = new CashCheckoutFixture(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        SeedDeviceContext(dbContext, fixture.TenantId, fixture.OutletId,
+            fixture.TillId, fixture.DeviceId, fixture.UserId, Now, isTrusted: true);
+        SeedTenantUser(dbContext, fixture.TenantId, fixture.UserId, "Cashier 001");
+        SeedOpenTillSession(dbContext, fixture.TenantId, fixture.OutletId,
+            fixture.TillId, fixture.DeviceId, fixture.UserId);
+        await SeedDefaultPriceListAsync(dbContext, fixture.TenantId,
+            fixture.ProductId, fixture.VariantId, 1250m);
+        SeedSellableProduct(dbContext, fixture.TenantId,
+            fixture.ProductId, fixture.VariantId);
+        var location = InventoryLocation.Create(
+            Guid.NewGuid(), fixture.TenantId, fixture.OutletId, null,
+            "STEP3-POS-FLOOR", "Step 3 POS Floor", "STORE", true, false,
+            false, false, "ACTIVE", fixture.UserId, Now);
+        var balance = InventoryBalance.Create(
+            Guid.NewGuid(), fixture.TenantId, location.Id, fixture.ProductId,
+            fixture.VariantId, null, Now);
+        balance.AdjustQuantities(5, 0, 0, 0, Now);
+        dbContext.InventoryLocations.Add(location);
+        dbContext.InventoryBalances.Add(balance);
+        await dbContext.SaveChangesAsync();
+        return fixture;
+    }
+
+    private sealed record CashCheckoutFixture(
+        Guid TenantId,
+        Guid OutletId,
+        Guid TillId,
+        Guid DeviceId,
+        Guid UserId,
+        Guid ProductId,
+        Guid VariantId);
 
     private sealed class StubCardGateway(CardPaymentCaptureResult result) : ICardPaymentGateway
     {

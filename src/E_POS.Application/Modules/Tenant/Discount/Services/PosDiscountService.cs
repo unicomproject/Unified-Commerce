@@ -181,6 +181,12 @@ public sealed class PosDiscountService : IPosDiscountService
         if (source == "MANUAL" && method is not ("PERCENTAGE" or "FIXED_AMOUNT"))
             return Failure<PosDiscountValidationResponseDto>("pos_discounts.invalid_request",
                 "Manual discount calculation method must be PERCENTAGE or FIXED_AMOUNT.");
+        // Current-release POS cashier envelope. Broader POLICY/approval
+        // capability remains available for future workflows, but the manual
+        // cashier path is intentionally LINE + PERCENTAGE only.
+        if (source == "MANUAL" && requestedScope == "LINE" && method == "FIXED_AMOUNT")
+            return Failure<PosDiscountValidationResponseDto>("pos_discounts.item_fixed_not_allowed",
+                "Fixed amount discounts are not available for individual cart lines.");
         var applicability = new PosDiscountApplicabilityContext(
             requestedScope, request.TargetVariantId,
             VariantIdsForScope(requestedScope, request.TargetVariantId, request.Lines),
@@ -242,6 +248,8 @@ public sealed class PosDiscountService : IPosDiscountService
 
         if (requestedValue <= 0) messages.Add("Requested discount must be greater than zero.");
         if (requestedValue > absoluteLimit) messages.Add("Requested discount exceeds the absolute policy maximum.");
+        if (source == "MANUAL" && requestedValue > cashierLimit)
+            messages.Add("Discount exceeds your allowed limit.");
         if (policy.CalculationMethod == "PERCENTAGE" && requestedValue > 100m) messages.Add("Percentage discount cannot exceed 100%.");
         if (policy.CalculationMethod == "FIXED_AMOUNT" && requestedValue > eligibleSubtotal)
             messages.Add("Fixed discount cannot exceed the eligible cart amount.");
@@ -260,7 +268,10 @@ public sealed class PosDiscountService : IPosDiscountService
         amount = Math.Clamp(amount, 0m, eligibleSubtotal);
         var discountAmount = ToMoney(amount);
         var valid = messages.Count == 0 && discountAmount > 0;
-        var approvalRequired = valid && !absoluteExceeded &&
+        // Current-release MANUAL cashier requests never enter manager approval:
+        // values above the user's authority are rejected above. POLICY retains
+        // the existing deferred approval behavior.
+        var approvalRequired = source == "POLICY" && valid && !absoluteExceeded &&
             (requestedValue > cashierLimit || policy.RequiresManagerApproval);
         var outcome = !valid ? "rejected" : approvalRequired ? "approval_required" : "direct_apply";
 

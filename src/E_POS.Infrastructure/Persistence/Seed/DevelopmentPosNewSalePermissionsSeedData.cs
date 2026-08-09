@@ -23,6 +23,8 @@ public static class DevelopmentPosNewSalePermissionsSeedData
         new(Guid.Parse("77777777-0309-4000-8000-000000000001"), SalesPermissions.Cart.RemoveItem, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosSalesFeatureId, "remove_item", "Remove items from POS sale cart."),
         new(Guid.Parse("77777777-0310-4000-8000-000000000001"), SalesPermissions.Cart.Clear, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosSalesFeatureId, "clear", "Clear POS sale cart."),
         new(Guid.Parse("77777777-0311-4000-8000-000000000001"), CustomerPermissions.View, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId, "view", "View customers on POS."),
+        // Keep catalogue ID aligned with the historical definition and corrective migration.
+        DevelopmentPosCustomerCreatePermissionSeedData.Definition,
         // Keep catalogue ID aligned with DevelopmentPosCustomerUpdatePermissionSeedData / migration.
         new(
             DevelopmentPosCustomerUpdatePermissionSeedData.PermissionId,
