@@ -151,11 +151,37 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
         {
             return ApplicationResult<TenantAdminTillDetailResponse>.Failure(accessError);
         }
+        
+        if ((request.PosDeviceId.HasValue || (request.HardwareAssignments != null && request.HardwareAssignments.Any())) &&
+            !context.HasPermission("tenant.hardware.manage"))
+        {
+            return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError(
+                "till.permission_denied",
+                "Permission denied for hardware assignment."));
+        }
 
         var validationError = ValidateCreateRequest(request);
         if (validationError is not null)
         {
             return ApplicationResult<TenantAdminTillDetailResponse>.Failure(validationError);
+        }
+
+        if (request.DefaultOpeningFloatAmount < 0)
+        {
+            return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError(
+                "till.validation_failed",
+                "Default opening float amount cannot be negative."));
+        }
+
+        if (request.DefaultCashierTenantUserId.HasValue)
+        {
+            var isValidCashier = await _repository.IsValidCashierAsync(context.TenantId, request.OutletId, request.DefaultCashierTenantUserId.Value, cancellationToken);
+            if (!isValidCashier)
+            {
+                return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError(
+                    "till.validation_failed",
+                    "Invalid default cashier selected. Cashier must be active and have access to the selected outlet."));
+            }
         }
 
         if (!await _repository.OutletBelongsToTenantAsync(context.TenantId, request.OutletId, cancellationToken))
@@ -185,6 +211,8 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             tillAreaName,
             cancellationToken);
 
+        var baseCurrencyCode = await _repository.GetTenantBaseCurrencyCodeAsync(context.TenantId, cancellationToken);
+
         var till = Till.Create(
             tillId,
             context.TenantId,
@@ -195,7 +223,7 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             normalizedTillCode,
             TillConstants.StandardTillType,
             request.DefaultOpeningFloatAmount,
-            TillConstants.DefaultCurrencyCode,
+            baseCurrencyCode,
             true,
             request.Status,
             actingUserId,
@@ -207,6 +235,56 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             request.CashDrawerName,
             request.CardReaderName,
             request.InternalNote);
+
+        // Pre-validate POS device if supplied
+        if (request.PosDeviceId.HasValue)
+        {
+            var device = await _hardwareRepository.GetPosDeviceAsync(context.TenantId, request.PosDeviceId.Value, cancellationToken);
+            if (device == null || device.Status == PosDeviceConstants.DeletedStatus)
+            {
+                return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError("till.pos_device_not_found", "Selected POS device was not found or is deleted."));
+            }
+            if (device.OutletId != request.OutletId)
+            {
+                return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError("till.pos_device_outlet_mismatch", "Selected POS device does not belong to the selected outlet."));
+            }
+            
+            // Check global assignment state
+            var isAssigned = await _assignmentRepository.DeviceAssignedToAnyTillAsync(context.TenantId, device.Id, null, cancellationToken);
+            if (isAssigned)
+            {
+                return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError("till.pos_device_already_assigned", "Selected POS device is already assigned to another Till."));
+            }
+        }
+
+        // Pre-validate Hardware devices if supplied
+        if (request.HardwareAssignments != null && request.HardwareAssignments.Any())
+        {
+            var uniqueIds = new HashSet<Guid>();
+            foreach (var hw in request.HardwareAssignments)
+            {
+                if (!uniqueIds.Add(hw.HardwareDeviceId))
+                {
+                    return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError("till.hardware_duplicate_selection", "Duplicate hardware device selected in request."));
+                }
+                
+                var hardwareDevice = await _hardwareRepository.GetEditableDeviceAsync(context.TenantId, hw.HardwareDeviceId, cancellationToken);
+                if (hardwareDevice == null || hardwareDevice.Status != "ACTIVE")
+                {
+                    return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError("till.hardware_not_found", "Selected hardware device was not found or is inactive."));
+                }
+                if (hardwareDevice.OutletId != request.OutletId)
+                {
+                    return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError("till.hardware_outlet_mismatch", "Selected hardware device does not belong to the selected outlet."));
+                }
+                
+                var hwAssigned = await _hardwareRepository.GetActiveAssignmentForDeviceAsync(context.TenantId, hw.HardwareDeviceId, cancellationToken);
+                if (hwAssigned != null)
+                {
+                    return ApplicationResult<TenantAdminTillDetailResponse>.Failure(new ApplicationError("till.hardware_already_assigned", "Selected hardware device is already assigned."));
+                }
+            }
+        }
 
         var guarded = await _resourceLimitGuard.ExecuteWithinCapacityAsync(
             context.TenantId,
@@ -454,6 +532,7 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
 
     public async Task<ApplicationResult<TenantAdminTillCreateOptionsResponse>> GetCreateOptionsAsync(
         TenantRequestContext context,
+        Guid? outletId,
         CancellationToken cancellationToken)
     {
         var accessError = ValidateAccessAny(
@@ -465,7 +544,7 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             return ApplicationResult<TenantAdminTillCreateOptionsResponse>.Failure(accessError);
         }
 
-        var options = await _repository.GetCreateOptionsAsync(context.TenantId, cancellationToken);
+        var options = await _repository.GetCreateOptionsAsync(context.TenantId, outletId, cancellationToken);
         return ApplicationResult<TenantAdminTillCreateOptionsResponse>.Success(options);
     }
 
@@ -687,14 +766,14 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             return ValidationFailed("Outlet is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(tillName) || tillName.Trim().Length > 120)
+        if (string.IsNullOrWhiteSpace(tillName) || tillName.Trim().Length > 150)
         {
-            return ValidationFailed("Till name is required and must be 120 characters or less.");
+            return ValidationFailed("Till name is required and must be 150 characters or less.");
         }
 
-        if (string.IsNullOrWhiteSpace(tillCode) || tillCode.Trim().Length > 40)
+        if (string.IsNullOrWhiteSpace(tillCode) || tillCode.Trim().Length > 60)
         {
-            return ValidationFailed("Till code is required and must be 40 characters or less.");
+            return ValidationFailed("Till code is required and must be 60 characters or less.");
         }
 
         if (string.IsNullOrWhiteSpace(status) || !TillConstants.IsValidWriteStatus(status))
