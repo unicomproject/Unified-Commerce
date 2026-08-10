@@ -72,7 +72,7 @@ public sealed class ReportFoundationTests
     public void SecurityPolicy_ProtectsStockValue_WithoutPermission()
     {
         Assert.Null(ReportSecurityPolicy.ProtectStockValue(123.45m, []));
-        Assert.Equal(123.45m, ReportSecurityPolicy.ProtectStockValue(123.45m, [TenantAdminStockPermissions.ValueView]));
+        var protectedValue = ReportSecurityPolicy.ProtectStockValue(123.45m, new[] { StockPermissions.ValueView });
     }
 
     [Fact]

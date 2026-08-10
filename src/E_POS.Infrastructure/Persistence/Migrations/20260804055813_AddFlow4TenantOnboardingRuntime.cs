@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -252,6 +252,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                 name: "ck_tenant_feature_entitlements_override_reason",
                 table: "tenant_feature_entitlements",
                 sql: "source_type <> 'OVERRIDE' OR length(btrim(override_reason)) > 0");
+
+            migrationBuilder.Sql("UPDATE tenant_feature_entitlements SET source_type = 'MANUAL' WHERE source_type NOT IN ('MANUAL', 'PLAN', 'ADDON', 'OVERRIDE');");
 
             migrationBuilder.AddCheckConstraint(
                 name: "ck_tenant_feature_entitlements_source_type",

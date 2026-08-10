@@ -5,7 +5,16 @@ namespace E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
 
 public interface IProductReviewService
 {
-    Task<ApplicationResult<ProductReviewsPageReadModel>> GetAsync(Guid tenantId, Guid? customerId, Guid productId, int page, int pageSize, string? sort, CancellationToken cancellationToken);
+    Task<ApplicationResult<ProductReviewsPageReadModel>> GetAsync(
+        Guid tenantId,
+        Guid? customerId,
+        Guid productId,
+        int page,
+        int pageSize,
+        string? sort,
+        int? rating,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<CustomerReviewsPageReadModel>> GetCustomerReviewsAsync(
         Guid tenantId,
         Guid customerId,

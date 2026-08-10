@@ -2,6 +2,7 @@
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -13,7 +14,8 @@ namespace E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 
 public sealed class StorefrontProductSearchRepository : StorefrontProductRepositoryBase, IStorefrontProductSearchRepository
 {
-    public StorefrontProductSearchRepository(EPosDbContext dbContext) : base(dbContext)
+    public StorefrontProductSearchRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
+        : base(dbContext, mediaReadUrlResolver)
     {
     }
 
@@ -129,7 +131,9 @@ public sealed class StorefrontProductSearchRepository : StorefrontProductReposit
                                   {
                                       Category = category,
                                       MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
-                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                      MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                      MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                                      MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                   })
             .ToListAsync(cancellationToken);
         var collections = await DbContext.Set<Collection>().AsNoTracking()
@@ -164,7 +168,11 @@ public sealed class StorefrontProductSearchRepository : StorefrontProductReposit
                 Name = x.Category.CategoryName,
                 Slug = x.Category.CategorySlug,
                 Description = x.Category.Description,
-                ImageUrl = x.MediaPublicUrl
+                ImageUrl = ResolveActiveMediaReadUrl(
+                    x.MediaStatus,
+                    x.MediaContainerName,
+                    x.MediaStorageKey,
+                    x.MediaPublicUrl)
             }).ToList(),
             Collections = collections.Select(x => new StorefrontSearchMatchReadModel
             {

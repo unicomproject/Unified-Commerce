@@ -1,4 +1,5 @@
 using System.Reflection;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -629,6 +630,43 @@ public sealed class StorefrontRepositoryTests
     }
 
     [Fact]
+    public async Task GetActiveBannersAsync_ResolvesMediaReadUrlWhenResolverIsConfigured()
+    {
+        var tenantId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var mediaPublicUrl = "https://oneverzdevstorage01.blob.core.windows.net/images/banner.jpg";
+        var banner = StorefrontBanner.Create(
+            tenantId,
+            null,
+            "HERO",
+            "Media Hero",
+            null,
+            "/legacy/banner.jpg",
+            null,
+            null,
+            1,
+            "ACTIVE");
+        Set(banner, "ImageMediaAssetId", mediaAssetId);
+
+        await using var dbContext = CreateDbContext();
+        dbContext.MediaAssets.Add(CreateMediaAsset(tenantId, mediaAssetId, mediaPublicUrl, "STOREFRONT_BANNER"));
+        dbContext.StorefrontBanners.Add(banner);
+        await dbContext.SaveChangesAsync();
+        var resolver = new PrefixMediaReadUrlResolver("signed:");
+        var repository = new StorefrontRepository(
+            new StorefrontBannerRepository(dbContext, resolver),
+            new StorefrontCategoryRepository(dbContext),
+            new StorefrontProductRepository(dbContext),
+            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontTenantRepository(dbContext));
+
+        var result = Assert.Single(await repository.GetActiveBannersAsync(tenantId, "HERO", CancellationToken.None));
+
+        Assert.Equal($"signed:{mediaPublicUrl}", result.ImageUrl);
+        Assert.Equal((mediaPublicUrl, "images", $"tests/{mediaAssetId:D}.jpg"), Assert.Single(resolver.Calls));
+    }
+
+    [Fact]
     public async Task GetRootCategoriesAsync_PrefersMediaAssetPublicUrlWhenAvailable()
     {
         var tenantId = Guid.NewGuid();
@@ -821,6 +859,31 @@ public sealed class StorefrontRepositoryTests
             null,
             Now);
     }
+
+    private sealed class PrefixMediaReadUrlResolver : IMediaReadUrlResolver
+    {
+        private readonly string _prefix;
+
+        public PrefixMediaReadUrlResolver(string prefix)
+        {
+            _prefix = prefix;
+        }
+
+        public List<(string? MediaPublicUrl, string? ContainerName, string? StorageKey)> Calls { get; } = [];
+
+        public string? ResolveReadUrl(string? mediaPublicUrl)
+        {
+            Calls.Add((mediaPublicUrl, null, null));
+            return string.IsNullOrWhiteSpace(mediaPublicUrl) ? null : $"{_prefix}{mediaPublicUrl.Trim()}";
+        }
+
+        public string? ResolveReadUrl(string? containerName, string? storageKey, string? mediaPublicUrl)
+        {
+            Calls.Add((mediaPublicUrl, containerName, storageKey));
+            return string.IsNullOrWhiteSpace(mediaPublicUrl) ? null : $"{_prefix}{mediaPublicUrl.Trim()}";
+        }
+    }
+
     private static void Set<T>(object entity, string propertyName, T value)
     {
         var property = entity.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);

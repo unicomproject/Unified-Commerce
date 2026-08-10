@@ -27,6 +27,7 @@ public sealed class ProductReviewService : IProductReviewService
         int page,
         int pageSize,
         string? sort,
+        int? rating,
         CancellationToken cancellationToken)
     {
         if (tenantId == Guid.Empty)
@@ -41,7 +42,7 @@ public sealed class ProductReviewService : IProductReviewService
             return PageFailure("product_reviews.invalid_sort", "Sort must be newest, oldest, highest, or lowest.");
 
         var result = await _repository.GetAsync(
-            tenantId, customerId, productId, page, pageSize, normalizedSort,
+            tenantId, customerId, productId, page, pageSize, normalizedSort, rating,
             _dateTimeProvider.UtcNow, cancellationToken);
         return result.IsSuccess
             ? ApplicationResult<ProductReviewsPageReadModel>.Success(result.Page!)

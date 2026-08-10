@@ -2,6 +2,7 @@
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -13,7 +14,8 @@ namespace E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 
 public sealed class StorefrontProductBestSellerRepository : StorefrontProductRepositoryBase, IStorefrontProductBestSellerRepository
 {
-    public StorefrontProductBestSellerRepository(EPosDbContext dbContext) : base(dbContext)
+    public StorefrontProductBestSellerRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
+        : base(dbContext, mediaReadUrlResolver)
     {
     }
 

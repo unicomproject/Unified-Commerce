@@ -9,20 +9,17 @@ namespace E_POS.Infrastructure.Modules.Shared.Storage.Services;
 
 public sealed class AzureBlobSasTokenProvider : IAzureSasTokenProvider
 {
-    private readonly AzureBlobStorageOptions _options;
-    private readonly BlobServiceClient _blobServiceClient;
+    private readonly BlobServiceClient? _blobServiceClient;
+    private readonly string? _storageAccountName;
 
     public AzureBlobSasTokenProvider(IOptions<AzureBlobStorageOptions> options)
     {
-        _options = options.Value;
-        
-        if (!string.IsNullOrWhiteSpace(_options.ConnectionString))
+        var configuredOptions = options.Value;
+
+        if (!string.IsNullOrWhiteSpace(configuredOptions.ConnectionString))
         {
-            _blobServiceClient = new BlobServiceClient(_options.ConnectionString);
-        }
-        else
-        {
-            throw new InvalidOperationException("AzureBlobStorage ConnectionString is not configured.");
+            _blobServiceClient = new BlobServiceClient(configuredOptions.ConnectionString);
+            _storageAccountName = TryParseStorageAccountName(_blobServiceClient.Uri);
         }
     }
 
@@ -35,43 +32,34 @@ public sealed class AzureBlobSasTokenProvider : IAzureSasTokenProvider
 
         try
         {
-            var publicBaseUrl = _options.PublicBaseUrl;
-            if (string.IsNullOrWhiteSpace(publicBaseUrl))
+            var normalizedBlobUrl = blobUrl.Trim();
+            if (_blobServiceClient is null ||
+                !Uri.TryCreate(normalizedBlobUrl, UriKind.Absolute, out var blobUri) ||
+                HasSasQuery(blobUri) ||
+                !IsConfiguredStorageAccount(blobUri))
             {
-                return blobUrl;
+                return normalizedBlobUrl;
             }
 
-            // Extract blob name from URL based on the configured public base URL
-            if (!blobUrl.StartsWith(publicBaseUrl, StringComparison.OrdinalIgnoreCase))
+            var blobUriBuilder = new BlobUriBuilder(blobUri);
+            if (string.IsNullOrWhiteSpace(blobUriBuilder.BlobContainerName) ||
+                string.IsNullOrWhiteSpace(blobUriBuilder.BlobName))
             {
-                // If it doesn't match the expected base URL, just return it as is
-                return blobUrl;
+                return normalizedBlobUrl;
             }
 
-            string relativePath = blobUrl.Substring(publicBaseUrl.Length).TrimStart('/');
-            
-            // Expected format: containerName/blobName
-            string[] parts = relativePath.Split('/', 2);
-            if (parts.Length != 2)
-            {
-                return blobUrl;
-            }
-
-            string containerName = parts[0];
-            string blobName = parts[1];
-
-            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-            var blobClient = containerClient.GetBlobClient(blobName);
+            var containerClient = _blobServiceClient.GetBlobContainerClient(blobUriBuilder.BlobContainerName);
+            var blobClient = containerClient.GetBlobClient(blobUriBuilder.BlobName);
 
             if (!blobClient.CanGenerateSasUri)
             {
-                return blobUrl;
+                return normalizedBlobUrl;
             }
 
             var sasBuilder = new BlobSasBuilder
             {
-                BlobContainerName = containerName,
-                BlobName = blobName,
+                BlobContainerName = blobUriBuilder.BlobContainerName,
+                BlobName = blobUriBuilder.BlobName,
                 Resource = "b", // b for blob
                 StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Prevent clock skew issues
                 ExpiresOn = DateTimeOffset.UtcNow.AddHours(24) // 24 hours expiry
@@ -88,5 +76,43 @@ public sealed class AzureBlobSasTokenProvider : IAzureSasTokenProvider
             // In case of any error parsing the URL or generating SAS, fallback to original URL
             return blobUrl;
         }
+    }
+
+    private bool IsConfiguredStorageAccount(Uri blobUri)
+    {
+        if (!blobUri.Host.Contains(".blob.", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_storageAccountName))
+        {
+            return true;
+        }
+
+        var accountName = TryParseStorageAccountName(blobUri);
+        return string.Equals(accountName, _storageAccountName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasSasQuery(Uri uri)
+    {
+        var query = uri.Query.TrimStart('?');
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return false;
+        }
+
+        var keys = query
+            .Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part => part.Split('=', 2)[0])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return keys.Contains("sig") && keys.Contains("se") && keys.Contains("sp");
+    }
+
+    private static string? TryParseStorageAccountName(Uri uri)
+    {
+        var hostParts = uri.Host.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        return hostParts.Length == 0 ? null : hostParts[0];
     }
 }

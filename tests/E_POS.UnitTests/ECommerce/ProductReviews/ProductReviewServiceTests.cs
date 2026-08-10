@@ -20,7 +20,7 @@ public sealed class ProductReviewServiceTests
         var service = CreateService(repository);
 
         var result = await service.GetAsync(
-            TenantId, null, ProductId, 0, 51, "newest", CancellationToken.None);
+            TenantId, null, ProductId, 0, 51, "newest", null, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("product_reviews.invalid_paging", result.Error.Code);
@@ -38,7 +38,7 @@ public sealed class ProductReviewServiceTests
         var service = CreateService(repository);
 
         var result = await service.GetAsync(
-            TenantId, null, ProductId, 2, 20, " HIGHEST ", CancellationToken.None);
+            TenantId, null, ProductId, 2, 20, " HIGHEST ", null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Same(page, result.Value);
@@ -171,7 +171,7 @@ public sealed class ProductReviewServiceTests
 
         public Task<ProductReviewPageRepositoryResult> GetAsync(
             Guid tenantId, Guid? customerId, Guid productId, int page, int pageSize, string sort,
-            DateTimeOffset now, CancellationToken cancellationToken)
+            int? rating, DateTimeOffset now, CancellationToken cancellationToken)
         {
             Capture(tenantId, customerId, productId, now);
             Page = page;

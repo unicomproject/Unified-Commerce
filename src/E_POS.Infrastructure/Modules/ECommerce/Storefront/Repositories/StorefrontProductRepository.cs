@@ -1,5 +1,6 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Infrastructure.Persistence;
 
@@ -12,12 +13,12 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
     private readonly IStorefrontProductSearchRepository _searchRepository;
     private readonly IStorefrontProductBestSellerRepository _bestSellerRepository;
 
-    public StorefrontProductRepository(EPosDbContext dbContext)
+    public StorefrontProductRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
         : this(
-            new StorefrontProductListingRepository(dbContext),
-            new StorefrontProductDetailRepository(dbContext),
-            new StorefrontProductSearchRepository(dbContext),
-            new StorefrontProductBestSellerRepository(dbContext))
+            new StorefrontProductListingRepository(dbContext, mediaReadUrlResolver),
+            new StorefrontProductDetailRepository(dbContext, mediaReadUrlResolver),
+            new StorefrontProductSearchRepository(dbContext, mediaReadUrlResolver),
+            new StorefrontProductBestSellerRepository(dbContext, mediaReadUrlResolver))
     {
     }
 

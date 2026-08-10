@@ -2,6 +2,7 @@
 using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Shared.Media.Entities;
@@ -26,10 +27,12 @@ public abstract class StorefrontCheckoutRepositoryBase
         PlatformTenantFeatureCodes.ClickCollect
     ];
     protected static readonly TimeSpan CheckoutLifetime = TimeSpan.FromMinutes(15);
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    protected StorefrontCheckoutRepositoryBase(EPosDbContext dbContext)
+    protected StorefrontCheckoutRepositoryBase(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         DbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     protected EPosDbContext DbContext { get; }
@@ -467,16 +470,29 @@ public abstract class StorefrontCheckoutRepositoryBase
                                          image.Status == Active &&
                                          image.IsPrimaryImage &&
                                          mediaAsset.Status == Active
-                                   select new
-                                   {
-                                       image.ProductId,
-                                       mediaAsset.PublicUrl
-                                   })
-                                   .ToListAsync(cancellationToken);
+                                 select new
+                                 {
+                                     image.ProductId,
+                                     MediaContainerName = mediaAsset.ContainerName,
+                                     MediaStorageKey = mediaAsset.StorageKey,
+                                     MediaPublicUrl = mediaAsset.PublicUrl,
+                                     MediaStatus = mediaAsset.Status
+                                 })
+                                 .ToListAsync(cancellationToken);
 
         var primaryImageDict = primaryImages
             .GroupBy(x => x.ProductId)
-            .ToDictionary(g => g.Key, g => g.First().PublicUrl);
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var row = g.First();
+                    return ResolveActiveMediaReadUrl(
+                        row.MediaStatus,
+                        row.MediaContainerName,
+                        row.MediaStorageKey,
+                        row.MediaPublicUrl);
+                });
 
         StorefrontCheckoutOrderReadModel? orderModel = null;
         if (checkout.ConvertedOrderId.HasValue)
@@ -597,6 +613,18 @@ public abstract class StorefrontCheckoutRepositoryBase
         !string.IsNullOrWhiteSpace(preferred)
             ? preferred.Trim()
             : string.IsNullOrWhiteSpace(fallback) ? null : fallback.Trim();
+
+    private string? ResolveActiveMediaReadUrl(
+        string? mediaStatus,
+        string? containerName,
+        string? storageKey,
+        string? mediaPublicUrl)
+    {
+        return mediaStatus == Active
+            ? _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, mediaPublicUrl)
+              ?? mediaPublicUrl?.Trim()
+            : null;
+    }
 
     protected static StorefrontCheckoutRepositoryResult Success(StorefrontCheckoutReadModel checkout) =>
         StorefrontCheckoutRepositoryResult.Success(checkout);

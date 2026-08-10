@@ -30,12 +30,13 @@ public sealed class ProductReviewsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? sort = "newest",
+        [FromQuery] int? rating = null,
         CancellationToken cancellationToken = default)
     {
         TryGetCustomerContext(out _, out var customerId);
         
         var result = await _service.GetAsync(
-            tenantId, customerId, productId, page, pageSize, sort, cancellationToken);
+            tenantId, customerId, productId, page, pageSize, sort, rating, cancellationToken);
         if (result.IsSuccess && result.Value is not null)
             return Ok(Success("Product reviews retrieved successfully.", result.Value));
 

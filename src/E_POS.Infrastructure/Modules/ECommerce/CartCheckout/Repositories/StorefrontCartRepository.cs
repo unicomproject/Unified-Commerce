@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
@@ -17,10 +18,12 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
 {
     private const string Active = "ACTIVE";
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public StorefrontCartRepository(EPosDbContext dbContext)
+    public StorefrontCartRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<StorefrontCartRepositoryResult> GetAsync(
@@ -370,6 +373,9 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
                             {
                                 image.ProductId,
                                 image.ProductVariantId,
+                                MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
                                 MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                             })
             .ToListAsync(cancellationToken);
@@ -423,7 +429,13 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
                 Name = item.ProductNameSnapshot,
                 VariantName = variant?.VariantName,
                 Sku = item.SkuSnapshot,
-                ImageUrl = image is null ? null : image.MediaPublicUrl,
+                ImageUrl = image is null
+                    ? null
+                    : ResolveActiveMediaReadUrl(
+                        image.MediaStatus,
+                        image.MediaContainerName,
+                        image.MediaStorageKey,
+                        image.MediaPublicUrl),
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
                 Subtotal = item.LineSubtotalAmount,
@@ -464,6 +476,18 @@ public sealed class StorefrontCartRepository : IStorefrontCartRepository
             Items = [],
             IsTaxInclusive = await ResolveTaxInclusiveAsync(tenantId, currencyCode, now, cancellationToken)
         };
+    }
+
+    private string? ResolveActiveMediaReadUrl(
+        string? mediaStatus,
+        string? containerName,
+        string? storageKey,
+        string? mediaPublicUrl)
+    {
+        return mediaStatus == Active
+            ? _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, mediaPublicUrl)
+              ?? mediaPublicUrl?.Trim()
+            : null;
     }
 
     private async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>

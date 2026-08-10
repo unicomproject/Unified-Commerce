@@ -2,6 +2,7 @@ using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -15,12 +16,33 @@ public abstract class StorefrontProductRepositoryBase
 {
     protected const string ActiveStatus = "ACTIVE";
 
-    protected StorefrontProductRepositoryBase(EPosDbContext dbContext)
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
+
+    protected StorefrontProductRepositoryBase(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         DbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     protected EPosDbContext DbContext { get; }
+
+    protected string? ResolveActiveMediaReadUrl(
+        string? mediaStatus,
+        string? containerName,
+        string? storageKey,
+        string? mediaPublicUrl)
+    {
+        return mediaStatus == ActiveStatus
+            ? _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, mediaPublicUrl)
+              ?? mediaPublicUrl?.Trim()
+            : null;
+    }
+
+    protected static bool HasMediaReference(string? mediaPublicUrl, string? storageKey)
+    {
+        return !string.IsNullOrWhiteSpace(mediaPublicUrl) ||
+               !string.IsNullOrWhiteSpace(storageKey);
+    }
 
     protected async Task<string> ResolveCurrencyCodeAsync(Guid tenantId, CancellationToken cancellationToken) =>
         await DbContext.Tenants.AsNoTracking()
@@ -169,16 +191,26 @@ public abstract class StorefrontProductRepositoryBase
                                {
                                    Image = image,
                                    MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
-                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                   MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                   MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                })
             .ToListAsync(cancellationToken);
 
         return imageRows
-            .Where(x => x.MediaStatus == ActiveStatus && !string.IsNullOrWhiteSpace(x.MediaPublicUrl))
+            .Where(x => x.MediaStatus == ActiveStatus && HasMediaReference(x.MediaPublicUrl, x.MediaStorageKey))
             .GroupBy(x => x.Image.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => (string?)x.First().MediaPublicUrl);
+                x =>
+                {
+                    var row = x.First();
+                    return ResolveActiveMediaReadUrl(
+                        row.MediaStatus,
+                        row.MediaContainerName,
+                        row.MediaStorageKey,
+                        row.MediaPublicUrl);
+                });
     }
 
     protected async Task<IReadOnlyList<StorefrontProductImageReadModel>> GetProductImagesAsync(Guid tenantId, Product product, CancellationToken cancellationToken)
@@ -196,12 +228,21 @@ public abstract class StorefrontProductRepositoryBase
                                {
                                    Image = image,
                                    MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
-                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                   MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                   MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                                   MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                })
             .ToListAsync(cancellationToken);
 
         return imageRows
-            .Select(row => StorefrontProductMapper.ToImageReadModel(row.Image, product.ProductName, row.MediaPublicUrl))
+            .Select(row => StorefrontProductMapper.ToImageReadModel(
+                row.Image,
+                product.ProductName,
+                ResolveActiveMediaReadUrl(
+                    row.MediaStatus,
+                    row.MediaContainerName,
+                    row.MediaStorageKey,
+                    row.MediaPublicUrl)))
             .ToList();
     }
 
@@ -277,12 +318,20 @@ public abstract class StorefrontProductRepositoryBase
                                          {
                                              OptionValue = optionValue,
                                              MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
-                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                             MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                             MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                                             MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                          })
                 .ToListAsync(cancellationToken);
 
             optionValues = optionValueRows
-                .Select(x => new ProductOptionValueMedia(x.OptionValue, x.MediaPublicUrl))
+                .Select(x => new ProductOptionValueMedia(
+                    x.OptionValue,
+                    ResolveActiveMediaReadUrl(
+                        x.MediaStatus,
+                        x.MediaContainerName,
+                        x.MediaStorageKey,
+                        x.MediaPublicUrl)))
                 .ToList();
         }
 

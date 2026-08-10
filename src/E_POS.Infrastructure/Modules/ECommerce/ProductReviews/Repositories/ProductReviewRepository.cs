@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.ECommerce.ProductReviews.Contracts;
 using E_POS.Application.Modules.ECommerce.ProductReviews.Dtos;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -22,10 +23,12 @@ public sealed class ProductReviewRepository : IProductReviewRepository
     private const string UniqueReviewConstraint = "ux_product_reviews_tenant_product_customer";
 
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public ProductReviewRepository(EPosDbContext dbContext)
+    public ProductReviewRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<ProductReviewPageRepositoryResult> GetAsync(
@@ -35,6 +38,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
         int page,
         int pageSize,
         string sort,
+        int? rating,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -51,6 +55,13 @@ public sealed class ProductReviewRepository : IProductReviewRepository
                 x.TenantId == tenantId &&
                 x.ProductId == productId &&
                 x.Status == ProductReviewConstants.ApprovedStatus);
+
+        var unfilteredCount = await query.CountAsync(cancellationToken);
+        
+        if (rating.HasValue)
+        {
+            query = query.Where(x => x.RatingValue == rating.Value);
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
         var orderedQuery = sort switch
@@ -69,7 +80,7 @@ public sealed class ProductReviewRepository : IProductReviewRepository
             tenantId,
             reviews.Select(x => x.CustomerId),
             cancellationToken);
-        var summary = await ReadSummaryAsync(tenantId, productId, totalCount, cancellationToken);
+        var summary = await ReadSummaryAsync(tenantId, productId, unfilteredCount, cancellationToken);
 
         bool canWriteReview = false;
         if (customerId.HasValue && customerId.Value != Guid.Empty)
@@ -149,16 +160,27 @@ public sealed class ProductReviewRepository : IProductReviewRepository
                             {
                                 Image = image,
                                 MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
                                 MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                             })
             .ToListAsync(cancellationToken);
 
         var imageLookup = images
-            .Where(x => x.MediaStatus == "ACTIVE" && !string.IsNullOrWhiteSpace(x.MediaPublicUrl))
+            .Where(x => x.MediaStatus == ProductConstants.ActiveStatus &&
+                        (!string.IsNullOrWhiteSpace(x.MediaPublicUrl) || !string.IsNullOrWhiteSpace(x.MediaStorageKey)))
             .GroupBy(x => x.Image.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => (string?)x.First().MediaPublicUrl);
+                x =>
+                {
+                    var row = x.First();
+                    return ResolveActiveMediaReadUrl(
+                        row.MediaStatus,
+                        row.MediaContainerName,
+                        row.MediaStorageKey,
+                        row.MediaPublicUrl);
+                });
 
         var items = new List<CustomerReviewItemReadModel>();
         foreach (var review in reviews)
@@ -255,16 +277,27 @@ public sealed class ProductReviewRepository : IProductReviewRepository
                             {
                                 Image = image,
                                 MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
                                 MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                             })
             .ToListAsync(cancellationToken);
 
         var imageLookup = images
-            .Where(x => x.MediaStatus == "ACTIVE" && !string.IsNullOrWhiteSpace(x.MediaPublicUrl))
+            .Where(x => x.MediaStatus == ProductConstants.ActiveStatus &&
+                        (!string.IsNullOrWhiteSpace(x.MediaPublicUrl) || !string.IsNullOrWhiteSpace(x.MediaStorageKey)))
             .GroupBy(x => x.Image.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => (string?)x.First().MediaPublicUrl);
+                x =>
+                {
+                    var row = x.First();
+                    return ResolveActiveMediaReadUrl(
+                        row.MediaStatus,
+                        row.MediaContainerName,
+                        row.MediaStorageKey,
+                        row.MediaPublicUrl);
+                });
 
         var items = new List<EligibleReviewItemReadModel>();
         
@@ -628,6 +661,18 @@ public sealed class ProductReviewRepository : IProductReviewRepository
         TwoStarCount = ratings.Count(x => x == 2),
         OneStarCount = ratings.Count(x => x == 1)
     };
+
+    private string? ResolveActiveMediaReadUrl(
+        string? mediaStatus,
+        string? containerName,
+        string? storageKey,
+        string? mediaPublicUrl)
+    {
+        return mediaStatus == ProductConstants.ActiveStatus
+            ? _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, mediaPublicUrl)
+              ?? mediaPublicUrl?.Trim()
+            : null;
+    }
 
     private static bool IsUniqueReviewViolation(DbUpdateException exception) =>
         exception.InnerException is PostgresException

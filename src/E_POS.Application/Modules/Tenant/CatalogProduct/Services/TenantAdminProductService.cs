@@ -737,20 +737,20 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         context.HasPermission(ProductConstants.ViewPermission);
 
     private static bool CanViewStock(TenantRequestContext context) =>
-        context.HasPermission(TenantAdminStockPermissions.View) ||
-        context.HasPermission(TenantAdminStockPermissions.LegacyInventoryView);
+        context.HasPermission(StockPermissions.View) ||
+        context.HasPermission(StockPermissions.LegacyInventoryView);
 
     private static bool CanViewExpiry(TenantRequestContext context) =>
-        context.HasPermission(TenantAdminStockPermissions.ExpiryView);
+        context.HasPermission(StockPermissions.ExpiryView);
 
     private static bool CanViewFastMoving(TenantRequestContext context) =>
         context.HasPermission(TenantAdminProductReportPermissions.ProductsView);
 
     private static bool CanViewStockValue(TenantRequestContext context) =>
-        context.HasPermission(TenantAdminStockPermissions.ValueView);
+        context.HasPermission(StockPermissions.ValueView);
 
     private static bool CanViewStockMovements(TenantRequestContext context) =>
-        context.HasPermission(TenantAdminStockPermissions.MovementsView);
+        context.HasPermission(StockPermissions.MovementsView);
 
     private static ApplicationError? ValidateDashboardAccess(TenantRequestContext context)
     {

@@ -1,0 +1,447 @@
+Nytroz POS API launcher
+  Source: C:\POS_PROPJECT\BACKEND
+  Run at: C:\Users\User\source\nytroz-pos-api-run
+
+Stopping any existing API process...
+Syncing project files...
+Cleaning run build artifacts...
+Building API...
+  Determining projects to restore...
+  Restored C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Domain\E_POS.Domain.csproj (in 99 ms).
+  Restored C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Application\E_POS.Application.csproj (in 1.37 sec).
+  Restored C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\E_POS.Infrastructure.csproj (in 1.51 sec).
+  Restored C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj (in 1.52 sec).
+  E_POS.Domain -> C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Domain\bin\Debug\net10.0\E_POS.Domain.dll
+  E_POS.Application -> C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Application\bin\Debug\net10.0\E_POS.Application.dll
+  E_POS.Infrastructure -> C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Infrastructure\bin\Debug\net10.0\E_POS.Infrastructure.dll
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\Controllers\V1\Tenant\Inventory\InventoryController.cs(101,21): warning CS8604: Possible null reference argument for parameter 'fileContents' in 'FileContentResult ControllerBase.File(byte[] fileContents, string contentType, string? fileDownloadName)'. [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+  E_POS.Api -> C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\bin\Debug\net10.0\E_POS.Api.dll
+
+Build succeeded.
+
+C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\Controllers\V1\Tenant\Inventory\InventoryController.cs(101,21): warning CS8604: Possible null reference argument for parameter 'fileContents' in 'FileContentResult ControllerBase.File(byte[] fileContents, string contentType, string? fileDownloadName)'. [C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api\E_POS.Api.csproj]
+    1 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:01:42.55
+
+Starting API at http://0.0.0.0:5150
+Press Ctrl+C to stop.
+
+warn: E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services.DevelopmentPlatformAdminTestAccountSeeder[0]
+      Development Platform Admin seed profile BillingViewer skipped: email and password must both be configured under DevelopmentSeed:PlatformAdmin.
+warn: E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services.DevelopmentPlatformAdminTestAccountSeeder[0]
+      Development Platform Admin seed profile NoBilling skipped: email and password must both be configured under DevelopmentSeed:PlatformAdmin.
+info: E_POS.Infrastructure.Modules.ECommerce.Storefront.Services.Autocomplete.AutocompleteInitializationHostedService[0]
+      Starting Autocomplete Initialization...
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (24ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT t.id
+      FROM tenants AS t
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (29ms) [Parameters=[@now='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      SELECT r.id, r.created_at, r.created_by_tenant_user_id, r.expires_at, r.outlet_id, r.refund_method_code, r.refund_method_selected_at, r.refund_method_selected_by_tenant_user_id, r.requires_inspection, r.requires_manager_approval, r.resolution_selected_at, r.resolution_selected_by_tenant_user_id, r.resolution_type, r.sale_id, r.status, r.tenant_id, r.validated_at, r.validated_by_tenant_user_id, r.version
+      FROM return_inspection_drafts AS r
+      WHERE r.status NOT IN ('CONSUMED', 'CANCELLED') AND r.expires_at < @now
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (55ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@now='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      SELECT r.id, r.consumed_at, r.content_type, r.created_at, r.deleted_at, r.expires_at, r.file_name, r.inspection_draft_id, r.inspection_draft_line_id, r.outlet_id, r.sale_id, r.sale_line_id, r.size_bytes, r.status, r.storage_key, r.tenant_id, r.uploaded_by_tenant_user_id
+      FROM return_inspection_media_staging AS r
+      WHERE r.status = 'STAGED' AND r.expires_at < @now
+info: E_POS.Infrastructure.Modules.ECommerce.Storefront.Services.Autocomplete.StorefrontAutocompleteService[0]
+      Loading autocomplete data for Tenant 07fdfd9f-33a2-46e5-9af0-99acf219fd57.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (9ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT p.id AS "Id", p.product_name AS "ProductName", p.product_slug AS "ProductSlug"
+      FROM products AS p
+      WHERE p.tenant_id = @tenantId AND p.status = 'ACTIVE' AND p.is_sellable
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT t.base_currency_code
+      FROM tenants AS t
+      WHERE t.id = @tenantId
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (10ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT c.id AS "Id", c.category_name AS "CategoryName", c.category_slug AS "CategorySlug"
+      FROM categories AS c
+      WHERE c.tenant_id = @tenantId AND c.status = 'ACTIVE'
+info: E_POS.Infrastructure.Modules.ECommerce.Storefront.Services.Autocomplete.StorefrontAutocompleteService[0]
+      Loaded 0 products and 0 categories into autocomplete for Tenant 07fdfd9f-33a2-46e5-9af0-99acf219fd57.
+info: E_POS.Infrastructure.Modules.ECommerce.Storefront.Services.Autocomplete.StorefrontAutocompleteService[0]
+      Loading autocomplete data for Tenant 55555555-0000-4000-8000-000000000001.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT p.id AS "Id", p.product_name AS "ProductName", p.product_slug AS "ProductSlug"
+      FROM products AS p
+      WHERE p.tenant_id = @tenantId AND p.status = 'ACTIVE' AND p.is_sellable
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT t.base_currency_code
+      FROM tenants AS t
+      WHERE t.id = @tenantId
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (92ms) [Parameters=[@tenantId='?' (DbType = Guid), @productIds='?' (DbType = Object)], CommandType='Text', CommandTimeout='30']
+      SELECT p.id, p.alt_text, p.created_at, p.created_by_tenant_user_id, p.image_purpose, p.is_primary_image, p.media_asset_id, p.product_id, p.product_variant_id, p.sales_channel_id, p.sort_order, p.status, p.tenant_id, p.updated_at, p.updated_by_tenant_user_id, m.status AS "MediaStatus", m.public_url AS "MediaPublicUrl"
+      FROM product_images AS p
+      LEFT JOIN media_assets AS m ON p.tenant_id = m.tenant_id AND p.media_asset_id = m.id
+      WHERE p.tenant_id = @tenantId AND p.product_id = ANY (@productIds) AND p.product_variant_id IS NULL AND p.is_primary_image AND p.status = 'ACTIVE'
+      ORDER BY p.sort_order
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (17ms) [Parameters=[@tenantId='?' (DbType = Guid), @productIds='?' (DbType = Object), @currencyCode='?' (DbType = StringFixedLength), @now='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      SELECT p.product_id AS "ProductId", p.selling_price AS "SellingPrice"
+      FROM price_list_items AS p
+      INNER JOIN price_lists AS p0 ON p.tenant_id = p0.tenant_id AND p.price_list_id = p0.id
+      WHERE p.tenant_id = @tenantId AND p.product_id = ANY (@productIds) AND p.product_variant_id IS NULL AND p.status = 'ACTIVE' AND p.min_quantity <= 1.0 AND p0.status = 'ACTIVE' AND p0.currency_code = @currencyCode AND (p0.valid_from IS NULL OR p0.valid_from <= @now) AND (p0.valid_until IS NULL OR p0.valid_until >= @now) AND (p.valid_from IS NULL OR p.valid_from <= @now) AND (p.valid_until IS NULL OR p.valid_until >= @now)
+      ORDER BY p0.is_default_price_list DESC, p0.priority DESC, COALESCE(p.valid_from, TIMESTAMPTZ '-infinity') DESC, p.min_quantity DESC
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[@tenantId='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT c.id AS "Id", c.category_name AS "CategoryName", c.category_slug AS "CategorySlug"
+      FROM categories AS c
+      WHERE c.tenant_id = @tenantId AND c.status = 'ACTIVE'
+info: E_POS.Infrastructure.Modules.ECommerce.Storefront.Services.Autocomplete.StorefrontAutocompleteService[0]
+      Loaded 16 products and 9 categories into autocomplete for Tenant 55555555-0000-4000-8000-000000000001.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://0.0.0.0:5150
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\User\source\nytroz-pos-api-run\src\E_POS.Api
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@normalizedSlug='?'], CommandType='Text', CommandTimeout='30']
+      SELECT t.id AS "Id", t.tenant_slug AS "TenantSlug", t.status AS "Status", t.base_currency_code AS "BaseCurrencyCode"
+      FROM tenants AS t
+      WHERE t.tenant_slug = @normalizedSlug AND lower(t.status) = 'active'
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[@tenantId='?' (DbType = Guid), @normalizedBannerType='?'], CommandType='Text', CommandTimeout='30']
+      SELECT s.id, s.action_text, s.action_url, s.banner_type, s.created_at, s.created_by, s.image_media_asset_id, s.sales_channel_id, s.sort_order, s.status, s.subtitle, s.tenant_id, s.title, s.updated_at, s.updated_by, m.container_name AS "MediaContainerName", m.storage_key AS "MediaStorageKey", m.public_url AS "MediaPublicUrl", m.status AS "MediaStatus"
+      FROM storefront_banners AS s
+      LEFT JOIN media_assets AS m ON s.tenant_id = m.tenant_id AND s.image_media_asset_id = m.id
+      WHERE s.tenant_id = @tenantId AND s.banner_type = @normalizedBannerType AND s.status = 'ACTIVE'
+      ORDER BY s.sort_order
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@normalizedSlug='?'], CommandType='Text', CommandTimeout='30']
+      SELECT t.id AS "Id", t.tenant_slug AS "TenantSlug", t.status AS "Status", t.base_currency_code AS "BaseCurrencyCode"
+      FROM tenants AS t
+      WHERE t.tenant_slug = @normalizedSlug AND lower(t.status) = 'active'
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@tenantId='?' (DbType = Guid), @normalizedBannerType='?'], CommandType='Text', CommandTimeout='30']
+      SELECT s.id, s.action_text, s.action_url, s.banner_type, s.created_at, s.created_by, s.image_media_asset_id, s.sales_channel_id, s.sort_order, s.status, s.subtitle, s.tenant_id, s.title, s.updated_at, s.updated_by, m.container_name AS "MediaContainerName", m.storage_key AS "MediaStorageKey", m.public_url AS "MediaPublicUrl", m.status AS "MediaStatus"
+      FROM storefront_banners AS s
+      LEFT JOIN media_assets AS m ON s.tenant_id = m.tenant_id AND s.image_media_asset_id = m.id
+      WHERE s.tenant_id = @tenantId AND s.banner_type = @normalizedBannerType AND s.status = 'ACTIVE'
+      ORDER BY s.sort_order
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@normalizedSlug='?'], CommandType='Text', CommandTimeout='30']
+      SELECT t.id AS "Id", t.tenant_slug AS "TenantSlug", t.status AS "Status", t.base_currency_code AS "BaseCurrencyCode"
+      FROM tenants AS t
+      WHERE t.tenant_slug = @normalizedSlug AND lower(t.status) = 'active'
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (7ms) [Parameters=[@tenantId='?' (DbType = Guid), @normalizedBannerType='?'], CommandType='Text', CommandTimeout='30']
+      SELECT s.id, s.action_text, s.action_url, s.banner_type, s.created_at, s.created_by, s.image_media_asset_id, s.sales_channel_id, s.sort_order, s.status, s.subtitle, s.tenant_id, s.title, s.updated_at, s.updated_by, m.container_name AS "MediaContainerName", m.storage_key AS "MediaStorageKey", m.public_url AS "MediaPublicUrl", m.status AS "MediaStatus"
+      FROM storefront_banners AS s
+      LEFT JOIN media_assets AS m ON s.tenant_id = m.tenant_id AND s.image_media_asset_id = m.id
+      WHERE s.tenant_id = @tenantId AND s.banner_type = @normalizedBannerType AND s.status = 'ACTIVE'
+      ORDER BY s.sort_order
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[p0='?' (DbType = DateTime), p1='?' (DbType = DateTime), p2='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT * FROM integration_outbox_messages
+                  WHERE status IN ('PENDING','FAILED_RETRYABLE','PROCESSING') AND available_at <= @p0
+                    AND (status <> 'PROCESSING' OR lease_expires_at IS NULL OR lease_expires_at <= @p1)
+                  ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT @p2

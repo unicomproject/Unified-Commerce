@@ -252,13 +252,13 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
     {
         var sectionPermission = section switch
         {
-            "batch-expiry" => TenantAdminStockPermissions.ExpiryView,
-            "movements" => TenantAdminStockPermissions.MovementsView,
-            "valuation" => TenantAdminStockPermissions.ValueView,
-            _ => TenantAdminStockPermissions.View
+            "batch-expiry" => StockPermissions.ExpiryView,
+            "movements" => StockPermissions.MovementsView,
+            "valuation" => StockPermissions.ValueView,
+            _ => StockPermissions.View
         };
 
-        return HasAnyPermission(context, sectionPermission, TenantAdminStockPermissions.View, TenantAdminStockPermissions.LegacyInventoryView);
+        return HasAnyPermission(context, sectionPermission, StockPermissions.View, StockPermissions.LegacyInventoryView);
     }
 
     private static bool CanViewOutletSection(TenantRequestContext context, string section)

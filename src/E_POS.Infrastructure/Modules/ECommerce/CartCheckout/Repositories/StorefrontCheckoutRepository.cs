@@ -1,5 +1,6 @@
-﻿using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Infrastructure.Persistence;
 
 namespace E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
@@ -9,10 +10,10 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
     private readonly IStorefrontCheckoutSessionRepository _sessionRepository;
     private readonly IStorefrontCheckoutConfirmationRepository _confirmationRepository;
 
-    public StorefrontCheckoutRepository(EPosDbContext dbContext)
+    public StorefrontCheckoutRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
         : this(
-            new StorefrontCheckoutSessionRepository(dbContext),
-            new StorefrontCheckoutConfirmationRepository(dbContext))
+            new StorefrontCheckoutSessionRepository(dbContext, mediaReadUrlResolver),
+            new StorefrontCheckoutConfirmationRepository(dbContext, mediaReadUrlResolver))
     {
     }
 
