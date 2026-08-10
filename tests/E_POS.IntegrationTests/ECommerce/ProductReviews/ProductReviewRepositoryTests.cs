@@ -43,7 +43,7 @@ public sealed class ProductReviewRepositoryTests
         var repository = new ProductReviewRepository(dbContext);
 
         var result = await repository.GetAsync(
-            tenantId, null, productId, 1, 10, "highest", Now.AddMinutes(3), CancellationToken.None);
+            tenantId, null, productId, 1, 10, "highest", null, Now.AddMinutes(3), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Page!.TotalCount);
@@ -114,7 +114,7 @@ public sealed class ProductReviewRepositoryTests
         var duplicate = await repository.CreateAsync(
             tenantId, customerId, productId, request, Now.AddMinutes(2), CancellationToken.None);
         var visible = await repository.GetAsync(
-            tenantId, customerId, productId, 1, 10, "newest", Now.AddMinutes(3), CancellationToken.None);
+            tenantId, customerId, productId, 1, 10, "newest", null, Now.AddMinutes(3), CancellationToken.None);
 
         Assert.True(created.IsSuccess);
         Assert.Equal(ProductReviewConstants.ApprovedStatus, created.Review!.Status);
@@ -192,7 +192,7 @@ public sealed class ProductReviewRepositoryTests
         var repository = new ProductReviewRepository(dbContext);
 
         var result = await repository.GetAsync(
-            tenantId, null, productId, 1, 10, "newest", Now, CancellationToken.None);
+            tenantId, null, productId, 1, 10, "newest", null, Now, CancellationToken.None);
 
         Assert.Equal("product_reviews.feature_disabled", result.ErrorCode);
     }

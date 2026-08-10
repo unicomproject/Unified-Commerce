@@ -1,5 +1,6 @@
-﻿using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
+using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Infrastructure.Persistence;
 
 namespace E_POS.Infrastructure.Modules.ECommerce.CustomerOrders.Repositories;
@@ -9,10 +10,10 @@ public sealed class CustomerOrderRepository : ICustomerOrderRepository
     private readonly ICustomerOrderReadRepository _readRepository;
     private readonly ICustomerOrderCancelRepository _cancelRepository;
 
-    public CustomerOrderRepository(EPosDbContext dbContext)
+    public CustomerOrderRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
         : this(
-            new CustomerOrderReadRepository(dbContext),
-            new CustomerOrderCancelRepository(dbContext))
+            new CustomerOrderReadRepository(dbContext, mediaReadUrlResolver),
+            new CustomerOrderCancelRepository(dbContext, mediaReadUrlResolver))
     {
     }
 

@@ -1,6 +1,7 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
@@ -13,10 +14,12 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
 {
     private const string ActiveStatus = "ACTIVE";
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public StorefrontCategoryRepository(EPosDbContext dbContext)
+    public StorefrontCategoryRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<IEnumerable<StorefrontCategoryReadModel>> GetFeaturedCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -31,12 +34,19 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
                           select new
                           {
                               Category = category,
-                              MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                              MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                              MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                              MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+                              MediaStatus = mediaAsset == null ? null : mediaAsset.Status
                           })
             .Take(10)
             .ToListAsync(cancellationToken);
 
-        return rows.Select(x => x.Category.ToReadModel(x.MediaPublicUrl));
+        return rows.Select(x => x.Category.ToReadModel(ResolveActiveMediaReadUrl(
+            x.MediaStatus,
+            x.MediaContainerName,
+            x.MediaStorageKey,
+            x.MediaPublicUrl)));
     }
 
     public async Task<IEnumerable<StorefrontCategoryListReadModel>> GetRootCategoriesAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -62,14 +72,23 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
                          select new
                          {
                              Category = category,
-                             MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                             MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                             MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                             MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+                             MediaStatus = mediaAsset == null ? null : mediaAsset.Status
                          })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (row == null) return null;
 
         var itemCount = await GetItemCountForCategoryAsync(tenantId, row.Category.Id, cancellationToken);
-        return row.Category.ToListReadModel(itemCount, row.MediaPublicUrl);
+        return row.Category.ToListReadModel(
+            itemCount,
+            ResolveActiveMediaReadUrl(
+                row.MediaStatus,
+                row.MediaContainerName,
+                row.MediaStorageKey,
+                row.MediaPublicUrl));
     }
 
     private async Task<int> GetItemCountForCategoryAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken)
@@ -106,7 +125,10 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
                                   select new
                                   {
                                       Category = category,
-                                      MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                      MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                      MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                                      MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+                                      MediaStatus = mediaAsset == null ? null : mediaAsset.Status
                                   })
             .ToListAsync(cancellationToken);
 
@@ -136,6 +158,22 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
         return categoryRows.Select(row =>
             row.Category.ToListReadModel(
                 itemCounts.TryGetValue(row.Category.Id, out var count) ? count : 0,
-                row.MediaPublicUrl));
+                ResolveActiveMediaReadUrl(
+                    row.MediaStatus,
+                    row.MediaContainerName,
+                    row.MediaStorageKey,
+                    row.MediaPublicUrl)));
+    }
+
+    private string? ResolveActiveMediaReadUrl(
+        string? mediaStatus,
+        string? containerName,
+        string? storageKey,
+        string? mediaPublicUrl)
+    {
+        return mediaStatus == ActiveStatus
+            ? _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, mediaPublicUrl)
+              ?? mediaPublicUrl?.Trim()
+            : null;
     }
 }

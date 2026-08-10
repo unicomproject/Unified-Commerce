@@ -640,9 +640,9 @@ public sealed class TenantAdminProductServiceTests
         var result = await service.GetDashboardAsync(
             CreateContext([
                 TenantAdminProductPermissions.DashboardView,
-                TenantAdminStockPermissions.View,
-                TenantAdminStockPermissions.ValueView,
-                TenantAdminStockPermissions.MovementsView,
+                StockPermissions.View,
+                StockPermissions.ValueView,
+                StockPermissions.MovementsView,
             ]),
             new TenantAdminProductDashboardQuery(
                 null,

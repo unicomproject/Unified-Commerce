@@ -3,6 +3,12 @@ using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
+using E_POS.Application.Modules.Tenant.Inventory.Contracts;
+using E_POS.Application.Modules.Tenant.Inventory.Contracts.CurrentStock;
+using E_POS.Application.Modules.Tenant.Inventory.Contracts.Dashboard;
+using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories.CurrentStock;
+using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories.Dashboard;
+using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
@@ -27,9 +33,6 @@ using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services;
-using E_POS.Application.Modules.Tenant.Inventory.Contracts;
-using E_POS.Infrastructure.Modules.Tenant.Inventory.Repositories;
-using E_POS.Infrastructure.Modules.Tenant.Inventory.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Application.Common.Email;
@@ -115,7 +118,6 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
-        services.AddSingleton<IAzureSasTokenProvider, AzureBlobSasTokenProvider>();
         services.AddScoped<IPasswordHashService, PasswordHashService>();
         services.AddScoped<IJwtTokenFactory, JwtTokenFactory>();
         services.AddScoped<IRefreshTokenGenerator, RefreshTokenGenerator>();
@@ -183,6 +185,9 @@ public static class DependencyInjection
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
         services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
+        services.AddScoped<IDashboardRepository, DashboardRepository>();
+        services.AddScoped<ICurrentStockRepository, CurrentStockRepository>();
+        services.AddScoped<IInventoryAuditLogger, InventoryAuditLogger>();
         services.AddScoped<ICatalogMediaRepository, CatalogMediaRepository>();
         services.AddScoped<IPosProductCatalogRepository, PosProductCatalogRepository>();
         services.AddScoped<IPosCustomerRepository, PosCustomerRepository>();
@@ -206,8 +211,6 @@ public static class DependencyInjection
         services.AddScoped<IProductTaxAssignmentRepository, ProductTaxAssignmentRepository>();
         services.AddScoped<ITenantLookupRepository, TenantLookupRepository>();
         services.AddScoped<IPosHomeDashboardRepository, PosHomeDashboardRepository>();
-        services.AddScoped<ITenantAdminInventoryRepository, TenantAdminInventoryRepository>();
-        services.AddScoped<ITenantAdminInventoryAuditLogger, TenantAdminInventoryAuditLogger>();
         services.AddScoped<IPosTillSessionRepository, PosTillSessionRepository>();
         services.AddScoped<IPosCheckoutRepository, PosCheckoutRepository>();
         services.AddScoped<IReceiptTemplateResolutionService, ReceiptTemplateResolutionService>();
@@ -217,6 +220,7 @@ public static class DependencyInjection
         services.AddScoped<IPosReturnRepository, PosReturnRepository>();
         services.AddScoped<IMediaObjectStorage, AzureBlobMediaObjectStorage>();
         services.AddScoped<IAzureSasTokenProvider, AzureBlobSasTokenProvider>();
+        services.AddScoped<IMediaReadUrlResolver, AzureBlobMediaReadUrlResolver>();
         services.AddScoped<IReturnInspectionMediaStorage, LocalReturnInspectionMediaStorage>();
         services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();

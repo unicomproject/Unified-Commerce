@@ -1,6 +1,6 @@
 namespace E_POS.Domain.Modules.Tenant.Inventory.Constants;
 
-public static class TenantAdminInventoryConstants
+public static class InventoryConstants
 {
     public const string ActiveStatus = "ACTIVE";
     public const string DefaultLocationType = "STORE";

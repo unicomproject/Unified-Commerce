@@ -1,7 +1,6 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
-using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Api.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,16 +13,13 @@ namespace E_POS.Api.Controllers.V1.Tenant.CatalogProduct;
 public sealed class TenantAdminProductsController : ControllerBase
 {
     private readonly ITenantAdminProductService _tenantAdminProductService;
-    private readonly ITenantAdminInventoryService _tenantAdminInventoryService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
     public TenantAdminProductsController(
         ITenantAdminProductService tenantAdminProductService,
-        ITenantAdminInventoryService tenantAdminInventoryService,
         ITenantRequestContextFactory tenantRequestContextFactory)
     {
         _tenantAdminProductService = tenantAdminProductService;
-        _tenantAdminInventoryService = tenantAdminInventoryService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }
 
@@ -185,38 +181,6 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToActionResult(result);
     }
 
-    [HttpGet("{productId:guid}/variants")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetVariants(
-        Guid productId,
-        CancellationToken cancellationToken = default)
-    {
-        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
-        {
-            return Unauthorized(CreateError(new ApplicationError(
-                "product.invalid_tenant_context",
-                "Invalid tenant context.")));
-        }
-
-        var result = await _tenantAdminInventoryService.GetProductVariantsForStockInAsync(
-            context,
-            productId,
-            cancellationToken);
-
-        if (result.IsFailure)
-        {
-            return result.Error.Code switch
-            {
-                "inventory.permission_denied" => StatusCode(
-                    StatusCodes.Status403Forbidden,
-                    CreateError(result.Error)),
-                "inventory.not_found" => NotFound(CreateError(result.Error)),
-                _ => BadRequest(CreateError(result.Error)),
-            };
-        }
-
-        return Ok(new { data = result.Value });
-    }
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]

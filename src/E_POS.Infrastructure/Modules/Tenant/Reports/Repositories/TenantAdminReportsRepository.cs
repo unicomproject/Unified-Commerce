@@ -208,7 +208,7 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
     {
         var tenantInfo = await GetTenantInfoAsync(context.TenantId, cancellationToken);
         var outletIds = await GetAccessibleOutletIdsAsync(context, cancellationToken);
-        var canViewValue = context.HasPermission(TenantAdminStockPermissions.ValueView);
+        var canViewValue = context.HasPermission(StockPermissions.ValueView);
         var tenantToday = ReportBusinessDateCalculator.FromInstant(DateTimeOffset.UtcNow, tenantInfo.Timezone);
         var section = request.Section ?? "current";
         var stockStatusFilter = request.StockStatus;

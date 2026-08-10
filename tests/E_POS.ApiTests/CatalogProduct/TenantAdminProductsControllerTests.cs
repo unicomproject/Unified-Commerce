@@ -5,8 +5,6 @@ using E_POS.Api.Controllers.V1.Tenant.CatalogProduct;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
-using E_POS.Application.Modules.Tenant.Inventory.Contracts;
-using E_POS.Application.Modules.Tenant.Inventory.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -557,7 +555,6 @@ public sealed class TenantAdminProductsControllerTests
     {
         var controller = new TenantAdminProductsController(
             service,
-            new FakeTenantAdminInventoryService(),
             new FakeTenantRequestContextFactory());
         controller.ControllerContext = new ControllerContext
         {
@@ -776,37 +773,6 @@ public sealed class TenantAdminProductsControllerTests
                         page,
                         pageSize,
                         0)));
-    }
-
-    private sealed class FakeTenantAdminInventoryService : ITenantAdminInventoryService
-    {
-        public Task<ApplicationResult<TenantAdminCurrentStockListResponse>> GetCurrentStockAsync(
-            TenantRequestContext context,
-            TenantAdminCurrentStockQuery query,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantAdminCurrentStockListResponse>.Failure(
-                new ApplicationError("inventory.permission_denied", "Permission denied for inventory management.")));
-
-        public Task<ApplicationResult<TenantAdminCurrentStockSummaryResponse>> GetCurrentStockSummaryAsync(
-            TenantRequestContext context,
-            Guid? outletId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantAdminCurrentStockSummaryResponse>.Failure(
-                new ApplicationError("inventory.permission_denied", "Permission denied for inventory management.")));
-
-        public Task<ApplicationResult<TenantAdminStockInResponse>> StockInAsync(
-            TenantRequestContext context,
-            TenantAdminStockInRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantAdminStockInResponse>.Failure(
-                new ApplicationError("inventory.permission_denied", "Permission denied for inventory management.")));
-
-        public Task<ApplicationResult<TenantAdminInventoryVariantLookupResponse>> GetProductVariantsForStockInAsync(
-            TenantRequestContext context,
-            Guid productId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantAdminInventoryVariantLookupResponse>.Failure(
-                new ApplicationError("inventory.permission_denied", "Permission denied for inventory management.")));
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory

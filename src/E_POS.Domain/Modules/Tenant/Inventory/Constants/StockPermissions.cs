@@ -1,8 +1,9 @@
 namespace E_POS.Domain.Modules.Tenant.Inventory.Constants;
 
-public static class TenantAdminStockPermissions
+public static class StockPermissions
 {
     public const string View = "tenant.stock.view";
+    public const string DashboardView = "tenant.stock.dashboard.view";
     public const string StockIn = "tenant.stock.in";
     public const string StockOut = "tenant.stock.out";
     public const string ValueView = "tenant.stock.value.view";

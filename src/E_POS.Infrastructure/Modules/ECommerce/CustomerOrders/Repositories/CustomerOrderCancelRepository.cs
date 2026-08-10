@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
@@ -11,7 +12,8 @@ namespace E_POS.Infrastructure.Modules.ECommerce.CustomerOrders.Repositories;
 
 public sealed class CustomerOrderCancelRepository : CustomerOrderRepositoryBase, ICustomerOrderCancelRepository
 {
-    public CustomerOrderCancelRepository(EPosDbContext dbContext) : base(dbContext)
+    public CustomerOrderCancelRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
+        : base(dbContext, mediaReadUrlResolver)
     {
     }
 

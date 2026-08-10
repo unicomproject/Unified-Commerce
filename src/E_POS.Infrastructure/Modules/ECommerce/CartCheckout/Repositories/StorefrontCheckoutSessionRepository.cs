@@ -2,6 +2,7 @@
 using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Shared.Media.Entities;
@@ -19,7 +20,8 @@ namespace E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
 
 public sealed class StorefrontCheckoutSessionRepository : StorefrontCheckoutRepositoryBase, IStorefrontCheckoutSessionRepository
 {
-    public StorefrontCheckoutSessionRepository(EPosDbContext dbContext) : base(dbContext)
+    public StorefrontCheckoutSessionRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
+        : base(dbContext, mediaReadUrlResolver)
     {
     }
 

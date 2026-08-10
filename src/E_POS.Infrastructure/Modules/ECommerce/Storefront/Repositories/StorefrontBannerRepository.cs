@@ -1,6 +1,7 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Infrastructure.Persistence;
@@ -12,10 +13,12 @@ public sealed class StorefrontBannerRepository : IStorefrontBannerRepository
 {
     private const string ActiveStatus = "ACTIVE";
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public StorefrontBannerRepository(EPosDbContext dbContext)
+    public StorefrontBannerRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<IEnumerable<StorefrontBannerReadModel>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
@@ -34,10 +37,22 @@ public sealed class StorefrontBannerRepository : IStorefrontBannerRepository
                           select new
                           {
                               Banner = banner,
-                              MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                              MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                              MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                              MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+                              MediaStatus = mediaAsset == null ? null : mediaAsset.Status
                           })
             .ToListAsync(cancellationToken);
 
-        return rows.Select(x => x.Banner.ToReadModel(x.MediaPublicUrl));
+        return rows.Select(x => x.Banner.ToReadModel(
+            x.MediaStatus == ActiveStatus
+                ? ResolveMediaReadUrl(x.MediaContainerName, x.MediaStorageKey, x.MediaPublicUrl)
+                : null));
+    }
+
+    private string? ResolveMediaReadUrl(string? containerName, string? storageKey, string? mediaPublicUrl)
+    {
+        return _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, mediaPublicUrl)
+               ?? mediaPublicUrl?.Trim();
     }
 }
