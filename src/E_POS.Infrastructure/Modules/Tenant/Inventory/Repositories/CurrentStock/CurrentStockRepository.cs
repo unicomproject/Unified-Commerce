@@ -1,6 +1,8 @@
-using E_POS.Application.Modules.Tenant.Inventory.Contracts.CurrentStock;
-using E_POS.Application.Modules.Tenant.Inventory.Dtos.CurrentStock;
-using E_POS.Application.Modules.Tenant.Inventory.Dtos.StockIn;
+using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Contracts.Repositories;
+using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Contracts.Services;
+using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Dtos;
+using E_POS.Application.Modules.Tenant.Inventory.StockIn.Dtos;
+using E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Dtos;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
@@ -96,6 +98,16 @@ internal sealed class CurrentStockRepository : ICurrentStockRepository
                 _dbContext.Set<ProductBarcode>().Any(pb => pb.TenantId == tenantId && pb.ProductId == x.p.Id && (pb.ProductVariantId == null || x.variant == null || pb.ProductVariantId == x.variant.Id) && pb.Barcode.ToLower().Contains(searchTerm)));
         }
 
+        if (!string.IsNullOrWhiteSpace(query.StockStatus))
+        {
+            if (query.StockStatus == "InStock")
+                dataQuery = dataQuery.Where(x => x.b.AvailableQuantity > 0);
+            else if (query.StockStatus == "LowStock")
+                dataQuery = dataQuery.Where(x => x.b.AvailableQuantity > 0 && x.rule != null && x.b.AvailableQuantity <= x.rule.ReorderPointQuantity);
+            else if (query.StockStatus == "OutOfStock")
+                dataQuery = dataQuery.Where(x => x.b.AvailableQuantity <= 0);
+        }
+
         var totalCount = await dataQuery.CountAsync(cancellationToken);
 
         var pagedData = await dataQuery
@@ -136,7 +148,7 @@ internal sealed class CurrentStockRepository : ICurrentStockRepository
             (x.rule != null && x.b.AvailableQuantity <= x.rule.ReorderPointQuantity ? "LowStock" : "InStock"),
             "Normal", // ExpiryStatus
             x.rule?.ReorderPointQuantity,
-            imageDict.GetValueOrDefault(x.p.Id), // ImageUrl
+            _mediaReadUrlResolver != null ? _mediaReadUrlResolver.ResolveReadUrl(imageDict.GetValueOrDefault(x.p.Id)) : imageDict.GetValueOrDefault(x.p.Id), // ImageUrl
             x.b.UpdatedAt,
             x.b.RowVersion
         )).ToList();
@@ -152,6 +164,16 @@ internal sealed class CurrentStockRepository : ICurrentStockRepository
         CancellationToken cancellationToken)
     {
         return Task.FromResult(new StockInResponse(Guid.NewGuid(), request.OutletId, "StockIn", request.ReferenceNumber, [], now));
+    }
+
+    public Task<OpeningStockResponse> AddOpeningStockAsync(
+        Guid tenantId,
+        Guid userId,
+        OpeningStockRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(new OpeningStockResponse(Guid.NewGuid(), request.OutletId, "OpeningStock", request.Items.Count, now));
     }
 
     public async Task<bool> OutletExistsAsync(

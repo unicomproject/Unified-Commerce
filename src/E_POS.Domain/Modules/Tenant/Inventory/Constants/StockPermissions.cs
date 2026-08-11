@@ -11,6 +11,8 @@ public static class StockPermissions
     public const string ExpiryView = "tenant.stock.expiry.view";
     public const string AdjustmentsView = "tenant.stock.adjustments.view";
     public const string TransfersView = "tenant.stock.transfers.view";
+    
+    public const string OpeningStock = "tenant.stock.opening";
 
     public const string LegacyInventoryView = "inventory.stock.view";
 }
