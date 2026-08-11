@@ -228,6 +228,7 @@ public static class DependencyInjection
         services.AddScoped<IReturnInspectionMediaStorage, LocalReturnInspectionMediaStorage>();
         services.AddHostedService<ReturnInspectionMediaStagingCleanupService>();
         services.AddHostedService<OutletMediaStagingCleanupService>();
+        services.AddHostedService<ProductMediaStagingCleanupService>();
         services.AddScoped<IPosHoldRepository, PosHoldRepository>();
         services.AddScoped<IPosDiscountRepository, PosDiscountRepository>();
         services.AddScoped<IPosHardwareRepository, PosHardwareRepository>();

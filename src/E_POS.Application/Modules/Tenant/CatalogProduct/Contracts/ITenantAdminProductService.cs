@@ -61,4 +61,20 @@ public interface ITenantAdminProductService
         TenantRequestContext context,
         TenantAdminProductDashboardQuery query,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<ProductDraftResponse>> SaveDraftAsync(
+        TenantRequestContext context,
+        SaveProductDraftRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<ProductDraftResponse>> UpdateDraftAsync(
+        TenantRequestContext context,
+        Guid productId,
+        SaveProductDraftRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<ProductSetupWizardDto>> GetSetupAsync(
+        TenantRequestContext context,
+        Guid productId,
+        CancellationToken cancellationToken);
 }

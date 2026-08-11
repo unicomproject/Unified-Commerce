@@ -8,6 +8,7 @@ using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Infrastructure.Persistence;
+using E_POS.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
@@ -27,7 +28,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
     {
         var products = _dbContext.Products
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus);
+            .Where(x => x.TenantId == tenantId &&
+                        x.Status != ProductConstants.ArchivedStatus &&
+                        (x.Status != ProductConstants.DraftStatus || x.DraftSavedAt != null));
 
         var totalProducts = await products.CountAsync(cancellationToken);
         var activeProducts = await products.CountAsync(
@@ -185,17 +188,23 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 x.BrandCode))
             .ToListAsync(cancellationToken);
 
+        var decimalUomTypes = new[] { "WEIGHT", "VOLUME", "LENGTH" };
+        var decimalUomCodes = new[] { "KG", "G", "L", "ML", "M" };
+
         var units = await _dbContext.UnitOfMeasures
             .AsNoTracking()
             .Where(x =>
                 (x.TenantId == null || x.TenantId == tenantId) &&
-                x.Status != "DELETED")
+                x.Status == "ACTIVE")
             .OrderBy(x => x.TenantId == null ? 0 : 1)
             .ThenBy(x => x.UomCode)
             .Select(x => new TenantAdminProductUnitOptionResponse(
                 x.Id,
                 x.UomCode,
-                x.UomName))
+                x.UomName,
+                x.UomType,
+                x.Symbol,
+                decimalUomTypes.Contains(x.UomType.ToUpper()) || decimalUomCodes.Contains(x.UomCode.ToUpper())))
             .ToListAsync(cancellationToken);
 
         var taxes = await _dbContext.TaxClasses
@@ -233,6 +242,28 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 x.OptionType))
             .ToListAsync(cancellationToken);
 
+        var allowedChannelCodes = new[]
+        {
+            PlatformSalesChannelSeedConstants.PosChannelCode,
+            "ONLINE",
+            "PHYSICAL",
+        };
+
+        var salesChannels = await (
+            from channel in _dbContext.SalesChannels.AsNoTracking()
+            join platform in _dbContext.PlatformSalesChannels.AsNoTracking()
+                on channel.PlatformSalesChannelId equals platform.Id
+            where channel.TenantId == tenantId &&
+                  channel.Status == "ACTIVE" &&
+                  allowedChannelCodes.Contains(platform.ChannelCode)
+            orderby channel.SortOrder, platform.ChannelCode
+            select new TenantAdminProductSalesChannelOptionResponse(
+                channel.Id,
+                platform.ChannelCode,
+                string.IsNullOrWhiteSpace(channel.CustomName) ? platform.DefaultName : channel.CustomName,
+                platform.ChannelType))
+            .ToListAsync(cancellationToken);
+
         return new TenantAdminProductCreateOptionsResponse(
             categories,
             subCategories,
@@ -240,7 +271,8 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             units,
             taxes,
             outlets,
-            variantOptionTemplates);
+            variantOptionTemplates,
+            salesChannels);
     }
 
     public async Task<TenantAdminProductFilterOptionsResponse> GetFilterOptionsAsync(
@@ -653,6 +685,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             product.BrandId,
             unitType,
             product.ShortDescription,
+            product.LongDescription,
             imageUrl,
             productImages,
             CostPrice: null,
@@ -739,7 +772,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             request.BrandId,
             returnPolicyId: null,
             request.ShortDescription,
-            longDescription: null,
+            longDescription: string.IsNullOrWhiteSpace(request.LongDescription) ? null : request.LongDescription.Trim(),
             isSellable: true,
             isTaxable: request.TaxId.HasValue,
             normalizedStatus,
@@ -1667,7 +1700,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
     {
         var productsQuery = _dbContext.Products
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus);
+            .Where(x => x.TenantId == tenantId &&
+                        x.Status != ProductConstants.ArchivedStatus &&
+                        (x.Status != ProductConstants.DraftStatus || x.DraftSavedAt != null));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -1700,7 +1735,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
         var catalogTotalCount = await _dbContext.Products
             .AsNoTracking()
-            .CountAsync(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
+            .CountAsync(x => x.TenantId == tenantId &&
+                             x.Status != ProductConstants.ArchivedStatus &&
+                             (x.Status != ProductConstants.DraftStatus || x.DraftSavedAt != null), cancellationToken);
 
         var sortCol = sortBy?.Trim().ToUpperInvariant() ?? "PRODUCTNAME";
         var sortDir = sortDirection?.Trim().ToUpperInvariant() ?? "ASC";

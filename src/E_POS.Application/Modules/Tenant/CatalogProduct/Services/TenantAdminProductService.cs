@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -23,19 +24,22 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
     private readonly ITenantAdminProductRequestValidator _validator;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly ITenantAdminProductAuditLogger _auditLogger;
+    private readonly ProductWizardAccessPolicy _accessPolicy;
 
     public TenantAdminProductService(
         IProductRepository productRepository,
         ITenantAdminProductRepository tenantAdminProductRepository,
         ITenantAdminProductRequestValidator validator,
         IDateTimeProvider dateTimeProvider,
-        ITenantAdminProductAuditLogger auditLogger)
+        ITenantAdminProductAuditLogger auditLogger,
+        ProductWizardAccessPolicy accessPolicy)
     {
         _productRepository = productRepository;
         _tenantAdminProductRepository = tenantAdminProductRepository;
         _validator = validator;
         _dateTimeProvider = dateTimeProvider;
         _auditLogger = auditLogger;
+        _accessPolicy = accessPolicy;
     }
 
     public async Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
@@ -426,7 +430,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         TenantRequestContext context,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateCreateAccess(context);
+        var accessError = ValidateWizardCreateAccess(context);
         if (accessError is not null)
         {
             return ApplicationResult<TenantAdminProductCreateOptionsResponse>.Failure(accessError);
@@ -437,6 +441,350 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             cancellationToken);
 
         return ApplicationResult<TenantAdminProductCreateOptionsResponse>.Success(response);
+    }
+
+    public async Task<ApplicationResult<ProductDraftResponse>> SaveDraftAsync(
+        TenantRequestContext context,
+        SaveProductDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        var accessError = await _accessPolicy.ValidateWizardAccessAsync(
+            context,
+            productId: null,
+            isCreateAction: true,
+            cancellationToken);
+        if (accessError is not null)
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(accessError);
+        }
+
+        return await SaveOrUpdateDraftAsync(context, productId: null, request, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<ProductDraftResponse>> UpdateDraftAsync(
+        TenantRequestContext context,
+        Guid productId,
+        SaveProductDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        var accessError = await _accessPolicy.ValidateWizardAccessAsync(
+            context,
+            productId,
+            isCreateAction: false,
+            cancellationToken);
+        if (accessError is not null)
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(accessError);
+        }
+
+        return await SaveOrUpdateDraftAsync(context, productId, request, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<ProductSetupWizardDto>> GetSetupAsync(
+        TenantRequestContext context,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        var accessError = await _accessPolicy.ValidateReadAccessAsync(context, cancellationToken);
+        if (accessError is not null)
+        {
+            return ApplicationResult<ProductSetupWizardDto>.Failure(accessError);
+        }
+
+        var response = await _tenantAdminProductRepository.GetSetupAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+
+        return response is null
+            ? ApplicationResult<ProductSetupWizardDto>.Failure(NotFound)
+            : ApplicationResult<ProductSetupWizardDto>.Success(response);
+    }
+
+    private async Task<ApplicationResult<ProductDraftResponse>> SaveOrUpdateDraftAsync(
+        TenantRequestContext context,
+        Guid? productId,
+        SaveProductDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        var currentStage = Math.Clamp(request.CurrentSetupStep, 1, 8);
+        var isSaveAndContinue = string.Equals(request.WizardAction, "SAVE_AND_CONTINUE", StringComparison.OrdinalIgnoreCase) || request.AdvanceStep;
+        var isSkip = string.Equals(request.WizardAction, "SKIP", StringComparison.OrdinalIgnoreCase);
+
+        var validationError = isSaveAndContinue
+            ? _validator.ValidateSaveAndContinue(request)
+            : _validator.ValidateSaveDraft(request);
+        if (validationError is not null)
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(validationError);
+        }
+
+        if (currentStage == ProductWizardStage.ProductTypeTracking && (!productId.HasValue || productId.Value == Guid.Empty))
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                "product.draft_not_found",
+                "Product draft must be initialized in Basic Details before updating Product Type & Tracking."));
+        }
+
+        var existingSetup = productId.HasValue
+            ? await _tenantAdminProductRepository.GetSetupAsync(context.TenantId, productId.Value, cancellationToken)
+            : null;
+
+        if (productId.HasValue && existingSetup == null)
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(NotFound);
+        }
+
+        if (currentStage == ProductWizardStage.BasicDetails)
+        {
+            if (request.CategoryId.HasValue && request.CategoryId != Guid.Empty)
+            {
+                if (!await _tenantAdminProductRepository.ActiveCategoryExistsAsync(
+                        context.TenantId,
+                        request.CategoryId.Value,
+                        cancellationToken))
+                {
+                    return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                        "product.validation_failed",
+                        "Product validation failed.",
+                        [new ApplicationFieldError("categoryId", "Category was not found or is not active for this tenant.")]));
+                }
+            }
+
+            if (request.BrandId.HasValue &&
+                !await _tenantAdminProductRepository.BrandBelongsToTenantAsync(
+                    context.TenantId,
+                    request.BrandId.Value,
+                    cancellationToken))
+            {
+                return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                    "product.validation_failed",
+                    "Product validation failed.",
+                    [new ApplicationFieldError("brandId", "Brand was not found for this tenant.")]));
+            }
+
+            var productCodeCheck = ResolveProductCode(request);
+            if (!string.IsNullOrWhiteSpace(productCodeCheck) &&
+                await _tenantAdminProductRepository.ProductCodeExistsAsync(
+                    context.TenantId,
+                    productCodeCheck,
+                    productId,
+                    cancellationToken))
+            {
+                return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                    "product.validation_failed",
+                    "Product validation failed.",
+                    [new ApplicationFieldError("productCode", "Product code already exists for this tenant.")]));
+            }
+        }
+
+        string resolvedStructure;
+        if (ProductStructureConstants.TryNormalize(request.ProductStructure, out var parsedStructure))
+        {
+            resolvedStructure = parsedStructure;
+        }
+        else if (existingSetup != null && !string.IsNullOrWhiteSpace(existingSetup.ProductStructure))
+        {
+            resolvedStructure = existingSetup.ProductStructure;
+        }
+        else
+        {
+            resolvedStructure = ProductStructureConstants.DefaultDraftStructure;
+        }
+
+        if (currentStage == ProductWizardStage.ProductTypeTracking && productId.HasValue && existingSetup != null)
+        {
+            var oldStructure = existingSetup.ProductStructure;
+            if (!string.Equals(oldStructure, resolvedStructure, StringComparison.OrdinalIgnoreCase))
+            {
+                var hasHistory = await _tenantAdminProductRepository.HasOperationalHistoryAsync(
+                    context.TenantId,
+                    productId.Value,
+                    cancellationToken);
+
+                if (hasHistory)
+                {
+                    return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                        "product.structure_change_prohibited_has_history",
+                        "Product structure cannot be changed because operational inventory movements or sales history exist."));
+                }
+            }
+        }
+
+        var trackInventory = isSkip ? (resolvedStructure != ProductStructureConstants.Bundle) : request.TrackInventory;
+        var batchTracking = isSkip ? false : request.BatchTracking;
+        var expiryTracking = isSkip ? false : request.ExpiryTracking;
+        var serialTracking = isSkip ? false : request.SerialTracking;
+
+        var targetSetupStep = (isSaveAndContinue || isSkip)
+            ? ResolveNextApplicableStage(resolvedStructure, trackInventory, currentStage)
+            : currentStage;
+
+        var desiredPublishStatus = request.DesiredPublishActive
+            ? ProductConstants.DesiredPublishActive
+            : ProductConstants.DesiredPublishInactive;
+
+        var productCode = ResolveProductCode(request) ?? string.Empty;
+        var resolvedProductName = string.IsNullOrWhiteSpace(request.ProductName)
+            ? ProductConstants.DraftProductNamePlaceholder
+            : request.ProductName.Trim();
+
+        var slugSourceCode = string.IsNullOrWhiteSpace(productCode)
+            ? $"DRF-{Guid.NewGuid():N}"[..Math.Min(80, 36)]
+            : productCode;
+        var productSlug = GenerateDraftSlug(resolvedProductName, slugSourceCode);
+
+        var isExplicitDraftSave = string.Equals(request.WizardAction, "SAVE_DRAFT", StringComparison.OrdinalIgnoreCase) || (!request.AdvanceStep && !isSaveAndContinue && !isSkip);
+
+        var command = new SaveProductDraftCommand(
+            productId,
+            resolvedProductName,
+            productCode,
+            productSlug,
+            resolvedStructure,
+            request.CategoryId is null || request.CategoryId == Guid.Empty ? null : request.CategoryId,
+            request.BrandId,
+            string.IsNullOrWhiteSpace(request.ShortDescription) ? null : request.ShortDescription.Trim(),
+            string.IsNullOrWhiteSpace(request.LongDescription) ? null : request.LongDescription.Trim(),
+            desiredPublishStatus,
+            request.PosSellable,
+            trackInventory,
+            batchTracking,
+            expiryTracking,
+            serialTracking,
+            request.AllowOnlineSale,
+            currentStage,
+            targetSetupStep,
+            request.ExpectedRowVersion,
+            request.StagedMediaAssetIds?.Distinct().ToArray() ?? [],
+            request.UnitModel,
+            request.ProductUnitId ?? request.BaseUnitId,
+            request.SellingUnitId,
+            request.PurchaseUnitId,
+            request.OuterPackUnitId,
+            request.ItemsPerPurchaseUnit,
+            request.PurchaseUnitsPerOuterPack,
+            request.AllowDecimalQuantity,
+            isExplicitDraftSave,
+            request.WizardAction);
+
+        var result = await _tenantAdminProductRepository.SaveProductDraftAsync(
+            context.TenantId,
+            context.UserId,
+            command,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+
+        return result.IsSuccess
+            ? ApplicationResult<ProductDraftResponse>.Success(result.Response!)
+            : ApplicationResult<ProductDraftResponse>.Failure(result.Error!);
+    }
+
+    private static int ResolveNextApplicableStage(string productStructure, bool trackInventory, int currentStage)
+    {
+        var normalizedStructure = ProductStructureConstants.Normalize(productStructure);
+
+        if (currentStage == ProductWizardStage.ProductTypeTracking)
+        {
+            if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+            {
+                return ProductWizardStage.ProductConfiguration;
+            }
+
+            if (!trackInventory)
+            {
+                return string.Equals(normalizedStructure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase)
+                    ? ProductWizardStage.BarcodeSku
+                    : ProductWizardStage.ProductConfiguration;
+            }
+
+            return ProductWizardStage.UnitsPackConversion;
+        }
+
+        if (currentStage == ProductWizardStage.UnitsPackConversion)
+        {
+            if (string.Equals(normalizedStructure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase))
+            {
+                return ProductWizardStage.BarcodeSku;
+            }
+
+            return ProductWizardStage.ProductConfiguration;
+        }
+
+        if (currentStage == ProductWizardStage.ProductConfiguration &&
+            string.Equals(normalizedStructure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase))
+        {
+            return ProductWizardStage.BarcodeSku;
+        }
+
+        return Math.Min(currentStage + 1, ProductWizardStage.ReviewCreate);
+    }
+
+    private static ApplicationError? ValidateWizardCreateAccess(TenantRequestContext context)
+    {
+        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
+        {
+            return new ApplicationError("product.invalid_tenant_context", "Invalid tenant context.");
+        }
+
+        return context.HasPermission(ProductConstants.CreatePermission)
+            ? null
+            : PermissionDenied;
+    }
+
+    private static ApplicationError? ValidateWizardUpdateAccess(TenantRequestContext context)
+    {
+        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
+        {
+            return new ApplicationError("product.invalid_tenant_context", "Invalid tenant context.");
+        }
+
+        return context.HasPermission(ProductConstants.UpdatePermission)
+            ? null
+            : PermissionDenied;
+    }
+
+    private static ApplicationError? ValidateWizardViewAccess(TenantRequestContext context)
+    {
+        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
+        {
+            return new ApplicationError("product.invalid_tenant_context", "Invalid tenant context.");
+        }
+
+        return context.HasPermission(ProductConstants.ViewPermission)
+            ? null
+            : PermissionDenied;
+    }
+
+    private static string? ResolveProductCode(SaveProductDraftRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.ProductCode))
+        {
+            return request.ProductCode.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ShortName))
+        {
+            return request.ShortName.Trim();
+        }
+
+        return null;
+    }
+
+    private static string GenerateDraftSlug(string name, string code)
+    {
+        var normalizedName = new string(name
+            .Trim()
+            .ToLowerInvariant()
+            .Where(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_')
+            .ToArray());
+
+        if (string.IsNullOrWhiteSpace(normalizedName))
+        {
+            normalizedName = "product";
+        }
+
+        return $"{normalizedName}-{code.Trim().ToLowerInvariant()}";
     }
 
     public async Task<ApplicationResult<TenantAdminProductFilterOptionsResponse>> GetFilterOptionsAsync(

@@ -4,6 +4,7 @@ using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Media.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -30,7 +31,7 @@ public sealed class CatalogMediaServicePhase4ETests
 
         await using var stream = new MemoryStream(CreateOnePixelPng());
         var result = await service.UploadProductImageAsync(
-            CreateContext([ProductConstants.UpdatePermission]),
+            CreateContext([ProductConstants.MediaManagePermission]),
             ProductId,
             new ProductImageUploadRequest(
                 ProductVariantId: null,
@@ -58,7 +59,7 @@ public sealed class CatalogMediaServicePhase4ETests
 
         await using var stream = new MemoryStream();
         var result = await service.UploadProductImageAsync(
-            CreateContext([ProductConstants.UpdatePermission]),
+            CreateContext([ProductConstants.MediaManagePermission]),
             ProductId,
             new ProductImageUploadRequest(
                 ProductVariantId: null,
@@ -86,7 +87,7 @@ public sealed class CatalogMediaServicePhase4ETests
 
         await using var stream = new MemoryStream(CreateOnePixelPng());
         var result = await service.UploadProductImageAsync(
-            CreateContext([ProductConstants.UpdatePermission]),
+            CreateContext([ProductConstants.MediaManagePermission]),
             ProductId,
             new ProductImageUploadRequest(
                 ProductVariantId: null,
@@ -312,7 +313,56 @@ public sealed class CatalogMediaServicePhase4ETests
             return Task.CompletedTask;
         }
 
+        public Task<Product?> GetProductForUpdateAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<Product?>(null);
+
+        public Task<int> CountActiveProductImagesAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ProductImages.Count(x => x.Status == "ACTIVE"));
+
+        public Task<IReadOnlyList<ProductImage>> GetActiveProductImagesAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ProductImage>>(
+                ProductImages.Where(x => x.Status == "ACTIVE").ToList());
+
+        public Task<ProductImage?> GetProductImageAsync(
+            Guid tenantId,
+            Guid productId,
+            Guid productImageId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ProductImages.FirstOrDefault(x => x.Id == productImageId));
+
+        public Task<MediaAsset?> GetMediaAssetAsync(
+            Guid tenantId,
+            Guid mediaAssetId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(MediaAssets.FirstOrDefault(x => x.Id == mediaAssetId));
+
+        public Task<bool> IsMediaAssetLinkedAsync(
+            Guid tenantId,
+            Guid mediaAssetId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ProductImages.Any(x => x.MediaAssetId == mediaAssetId && x.Status != "DELETED"));
+
+        public Task<IReadOnlyList<TenantAdminProductImageResponse>> GetProductImageResponsesAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<TenantAdminProductImageResponse>>([]);
+
         public Task SaveChangesAsync(CancellationToken cancellationToken) =>
             Task.CompletedTask;
+
+        public Task ExecuteInTransactionAsync(
+            Func<CancellationToken, Task> action,
+            CancellationToken cancellationToken) =>
+            action(cancellationToken);
     }
 }

@@ -6,6 +6,7 @@ using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Media.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
@@ -43,7 +44,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
         MediaUploadFile file,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateProductAccess(context);
+        var accessError = ValidateProductMediaAccess(context);
         if (accessError is not null)
         {
             return ApplicationResult<MediaAssetUploadResponse>.Failure(accessError);
@@ -71,6 +72,17 @@ public sealed class CatalogMediaService : ICatalogMediaService
             return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
                 "media.variant_not_found",
                 "Product variant was not found for this product."));
+        }
+
+        var activeCount = await _repository.CountActiveProductImagesAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+        if (activeCount >= ProductConstants.MaxProductImages)
+        {
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
+                "media.max_images_exceeded",
+                $"A product can have at most {ProductConstants.MaxProductImages} images."));
         }
 
         var preparedResult = await PrepareImageAsync(file, cancellationToken);
@@ -108,7 +120,15 @@ public sealed class CatalogMediaService : ICatalogMediaService
             uploadResult,
             preparedResult.Image,
             purpose,
+            ActiveStatus,
             now);
+
+        var existingImages = await _repository.GetActiveProductImagesAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+        var hasPrimary = existingImages.Any(x => x.IsPrimaryImage);
+        var isPrimary = request.IsPrimaryImage ?? (!hasPrimary && existingImages.Count == 0);
 
         var image = ProductImage.Create(
             id: productImageId,
@@ -119,8 +139,8 @@ public sealed class CatalogMediaService : ICatalogMediaService
             mediaAssetId: mediaAssetId,
             altText: request.AltText,
             imagePurpose: purpose,
-            sortOrder: Math.Max(0, request.SortOrder ?? 0),
-            isPrimaryImage: request.IsPrimaryImage ?? false,
+            sortOrder: Math.Max(0, request.SortOrder ?? existingImages.Count),
+            isPrimaryImage: isPrimary,
             status: ActiveStatus,
             createdByTenantUserId: context.UserId,
             now: now);
@@ -131,10 +151,12 @@ public sealed class CatalogMediaService : ICatalogMediaService
             await _repository.AddProductImageAsync(image, cancellationToken);
             await _repository.SaveChangesAsync(cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
             await TryDeleteUploadedBlobAsync(uploadResult, cancellationToken);
-            throw;
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
+                "media.save_failed",
+                "Failed to save image record: " + ex.Message));
         }
 
         return ApplicationResult<MediaAssetUploadResponse>.Success(new MediaAssetUploadResponse(
@@ -156,6 +178,446 @@ public sealed class CatalogMediaService : ICatalogMediaService
             preparedResult.Image.WidthPx,
             preparedResult.Image.HeightPx,
             preparedResult.Image.ChecksumHash));
+    }
+
+    public async Task<ApplicationResult<StagedProductImageResponse>> StageProductImageAsync(
+        TenantRequestContext context,
+        MediaUploadFile file,
+        Guid? uploadSessionId,
+        CancellationToken cancellationToken)
+    {
+        _ = uploadSessionId;
+        var accessError = ValidateProductMediaAccess(context);
+        if (accessError is not null)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(accessError);
+        }
+
+        if (!_storage.IsConfigured)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(StorageNotConfigured());
+        }
+
+        var preparedResult = await PrepareImageAsync(file, cancellationToken);
+        if (preparedResult.Error is not null)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(preparedResult.Error);
+        }
+
+        await using var content = preparedResult.Image!.Content;
+        var mediaAssetId = Guid.NewGuid();
+        var purpose = ProductConstants.ProductImagePurpose;
+        var storageKey =
+            $"tenants/{context.TenantId:D}/products/staged/{mediaAssetId:D}{preparedResult.Image.StorageExtension}";
+
+        MediaObjectUploadResult uploadResult;
+        try
+        {
+            uploadResult = await UploadToStorageAsync(
+                context,
+                mediaAssetId,
+                storageKey,
+                purpose,
+                preparedResult.Image,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(new ApplicationError(
+                "media.storage_unavailable",
+                "Failed to upload media to storage: " + ex.Message));
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var mediaAsset = CreateMediaAsset(
+            context,
+            mediaAssetId,
+            uploadResult,
+            preparedResult.Image,
+            purpose,
+            "STAGED",
+            now);
+
+        try
+        {
+            await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
+            await _repository.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await TryDeleteUploadedBlobAsync(uploadResult, cancellationToken);
+            return ApplicationResult<StagedProductImageResponse>.Failure(new ApplicationError(
+                "media.save_failed",
+                "Failed to save staged image record: " + ex.Message));
+        }
+
+        return ApplicationResult<StagedProductImageResponse>.Success(new StagedProductImageResponse(
+            mediaAssetId,
+            uploadResult.PublicUrl,
+            preparedResult.Image.OriginalFileName,
+            preparedResult.Image.MimeType,
+            preparedResult.Image.FileSizeBytes,
+            now,
+            ProductConstants.StagedMediaStatus));
+    }
+
+    public async Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
+        TenantRequestContext context,
+        Guid productId,
+        ReorderProductImagesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateProductMediaManageAccess(context);
+        if (accessError is not null)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(accessError);
+        }
+
+        var product = await _repository.GetProductForUpdateAsync(context.TenantId, productId, cancellationToken);
+        if (product is null)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.product_not_found",
+                "Product was not found."));
+        }
+
+        if (product.RowVersion != request.ExpectedRowVersion)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.concurrency_conflict",
+                "Product was modified by another user. Refresh and try again."));
+        }
+
+        var images = await _repository.GetActiveProductImagesAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+        var imageMap = images.ToDictionary(x => x.Id);
+        var now = _dateTimeProvider.UtcNow;
+
+        foreach (var item in request.Items)
+        {
+            if (!imageMap.TryGetValue(item.ProductImageId, out var image))
+            {
+                return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                    "media.validation_failed",
+                    "Image validation failed.",
+                    [new ApplicationFieldError("items", "One or more product images were not found.")]));
+            }
+
+            image.SetSortOrder(item.SortOrder, context.UserId, now);
+        }
+
+        if (request.PrimaryProductImageId.HasValue)
+        {
+            if (!imageMap.ContainsKey(request.PrimaryProductImageId.Value))
+            {
+                return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                    "media.validation_failed",
+                    "Image validation failed.",
+                    [new ApplicationFieldError("primaryProductImageId", "Primary product image was not found.")]));
+            }
+
+            foreach (var image in images)
+            {
+                image.SetPrimary(image.Id == request.PrimaryProductImageId.Value, context.UserId, now);
+            }
+        }
+
+        product.IncrementRowVersion();
+        await _repository.SaveChangesAsync(cancellationToken);
+
+        var responseImages = await _repository.GetProductImageResponsesAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+
+        return ApplicationResult<ProductImagesMutationResponse>.Success(
+            new ProductImagesMutationResponse(productId, product.RowVersion, responseImages));
+    }
+
+    public async Task<ApplicationResult<ProductImagesMutationResponse>> DeleteProductImageAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid productImageId,
+        long? expectedRowVersion,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateProductMediaManageAccess(context);
+        if (accessError is not null)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(accessError);
+        }
+
+        var product = await _repository.GetProductForUpdateAsync(context.TenantId, productId, cancellationToken);
+        if (product is null)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.product_not_found",
+                "Product was not found."));
+        }
+
+        if (expectedRowVersion.HasValue && product.RowVersion != expectedRowVersion.Value)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.concurrency_conflict",
+                "Product was modified by another user. Refresh and try again."));
+        }
+
+        var image = await _repository.GetProductImageAsync(
+            context.TenantId,
+            productId,
+            productImageId,
+            cancellationToken);
+        if (image is null || image.Status == ProductConstants.DeletedStatus)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.validation_failed",
+                "Product image was not found."));
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var wasPrimary = image.IsPrimaryImage;
+        image.SoftDelete(context.UserId, now);
+
+        if (wasPrimary)
+        {
+            var remaining = (await _repository.GetActiveProductImagesAsync(
+                    context.TenantId,
+                    productId,
+                    cancellationToken))
+                .Where(x => x.Id != productImageId)
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.CreatedAt)
+                .ToList();
+
+            var nextPrimary = remaining.FirstOrDefault();
+            if (nextPrimary is not null)
+            {
+                nextPrimary.SetPrimary(true, context.UserId, now);
+            }
+        }
+
+        product.IncrementRowVersion();
+        await _repository.SaveChangesAsync(cancellationToken);
+
+        var responseImages = await _repository.GetProductImageResponsesAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+
+        return ApplicationResult<ProductImagesMutationResponse>.Success(
+            new ProductImagesMutationResponse(productId, product.RowVersion, responseImages));
+    }
+
+    public async Task<ApplicationResult<ProductImagesMutationResponse>> ReplaceProductImagesAsync(
+        TenantRequestContext context,
+        Guid productId,
+        long expectedRowVersion,
+        IReadOnlyList<MediaUploadFile>? files,
+        IReadOnlyList<Guid>? stagedMediaAssetIds,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateProductMediaManageAccess(context);
+        if (accessError is not null)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(accessError);
+        }
+
+        if (!_storage.IsConfigured && files is { Count: > 0 })
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(StorageNotConfigured());
+        }
+
+        var product = await _repository.GetProductForUpdateAsync(context.TenantId, productId, cancellationToken);
+        if (product is null)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.product_not_found",
+                "Product was not found."));
+        }
+
+        if (product.RowVersion != expectedRowVersion)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.concurrency_conflict",
+                "Product was modified by another user. Refresh and try again."));
+        }
+
+        var stagedIds = stagedMediaAssetIds?.Distinct().ToArray() ?? [];
+        var uploadCount = files?.Count ?? 0;
+        if (stagedIds.Length + uploadCount > ProductConstants.MaxProductImages)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.max_images_exceeded",
+                $"A product can have at most {ProductConstants.MaxProductImages} images."));
+        }
+
+        if (stagedIds.Length + uploadCount == 0)
+        {
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(new ApplicationError(
+                "media.validation_failed",
+                "Image validation failed.",
+                [new ApplicationFieldError("files", "At least one image file or staged media asset is required.")]));
+        }
+
+        var preparedUploads = new List<(PreparedImageUpload Image, MediaObjectUploadResult Upload, Guid MediaAssetId)>();
+        ApplicationError? replaceError = null;
+        try
+        {
+            await _repository.ExecuteInTransactionAsync(async ct =>
+            {
+                var now = _dateTimeProvider.UtcNow;
+                var existing = await _repository.GetActiveProductImagesAsync(context.TenantId, productId, ct);
+                foreach (var image in existing)
+                {
+                    image.SoftDelete(context.UserId, now);
+                }
+
+                var sortOrder = 0;
+                var assignPrimary = true;
+
+                foreach (var stagedId in stagedIds)
+                {
+                    var asset = await _repository.GetMediaAssetAsync(context.TenantId, stagedId, ct);
+                    if (asset is null ||
+                        asset.Status != "STAGED" ||
+                        asset.AssetPurpose != ProductConstants.ProductImagePurpose)
+                    {
+                        replaceError = new ApplicationError(
+                            "media.validation_failed",
+                            "Image validation failed.",
+                            [new ApplicationFieldError(
+                                "stagedMediaAssetIds",
+                                "One or more staged media assets were not found or are not available.")]);
+                        throw new InvalidOperationException("staged_media_invalid");
+                    }
+
+                    // Soft-deleted current images still count as linked until save; allow same-session reuse after soft delete.
+                    var linkedElsewhere = await _repository.IsMediaAssetLinkedAsync(context.TenantId, stagedId, ct);
+                    if (linkedElsewhere &&
+                        !existing.Any(x => x.MediaAssetId == stagedId))
+                    {
+                        replaceError = new ApplicationError(
+                            "media.validation_failed",
+                            "Image validation failed.",
+                            [new ApplicationFieldError(
+                                "stagedMediaAssetIds",
+                                "One or more staged media assets are already linked.")]);
+                        throw new InvalidOperationException("staged_media_linked");
+                    }
+
+                    var productImage = ProductImage.Create(
+                        Guid.NewGuid(),
+                        context.TenantId,
+                        productId,
+                        null,
+                        null,
+                        stagedId,
+                        null,
+                        ProductConstants.ProductImagePurpose,
+                        sortOrder++,
+                        assignPrimary,
+                        ActiveStatus,
+                        context.UserId,
+                        now);
+                    assignPrimary = false;
+                    asset.MarkActive(context.UserId, now);
+                    await _repository.AddProductImageAsync(productImage, ct);
+                }
+
+                if (files is { Count: > 0 })
+                {
+                    foreach (var file in files)
+                    {
+                        var preparedResult = await PrepareImageAsync(file, ct);
+                        if (preparedResult.Error is not null)
+                        {
+                            replaceError = preparedResult.Error;
+                            throw new InvalidOperationException("prepare_failed");
+                        }
+
+                        var mediaAssetId = Guid.NewGuid();
+                        var storageKey = BuildStorageKey(
+                            context.TenantId,
+                            "products",
+                            productId,
+                            "images",
+                            mediaAssetId,
+                            preparedResult.Image!.StorageExtension);
+
+                        var uploadResult = await UploadToStorageAsync(
+                            context,
+                            mediaAssetId,
+                            storageKey,
+                            ProductConstants.ProductImagePurpose,
+                            preparedResult.Image,
+                            ct);
+                        preparedUploads.Add((preparedResult.Image, uploadResult, mediaAssetId));
+
+                        var mediaAsset = CreateMediaAsset(
+                            context,
+                            mediaAssetId,
+                            uploadResult,
+                            preparedResult.Image,
+                            ProductConstants.ProductImagePurpose,
+                            ActiveStatus,
+                            now);
+
+                        var productImage = ProductImage.Create(
+                            Guid.NewGuid(),
+                            context.TenantId,
+                            productId,
+                            null,
+                            null,
+                            mediaAssetId,
+                            null,
+                            ProductConstants.ProductImagePurpose,
+                            sortOrder++,
+                            assignPrimary,
+                            ActiveStatus,
+                            context.UserId,
+                            now);
+                        assignPrimary = false;
+
+                        await _repository.AddMediaAssetAsync(mediaAsset, ct);
+                        await _repository.AddProductImageAsync(productImage, ct);
+                    }
+                }
+
+                product.IncrementRowVersion();
+                await _repository.SaveChangesAsync(ct);
+            }, cancellationToken);
+        }
+        catch (InvalidOperationException)
+        {
+            foreach (var prepared in preparedUploads)
+            {
+                await TryDeleteUploadedBlobAsync(prepared.Upload, cancellationToken);
+            }
+
+            return ApplicationResult<ProductImagesMutationResponse>.Failure(
+                replaceError ?? new ApplicationError(
+                    "media.validation_failed",
+                    "Image replacement failed validation."));
+        }
+        catch
+        {
+            foreach (var prepared in preparedUploads)
+            {
+                await TryDeleteUploadedBlobAsync(prepared.Upload, cancellationToken);
+            }
+
+            throw;
+        }
+
+        var responseImages = await _repository.GetProductImageResponsesAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+
+        return ApplicationResult<ProductImagesMutationResponse>.Success(
+            new ProductImagesMutationResponse(productId, product.RowVersion, responseImages));
     }
 
     public async Task<ApplicationResult<MediaAssetUploadResponse>> UploadCategoryImageAsync(
@@ -220,6 +682,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             uploadResult,
             preparedResult.Image,
             purpose,
+            ActiveStatus,
             now);
 
         category.UpdateImage(mediaAssetId, context.UserId, now);
@@ -239,10 +702,12 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
             await _repository.SaveChangesAsync(cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
             await TryDeleteUploadedBlobAsync(uploadResult, cancellationToken);
-            throw;
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
+                "media.save_failed",
+                "Failed to save category image record: " + ex.Message));
         }
 
         return ApplicationResult<MediaAssetUploadResponse>.Success(new MediaAssetUploadResponse(
@@ -328,6 +793,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             uploadResult,
             preparedResult.Image,
             purpose,
+            ActiveStatus,
             now);
 
         brand.UpdateLogo(mediaAssetId, context.UserId, now);
@@ -347,10 +813,12 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
             await _repository.SaveChangesAsync(cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
             await TryDeleteUploadedBlobAsync(uploadResult, cancellationToken);
-            throw;
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
+                "media.save_failed",
+                "Failed to save brand image record: " + ex.Message));
         }
 
         return ApplicationResult<MediaAssetUploadResponse>.Success(new MediaAssetUploadResponse(
@@ -392,26 +860,23 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
         if (file.Length > MaxImageFileSizeBytes)
         {
-            fieldErrors.Add(new ApplicationFieldError("file", "Image file size exceeds the allowed limit."));
+            return PrepareImageResult.Failed(new ApplicationError(
+                "media.file_size_exceeded",
+                "Image file size exceeds the allowed limit.",
+                [new ApplicationFieldError("file", "Image file size exceeds the allowed 5 MB limit.")]));
         }
 
-        var mimeType = NormalizeContentType(file.ContentType);
-        if (!IsAllowedMimeType(mimeType))
+        var declaredContentType = NormalizeContentType(file.ContentType);
+        if (!string.IsNullOrWhiteSpace(declaredContentType) && declaredContentType != "application/octet-stream" && !IsAllowedMimeType(declaredContentType))
         {
-            fieldErrors.Add(new ApplicationFieldError("contentType", "Only JPEG, PNG and WebP images are allowed."));
+            return PrepareImageResult.Failed(new ApplicationError(
+                "media.unsupported_media_type",
+                "Only JPEG, PNG and WebP images are allowed.",
+                [new ApplicationFieldError("contentType", "Only JPEG, PNG and WebP images are allowed.")]));
         }
 
         var originalFileName = NormalizeFileName(file.FileName);
         var fileExtension = Path.GetExtension(originalFileName).ToLowerInvariant();
-        if (!IsAllowedExtensionForMimeType(fileExtension, mimeType))
-        {
-            fieldErrors.Add(new ApplicationFieldError("fileName", "File extension does not match an allowed image type."));
-        }
-
-        if (fieldErrors.Count > 0)
-        {
-            return PrepareImageResult.Failed(ValidationFailed(fieldErrors));
-        }
 
         var memory = new MemoryStream(capacity: (int)Math.Min(file.Length, MaxImageFileSizeBytes));
         await file.Content.CopyToAsync(memory, cancellationToken);
@@ -426,17 +891,42 @@ public sealed class CatalogMediaService : ICatalogMediaService
         if (memory.Length > MaxImageFileSizeBytes)
         {
             await memory.DisposeAsync();
-            return PrepareImageResult.Failed(ValidationFailed([
-                new ApplicationFieldError("file", "Image file size exceeds the allowed limit.")
-            ]));
+            return PrepareImageResult.Failed(new ApplicationError(
+                "media.file_size_exceeded",
+                "Image file size exceeds the allowed limit.",
+                [new ApplicationFieldError("file", "Image file size exceeds the allowed 5 MB limit.")]));
         }
 
         var bytes = memory.ToArray();
-        if (!TryReadImageDimensions(bytes, mimeType, out var widthPx, out var heightPx))
+        var mimeType = declaredContentType;
+
+        if (!TryReadImageDimensions(bytes, ref mimeType, out var widthPx, out var heightPx))
         {
             await memory.DisposeAsync();
             return PrepareImageResult.Failed(ValidationFailed([
                 new ApplicationFieldError("file", "Image signature or dimensions are invalid for the supplied MIME type.")
+            ]));
+        }
+
+        if (!IsAllowedMimeType(mimeType))
+        {
+            await memory.DisposeAsync();
+            return PrepareImageResult.Failed(new ApplicationError(
+                "media.unsupported_media_type",
+                "Only JPEG, PNG and WebP images are allowed.",
+                [new ApplicationFieldError("contentType", "Only JPEG, PNG and WebP images are allowed.")]));
+        }
+
+        // If byte signature auto-detected the true format (e.g. WebP/PNG) or extension is missing/mismatched for auto-probed type, adjust fileExtension
+        if (string.IsNullOrWhiteSpace(fileExtension) || fileExtension == "." || (mimeType != declaredContentType && IsAllowedMimeType(mimeType)))
+        {
+            fileExtension = ResolveStorageExtension(mimeType);
+        }
+        else if (!IsAllowedExtensionForMimeType(fileExtension, mimeType))
+        {
+            await memory.DisposeAsync();
+            return PrepareImageResult.Failed(ValidationFailed([
+                new ApplicationFieldError("fileName", "File extension does not match an allowed image type.")
             ]));
         }
 
@@ -486,6 +976,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
         MediaObjectUploadResult uploadResult,
         PreparedImageUpload image,
         string purpose,
+        string status,
         DateTimeOffset now)
     {
         return MediaAsset.Create(
@@ -503,7 +994,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             image.ChecksumHash,
             AssetTypeImage,
             purpose,
-            ActiveStatus,
+            status,
             context.UserId,
             now);
     }
@@ -525,19 +1016,24 @@ public sealed class CatalogMediaService : ICatalogMediaService
         }
     }
 
-    private static ApplicationError? ValidateProductAccess(TenantRequestContext context)
+    private static ApplicationError? ValidateProductMediaAccess(TenantRequestContext context) =>
+        ValidateProductMediaManageAccess(context);
+
+    private static ApplicationError? ValidateProductMediaManageAccess(TenantRequestContext context)
     {
         if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
         {
             return new ApplicationError("media.invalid_tenant_context", "Invalid tenant context.");
         }
 
-        return context.HasPermission(TenantAdminProductPermissions.Update) ||
-               context.HasPermission(ProductConstants.UpdatePermission) ||
-               context.HasPermission(ProductConstants.ManagePermission)
+        // Canonical catalogue only — no tenant.products.* and no products.update substitute.
+        return context.HasPermission(ProductConstants.MediaManagePermission)
             ? null
             : PermissionDenied;
     }
+
+    private static ApplicationError? ValidateProductAccess(TenantRequestContext context) =>
+        ValidateProductMediaManageAccess(context);
 
     private static ApplicationError? ValidateCategoryAccess(TenantRequestContext context)
     {
@@ -613,12 +1109,12 @@ public sealed class CatalogMediaService : ICatalogMediaService
         mimeType is "image/jpeg" or "image/png" or "image/webp";
 
     private static bool IsAllowedExtensionForMimeType(string extension, string mimeType) =>
-        mimeType switch
+        extension switch
         {
-            "image/jpeg" => extension is ".jpg" or ".jpeg",
-            "image/png" => extension == ".png",
-            "image/webp" => extension == ".webp",
-            _ => false
+            ".jpg" or ".jpeg" or ".jfif" or ".pjpeg" or ".pjp" => mimeType is "image/jpeg" or "image/pjpeg" or "image/jfif",
+            ".png" => mimeType == "image/png",
+            ".webp" => mimeType == "image/webp",
+            _ => true
         };
 
     private static string ResolveStorageExtension(string mimeType) =>
@@ -631,20 +1127,74 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
     private static bool TryReadImageDimensions(
         byte[] bytes,
-        string mimeType,
+        ref string mimeType,
         out int? widthPx,
         out int? heightPx)
     {
         widthPx = null;
         heightPx = null;
 
-        return mimeType switch
+        if (mimeType switch
+            {
+                "image/png" => TryReadPngDimensions(bytes, out widthPx, out heightPx),
+                "image/jpeg" or "image/pjpeg" or "image/jfif" => TryReadJpegDimensions(bytes, out widthPx, out heightPx),
+                "image/webp" => TryReadWebpDimensions(bytes, out widthPx, out heightPx),
+                _ => false
+            })
         {
-            "image/png" => TryReadPngDimensions(bytes, out widthPx, out heightPx),
-            "image/jpeg" => TryReadJpegDimensions(bytes, out widthPx, out heightPx),
-            "image/webp" => TryReadWebpDimensions(bytes, out widthPx, out heightPx),
-            _ => false
-        };
+            return true;
+        }
+
+        if (TryReadPngDimensions(bytes, out widthPx, out heightPx))
+        {
+            mimeType = "image/png";
+            return true;
+        }
+
+        if (TryReadJpegDimensions(bytes, out widthPx, out heightPx))
+        {
+            mimeType = "image/jpeg";
+            return true;
+        }
+
+        if (TryReadWebpDimensions(bytes, out widthPx, out heightPx))
+        {
+            mimeType = "image/webp";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadGifDimensions(byte[] bytes, out int? widthPx, out int? heightPx)
+    {
+        widthPx = null;
+        heightPx = null;
+
+        if (bytes.Length < 10 ||
+            !HasAscii(bytes, 0, "GIF87a") && !HasAscii(bytes, 0, "GIF89a"))
+        {
+            return false;
+        }
+
+        widthPx = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(6, 2));
+        heightPx = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(8, 2));
+        return widthPx > 0 && heightPx > 0;
+    }
+
+    private static bool TryReadBmpDimensions(byte[] bytes, out int? widthPx, out int? heightPx)
+    {
+        widthPx = null;
+        heightPx = null;
+
+        if (bytes.Length < 26 || bytes[0] != 0x42 || bytes[1] != 0x4D)
+        {
+            return false;
+        }
+
+        widthPx = Math.Abs(BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(18, 4)));
+        heightPx = Math.Abs(BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(22, 4)));
+        return widthPx > 0 && heightPx > 0;
     }
 
     private static bool TryReadPngDimensions(byte[] bytes, out int? widthPx, out int? heightPx)

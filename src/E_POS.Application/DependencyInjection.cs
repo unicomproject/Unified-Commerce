@@ -91,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
+        services.AddScoped<ProductWizardAccessPolicy>();
         services.AddScoped<ICatalogMediaService, CatalogMediaService>();
         services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
         services.AddScoped<IPosProductCatalogService, PosProductCatalogService>();

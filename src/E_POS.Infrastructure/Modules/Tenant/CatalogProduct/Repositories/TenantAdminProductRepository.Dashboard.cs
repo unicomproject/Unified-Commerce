@@ -131,6 +131,7 @@ public sealed partial class TenantAdminProductRepository
             .Where(x =>
                 x.TenantId == tenantId &&
                 x.Status != ProductConstants.ArchivedStatus &&
+                (x.Status != ProductConstants.DraftStatus || x.DraftSavedAt != null) &&
                 x.CreatedAt <= asOf)
             .CountAsync(cancellationToken);
     }

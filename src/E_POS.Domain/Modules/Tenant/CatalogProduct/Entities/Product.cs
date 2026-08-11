@@ -29,6 +29,7 @@ public class Product : AuditableEntity
     public DateTimeOffset? ArchivedAt { get; protected set; }
     public Guid? ArchivedByTenantUserId { get; protected set; }
     public long RowVersion { get; protected set; } = 1;
+    public string? DesiredPublishStatus { get; protected set; }
 
     public static Product Create(
         Guid id,
@@ -47,7 +48,8 @@ public class Product : AuditableEntity
         bool isTaxable,
         string status,
         Guid? createdByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool isExplicitDraftSave = false)
     {
         return new Product
         {
@@ -57,7 +59,7 @@ public class Product : AuditableEntity
             ProductName = productName.Trim(),
             ProductSlug = productSlug.Trim().ToLowerInvariant(),
             ProductType = productType.Trim().ToUpperInvariant(),
-            ProductStructure = productStructure.Trim().ToUpperInvariant(),
+            ProductStructure = ProductStructureConstants.Normalize(productStructure),
             BusinessTypeId = businessTypeId,
             BrandId = brandId,
             ReturnPolicyId = returnPolicyId,
@@ -71,7 +73,7 @@ public class Product : AuditableEntity
             CreatedAt = now,
             UpdatedAt = now,
             CurrentSetupStep = status == ProductConstants.DraftStatus ? 1 : 8,
-            DraftSavedAt = status == ProductConstants.DraftStatus ? now : null,
+            DraftSavedAt = isExplicitDraftSave ? now : null,
             PublishedAt = status != ProductConstants.DraftStatus ? now : null,
             PublishedByTenantUserId = status != ProductConstants.DraftStatus ? createdByTenantUserId : null,
             RowVersion = 1
@@ -99,7 +101,7 @@ public class Product : AuditableEntity
         ProductName = productName.Trim();
         ProductSlug = productSlug.Trim().ToLowerInvariant();
         ProductType = productType.Trim().ToUpperInvariant();
-        ProductStructure = productStructure.Trim().ToUpperInvariant();
+        ProductStructure = ProductStructureConstants.Normalize(productStructure);
         BusinessTypeId = businessTypeId;
         BrandId = brandId;
         ReturnPolicyId = returnPolicyId;
@@ -110,10 +112,64 @@ public class Product : AuditableEntity
         Status = ProductConstants.NormalizeStatus(status);
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
-        if (status == ProductConstants.DraftStatus)
+    }
+
+    public void UpdateWizardStep1Profile(
+        string productCode,
+        string productName,
+        string productSlug,
+        Guid? brandId,
+        string? shortDescription,
+        string? longDescription,
+        bool isSellable,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        ProductCode = ProductConstants.NormalizeCode(productCode);
+        ProductName = productName.Trim();
+        ProductSlug = productSlug.Trim().ToLowerInvariant();
+        BrandId = brandId;
+        ShortDescription = shortDescription?.Trim();
+        LongDescription = longDescription?.Trim();
+        IsSellable = isSellable;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateWizardStep2Profile(
+        string productStructure,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now)
+    {
+        if (!ProductStructureConstants.TryNormalize(productStructure, out var normalized))
+        {
+            throw new ArgumentException("Invalid product structure.", nameof(productStructure));
+        }
+
+        ProductStructure = normalized;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void SaveWizardDraft(
+        int setupStep,
+        string? desiredPublishStatus,
+        Guid? updatedBy,
+        DateTimeOffset now,
+        bool isExplicitDraftSave = false)
+    {
+        if (isExplicitDraftSave)
         {
             DraftSavedAt = now;
         }
+        CurrentSetupStep = setupStep;
+        DesiredPublishStatus = string.IsNullOrWhiteSpace(desiredPublishStatus)
+            ? null
+            : ProductConstants.NormalizeStatus(desiredPublishStatus);
+        UpdatedAt = now;
+        UpdatedBy = updatedBy;
+        UpdatedByTenantUserId = updatedBy;
+        IncrementRowVersion();
     }
 
     public void UpdateStatus(string status, Guid? updatedByTenantUserId, DateTimeOffset now)
@@ -149,8 +205,12 @@ public class Product : AuditableEntity
         UpdatedAt = now;
     }
 
-    public void SetPublished(Guid? userId, DateTimeOffset now)
+    public void SetPublished(Guid? userId, DateTimeOffset now, string? desiredPublishStatus = null)
     {
+        var finalStatus = string.IsNullOrWhiteSpace(desiredPublishStatus)
+            ? ProductConstants.ActiveStatus
+            : ProductConstants.NormalizeStatus(desiredPublishStatus);
+        Status = finalStatus == ProductConstants.DraftStatus ? ProductConstants.ActiveStatus : finalStatus;
         PublishedAt = now;
         PublishedByTenantUserId = userId;
         CurrentSetupStep = 8;
@@ -162,4 +222,3 @@ public class Product : AuditableEntity
         RowVersion++;
     }
 }
-
