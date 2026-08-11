@@ -1,5 +1,6 @@
-using E_POS.Application.Modules.Tenant.Inventory.Contracts.Dashboard;
-using E_POS.Application.Modules.Tenant.Inventory.Dtos.Dashboard;
+using E_POS.Application.Modules.Tenant.Inventory.Dashboard.Contracts.Repositories;
+using E_POS.Application.Modules.Tenant.Inventory.Dashboard.Contracts.Services;
+using E_POS.Application.Modules.Tenant.Inventory.Dashboard.Dtos;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

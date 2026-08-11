@@ -1,0 +1,26 @@
+namespace E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Dtos;
+
+public sealed record CurrentStockListItemResponse(
+    Guid InventoryBalanceId,
+    Guid OutletId,
+    Guid ProductId,
+    string ProductName,
+    Guid? VariantId,
+    string? VariantName,
+    IReadOnlyList<CurrentStockVariantOptionResponse> VariantOptions,
+    string? Sku,
+    string? Barcode,
+    Guid? ProductBatchId,
+    string? BatchNumber,
+    DateOnly? ExpiryDate,
+    decimal OnHandQuantity,
+    decimal ReservedQuantity,
+    decimal DamagedQuantity,
+    decimal QuarantineQuantity,
+    decimal AvailableQuantity,
+    string StockStatus,
+    string ExpiryStatus,
+    decimal? ReorderLevel,
+    string? ImageUrl,
+    DateTimeOffset? LastMovementAt,
+    long RowVersion);
