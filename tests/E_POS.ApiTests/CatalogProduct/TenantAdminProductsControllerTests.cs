@@ -595,11 +595,8 @@ public sealed class TenantAdminProductsControllerTests
     {
         var controller = new TenantAdminProductsController(
             service,
-<<<<<<< HEAD
             new FakeTenantAdminInventoryService(),
             new FakeCatalogMediaService(),
-=======
->>>>>>> origin/main
             new FakeTenantRequestContextFactory());
         controller.ControllerContext = new ControllerContext
         {
@@ -904,7 +901,6 @@ public sealed class TenantAdminProductsControllerTests
             Task.FromResult(SetupResult);
     }
 
-<<<<<<< HEAD
     private sealed class FakeTenantAdminInventoryService : ITenantAdminInventoryService
     {
         public Task<ApplicationResult<TenantAdminCurrentStockListResponse>> GetCurrentStockAsync(

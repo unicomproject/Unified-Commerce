@@ -41,7 +41,6 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
                     cancellationToken: cancellationToken);
             }
 
-<<<<<<< HEAD
             var blobClient = containerClient.GetBlobClient(storageKey);
             if (request.Content.CanSeek)
             {
