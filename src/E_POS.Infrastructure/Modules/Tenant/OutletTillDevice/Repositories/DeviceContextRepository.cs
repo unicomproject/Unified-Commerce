@@ -50,20 +50,6 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
         var fingerprintHash = DeviceFingerprintHasher.Hash(command.DeviceFingerprint);
         var activationCodeHash = DeviceFingerprintHasher.Hash(command.ActivationCode);
 
-        var existingSnapshot = await BuildSnapshotByFingerprintAsync(
-            tenantId,
-            fingerprintHash,
-            cancellationToken);
-
-        if (existingSnapshot is not null && existingSnapshot.IsTrusted)
-        {
-            _logger.LogDebug(
-                "Device activation idempotent for tenant {TenantId}, device {DeviceId}.",
-                tenantId,
-                existingSnapshot.DeviceId);
-            return Success(existingSnapshot);
-        }
-
         var activationCode = await _dbContext.TillActivationCodes
             .FirstOrDefaultAsync(
                 x => x.TenantId == tenantId && x.ActivationCodeHash == activationCodeHash,
@@ -81,37 +67,6 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
                 TillActivationCodeConstants.UsedStatus,
                 StringComparison.Ordinal))
         {
-            if (activationCode.UsedByPosDeviceId is not null)
-            {
-                var usedDeviceSnapshot = await BuildSnapshotAsync(
-                    tenantId,
-                    activationCode.UsedByPosDeviceId.Value,
-                    cancellationToken);
-
-                if (usedDeviceSnapshot is not null &&
-                    string.Equals(
-                        await GetDeviceFingerprintHashAsync(usedDeviceSnapshot.DeviceId, cancellationToken),
-                        fingerprintHash,
-                        StringComparison.Ordinal))
-                {
-                    return Success(usedDeviceSnapshot);
-                }
-
-                var usedDeviceRePairResult = await TryRePairUsedActivationCodeAsync(
-                    tenantId,
-                    tenantUserId,
-                    activationCode,
-                    fingerprintHash,
-                    command,
-                    now,
-                    cancellationToken);
-
-                if (usedDeviceRePairResult is not null)
-                {
-                    return usedDeviceRePairResult;
-                }
-            }
-
             return Failure(
                 "device_context.activation_code_used",
                 "Activation code has already been used.");
@@ -224,121 +179,6 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
         return Success(snapshot with { IsTrusted = true });
     }
 
-    private async Task<DeviceActivationRepositoryResult?> TryRePairUsedActivationCodeAsync(
-        Guid tenantId,
-        Guid tenantUserId,
-        TillActivationCode activationCode,
-        string fingerprintHash,
-        DeviceActivationCommand command,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        if (activationCode.UsedByPosDeviceId is null || activationCode.UsedByPosDeviceId == Guid.Empty)
-        {
-            return null;
-        }
-
-        var assignedDeviceId = await (
-                from assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
-                where assignment.TenantId == tenantId &&
-                      assignment.TillId == activationCode.TillId &&
-                      assignment.ReleasedAt == null
-                orderby assignment.AssignedAt descending
-                select assignment.PosDeviceId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (assignedDeviceId == Guid.Empty ||
-            assignedDeviceId != activationCode.UsedByPosDeviceId)
-        {
-            return null;
-        }
-
-        var conflictingDeviceId = await _dbContext.PosDevices
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.DeviceFingerprintHash == fingerprintHash &&
-                x.Status == PosDeviceConstants.ActiveStatus &&
-                x.Id != assignedDeviceId)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (conflictingDeviceId is not null && conflictingDeviceId != Guid.Empty)
-        {
-            return Failure(
-                "device_context.fingerprint_already_paired",
-                "This device fingerprint is already paired to another POS device.");
-        }
-
-        var device = await _dbContext.PosDevices
-            .FirstOrDefaultAsync(
-                x => x.TenantId == tenantId && x.Id == assignedDeviceId,
-                cancellationToken);
-
-        if (device is null)
-        {
-            return Failure(
-                "device_context.no_device_assigned",
-                "Assigned POS device could not be found.");
-        }
-
-        if (!string.Equals(device.Status, PosDeviceConstants.ActiveStatus, StringComparison.OrdinalIgnoreCase))
-        {
-            return Failure(
-                "device_context.device_not_active",
-                "Assigned POS device is not active.");
-        }
-
-        device.PairForActivation(
-            command.DeviceName,
-            command.DeviceType,
-            command.Platform,
-            command.AppVersion,
-            fingerprintHash,
-            tenantUserId,
-            now);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        _logger.LogDebug(
-            "Device re-paired for tenant {TenantId}: device {DeviceId}, till {TillId}.",
-            tenantId,
-            device.Id,
-            activationCode.TillId);
-
-        var snapshot = await BuildSnapshotAsync(tenantId, device.Id, cancellationToken);
-        if (snapshot is null)
-        {
-            return Failure(
-                "device_context.activation_failed",
-                "POS device was activated but context could not be resolved.");
-        }
-
-        return Success(snapshot with { IsTrusted = true });
-    }
-
-    private async Task<CurrentDeviceDbSnapshot?> BuildSnapshotByFingerprintAsync(
-        Guid tenantId,
-        string fingerprintHash,
-        CancellationToken cancellationToken)
-    {
-        var deviceId = await _dbContext.PosDevices
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.DeviceFingerprintHash == fingerprintHash &&
-                x.Status == PosDeviceConstants.ActiveStatus)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (deviceId is null || deviceId == Guid.Empty)
-        {
-            return null;
-        }
-
-        return await BuildSnapshotAsync(tenantId, deviceId.Value, cancellationToken);
-    }
-
     private async Task<CurrentDeviceDbSnapshot?> BuildSnapshotAsync(
         Guid tenantId,
         Guid deviceId,
@@ -346,6 +186,8 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
     {
         var snapshot = await (
                 from device in _dbContext.PosDevices.AsNoTracking()
+                join tenant in _dbContext.Tenants.AsNoTracking()
+                    on device.TenantId equals tenant.Id
                 join assignment in _dbContext.TillDeviceAssignments.AsNoTracking()
                     on device.Id equals assignment.PosDeviceId
                 join till in _dbContext.Tills.AsNoTracking()
@@ -368,6 +210,7 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
                 select new
                 {
                     device.TenantId,
+                    tenant.TenantSlug,
                     DeviceId = device.Id,
                     device.DeviceCode,
                     device.DeviceName,
@@ -391,6 +234,7 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
 
         return new CurrentDeviceDbSnapshot(
             TenantId: snapshot.TenantId,
+            TenantSlug: snapshot.TenantSlug,
             DeviceId: snapshot.DeviceId,
             DeviceCode: snapshot.DeviceCode,
             DeviceName: snapshot.DeviceName,
@@ -435,15 +279,6 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
         return null;
     }
 
-    private async Task<string?> GetDeviceFingerprintHashAsync(
-        Guid deviceId,
-        CancellationToken cancellationToken) =>
-        await _dbContext.PosDevices
-            .AsNoTracking()
-            .Where(x => x.Id == deviceId)
-            .Select(x => x.DeviceFingerprintHash)
-            .FirstOrDefaultAsync(cancellationToken);
-
     private static DeviceActivationRepositoryResult Success(CurrentDeviceDbSnapshot snapshot) =>
         new(true, null, null, snapshot);
 
@@ -456,13 +291,13 @@ public sealed class DeviceContextRepository : IDeviceContextRepository
         CancellationToken cancellationToken)
     {
         var fingerprintHash = DeviceFingerprintHasher.Hash(deviceFingerprint);
-        
+
         return await _dbContext.PosDevices
-            .FirstOrDefaultAsync(x => 
-                x.TenantId == tenantId && 
+            .FirstOrDefaultAsync(x =>
+                x.TenantId == tenantId &&
                 x.DeviceFingerprintHash == fingerprintHash &&
                 x.Status == PosDeviceConstants.ActiveStatus &&
-                x.IsTrusted, 
+                x.IsTrusted,
                 cancellationToken);
     }
 

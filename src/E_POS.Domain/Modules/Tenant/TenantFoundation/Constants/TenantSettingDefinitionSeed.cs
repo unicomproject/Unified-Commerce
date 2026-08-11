@@ -17,6 +17,13 @@ public static class TenantSettingDefinitionSeed
     public static readonly Guid BrandingPlaceholdersId = Guid.Parse("a1000000-0000-4000-8000-000000000009");
     public static readonly Guid InventoryStockBehaviourId = Guid.Parse("a1000000-0000-4000-8000-00000000000a");
     public static readonly Guid OnlineStoreDefaultsId = Guid.Parse("a1000000-0000-4000-8000-00000000000b");
+    public static readonly Guid PosLoginSystemNameId = Guid.Parse("a1000000-0000-4000-8000-00000000000c");
+    public static readonly Guid PosLoginDescriptionId = Guid.Parse("a1000000-0000-4000-8000-00000000000d");
+    public static readonly Guid PosLoginSubtitleTemplateId = Guid.Parse("a1000000-0000-4000-8000-00000000000e");
+    public static readonly Guid PosLoginBackgroundModeId = Guid.Parse("a1000000-0000-4000-8000-00000000000f");
+    public static readonly Guid PosLoginBackgroundColorId = Guid.Parse("a1000000-0000-4000-8000-000000000010");
+    public static readonly Guid PosLoginBackgroundMediaAssetId = Guid.Parse("a1000000-0000-4000-8000-000000000011");
+    public static readonly Guid PosLoginHeroMediaAssetId = Guid.Parse("a1000000-0000-4000-8000-000000000012");
 
     public const string TaxPricingModeDefaultJson = "\"TAX_EXCLUSIVE\"";
     public const string LocaleDateFormatDefaultJson = "\"yyyy-MM-dd\"";
@@ -67,7 +74,21 @@ public static class TenantSettingDefinitionSeed
         new(InventoryStockBehaviourId, TenantSettingKeys.InventoryStockBehaviour, "Inventory stock behaviour", "object",
             InventoryStockBehaviourDefaultJson, "Inventory stock behaviour defaults.", true, "inventory_tracking"),
         new(OnlineStoreDefaultsId, TenantSettingKeys.OnlineStoreDefaults, "Online store defaults", "object",
-            OnlineStoreDefaultsDefaultJson, "Online store operational defaults.", true, "online_store")
+            OnlineStoreDefaultsDefaultJson, "Online store operational defaults.", true, "online_store"),
+        new(PosLoginSystemNameId, TenantSettingKeys.PosLoginSystemName, "POS login system name", "string",
+            "\"Smart Cashier System\"", "System label displayed on the POS login screen.", true, null),
+        new(PosLoginDescriptionId, TenantSettingKeys.PosLoginDescription, "POS login description", "string",
+            "\"Powering every sale. Every venue. Every day.\"", "Login-specific tenant presentation copy.", true, null),
+        new(PosLoginSubtitleTemplateId, TenantSettingKeys.PosLoginSubtitleTemplate, "POS login subtitle", "string",
+            "\"Sign in to continue to {tenantName}\"", "Login subtitle template; only {tenantName} is supported.", true, null),
+        new(PosLoginBackgroundModeId, TenantSettingKeys.PosLoginBackgroundMode, "POS login background mode", "string",
+            "\"COLOR\"", "Active POS login background mode: IMAGE or COLOR.", true, null),
+        new(PosLoginBackgroundColorId, TenantSettingKeys.PosLoginBackgroundColor, "POS login background color", "string",
+            "\"#020B1F\"", "POS login background color in #RRGGBB format.", true, null),
+        new(PosLoginBackgroundMediaAssetId, TenantSettingKeys.PosLoginBackgroundMediaAssetId, "POS login background media", "string",
+            "\"\"", "Optional tenant-owned POS_LOGIN_BACKGROUND media asset UUID.", true, null),
+        new(PosLoginHeroMediaAssetId, TenantSettingKeys.PosLoginHeroMediaAssetId, "POS login hero media", "string",
+            "\"\"", "Optional tenant-owned POS_LOGIN_HERO media asset UUID.", true, null)
     ];
 }
 

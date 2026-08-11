@@ -7,6 +7,12 @@ namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 
 public sealed class DeviceContextService : IDeviceContextService
 {
+    private const string ActivateDevicePermission = "tenant.till.manage";
+
+    private static readonly ApplicationError PermissionDenied = new(
+        "device_context.permission_denied",
+        "You do not have permission to activate POS devices.");
+
     private static readonly ApplicationError InvalidFingerprint = new(
         "device_context.invalid_fingerprint",
         "Device fingerprint is required.");
@@ -66,6 +72,11 @@ public sealed class DeviceContextService : IDeviceContextService
         ActivateDeviceRequest request,
         CancellationToken cancellationToken)
     {
+        if (!context.HasPermission(ActivateDevicePermission))
+        {
+            return ApplicationResult<CurrentDeviceResponseDto>.Failure(PermissionDenied);
+        }
+
         if (string.IsNullOrWhiteSpace(request.ActivationCode))
         {
             return ApplicationResult<CurrentDeviceResponseDto>.Failure(InvalidActivationCode);
@@ -142,6 +153,7 @@ public sealed class DeviceContextService : IDeviceContextService
     private static CurrentDeviceResponseDto MapToResponse(CurrentDeviceDbSnapshot snapshot) =>
         new(
             TenantId: snapshot.TenantId,
+            TenantSlug: snapshot.TenantSlug,
             Device: new CurrentDeviceDeviceDto(
                 Id: snapshot.DeviceId,
                 DeviceCode: snapshot.DeviceCode,
