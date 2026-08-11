@@ -142,6 +142,8 @@ public static class DependencyInjection
         services.AddScoped<IPlatformModulesCatalogRepository, PlatformModulesCatalogRepository>();
         services.AddScoped<IPlatformSettingsRepository, PlatformSettingsRepository>();
         services.AddScoped<ISettingDefinitionRepository, SettingDefinitionRepository>();
+        services.AddScoped<IPosLoginBrandingRepository, PosLoginBrandingRepository>();
+        services.AddScoped<IPosLoginBrandingMediaRepository, PosLoginBrandingMediaRepository>();
         services.AddScoped<IPlatformBillingRepository, PlatformBillingRepository>();
         services.AddScoped<IManualPaymentRepository, ManualPaymentRepository>();
         services.AddScoped<IManualPaymentAccessTokenService, ManualPaymentAccessTokenService>();

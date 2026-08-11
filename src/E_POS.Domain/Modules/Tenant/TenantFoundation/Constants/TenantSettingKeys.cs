@@ -16,6 +16,13 @@ public static class TenantSettingKeys
     public const string BrandingPlaceholders = "branding.placeholders";
     public const string InventoryStockBehaviour = "inventory.stock_behaviour";
     public const string OnlineStoreDefaults = "online_store.defaults";
+    public const string PosLoginSystemName = "pos.login.system_name";
+    public const string PosLoginDescription = "pos.login.description";
+    public const string PosLoginSubtitleTemplate = "pos.login.subtitle_template";
+    public const string PosLoginBackgroundMode = "pos.login.background_mode";
+    public const string PosLoginBackgroundColor = "pos.login.background_color";
+    public const string PosLoginBackgroundMediaAssetId = "pos.login.background_media_asset_id";
+    public const string PosLoginHeroMediaAssetId = "pos.login.hero_media_asset_id";
 
     public const string TaxPricingModeExclusive = "TAX_EXCLUSIVE";
     public const string TaxPricingModeInclusive = "TAX_INCLUSIVE";
@@ -32,7 +39,14 @@ public static class TenantSettingKeys
         NumberingPolicies,
         NotificationDefaults,
         SecuritySessionPolicy,
-        BrandingPlaceholders
+        BrandingPlaceholders,
+        PosLoginSystemName,
+        PosLoginDescription,
+        PosLoginSubtitleTemplate,
+        PosLoginBackgroundMode,
+        PosLoginBackgroundColor,
+        PosLoginBackgroundMediaAssetId,
+        PosLoginHeroMediaAssetId
     ];
 
     public static readonly IReadOnlyList<string> AllMvpKeys =
@@ -47,6 +61,13 @@ public static class TenantSettingKeys
         SecuritySessionPolicy,
         BrandingPlaceholders,
         InventoryStockBehaviour,
-        OnlineStoreDefaults
+        OnlineStoreDefaults,
+        PosLoginSystemName,
+        PosLoginDescription,
+        PosLoginSubtitleTemplate,
+        PosLoginBackgroundMode,
+        PosLoginBackgroundColor,
+        PosLoginBackgroundMediaAssetId,
+        PosLoginHeroMediaAssetId
     ];
 }

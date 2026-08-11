@@ -55,6 +55,7 @@ public sealed class DevicesController : ControllerBase
     [ProducesResponseType(typeof(CurrentDeviceResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ActivateDevice(
@@ -114,6 +115,7 @@ public sealed class DevicesController : ControllerBase
         {
             "device_context.not_found" => NotFound(CreateError(error)),
             "device_context.invalid_tenant_context" => Unauthorized(CreateError(error)),
+            "device_context.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "device_context.fingerprint_already_paired" => Conflict(CreateError(error)),
             "device_context.activation_code_used" => Conflict(CreateError(error)),
             _ => BadRequest(CreateError(error))
