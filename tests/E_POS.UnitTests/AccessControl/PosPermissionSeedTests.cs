@@ -238,6 +238,57 @@ public sealed class PosPermissionSeedTests
     }
 
     [Fact]
+    public void CustomerCreatePermission_IsActiveCanonicalNewSaleDefinition()
+    {
+        var createDefinitions = DevelopmentPosNewSalePermissionsSeedData.Definitions
+            .Where(definition => string.Equals(
+                definition.PermissionCode,
+                CustomerPermissions.Create,
+                StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Single(createDefinitions);
+        Assert.Equal(
+            DevelopmentPosCustomerCreatePermissionSeedData.PermissionId,
+            createDefinitions[0].Id);
+        Assert.Equal(
+            DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId,
+            createDefinitions[0].FeatureId);
+        Assert.Equal("create", createDefinitions[0].ActionType);
+    }
+
+    [Fact]
+    public void CashierPermissionAssignments_ContainCustomersViewAndCreateWithoutOverGrant()
+    {
+        var assignments = DevelopmentPosCashierPermissionAssignmentSeedData.PermissionCodes;
+
+        Assert.Contains(CustomerPermissions.View, assignments);
+        Assert.Contains(CustomerPermissions.Create, assignments);
+        Assert.Equal(1, assignments.Count(code => code == CustomerPermissions.Create));
+        Assert.DoesNotContain("customers.delete", assignments);
+        Assert.DoesNotContain("tenant.users.manage", assignments);
+        Assert.DoesNotContain("tenant.roles.manage", assignments);
+    }
+
+    [Fact]
+    public void RestorePosCustomerCreatePermissionSql_IsScopedAndIdempotencyAware()
+    {
+        var upSql = DevelopmentPosCustomerCreatePermissionSeedData.UpSql
+                    + Environment.NewLine
+                    + DevelopmentPosCustomerCreatePermissionSeedData.CashierAssignmentUpSql;
+
+        Assert.Contains("customers.create", upSql, StringComparison.Ordinal);
+        Assert.Contains(
+            DevelopmentPosCustomerCreatePermissionSeedData.PermissionId.ToString(),
+            upSql,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("WHERE NOT EXISTS", upSql, StringComparison.Ordinal);
+        Assert.Contains("ON CONFLICT DO NOTHING", upSql, StringComparison.Ordinal);
+        Assert.DoesNotContain("customers.update", upSql, StringComparison.Ordinal);
+        Assert.DoesNotContain("customers.delete", upSql, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PosPermissionSeedIds_AreUniqueAcrossCatalogues()
     {
         var allIds = DevelopmentPosNewSalePermissionsSeedData.Definitions

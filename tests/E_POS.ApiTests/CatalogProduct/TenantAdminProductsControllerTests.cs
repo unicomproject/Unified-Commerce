@@ -7,8 +7,6 @@ using E_POS.Application.Modules.Shared.Media.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
-using E_POS.Application.Modules.Tenant.Inventory.Contracts;
-using E_POS.Application.Modules.Tenant.Inventory.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -597,8 +595,11 @@ public sealed class TenantAdminProductsControllerTests
     {
         var controller = new TenantAdminProductsController(
             service,
+<<<<<<< HEAD
             new FakeTenantAdminInventoryService(),
             new FakeCatalogMediaService(),
+=======
+>>>>>>> origin/main
             new FakeTenantRequestContextFactory());
         controller.ControllerContext = new ControllerContext
         {
@@ -903,6 +904,7 @@ public sealed class TenantAdminProductsControllerTests
             Task.FromResult(SetupResult);
     }
 
+<<<<<<< HEAD
     private sealed class FakeTenantAdminInventoryService : ITenantAdminInventoryService
     {
         public Task<ApplicationResult<TenantAdminCurrentStockListResponse>> GetCurrentStockAsync(

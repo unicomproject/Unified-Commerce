@@ -41,6 +41,7 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
                     cancellationToken: cancellationToken);
             }
 
+<<<<<<< HEAD
             var blobClient = containerClient.GetBlobClient(storageKey);
             if (request.Content.CanSeek)
             {
@@ -65,7 +66,7 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
             return new MediaObjectUploadResult(
                 containerName,
                 storageKey,
-                ResolvePublicUrl(blobClient.Uri, storageKey));
+                ResolvePublicUrl(blobClient.Uri, containerName, storageKey));
         }
         catch (Exception)
         {
@@ -140,13 +141,36 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
         }
     }
 
-    private string ResolvePublicUrl(Uri blobUri, string storageKey)
+    private string ResolvePublicUrl(Uri blobUri, string containerName, string storageKey)
     {
         if (string.IsNullOrWhiteSpace(_options.PublicBaseUrl))
         {
             return blobUri.ToString();
         }
 
-        return $"{_options.PublicBaseUrl.TrimEnd('/')}/{storageKey.TrimStart('/')}";
+        var normalizedStorageKey = storageKey.Trim().Replace('\\', '/').Trim('/');
+        var normalizedContainerName = containerName.Trim().Replace('\\', '/').Trim('/');
+        var baseUrl = _options.PublicBaseUrl.Trim().TrimEnd('/');
+        var includeContainer = !string.IsNullOrWhiteSpace(normalizedContainerName) &&
+                               !normalizedStorageKey.StartsWith(
+                                   $"{normalizedContainerName}/",
+                                   StringComparison.OrdinalIgnoreCase) &&
+                               !BaseUrlAlreadyEndsWithContainer(baseUrl, normalizedContainerName);
+        var relativePath = includeContainer
+            ? $"{normalizedContainerName}/{normalizedStorageKey}"
+            : normalizedStorageKey;
+
+        return $"{baseUrl}/{relativePath}";
+    }
+
+    private static bool BaseUrlAlreadyEndsWithContainer(string baseUrl, string containerName)
+    {
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        var path = uri.AbsolutePath.Trim('/').Replace('\\', '/');
+        return string.Equals(path.Split('/').LastOrDefault(), containerName, StringComparison.OrdinalIgnoreCase);
     }
 }

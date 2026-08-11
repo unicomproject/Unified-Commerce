@@ -24,7 +24,7 @@ public sealed class PosDiscountServiceTests
     }
 
     [Fact]
-    public async Task Apply_WhenRequestedValueAboveCashierWithinPolicy_CreatesPendingApplication()
+    public async Task Apply_Manual_WhenRequestedValueAboveCashierLimit_RejectsWithoutPersistence()
     {
         var repository = new FakeDiscountRepository(maxPercentage: 10, absoluteLimit: 50);
         var service = CreateService(repository);
@@ -32,9 +32,9 @@ public sealed class PosDiscountServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.False(result.Value!.Applied);
-        Assert.Equal("pending_approval", result.Value.Status);
-        Assert.NotNull(repository.CreatedCommand);
-        Assert.True(repository.CreatedCommand!.RequiresManagerApproval);
+        Assert.Equal("rejected", result.Value.Status);
+        Assert.Null(repository.CreatedCommand);
+        Assert.Contains(result.Value.Messages, x => x.Contains("allowed limit", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -75,6 +75,37 @@ public sealed class PosDiscountServiceTests
         Assert.Equal("LINE", repository.CreatedCommand!.DiscountScope);
         Assert.Equal(variantId, repository.CreatedCommand.TargetVariantId);
         Assert.Equal("LINE", repository.LastRequestedManualScope);
+    }
+
+    [Fact]
+    public async Task Validate_Manual_WhenRequestedValueEqualsCashierLimit_DirectApplies()
+    {
+        var service = CreateService(maxPercentage: 10, absoluteLimit: 50);
+
+        var result = await service.ValidateAsync(
+            Context(SalesPermissions.Discount.Apply), Request(10), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsValid);
+        Assert.Equal("direct_apply", result.Value.Outcome);
+        Assert.False(result.Value.RequiresManagerApproval);
+    }
+
+    [Fact]
+    public async Task Validate_ManualLineFixed_ReturnsControlledCurrentReleaseRejection()
+    {
+        var service = CreateService(new FakeDiscountRepository(
+            maxPercentage: 10, absoluteLimit: 500, policyScope: "LINE"));
+        var variantId = Guid.NewGuid();
+
+        var result = await service.ValidateAsync(
+            Context(SalesPermissions.Discount.Apply),
+            ManualRequest(100, "LINE", "FIXED_AMOUNT", variantId,
+                [new PosCheckoutLineRequestDto(variantId, 1)]),
+            default);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("pos_discounts.item_fixed_not_allowed", result.Error.Code);
     }
 
     [Fact]

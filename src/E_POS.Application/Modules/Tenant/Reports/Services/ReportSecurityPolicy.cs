@@ -12,7 +12,7 @@ public static class ReportSecurityPolicy
         HasCustomerPii(permissions) ? phone : null;
 
     public static decimal? ProtectStockValue(decimal? value, IReadOnlyCollection<string> permissions) =>
-        permissions.Contains(TenantAdminStockPermissions.ValueView) ? value : null;
+        permissions.Contains(StockPermissions.ValueView) ? value : null;
 
     public static bool CanExport(IReadOnlyCollection<string> permissions, string sectionPermission) =>
         permissions.Contains(TenantAdminReportPermissions.Export) && permissions.Contains(sectionPermission);

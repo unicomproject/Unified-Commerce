@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Dtos;
 using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
@@ -17,10 +18,12 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
     private const string ActiveStatus = "ACTIVE";
     private const string DefaultWishlistName = "My Wishlist";
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public CustomerWishlistRepository(EPosDbContext dbContext)
+    public CustomerWishlistRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<CustomerWishlistRepositoryResult> GetAsync(
@@ -224,21 +227,44 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
                                select new
                                {
                                    Image = image,
+                                   MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                   MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                   MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
                                    MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                                })
             .ToListAsync(cancellationToken);
         var productImages = imageRows
-            .Where(x => !x.Image.ProductVariantId.HasValue)
+            .Where(x => x.MediaStatus == ActiveStatus &&
+                        !x.Image.ProductVariantId.HasValue &&
+                        (!string.IsNullOrWhiteSpace(x.MediaPublicUrl) || !string.IsNullOrWhiteSpace(x.MediaStorageKey)))
             .GroupBy(x => x.Image.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => x.First().MediaPublicUrl);
+                x =>
+                {
+                    var row = x.First();
+                    return ResolveActiveMediaReadUrl(
+                        row.MediaStatus,
+                        row.MediaContainerName,
+                        row.MediaStorageKey,
+                        row.MediaPublicUrl);
+                });
         var variantImages = imageRows
-            .Where(x => x.Image.ProductVariantId.HasValue)
+            .Where(x => x.MediaStatus == ActiveStatus &&
+                        x.Image.ProductVariantId.HasValue &&
+                        (!string.IsNullOrWhiteSpace(x.MediaPublicUrl) || !string.IsNullOrWhiteSpace(x.MediaStorageKey)))
             .GroupBy(x => x.Image.ProductVariantId!.Value)
             .ToDictionary(
                 x => x.Key,
-                x => x.First().MediaPublicUrl);
+                x =>
+                {
+                    var row = x.First();
+                    return ResolveActiveMediaReadUrl(
+                        row.MediaStatus,
+                        row.MediaContainerName,
+                        row.MediaStorageKey,
+                        row.MediaPublicUrl);
+                });
         var inventoryRows = await _dbContext.Set<InventoryBalance>()
             .AsNoTracking()
             .Where(x => x.TenantId == wishlist.TenantId && productIds.Contains(x.ProductId))
@@ -322,4 +348,16 @@ public sealed class CustomerWishlistRepository : ICustomerWishlistRepository
             .Where(x => x.Id == tenantId)
             .Select(x => x.BaseCurrencyCode)
             .FirstOrDefaultAsync(cancellationToken) ?? "LKR";
+
+    private string? ResolveActiveMediaReadUrl(
+        string? mediaStatus,
+        string? containerName,
+        string? storageKey,
+        string? mediaPublicUrl)
+    {
+        return mediaStatus == ActiveStatus
+            ? _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, mediaPublicUrl)
+              ?? mediaPublicUrl?.Trim()
+            : null;
+    }
 }

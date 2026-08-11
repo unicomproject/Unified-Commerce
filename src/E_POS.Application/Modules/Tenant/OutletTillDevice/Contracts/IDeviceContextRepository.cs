@@ -38,6 +38,7 @@ public sealed record DeviceActivationRepositoryResult(
 
 public sealed record CurrentDeviceDbSnapshot(
     Guid TenantId,
+    string TenantSlug,
     Guid DeviceId,
     string DeviceCode,
     string DeviceName,

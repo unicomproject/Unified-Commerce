@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Application.Modules.Shared.Media;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
@@ -14,9 +15,12 @@ public abstract class CustomerOrderRepositoryBase
     protected const string ActiveStatus = "ACTIVE";
     protected const string ClickAndCollectOrderType = "CLICK_AND_COLLECT";
 
-    protected CustomerOrderRepositoryBase(EPosDbContext dbContext)
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
+
+    protected CustomerOrderRepositoryBase(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         DbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     protected EPosDbContext DbContext { get; }
@@ -68,16 +72,39 @@ public abstract class CustomerOrderRepositoryBase
                             {
                                 Image = image,
                                 MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
                                 MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
                             })
             .ToListAsync(cancellationToken);
 
         return images
-            .Where(x => x.MediaStatus == ActiveStatus && !string.IsNullOrWhiteSpace(x.MediaPublicUrl))
+            .Where(x => x.MediaStatus == ActiveStatus &&
+                        (!string.IsNullOrWhiteSpace(x.MediaPublicUrl) || !string.IsNullOrWhiteSpace(x.MediaStorageKey)))
             .GroupBy(x => x.Image.ProductId)
             .ToDictionary(
                 x => x.Key,
-                x => (string?)x.First().MediaPublicUrl);
+                x =>
+                {
+                    var row = x.First();
+                    return ResolveActiveMediaReadUrl(
+                        row.MediaStatus,
+                        row.MediaContainerName,
+                        row.MediaStorageKey,
+                        row.MediaPublicUrl);
+                });
+    }
+
+    private string? ResolveActiveMediaReadUrl(
+        string? mediaStatus,
+        string? containerName,
+        string? storageKey,
+        string? mediaPublicUrl)
+    {
+        return mediaStatus == ActiveStatus
+            ? _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, mediaPublicUrl)
+              ?? mediaPublicUrl?.Trim()
+            : null;
     }
 
     protected static CustomerOrderSummaryReadModel BuildSummary(

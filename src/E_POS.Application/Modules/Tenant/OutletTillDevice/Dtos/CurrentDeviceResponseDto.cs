@@ -2,6 +2,7 @@ namespace E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos;
 
 public sealed record CurrentDeviceResponseDto(
     Guid TenantId,
+    string TenantSlug,
     CurrentDeviceDeviceDto Device,
     CurrentDeviceOutletDto Outlet,
     CurrentDeviceTillDto Till);

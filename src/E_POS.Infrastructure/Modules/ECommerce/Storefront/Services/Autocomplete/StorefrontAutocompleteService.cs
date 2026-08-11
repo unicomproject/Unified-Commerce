@@ -8,6 +8,7 @@ using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 
 namespace E_POS.Infrastructure.Modules.ECommerce.Storefront.Services.Autocomplete;
 
@@ -96,6 +97,7 @@ public sealed class StorefrontAutocompleteService : IStorefrontAutocompleteServi
     {
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<EPosDbContext>();
+        var mediaReadUrlResolver = scope.ServiceProvider.GetService<IMediaReadUrlResolver>();
 
         try
         {

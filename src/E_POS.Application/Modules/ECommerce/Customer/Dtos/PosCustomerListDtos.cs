@@ -47,7 +47,8 @@ public sealed record PosCustomerOrderItemDto(
     decimal TotalAmount,
     string CurrencyCode,
     string Status,
-    string? OutletDisplayName);
+    string? OutletDisplayName,
+    string? TillName = null);
 
 public sealed record PosCustomerOrdersResponseDto(
     IReadOnlyList<PosCustomerOrderItemDto> Items,

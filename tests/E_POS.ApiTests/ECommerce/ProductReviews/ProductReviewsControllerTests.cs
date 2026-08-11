@@ -27,7 +27,7 @@ public sealed class ProductReviewsControllerTests
         var controller = CreateController(service);
 
         var result = await controller.GetReviews(
-            tenantId, productId, 2, 15, "highest", CancellationToken.None);
+            tenantId, productId, 2, 15, "highest", null, CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
         Assert.Equal(tenantId, service.TenantId);
@@ -188,7 +188,7 @@ public sealed class ProductReviewsControllerTests
 
         public Task<ApplicationResult<ProductReviewsPageReadModel>> GetAsync(
             Guid tenantId, Guid? customerId, Guid productId, int page, int pageSize, string? sort,
-            CancellationToken cancellationToken)
+            int? rating, CancellationToken cancellationToken)
         {
             Capture(tenantId, customerId, productId);
             Page = page;

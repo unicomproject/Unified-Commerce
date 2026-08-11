@@ -219,38 +219,6 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToActionResult(result);
     }
 
-    [HttpGet("{productId:guid}/variants")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetVariants(
-        Guid productId,
-        CancellationToken cancellationToken = default)
-    {
-        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
-        {
-            return Unauthorized(CreateError(new ApplicationError(
-                "product.invalid_tenant_context",
-                "Invalid tenant context.")));
-        }
-
-        var result = await _tenantAdminInventoryService.GetProductVariantsForStockInAsync(
-            context,
-            productId,
-            cancellationToken);
-
-        if (result.IsFailure)
-        {
-            return result.Error.Code switch
-            {
-                "inventory.permission_denied" => StatusCode(
-                    StatusCodes.Status403Forbidden,
-                    CreateError(result.Error)),
-                "inventory.not_found" => NotFound(CreateError(result.Error)),
-                _ => BadRequest(CreateError(result.Error)),
-            };
-        }
-
-        return Ok(new { data = result.Value });
-    }
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]

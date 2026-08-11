@@ -30,5 +30,11 @@ public class TenantSetting : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void UpdateValue(string settingValue, DateTimeOffset now)
+    {
+        SettingValue = settingValue.Trim();
+        UpdatedAt = now;
+    }
 }
 

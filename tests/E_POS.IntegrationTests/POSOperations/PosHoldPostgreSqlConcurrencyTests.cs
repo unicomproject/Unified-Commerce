@@ -203,6 +203,7 @@ public sealed class PosHoldPostgreSqlConcurrencyTests
     private static async Task SeedFixtureAsync(HoldFixtureIds ids)
     {
         await using var db = CreateDb();
+        await db.Database.MigrateAsync();
 
         if (!await db.Currencies.AnyAsync(x => x.CurrencyCode == "LKR"))
         {
