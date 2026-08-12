@@ -108,6 +108,21 @@ public interface IPlatformTenantBootstrapRepository
         DateTimeOffset now,
         string? requestHash,
         CancellationToken cancellationToken);
+
+    Task<string?> GetOnlineStoreDefaultsJsonAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task UpsertOnlineStoreDefaultsAsync(
+        Guid tenantId,
+        string defaultsJson,
+        Guid? platformUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<bool> HasClickCollectCollectionConfiguredAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
 }
 
 public sealed record PlatformTenantBootstrapIdempotencyRecordLookup(
@@ -186,5 +201,17 @@ public interface IPlatformTenantBootstrapService
         Guid tenantId,
         Guid platformUserId,
         Guid importId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> GetOnlineStoreAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> UpsertOnlineStoreAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        PlatformTenantBootstrapOnlineStoreUpsertRequest request,
+        string idempotencyKey,
         CancellationToken cancellationToken);
 }

@@ -51,7 +51,7 @@ public sealed class PlatformAdminPermissionCatalogControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<LegacyApiResponse<PlatformPermissionFlatResponse>>(ok.Value);
         Assert.True(payload.Success);
-        Assert.Equal(44, payload.Data.TotalCount);
+        Assert.Equal(45, payload.Data.TotalCount);
         Assert.Contains(payload.Data.Permissions, p => p.Code == "platform.tenant_subscriptions.view");
     }
 

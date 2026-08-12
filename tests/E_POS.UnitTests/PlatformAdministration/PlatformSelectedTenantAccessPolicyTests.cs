@@ -189,6 +189,20 @@ public sealed class PlatformSelectedTenantAccessPolicyTests
             string? requestHash,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
+
+        public Task<string?> GetOnlineStoreDefaultsJsonAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>(null);
+
+        public Task UpsertOnlineStoreDefaultsAsync(
+            Guid tenantId,
+            string defaultsJson,
+            Guid? platformUserId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<bool> HasClickCollectCollectionConfiguredAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
     }
 
     private sealed class AllowAllPermissionChecker : IPlatformPermissionChecker

@@ -276,6 +276,45 @@ public sealed class PlatformTenantBootstrapController : ControllerBase
         return File(result.Value!, "text/csv", $"bootstrap-import-{importId:N}-errors.csv");
     }
 
+    [HttpGet("online-store")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantBootstrapOnlineStoreResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOnlineStore(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError("platform_auth.invalid_session", "Invalid platform session.")));
+        }
+
+        var result = await _bootstrapService.GetOnlineStoreAsync(tenantId, platformUserId, cancellationToken);
+        return ToActionResult(result, "Selected-tenant online store bootstrap loaded successfully.");
+    }
+
+    [HttpPut("online-store")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantBootstrapOnlineStoreResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpsertOnlineStore(
+        Guid tenantId,
+        [FromBody] PlatformTenantBootstrapOnlineStoreUpsertRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError("platform_auth.invalid_session", "Invalid platform session.")));
+        }
+
+        if (!TryGetRequiredIdempotencyKey(out var idempotencyKey, out var missingKeyResult))
+        {
+            return missingKeyResult!;
+        }
+
+        var result = await _bootstrapService.UpsertOnlineStoreAsync(
+            tenantId,
+            platformUserId,
+            request,
+            idempotencyKey,
+            cancellationToken);
+        return ToActionResult(result, "Bootstrap online store saved successfully.");
+    }
+
     private IActionResult ToActionResult<T>(ApplicationResult<T> result, string successMessage)
     {
         if (result.IsSuccess && result.Value is not null)

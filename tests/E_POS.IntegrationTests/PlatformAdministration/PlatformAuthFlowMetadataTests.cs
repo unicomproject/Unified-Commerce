@@ -230,7 +230,7 @@ public sealed class PlatformAuthFlowMetadataTests
         Assert.NotNull(login.Value);
         Assert.False(string.IsNullOrWhiteSpace(login.Value!.AccessToken));
         Assert.False(string.IsNullOrWhiteSpace(login.Value.RefreshToken));
-        Assert.Equal(44, login.Value.Permissions.Count);
+        Assert.Equal(45, login.Value.Permissions.Count);
         Assert.Equal(PlatformAdminSeedConstants.DevelopmentPlatformUserId, login.Value.User.Id);
         Assert.Equal(DevelopmentPlatformAdminSeedData.Email, login.Value.User.Email);
         Assert.Equal(PlatformAuthConstants.ActiveStatus, login.Value.User.Status);

@@ -7,6 +7,8 @@ using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -247,6 +249,79 @@ public sealed class PlatformTenantBootstrapRepository : IPlatformTenantBootstrap
         await _dbContext.PlatformTenantBootstrapIdempotencyRecords.AddAsync(record, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<string?> GetOnlineStoreDefaultsJsonAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return await (
+            from setting in _dbContext.TenantSettings.AsNoTracking()
+            join definition in _dbContext.SettingDefinitions.AsNoTracking()
+                on setting.SettingDefinitionId equals definition.Id
+            where setting.TenantId == tenantId &&
+                  (definition.SettingKey == TenantSettingKeys.OnlineStoreDefaults ||
+                   definition.Id == TenantSettingDefinitionSeed.OnlineStoreDefaultsId)
+            select setting.SettingValue)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task UpsertOnlineStoreDefaultsAsync(
+        Guid tenantId,
+        string defaultsJson,
+        Guid? platformUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var definitionId = await _dbContext.SettingDefinitions
+            .AsNoTracking()
+            .Where(definition =>
+                definition.SettingKey == TenantSettingKeys.OnlineStoreDefaults ||
+                definition.Id == TenantSettingDefinitionSeed.OnlineStoreDefaultsId)
+            .Select(definition => (Guid?)definition.Id)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? TenantSettingDefinitionSeed.OnlineStoreDefaultsId;
+
+        var existing = await _dbContext.TenantSettings
+            .FirstOrDefaultAsync(
+                setting => setting.TenantId == tenantId && setting.SettingDefinitionId == definitionId,
+                cancellationToken);
+
+        if (existing is not null)
+        {
+            existing.UpdateValue(defaultsJson, now);
+        }
+        else
+        {
+            await _dbContext.TenantSettings.AddAsync(
+                TenantSetting.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    definitionId,
+                    defaultsJson,
+                    platformUserId,
+                    now),
+                cancellationToken);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<bool> HasClickCollectCollectionConfiguredAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken) =>
+        (
+            from mapping in _dbContext.FulfillmentMethodOutlets.AsNoTracking()
+            join method in _dbContext.FulfillmentMethods.AsNoTracking()
+                on mapping.FulfillmentMethodId equals method.Id
+            join outlet in _dbContext.Outlets.AsNoTracking()
+                on mapping.OutletId equals outlet.Id
+            where outlet.TenantId == tenantId &&
+                  method.TenantId == tenantId &&
+                  mapping.Status == OutletConstants.ActiveStatus &&
+                  method.Status == OutletConstants.ActiveStatus &&
+                  method.MethodType == OutletConstants.PickupMethodType
+            select mapping.Id)
+            .AnyAsync(cancellationToken);
 
     public async Task<Guid?> ResolveBrandIdByCodeAsync(
         Guid tenantId,

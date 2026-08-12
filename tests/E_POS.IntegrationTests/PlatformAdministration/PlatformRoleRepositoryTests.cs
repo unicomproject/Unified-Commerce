@@ -28,7 +28,7 @@ public sealed class PlatformRoleRepositoryTests
             role.RoleCode == PlatformRoleCodes.SuperAdministrator);
 
         Assert.Equal(PlatformAdminSeedConstants.SuperAdministratorRoleId, superAdmin.Id);
-        Assert.Equal(44, superAdmin.PermissionCount);
+        Assert.Equal(45, superAdmin.PermissionCount);
         Assert.True(superAdmin.IsProtected);
         Assert.True(superAdmin.IsSystem);
     }
@@ -116,7 +116,7 @@ public sealed class PlatformRoleRepositoryTests
     }
 
     [Fact]
-    public async Task GetActiveBusinessPermissionIdMapAsync_ReturnsFortyFourBusinessPermissions()
+    public async Task GetActiveBusinessPermissionIdMapAsync_ReturnsFortyFiveBusinessPermissions()
     {
         await using var dbContext = CreateDbContext();
         await PlatformAdminPermissionSeedApplicator.ApplyAsync(dbContext, Now);
@@ -125,7 +125,7 @@ public sealed class PlatformRoleRepositoryTests
 
         var permissionMap = await repository.GetActiveBusinessPermissionIdMapAsync(CancellationToken.None);
 
-        Assert.Equal(44, permissionMap.Count);
+        Assert.Equal(45, permissionMap.Count);
         Assert.Equal(
             PlatformPermissionCodes.All.OrderBy(x => x, StringComparer.Ordinal),
             permissionMap.Keys.OrderBy(x => x, StringComparer.Ordinal));

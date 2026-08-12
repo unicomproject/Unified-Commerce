@@ -126,3 +126,17 @@ public sealed record PlatformTenantBootstrapProductImportCommitResponse(
     Guid ImportId,
     int CommittedRows,
     int SkippedRows);
+
+public sealed class PlatformTenantBootstrapOnlineStoreUpsertRequest
+{
+    public string StoreStatus { get; set; } = string.Empty;
+    public string? TaxDisplayMode { get; set; }
+}
+
+public sealed record PlatformTenantBootstrapOnlineStoreResponse(
+    bool Entitled,
+    string StoreStatus,
+    string TaxDisplayMode,
+    bool ClickCollectEntitled,
+    bool ClickCollectConfigured,
+    string? DependencyNotice);

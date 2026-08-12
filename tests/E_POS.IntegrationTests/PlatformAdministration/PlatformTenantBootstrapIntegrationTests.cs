@@ -76,7 +76,8 @@ public sealed class PlatformTenantBootstrapIntegrationTests
         Assert.Contains(PlatformPermissionCodes.TenantsBootstrapUsersManage, codes);
         Assert.Contains(PlatformPermissionCodes.TenantsBootstrapProductsManage, codes);
         Assert.Contains(PlatformPermissionCodes.TenantsBootstrapProductsImport, codes);
-        Assert.Equal(7, codes.Count);
+        Assert.Contains(PlatformPermissionCodes.TenantsBootstrapOnlineStoreManage, codes);
+        Assert.Equal(8, codes.Count);
 
         var tenantsView = await dbContext.PlatformPermissions
             .AsNoTracking()
@@ -96,7 +97,7 @@ public sealed class PlatformTenantBootstrapIntegrationTests
             select permission.PermissionCode).ToListAsync();
 
         Assert.Contains(PlatformPermissionCodes.TenantsView, grantedCodes);
-        Assert.Equal(8, grantedCodes.Count);
+        Assert.Equal(9, grantedCodes.Count);
     }
 
     [Fact]

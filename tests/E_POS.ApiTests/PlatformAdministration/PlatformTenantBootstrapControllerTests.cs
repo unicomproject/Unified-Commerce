@@ -213,12 +213,71 @@ public sealed class PlatformTenantBootstrapControllerTests
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
 
+    [Fact]
+    public async Task GetOnlineStore_WithSuccess_ReturnsOk()
+    {
+        var response = new PlatformTenantBootstrapOnlineStoreResponse(
+            true, "DRAFT", "MATCH_TENANT", false, false, null);
+        var controller = CreateController(new FakeBootstrapService
+        {
+            OnlineStoreResult = ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Success(response)
+        });
+        SetPlatformClaims(controller);
+
+        var result = await controller.GetOnlineStore(TenantId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var payload = Assert.IsType<LegacyApiResponse<PlatformTenantBootstrapOnlineStoreResponse>>(ok.Value);
+        Assert.True(payload.Success);
+        Assert.Same(response, payload.Data);
+    }
+
+    [Fact]
+    public async Task UpsertOnlineStore_WithSuccess_ReturnsOk()
+    {
+        var response = new PlatformTenantBootstrapOnlineStoreResponse(
+            true, "ACTIVE", "MATCH_TENANT", true, false,
+            "Click & Collect is entitled but collection points are not configured yet. That remains a Tenant Admin task. Online Store readiness can still be saved.");
+        var service = new FakeBootstrapService
+        {
+            OnlineStoreResult = ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Success(response)
+        };
+        var controller = CreateController(service);
+        SetPlatformClaims(controller);
+        controller.Request.Headers["Idempotency-Key"] = "os-key-1";
+
+        var result = await controller.UpsertOnlineStore(
+            TenantId,
+            new PlatformTenantBootstrapOnlineStoreUpsertRequest { StoreStatus = "ACTIVE" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal("os-key-1", service.LastIdempotencyKey);
+        var payload = Assert.IsType<LegacyApiResponse<PlatformTenantBootstrapOnlineStoreResponse>>(ok.Value);
+        Assert.True(payload.Success);
+    }
+
+    [Fact]
+    public async Task UpsertOnlineStore_WithoutIdempotencyKey_ReturnsBadRequest()
+    {
+        var controller = CreateController(new FakeBootstrapService());
+        SetPlatformClaims(controller);
+
+        var result = await controller.UpsertOnlineStore(
+            TenantId,
+            new PlatformTenantBootstrapOnlineStoreUpsertRequest { StoreStatus = "ACTIVE" },
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
     private static PlatformTenantBootstrapSummaryResponse CreateSummary() =>
         new(
             new PlatformTenantBootstrapTenantSummaryDto(TenantId, "Tenant", "TEN-001", "ACTIVE", "Starter"),
             PlatformSelectedTenantSetupHubStatusEvaluator.Evaluate(
                 new PlatformSelectedTenantSetupHubStatusEvaluator.Input(
-                    true, true, true, 0, 0, 0, 1, 0, false, true, true, true, true, true)));
+                    true, true, true, 0, 0, 0, 1, 0, false, true, true, true, true, true,
+                    OnlineStoreEntitled: false, OnlineStoreStatus: null, CanManageOnlineStore: false)));
 
     private static PlatformTenantBootstrapController CreateController(FakeBootstrapService service)
     {
@@ -246,6 +305,7 @@ public sealed class PlatformTenantBootstrapControllerTests
         public ApplicationResult<PlatformTenantBootstrapRoleResponse>? RoleResult { get; init; }
         public ApplicationResult<PlatformTenantBootstrapUserResponse>? UserResult { get; init; }
         public ApplicationResult<PlatformTenantBootstrapProductResponse>? ProductResult { get; init; }
+        public ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>? OnlineStoreResult { get; init; }
 
         public string? LastIdempotencyKey { get; private set; }
 
@@ -346,5 +406,24 @@ public sealed class PlatformTenantBootstrapControllerTests
             Guid importId,
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<byte[]>.Success([]));
+
+        public Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> GetOnlineStoreAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OnlineStoreResult ?? ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Failure(
+                new ApplicationError("platform_tenants.bootstrap.not_entitled", "Tenant is not entitled for this bootstrap module.")));
+
+        public Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> UpsertOnlineStoreAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            PlatformTenantBootstrapOnlineStoreUpsertRequest request,
+            string idempotencyKey,
+            CancellationToken cancellationToken)
+        {
+            LastIdempotencyKey = idempotencyKey;
+            return Task.FromResult(OnlineStoreResult ?? ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Failure(
+                new ApplicationError("platform_tenants.validation_failed", "Validation failed.")));
+        }
     }
 }
