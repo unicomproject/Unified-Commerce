@@ -63,7 +63,7 @@ public sealed class GlobalExceptionHandlingMiddleware
         {
             code = mapped.Code,
             message = mapped.Message,
-            details = new[] { exception.ToString() },
+            details = Array.Empty<string>(),
             traceId = context.TraceIdentifier,
             timestamp = DateTimeOffset.UtcNow
         };
