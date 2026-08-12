@@ -6,17 +6,17 @@ using E_POS.Application.Common.Idempotency;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Shared.Audit.Entities;
+using E_POS.Domain.Modules.Shared.Integration.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
-using E_POS.Domain.Modules.Shared.Audit.Entities;
-using E_POS.Domain.Modules.Shared.Integration.Entities;
-using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
-using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 
 namespace E_POS.Application.Modules.Tenant.AccessControl.Services;
 
@@ -296,7 +296,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
 
             var rawToken = _invitationTokenService.GenerateToken();
             var protectedToken = _deliverySecretProtector.Value.Protect(rawToken);
-
+            var inviteTokenHash = _invitationTokenService.HashToken(rawToken);
             invite = UserInvite.CreatePending(
                 Guid.NewGuid(),
                 context.TenantId,
@@ -304,7 +304,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 normalizedEmail,
                 request.RoleId,
                 null,
-                _invitationTokenService.HashToken(rawToken),
+                inviteTokenHash,
                 now.AddDays(7),
                 now,
                 userId);

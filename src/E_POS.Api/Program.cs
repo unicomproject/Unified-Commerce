@@ -169,6 +169,8 @@ app.UseMiddleware<PaymentAccessRequestRedactionMiddleware>();
 // Convert unexpected runtime failures into safe standard API errors.
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+
 app.UseCors("AllowAll");
 app.UseStaticFiles();
 

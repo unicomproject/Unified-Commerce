@@ -8,6 +8,8 @@ public static class InventoryConstants
     public const string StockMovementPrefix = "SM";
     public const int StockMovementPadding = 6;
     public const string StockReceiptReferenceType = "STOCK_IN_RECEIPT";
+    public const string OpeningStockReason = "OPENING_STOCK";
+    public const string ProductOpeningStockReferenceType = "PRODUCT_OPENING_STOCK";
     public const string CostLayerActiveStatus = "ACTIVE";
     public const string StockInCompletedStatus = "COMPLETED";
 

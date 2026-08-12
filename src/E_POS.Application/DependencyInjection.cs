@@ -1,3 +1,5 @@
+using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Services;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Services;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
@@ -63,11 +65,14 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddScoped<IRequestCorrelationAccessor, RequestCorrelationAccessor>();
         services.AddScoped<IPlatformAuthRequestValidator, PlatformAuthRequestValidator>();
         services.AddScoped<IPlatformAuthService, PlatformAuthService>();
         services.AddScoped<IPlatformPermissionChecker, PlatformPermissionChecker>();
         services.AddScoped<IPlatformDashboardService, PlatformDashboardService>();
         services.AddScoped<IPlatformTenantService, PlatformTenantService>();
+        services.AddScoped<PlatformSelectedTenantAccessPolicy>();
+        services.AddScoped<IPlatformTenantBootstrapService, PlatformTenantBootstrapService>();
         services.AddScoped<IPlatformTenantOnboardingService, PlatformTenantOnboardingService>();
         services.AddScoped<IPlatformPermissionCatalogService, PlatformPermissionCatalogService>();
         services.AddScoped<IPlatformModulesCatalogService, PlatformModulesCatalogService>();

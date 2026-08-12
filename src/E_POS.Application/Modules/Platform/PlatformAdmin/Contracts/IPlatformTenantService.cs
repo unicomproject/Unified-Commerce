@@ -107,6 +107,20 @@ public interface IPlatformTenantRepository
         string? reason,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+
+    Task AddAuditLogAsync(
+        Guid tenantId,
+        Guid? platformUserId,
+        string action,
+        string summary,
+        string? reason,
+        DateTimeOffset now,
+        string? entityType,
+        Guid? entityId,
+        object? before,
+        object? after,
+        string? correlationId,
+        CancellationToken cancellationToken);
 }
 
 public interface IPlatformTenantService

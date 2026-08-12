@@ -50,6 +50,9 @@ public sealed class EPosDbContext : DbContext
     public DbSet<PlatformSalesChannel> PlatformSalesChannels => Set<PlatformSalesChannel>();
     public DbSet<PlatformTenantOnboardingDraft> PlatformTenantOnboardingDrafts => Set<PlatformTenantOnboardingDraft>();
     public DbSet<PlatformTenantOnboardingOperation> PlatformTenantOnboardingOperations => Set<PlatformTenantOnboardingOperation>();
+    public DbSet<PlatformTenantBootstrapProductImportBatch> PlatformTenantBootstrapProductImportBatches => Set<PlatformTenantBootstrapProductImportBatch>();
+    public DbSet<PlatformTenantBootstrapProductImportRow> PlatformTenantBootstrapProductImportRows => Set<PlatformTenantBootstrapProductImportRow>();
+    public DbSet<PlatformTenantBootstrapIdempotencyRecord> PlatformTenantBootstrapIdempotencyRecords => Set<PlatformTenantBootstrapIdempotencyRecord>();
 
     // Tenant Foundation
     public DbSet<BusinessType> BusinessTypes => Set<BusinessType>();

@@ -22,7 +22,7 @@ public sealed class PlatformPermissionCatalogServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(14, result.Value!.Modules.Count);
-        Assert.Equal(37, CountPermissions(result.Value));
+        Assert.Equal(44, CountPermissions(result.Value));
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public sealed class PlatformPermissionCatalogServiceTests
         var result = await service.GetFlatCatalogAsync(Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(37, result.Value!.TotalCount);
+        Assert.Equal(44, result.Value!.TotalCount);
     }
 
     [Fact]

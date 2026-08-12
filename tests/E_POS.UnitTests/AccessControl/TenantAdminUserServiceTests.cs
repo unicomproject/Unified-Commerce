@@ -274,6 +274,8 @@ public sealed class TenantAdminUserServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(repository.CreatedInvite);
+        Assert.Equal("hash-value-1", repository.CreatedInvite!.InviteTokenHash);
+        Assert.NotEqual("raw-token", repository.CreatedInvite.InviteTokenHash);
         Assert.Equal(TenantUserConstants.StatusInvited, repository.CreatedUser?.AccountStatus);
         Assert.Equal(repository.CreatedUser?.Id, repository.CreatedInvite?.TenantUserId);
         Assert.Equal("USR-2026-00001", repository.CreatedUser?.StaffCode);

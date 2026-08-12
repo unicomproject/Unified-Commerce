@@ -293,6 +293,33 @@ public sealed class PlatformTenantServiceTests
             string? reason,
             DateTimeOffset now,
             CancellationToken cancellationToken) =>
+            AddAuditLogAsync(
+                tenantId,
+                platformUserId,
+                action,
+                summary,
+                reason,
+                now,
+                null,
+                null,
+                null,
+                null,
+                null,
+                cancellationToken);
+
+        public Task AddAuditLogAsync(
+            Guid tenantId,
+            Guid? platformUserId,
+            string action,
+            string summary,
+            string? reason,
+            DateTimeOffset now,
+            string? entityType,
+            Guid? entityId,
+            object? before,
+            object? after,
+            string? correlationId,
+            CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
         public Task<PlatformTenantListResponse> GetTenantsAsync(
@@ -523,6 +550,33 @@ public sealed class PlatformTenantServiceTests
             string summary,
             string? reason,
             DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            AddAuditLogAsync(
+                tenantId,
+                platformUserId,
+                action,
+                summary,
+                reason,
+                now,
+                null,
+                null,
+                null,
+                null,
+                null,
+                cancellationToken);
+
+        public Task AddAuditLogAsync(
+            Guid tenantId,
+            Guid? platformUserId,
+            string action,
+            string summary,
+            string? reason,
+            DateTimeOffset now,
+            string? entityType,
+            Guid? entityId,
+            object? before,
+            object? after,
+            string? correlationId,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
     }

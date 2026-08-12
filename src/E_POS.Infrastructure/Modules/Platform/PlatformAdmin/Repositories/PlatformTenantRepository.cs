@@ -966,6 +966,28 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         string SubscriptionStatus,
         DateTimeOffset CreatedAt);
 
+    public Task AddAuditLogAsync(
+        Guid tenantId,
+        Guid? platformUserId,
+        string action,
+        string summary,
+        string? reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        AddAuditLogAsync(
+            tenantId,
+            platformUserId,
+            action,
+            summary,
+            reason,
+            now,
+            entityType: null,
+            entityId: null,
+            before: null,
+            after: null,
+            correlationId: null,
+            cancellationToken);
+
     public async Task AddAuditLogAsync(
         Guid tenantId,
         Guid? platformUserId,
@@ -973,6 +995,11 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         string summary,
         string? reason,
         DateTimeOffset now,
+        string? entityType,
+        Guid? entityId,
+        object? before,
+        object? after,
+        string? correlationId,
         CancellationToken cancellationToken)
     {
         var subscription = await _dbContext.TenantSubscriptions.AsNoTracking()
@@ -983,6 +1010,18 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .Where(x => x.TenantId == tenantId)
             .CountAsync(cancellationToken) + 1;
 
+        var changeData = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            summary,
+            entityType,
+            entityId = entityId?.ToString(),
+            before,
+            after,
+            correlationId,
+            actorPlatformUserId = platformUserId?.ToString(),
+            selectedTenantId = tenantId.ToString()
+        });
+
         var history = TenantSubscriptionHistory.CreateEvent(
             Guid.NewGuid(),
             tenantId,
@@ -991,7 +1030,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             action,
             now,
             reason: reason ?? summary,
-            changeData: summary,
+            changeData: changeData,
             changedByPlatformUserId: platformUserId);
 
         _dbContext.TenantSubscriptionHistory.Add(history);
