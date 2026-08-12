@@ -122,6 +122,69 @@ public sealed class TenantAdminInvitationAcceptanceServiceTests
         Assert.Equal(TenantAdminInvitationAcceptanceService.ErrorInviteUsed, result.Error.Code);
     }
 
+    [Fact]
+    public async Task SetupPassword_RevokedInvite_Fails()
+    {
+        var sut = CreateSut(out var repo, out var tokens, out _);
+        tokens.Hash = "revoked";
+        var claim = CreateClaim(expiresAt: Now.AddHours(2));
+        claim.Invite.Revoke(Now.AddMinutes(-1));
+        repo.Claim = claim;
+
+        var result = await sut.SetupPasswordAsync(
+            new SetupTenantAdminPasswordRequest("raw", "Password1", "Password1"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TenantAdminInvitationAcceptanceService.ErrorInviteCancelled, result.Error.Code);
+        Assert.Equal(TenantUserConstants.StatusInvited, claim.User.AccountStatus);
+    }
+
+    [Fact]
+    public async Task SetupPassword_ExpiredInvite_Fails()
+    {
+        var sut = CreateSut(out var repo, out var tokens, out _);
+        tokens.Hash = "expired";
+        var claim = CreateClaim(expiresAt: Now.AddMinutes(-1));
+        repo.Claim = claim;
+
+        var result = await sut.SetupPasswordAsync(
+            new SetupTenantAdminPasswordRequest("raw", "Password1", "Password1"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TenantAdminInvitationAcceptanceService.ErrorInviteExpired, result.Error.Code);
+        Assert.Equal(TenantUserConstants.StatusInvited, claim.User.AccountStatus);
+    }
+
+    [Fact]
+    public async Task SetupPassword_ResentOldTokenFailsButNewTokenAccepts()
+    {
+        var sut = CreateSut(out var repo, out var tokens, out _);
+        var oldClaim = CreateClaim(expiresAt: Now.AddHours(2));
+        oldClaim.Invite.Revoke(Now.AddMinutes(-1));
+        tokens.Hash = "old-token-hash";
+        repo.Claim = oldClaim;
+
+        var oldResult = await sut.SetupPasswordAsync(
+            new SetupTenantAdminPasswordRequest("old-token", "Password1", "Password1"),
+            CancellationToken.None);
+
+        var newClaim = CreateClaim(expiresAt: Now.AddHours(2));
+        tokens.Hash = "new-token-hash";
+        repo.Claim = newClaim;
+
+        var newResult = await sut.SetupPasswordAsync(
+            new SetupTenantAdminPasswordRequest("new-token", "Password1", "Password1"),
+            CancellationToken.None);
+
+        Assert.True(oldResult.IsFailure);
+        Assert.Equal(TenantAdminInvitationAcceptanceService.ErrorInviteCancelled, oldResult.Error.Code);
+        Assert.True(newResult.IsSuccess);
+        Assert.Equal(UserInviteConstants.StatusAccepted, newClaim.Invite.InviteStatus);
+        Assert.Equal(TenantUserConstants.StatusActive, newClaim.User.AccountStatus);
+    }
+
     private static TenantAdminInvitationAcceptanceService CreateSut(
         out FakeRepo repo,
         out FakeTokens tokens,
@@ -164,7 +227,7 @@ public sealed class TenantAdminInvitationAcceptanceServiceTests
             Guid.NewGuid(), tenantId, "admin@example.test", "ADMIN@EXAMPLE.TEST",
             null, null, "h1", expiresAt, Now);
         invite.MarkSent(Now);
-        var user = TenantUser.CreatePendingInvite(userId, tenantId, "admin@example.test", "Admin", null, null, Now);
+        var user = TenantUser.CreatePendingInvite(userId, tenantId, "admin@example.test", "Admin", null, null, Now, "USR-2026-99401");
         var tenant = Tenant.Create(tenantId, "T1", "t1", "Demo", TenantStatusConstants.Active, "LKR", "Asia/Colombo", null, null, Now);
         return new TenantAdminInvitationAcceptanceClaim
         {

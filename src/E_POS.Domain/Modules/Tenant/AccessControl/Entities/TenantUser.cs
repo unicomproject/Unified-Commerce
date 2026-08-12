@@ -15,7 +15,9 @@ public class TenantUser : AuditableEntity
     public string? DisplayName { get; protected set; }
     public Guid? ProfileImageUrl { get; protected set; }
     public Guid? OutletId { get; protected set; }
-    public string DefaultOutletId { get; protected set; } = string.Empty;
+    public string? DefaultOutletId { get; protected set; }
+    public string? EmployeeId { get; protected set; }
+    public string? StaffCode { get; protected set; }
     public string UserType { get; protected set; } = string.Empty;
     public string AccountStatus { get; protected set; } = string.Empty;
     public DateTimeOffset? LockedUntil { get; protected set; }
@@ -40,8 +42,10 @@ public class TenantUser : AuditableEntity
         string accountStatus,
         string userType,
         string sourceUserType,
-        string defaultOutletId,
-        DateTimeOffset now)
+        string? defaultOutletId,
+        DateTimeOffset now,
+        string? employeeId = null,
+        string? staffCode = null)
     {
         return new TenantUser
         {
@@ -56,7 +60,9 @@ public class TenantUser : AuditableEntity
             AccountStatus = accountStatus,
             UserType = userType,
             SourceUserType = sourceUserType,
-            DefaultOutletId = defaultOutletId,
+            DefaultOutletId = string.IsNullOrWhiteSpace(defaultOutletId) ? null : defaultOutletId.Trim(),
+            EmployeeId = NormalizeOptional(employeeId),
+            StaffCode = NormalizeOptional(staffCode),
             FailedLoginAttempts = 0,
             AcceptedPrivacyTerms = false,
             AcceptedTermsVersion = "1.0",
@@ -72,7 +78,8 @@ public class TenantUser : AuditableEntity
         string fullName,
         string? phone,
         string? unmaskedPhone,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? staffCode = null)
     {
         return Create(
             id,
@@ -86,8 +93,9 @@ public class TenantUser : AuditableEntity
             TenantUserConstants.StatusInvited,
             "admin", // default
             "admin", // default
-            "HQ",
-            now);
+            null,
+            now,
+            staffCode: staffCode);
     }
 
     public void SetPasswordHash(string encryptedPassword, string passwordSalt, DateTimeOffset now)
@@ -121,18 +129,46 @@ public class TenantUser : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void SetProfileMediaAsset(Guid? mediaAssetId, Guid? updatedBy, DateTimeOffset now)
+    {
+        // Legacy column name profile_image_url stores the tenant user's MediaAsset identifier.
+        ProfileImageUrl = mediaAssetId;
+        UpdatedByTenantUserId = updatedBy;
+        UpdatedAt = now;
+    }
+
+    public void AssignStaffCode(string staffCode, DateTimeOffset now)
+    {
+        var normalized = NormalizeOptional(staffCode);
+        if (normalized is null)
+        {
+            throw new InvalidOperationException("Staff code is required.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(StaffCode) &&
+            !string.Equals(StaffCode, normalized, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Staff code is immutable.");
+        }
+
+        StaffCode = normalized;
+        UpdatedAt = now;
+    }
+
     public void UpdateProfile(
         string fullName,
         string email,
         string? phone,
         string accountStatus,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? employeeId = null)
     {
         FullName = fullName.Trim();
         Email = NormalizeEmail(email);
         Phone = phone;
         UnmaskedPhone = phone;
         AccountStatus = accountStatus;
+        EmployeeId = NormalizeOptional(employeeId);
         UpdatedAt = now;
     }
 
@@ -146,4 +182,7 @@ public class TenantUser : AuditableEntity
     {
         return email.Trim().ToUpperInvariant();
     }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

@@ -94,6 +94,30 @@ public sealed class TenantAuthServiceTests
     }
 
     [Fact]
+    public async Task LoginAsync_WithInactiveUser_RejectsBeforePasswordVerification()
+    {
+        var account = CreateAccount(
+            passwordHash: "PENDING_INVITE:UNSET",
+            userStatus: "INACTIVE");
+        var repository = new FakeTenantAuthRepository(account, ["tenant.dashboard.view"]);
+        var passwordHashService = new CountingPasswordHashService();
+        var service = CreateService(repository, passwordHashService: passwordHashService);
+
+        var result = await service.LoginAsync(
+            new TenantLoginRequest("user@tenant.test", "any-password"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_auth.invalid_credentials", result.Error.Code);
+        Assert.Equal(0, passwordHashService.VerifyCallCount);
+        Assert.NotNull(repository.SavedAudit);
+        Assert.Equal(TenantAuthConstants.FailedLoginResult, repository.SavedAudit!.LoginStatus);
+        Assert.Null(repository.SavedSession);
+        Assert.Null(repository.SavedRefreshToken);
+    }
+
+
+    [Fact]
     public async Task LogoutAsync_WithCurrentTenantSession_RevokesResolvedSession()
     {
         var repository = new FakeTenantAuthRepository(null, []);
@@ -202,11 +226,12 @@ public sealed class TenantAuthServiceTests
 
     private static TenantAuthService CreateService(
         FakeTenantAuthRepository repository,
-        IJwtTokenFactory? jwtFactory = null)
+        IJwtTokenFactory? jwtFactory = null,
+        IPasswordHashService? passwordHashService = null)
     {
         return new TenantAuthService(
             repository,
-            new FakePasswordHashService(),
+            passwordHashService ?? new FakePasswordHashService(),
             jwtFactory ?? new FakeJwtTokenFactory(),
             new FakeRefreshTokenGenerator(),
             new FakeTokenHashService(),
@@ -326,6 +351,19 @@ public sealed class TenantAuthServiceTests
         public bool VerifyPassword(string password, string passwordHash)
         {
             return password == "correct-password" && passwordHash == "valid-hash";
+        }
+    }
+
+    private sealed class CountingPasswordHashService : IPasswordHashService
+    {
+        public int VerifyCallCount { get; private set; }
+
+        public string HashPassword(string password) => "unused";
+
+        public bool VerifyPassword(string password, string passwordHash)
+        {
+            VerifyCallCount++;
+            return true;
         }
     }
 

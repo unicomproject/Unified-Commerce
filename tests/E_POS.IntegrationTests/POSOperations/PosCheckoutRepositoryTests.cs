@@ -783,7 +783,8 @@ public sealed class PosCheckoutRepositoryTests
             "cashier",
             "outlet",
             "default",
-            Now));
+            Now,
+            staffCode: "USR-2026-93001"));
     }
 
     private static void SeedOpenTillSession(

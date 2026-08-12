@@ -80,7 +80,17 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
         builder.Property(x => x.DefaultOutletId)
             .HasColumnName("default_outlet_id")
             .HasColumnType("varchar(50)")
-            .HasMaxLength(50)
+            .HasMaxLength(50);
+
+        builder.Property(x => x.EmployeeId)
+            .HasColumnName("employee_id")
+            .HasColumnType("varchar(100)")
+            .HasMaxLength(100);
+
+        builder.Property(x => x.StaffCode)
+            .HasColumnName("staff_code")
+            .HasColumnType("varchar(20)")
+            .HasMaxLength(20)
             .IsRequired();
 
         builder.Property(x => x.UserType)
@@ -158,6 +168,10 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_tenant_users_tenant_id_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.StaffCode })
+            .IsUnique()
+            .HasDatabaseName("uq_tenant_users_tenant_id_staff_code");
 
         builder.HasIndex(x => new { x.TenantId, x.UnmaskedPhone })
             .IsUnique()

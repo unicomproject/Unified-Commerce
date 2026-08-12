@@ -15,7 +15,8 @@ public static class DevelopmentPlatformAdminTestAccountSeedHost
         WebApplication app,
         CancellationToken cancellationToken = default)
     {
-        if (!ShouldSeed(app.Environment))
+        if (!ShouldSeed(app.Environment) ||
+            app.Configuration.GetValue<bool>("DevelopmentSeed:PlatformAdmin:Disabled"))
         {
             return;
         }

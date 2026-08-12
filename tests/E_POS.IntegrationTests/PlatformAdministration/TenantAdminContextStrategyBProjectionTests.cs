@@ -212,7 +212,8 @@ public sealed class TenantAdminContextStrategyBProjectionTests
             "admin",
             "admin",
             "HQ",
-            Now));
+            Now,
+            staffCode: $"USR-2026-{Math.Abs(tenantUserId.GetHashCode()) % 90000 + 10000:00000}"));
         await Task.CompletedTask;
         return (tenantId, tenantUserId);
     }

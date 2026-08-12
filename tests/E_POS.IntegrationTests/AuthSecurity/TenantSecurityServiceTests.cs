@@ -102,7 +102,7 @@ public sealed class TenantSecurityServiceTests
         var sessionId = Guid.NewGuid();
 
         dbContext.Tenants.Add(CreateTenant(tenantId, TenantAuthConstants.ActiveTenantStatus));
-        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.ActiveUserStatus, "standard", "system", "default", Now));
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.ActiveUserStatus, "standard", "system", "default", Now, staffCode: "USR-2026-90001"));
         dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantId, tenantUserId, null, null, Now.AddDays(1), Now));
         await dbContext.SaveChangesAsync();
 
@@ -122,7 +122,7 @@ public sealed class TenantSecurityServiceTests
         var sessionId = Guid.NewGuid();
 
         dbContext.Tenants.Add(CreateTenant(tenantId, TenantAuthConstants.ActiveTenantStatus));
-        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "locked@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.LockedUserStatus, "standard", "system", "default", Now));
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "locked@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.LockedUserStatus, "standard", "system", "default", Now, staffCode: "USR-2026-90002"));
         dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantId, tenantUserId, null, null, Now.AddDays(1), Now));
         await dbContext.SaveChangesAsync();
 
@@ -142,7 +142,7 @@ public sealed class TenantSecurityServiceTests
         var sessionId = Guid.NewGuid();
 
         dbContext.Tenants.Add(CreateTenant(tenantId, "suspended"));
-        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.ActiveUserStatus, "standard", "system", "default", Now));
+        dbContext.TenantUsers.Add(TenantUser.Create(tenantUserId, tenantId, "user@tenant.test", "First Last", null, null, "hash", "salt", TenantAuthConstants.ActiveUserStatus, "standard", "system", "default", Now, staffCode: "USR-2026-90003"));
         dbContext.TenantAuthSessions.Add(TenantAuthSession.Create(sessionId, tenantId, tenantUserId, null, null, Now.AddDays(1), Now));
         await dbContext.SaveChangesAsync();
 

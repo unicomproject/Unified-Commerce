@@ -24,7 +24,8 @@ public interface ITenantAdminUserService
     Task<ApplicationResult<TenantAdminUserDetailResponse>> CreateAsync(
         TenantRequestContext context,
         TenantAdminUserCreateRequest request,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? idempotencyKey = null);
 
     Task<ApplicationResult<TenantAdminUserDetailResponse>> GetByIdAsync(
         TenantRequestContext context,
@@ -35,6 +36,16 @@ public interface ITenantAdminUserService
         TenantRequestContext context,
         Guid userId,
         TenantAdminUserUpdateRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<TenantAdminUserDetailResponse>> ResendInviteAsync(
+        TenantRequestContext context,
+        Guid userId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<TenantAdminUserDetailResponse>> RevokeInviteAsync(
+        TenantRequestContext context,
+        Guid userId,
         CancellationToken cancellationToken);
 
     Task<ApplicationResult> DeleteAsync(

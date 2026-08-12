@@ -328,7 +328,8 @@ public sealed class TenantOnboardingOutboxWorkerIntegrationTests
         var tenantUser = TenantUser.Create(
             Guid.NewGuid(), ids.TenantId, ids.RecipientEmail, "Primary Admin",
             null, null, "pass-hash", "salt", "INVITED",
-            "TENANT_ADMIN", "admin", "MAIN", Now);
+            "TENANT_ADMIN", "admin", "MAIN", Now,
+            staffCode: "USR-2026-99001");
         db.TenantUsers.Add(tenantUser);
 
         var subscription = TenantSubscription.Create(ids.SubscriptionId, ids.TenantId, ids.PlanId, "ACTIVE", Now);

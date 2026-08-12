@@ -23,10 +23,8 @@ public sealed class TenantAdminInvitationAcceptanceRepository : ITenantAdminInvi
             .SingleOrDefaultAsync(x => x.Id == invite.TenantId, cancellationToken);
         if (tenant is null) return null;
 
-        var user = await _db.TenantUsers.AsNoTracking()
-            .Where(x => x.TenantId == invite.TenantId && x.Email == invite.NormalizedInvitedEmail)
-            .OrderBy(x => x.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+        var user = invite.TenantUserId is null ? null : await _db.TenantUsers.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.TenantId == invite.TenantId && x.Id == invite.TenantUserId, cancellationToken);
 
         return new TenantAdminInvitationAcceptanceSnapshot
         {
@@ -64,12 +62,10 @@ public sealed class TenantAdminInvitationAcceptanceRepository : ITenantAdminInvi
 
         var tenant = await _db.Tenants
             .SingleOrDefaultAsync(x => x.Id == invite.TenantId, cancellationToken);
-        var user = tenant is null
+        var user = tenant is null || invite.TenantUserId is null
             ? null
             : await _db.TenantUsers
-                .Where(x => x.TenantId == invite.TenantId && x.Email == invite.NormalizedInvitedEmail)
-                .OrderBy(x => x.CreatedAt)
-                .FirstOrDefaultAsync(cancellationToken);
+                .SingleOrDefaultAsync(x => x.TenantId == invite.TenantId && x.Id == invite.TenantUserId, cancellationToken);
 
         if (tenant is null || user is null)
         {
@@ -80,7 +76,7 @@ public sealed class TenantAdminInvitationAcceptanceRepository : ITenantAdminInvi
 
         var siblings = await _db.UserInvites
             .Where(x => x.TenantId == invite.TenantId &&
-                        x.NormalizedInvitedEmail == invite.NormalizedInvitedEmail &&
+                        x.TenantUserId == invite.TenantUserId &&
                         (x.InviteStatus == UserInviteConstants.StatusPending ||
                          x.InviteStatus == UserInviteConstants.StatusSent))
             .ToListAsync(cancellationToken);

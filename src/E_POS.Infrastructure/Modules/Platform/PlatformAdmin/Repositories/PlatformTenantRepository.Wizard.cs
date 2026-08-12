@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
+using E_POS.Infrastructure.Modules.Tenant.AccessControl.Services;
 
 namespace E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 
@@ -430,6 +431,16 @@ public sealed partial class PlatformTenantRepository
 
             if (model.TenantAdminUser is not null)
             {
+                if (string.IsNullOrWhiteSpace(model.TenantAdminUser.StaffCode))
+                {
+                    var staffCodeService = new TenantUserStaffCodeService(_dbContext);
+                    var staffCode = await staffCodeService.GenerateAsync(
+                        model.TenantAdminUser.TenantId,
+                        model.TenantAdminUser.CreatedAt,
+                        cancellationToken);
+                    model.TenantAdminUser.AssignStaffCode(staffCode, model.TenantAdminUser.CreatedAt);
+                }
+
                 _dbContext.TenantUsers.Add(model.TenantAdminUser);
             }
 

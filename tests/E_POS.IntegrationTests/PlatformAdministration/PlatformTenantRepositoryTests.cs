@@ -521,7 +521,8 @@ public sealed class PlatformTenantRepositoryTests
             "standard",
             "system",
             "default",
-            Now));
+            Now,
+            staffCode: "USR-2026-97001"));
 
         await dbContext.SaveChangesAsync();
     }

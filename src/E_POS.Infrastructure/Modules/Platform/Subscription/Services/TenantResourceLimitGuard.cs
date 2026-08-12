@@ -108,7 +108,8 @@ public sealed class TenantResourceLimitGuard : ITenantResourceLimitGuard
         ArgumentNullException.ThrowIfNull(operation);
 
         var useRelationalLock = _dbContext.Database.IsRelational();
-        await using var transaction = useRelationalLock
+        var ownsTransaction = useRelationalLock && _dbContext.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction
             ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken)
             : null;
 

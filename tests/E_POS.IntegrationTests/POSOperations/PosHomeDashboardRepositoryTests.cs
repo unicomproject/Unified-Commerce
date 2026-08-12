@@ -256,7 +256,8 @@ public sealed class PosHomeDashboardRepositoryTests
             "cashier",
             "outlet",
             outletId.ToString(),
-            now));
+            now,
+            staffCode: "USR-2026-94001"));
 
         dbContext.Outlets.Add(Outlet.Create(
             outletId,

@@ -25,7 +25,8 @@ public sealed class DevelopmentInventoryTopUpServiceTests
             "LKR", "Asia/Colombo", null, null, now);
         var actor = TenantUser.Create(
             Guid.NewGuid(), tenant.Id, "inventory@example.test", "Inventory User",
-            null, null, "hash", "salt", "ACTIVE", "admin", "admin", "DEV", now);
+            null, null, "hash", "salt", "ACTIVE", "admin", "admin", "DEV", now,
+            staffCode: "USR-2026-99301");
         var outlet = Outlet.Create(
             Guid.NewGuid(), tenant.Id, "Development Store", "DEV-01", "ACTIVE",
             "STORE", "Asia/Colombo", true, null, null, actor.Id, now);
