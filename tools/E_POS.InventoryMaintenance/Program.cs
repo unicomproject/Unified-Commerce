@@ -5,12 +5,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
 var command = args.FirstOrDefault()?.Trim().ToLowerInvariant();
-if (command is not ("inspect" or "top-up" or "seed-dev"))
+if (command is not ("inspect" or "top-up" or "seed-dev" or "clean-products"))
 {
     Console.Error.WriteLine(
         "Usage: inspect | top-up --tenant-code <code> --outlet-code <code> " +
         "--location-code <code> --actor-email <email> [--minimum 100] " +
-        "--confirm-local-development | seed-dev --confirm-local-development");
+        "--confirm-local-development | seed-dev --confirm-local-development | clean-products --confirm-local-development");
     return 2;
 }
 
@@ -41,6 +41,18 @@ if (command == "inspect")
 {
     var context = await service.InspectAsync(CancellationToken.None);
     Console.WriteLine(JsonSerializer.Serialize(context, jsonOptions));
+    return 0;
+}
+
+if (command == "clean-products")
+{
+    if (!values.ContainsKey("confirm-local-development"))
+    {
+        throw new InvalidOperationException(
+            "Refusing to clean products without --confirm-local-development.");
+    }
+    var deletedCount = await service.CleanTestProductsAsync(CancellationToken.None);
+    Console.WriteLine($"Successfully cleaned up {deletedCount} test product(s) and all associated images, variants, and data from the database.");
     return 0;
 }
 

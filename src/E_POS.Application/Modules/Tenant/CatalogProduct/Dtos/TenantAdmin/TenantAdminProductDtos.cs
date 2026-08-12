@@ -31,7 +31,10 @@ public sealed record TenantAdminProductBrandOptionResponse(
 public sealed record TenantAdminProductUnitOptionResponse(
     Guid UnitId,
     string UnitCode,
-    string UnitName);
+    string UnitName,
+    string UnitType = "",
+    string? Symbol = null,
+    bool RecommendedAllowDecimalQuantity = false);
 
 public sealed record TenantAdminProductTaxOptionResponse(
     Guid TaxId,
@@ -56,7 +59,8 @@ public sealed record TenantAdminProductCreateOptionsResponse(
     IReadOnlyList<TenantAdminProductUnitOptionResponse> Units,
     IReadOnlyList<TenantAdminProductTaxOptionResponse> Taxes,
     IReadOnlyList<TenantAdminProductOutletOptionResponse> Outlets,
-    IReadOnlyList<TenantAdminProductVariantOptionTemplateResponse> VariantOptionTemplates);
+    IReadOnlyList<TenantAdminProductVariantOptionTemplateResponse> VariantOptionTemplates,
+    IReadOnlyList<TenantAdminProductSalesChannelOptionResponse> SalesChannels);
 
 public sealed class TenantAdminProductVariantCreateRequest
 {
@@ -106,6 +110,7 @@ public sealed class TenantAdminProductCreateRequest
     public Guid? BrandId { get; set; }
     public string UnitType { get; set; } = string.Empty;
     public string? ShortDescription { get; set; }
+    public string? LongDescription { get; set; }
     public decimal? CostPrice { get; set; }
     public decimal SellingPrice { get; set; }
     public decimal? DiscountPrice { get; set; }
@@ -185,6 +190,7 @@ public sealed record TenantAdminProductDetailResponse(
     Guid? BrandId,
     string UnitType,
     string? ShortDescription,
+    string? LongDescription,
     string? ImageUrl,
     IReadOnlyList<TenantAdminProductImageResponse> Images,
     decimal? CostPrice,

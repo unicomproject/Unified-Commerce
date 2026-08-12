@@ -51,7 +51,9 @@ public static class TenantAdminBootstrapPermissionCatalog
             [
                 "catalog.products.view",
                 "catalog.products.create",
-                "catalog.products.update"
+                "catalog.products.update",
+                "catalog.product_media.manage",
+                "catalog.product_channels.manage"
             ],
             [PlatformTenantFeatureCodes.InventoryTracking] =
             [

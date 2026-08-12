@@ -36,5 +36,13 @@ public class ProductCategory : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void ReassignCategory(Guid categoryId, bool isPrimaryCategory, Guid? userId, DateTimeOffset now)
+    {
+        CategoryId = categoryId;
+        IsPrimaryCategory = isPrimaryCategory;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
 }
 

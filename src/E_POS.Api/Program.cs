@@ -172,6 +172,18 @@ app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 app.UseCors("AllowAll");
 app.UseStaticFiles();
 
+var mediaStoragePath = Path.Combine(AppContext.BaseDirectory, "App_Data", "media-storage");
+if (!Directory.Exists(mediaStoragePath))
+{
+    Directory.CreateDirectory(mediaStoragePath);
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(mediaStoragePath),
+    RequestPath = "/uploads"
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
