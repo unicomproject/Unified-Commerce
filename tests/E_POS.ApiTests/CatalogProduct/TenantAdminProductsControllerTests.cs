@@ -595,7 +595,6 @@ public sealed class TenantAdminProductsControllerTests
     {
         var controller = new TenantAdminProductsController(
             service,
-            new FakeTenantAdminInventoryService(),
             new FakeCatalogMediaService(),
             new FakeTenantRequestContextFactory());
         controller.ControllerContext = new ControllerContext
@@ -901,36 +900,7 @@ public sealed class TenantAdminProductsControllerTests
             Task.FromResult(SetupResult);
     }
 
-    private sealed class FakeTenantAdminInventoryService : ITenantAdminInventoryService
-    {
-        public Task<ApplicationResult<TenantAdminCurrentStockListResponse>> GetCurrentStockAsync(
-            TenantRequestContext context,
-            TenantAdminCurrentStockQuery query,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantAdminCurrentStockListResponse>.Failure(
-                new ApplicationError("inventory.permission_denied", "Permission denied for inventory management.")));
 
-        public Task<ApplicationResult<TenantAdminCurrentStockSummaryResponse>> GetCurrentStockSummaryAsync(
-            TenantRequestContext context,
-            Guid? outletId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantAdminCurrentStockSummaryResponse>.Failure(
-                new ApplicationError("inventory.permission_denied", "Permission denied for inventory management.")));
-
-        public Task<ApplicationResult<TenantAdminStockInResponse>> StockInAsync(
-            TenantRequestContext context,
-            TenantAdminStockInRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantAdminStockInResponse>.Failure(
-                new ApplicationError("inventory.permission_denied", "Permission denied for inventory management.")));
-
-        public Task<ApplicationResult<TenantAdminInventoryVariantLookupResponse>> GetProductVariantsForStockInAsync(
-            TenantRequestContext context,
-            Guid productId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantAdminInventoryVariantLookupResponse>.Failure(
-                new ApplicationError("inventory.permission_denied", "Permission denied for inventory management.")));
-    }
 
     private sealed class FakeCatalogMediaService : ICatalogMediaService
     {

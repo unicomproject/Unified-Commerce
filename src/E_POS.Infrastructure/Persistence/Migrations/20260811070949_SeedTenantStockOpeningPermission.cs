@@ -36,7 +36,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     now()
                 FROM (
                     VALUES
-                        ('77777777-0060-4000-8000-000000000001'::uuid, 'tenant.stock.opening', 'create', 'Add opening stock')
+                        ('77777777-0066-4000-8000-000000000001'::uuid, 'tenant.stock.opening', 'create', 'Add opening stock')
                 ) AS seed(id, permission_code, action_type, description)
                 CROSS JOIN (
                     SELECT module_id, feature_id

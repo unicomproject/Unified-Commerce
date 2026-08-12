@@ -1,9 +1,10 @@
-﻿using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Infrastructure.Persistence;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
@@ -11,10 +12,12 @@ namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 public sealed class CatalogMediaRepository : ICatalogMediaRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public CatalogMediaRepository(EPosDbContext dbContext)
+    public CatalogMediaRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public Task<bool> ProductExistsAsync(
@@ -191,7 +194,7 @@ public sealed class CatalogMediaRepository : ICatalogMediaRepository
         Guid productId,
         CancellationToken cancellationToken)
     {
-        return await (
+        var rawImages = await (
             from image in _dbContext.ProductImages.AsNoTracking()
             join media in _dbContext.MediaAssets.AsNoTracking()
                 on new { image.TenantId, MediaAssetId = image.MediaAssetId!.Value }
@@ -203,16 +206,28 @@ public sealed class CatalogMediaRepository : ICatalogMediaRepository
                   image.Status == ProductConstants.ActiveStatus &&
                   image.ProductVariantId == null
             orderby image.SortOrder, image.CreatedAt
-            select new TenantAdminProductImageResponse(
+            select new
+            {
                 image.Id,
                 image.MediaAssetId,
                 image.ProductVariantId,
-                media != null ? media.PublicUrl ?? string.Empty : string.Empty,
+                PublicUrl = media != null ? media.PublicUrl ?? string.Empty : string.Empty,
                 image.AltText,
                 image.ImagePurpose,
                 image.SortOrder,
-                image.IsPrimaryImage))
+                image.IsPrimaryImage
+            })
             .ToListAsync(cancellationToken);
+
+        return rawImages.Select(image => new TenantAdminProductImageResponse(
+            image.Id,
+            image.MediaAssetId,
+            image.ProductVariantId,
+            _mediaReadUrlResolver?.ResolveReadUrl(image.PublicUrl) ?? image.PublicUrl,
+            image.AltText,
+            image.ImagePurpose,
+            image.SortOrder,
+            image.IsPrimaryImage)).ToList();
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)

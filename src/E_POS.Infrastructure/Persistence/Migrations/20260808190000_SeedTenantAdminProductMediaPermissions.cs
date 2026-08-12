@@ -24,9 +24,9 @@ public partial class SeedTenantAdminProductMediaPermissions : Migration
                 updated_at
             )
             VALUES
-                ('77777777-0060-4000-8000-000000000001'::uuid, 'catalog.product_media.manage', 'update', 'Manage product images and media uploads', true, true, now(), now()),
-                ('77777777-0061-4000-8000-000000000001'::uuid, 'catalog.product_channels.manage', 'update', 'Manage product channel visibility', true, true, now(), now()),
-                ('77777777-0062-4000-8000-000000000001'::uuid, 'tenant.product_media.manage', 'update', 'Manage tenant product media', true, true, now(), now())
+                ('77777777-0063-4000-8000-000000000001'::uuid, 'catalog.product_media.manage', 'update', 'Manage product images and media uploads', true, true, now(), now()),
+                ('77777777-0064-4000-8000-000000000001'::uuid, 'catalog.product_channels.manage', 'update', 'Manage product channel visibility', true, true, now(), now()),
+                ('77777777-0065-4000-8000-000000000001'::uuid, 'tenant.product_media.manage', 'update', 'Manage tenant product media', true, true, now(), now())
             ON CONFLICT (permission_code) DO UPDATE
             SET description = EXCLUDED.description,
                 is_active = true,

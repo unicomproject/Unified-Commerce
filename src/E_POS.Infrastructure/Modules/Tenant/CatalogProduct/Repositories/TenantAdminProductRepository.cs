@@ -9,6 +9,7 @@ using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Infrastructure.Persistence.Seed;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
@@ -16,10 +17,12 @@ namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 public sealed partial class TenantAdminProductRepository : ITenantAdminProductRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public TenantAdminProductRepository(EPosDbContext dbContext)
+    public TenantAdminProductRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<TenantAdminProductSummaryResponse> GetSummaryAsync(
@@ -128,7 +131,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 row.ProductVariantId,
                 row.SortOrder,
                 row.IsPrimaryImage,
-                ImageUrl = row.MediaPublicUrl,
+                ImageUrl = _mediaReadUrlResolver?.ResolveReadUrl(row.MediaPublicUrl) ?? row.MediaPublicUrl,
             })
             .Where(row => !string.IsNullOrWhiteSpace(row.ImageUrl))
             .GroupBy(row => row.ProductId)
@@ -527,7 +530,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .Select(row => new
             {
                 Row = row,
-                ImageUrl = row.MediaPublicUrl,
+                ImageUrl = _mediaReadUrlResolver?.ResolveReadUrl(row.MediaPublicUrl) ?? row.MediaPublicUrl,
             })
             .Where(item => !string.IsNullOrWhiteSpace(item.ImageUrl))
             .OrderBy(item => item.Row.ProductVariantId.HasValue ? 1 : 0)

@@ -2,7 +2,6 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Shared.Media.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
-using E_POS.Application.Modules.Tenant.Inventory.Contracts;
 using E_POS.Api.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,18 +14,15 @@ namespace E_POS.Api.Controllers.V1.Tenant.CatalogProduct;
 public sealed class TenantAdminProductsController : ControllerBase
 {
     private readonly ITenantAdminProductService _tenantAdminProductService;
-    private readonly ITenantAdminInventoryService _tenantAdminInventoryService;
     private readonly ICatalogMediaService _catalogMediaService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
     public TenantAdminProductsController(
         ITenantAdminProductService tenantAdminProductService,
-        ITenantAdminInventoryService tenantAdminInventoryService,
         ICatalogMediaService catalogMediaService,
         ITenantRequestContextFactory tenantRequestContextFactory)
     {
         _tenantAdminProductService = tenantAdminProductService;
-        _tenantAdminInventoryService = tenantAdminInventoryService;
         _catalogMediaService = catalogMediaService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }

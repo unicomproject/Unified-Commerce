@@ -45,6 +45,13 @@ public partial class RemoveTestMerchandiseProductsFromDatabase : Migration
                         DELETE FROM product_options WHERE product_id = ANY(target_ids);
                     END IF;
 
+                    -- Explicitly delete inventory_reservation_allocations referencing inventory_balances
+                    IF target_variant_ids IS NOT NULL THEN
+                        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'inventory_reservation_allocations') AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'inventory_balances') THEN
+                            DELETE FROM inventory_reservation_allocations WHERE inventory_balance_id IN (SELECT id FROM inventory_balances WHERE product_variant_id = ANY(target_variant_ids));
+                        END IF;
+                    END IF;
+
                     -- Delete from any other tables referencing product_variants
                     IF target_variant_ids IS NOT NULL THEN
                         FOR rec IN 

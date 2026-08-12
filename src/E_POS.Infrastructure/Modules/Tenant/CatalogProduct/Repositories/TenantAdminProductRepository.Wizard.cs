@@ -1230,7 +1230,7 @@ public sealed partial class TenantAdminProductRepository
         Guid productId,
         CancellationToken cancellationToken)
     {
-        return await (
+        var rawImages = await (
             from image in _dbContext.ProductImages.AsNoTracking()
             join media in _dbContext.MediaAssets.AsNoTracking()
                 on new { image.TenantId, MediaAssetId = image.MediaAssetId }
@@ -1241,16 +1241,28 @@ public sealed partial class TenantAdminProductRepository
                   image.Status == ProductConstants.ActiveStatus &&
                   image.ProductVariantId == null
             orderby image.SortOrder, image.CreatedAt
-            select new TenantAdminProductImageResponse(
+            select new
+            {
                 image.Id,
                 image.MediaAssetId,
                 image.ProductVariantId,
-                media != null ? media.PublicUrl ?? string.Empty : string.Empty,
+                PublicUrl = media != null ? media.PublicUrl ?? string.Empty : string.Empty,
                 image.AltText,
                 image.ImagePurpose,
                 image.SortOrder,
-                image.IsPrimaryImage))
+                image.IsPrimaryImage
+            })
             .ToListAsync(cancellationToken);
+
+        return rawImages.Select(image => new TenantAdminProductImageResponse(
+            image.Id,
+            image.MediaAssetId,
+            image.ProductVariantId,
+            _mediaReadUrlResolver?.ResolveReadUrl(image.PublicUrl) ?? image.PublicUrl,
+            image.AltText,
+            image.ImagePurpose,
+            image.SortOrder,
+            image.IsPrimaryImage)).ToList();
     }
 
     private async Task<Guid?> GetPrimaryCategoryIdAsync(
