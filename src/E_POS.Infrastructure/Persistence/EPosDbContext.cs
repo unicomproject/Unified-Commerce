@@ -99,6 +99,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantRole> TenantRoles => Set<TenantRole>();
     public DbSet<TenantRolePermission> TenantRolePermissions => Set<TenantRolePermission>();
     public DbSet<TenantUser> TenantUsers => Set<TenantUser>();
+    public DbSet<TenantUserCodeSequence> TenantUserCodeSequences => Set<TenantUserCodeSequence>();
     public DbSet<TenantUserPermission> TenantUserPermissions => Set<TenantUserPermission>();
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
 
@@ -109,6 +110,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantLoginAudit> TenantLoginAudits => Set<TenantLoginAudit>();
     public DbSet<TenantRefreshToken> TenantRefreshTokens => Set<TenantRefreshToken>();
     public DbSet<UserInvite> UserInvites => Set<UserInvite>();
+    public DbSet<TenantUserInviteDeliverySecret> TenantUserInviteDeliverySecrets => Set<TenantUserInviteDeliverySecret>();
     public DbSet<UserSetupToken> UserSetupTokens => Set<UserSetupToken>();
     public DbSet<IntegrationOutboxMessage> IntegrationOutboxMessages => Set<IntegrationOutboxMessage>();
 

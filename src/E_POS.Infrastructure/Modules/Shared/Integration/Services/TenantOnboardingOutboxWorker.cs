@@ -3,6 +3,8 @@ using System.Text.Json;
 using E_POS.Application.Common.Email;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
+using E_POS.Domain.Modules.Shared.Audit.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
@@ -82,7 +84,9 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
         if (message is null || message.Status != "PROCESSING" || message.LeaseOwner != _workerId) return;
         try
         {
-            if (message.MessageType is "tenant_admin.invitation_requested" or "tenant_admin.invitation_resend_requested")
+            if (message.MessageType == "tenant.user_invited")
+                await DispatchTenantUserInvitationAsync(scope.ServiceProvider, db, message, ct);
+            else if (message.MessageType is "tenant_admin.invitation_requested" or "tenant_admin.invitation_resend_requested")
                 await DispatchInvitationAsync(scope.ServiceProvider, db, message.AggregateId, message.TenantId!.Value, ct);
             else if (message.MessageType.StartsWith("manual_payment.", StringComparison.Ordinal))
                 await DispatchManualPaymentAsync(scope.ServiceProvider, db, message, ct);
@@ -96,10 +100,81 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
             var delay = TimeSpan.FromMinutes(Math.Min(60, Math.Pow(2, Math.Max(0, message.AttemptCount - 1))));
             message.MarkFailed(retryable?.Code ?? "outbox_handler_failed", retryable?.SafeMessage ?? "Outbox handler failed.",
                 terminal, DateTimeOffset.UtcNow.Add(delay), DateTimeOffset.UtcNow);
+            if (terminal && message.MessageType == "tenant.user_invited")
+                await CancelTenantUserInvitationDeliveryAsync(db, message, DateTimeOffset.UtcNow, ct);
             _logger.LogWarning("Outbox delivery failed. MessageId={MessageId} Type={MessageType} Attempt={Attempt} Code={Code}",
                 message.Id, message.MessageType, message.AttemptCount, message.LastErrorCode);
         }
         await db.SaveChangesAsync(ct);
+    }
+
+    private async Task DispatchTenantUserInvitationAsync(IServiceProvider services, EPosDbContext db,
+        E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage message, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_options.TenantAdminAppBaseUrl))
+            throw new RetryableDeliveryException("invitation_base_url_not_configured", "Tenant Admin application URL is not configured.");
+        if (!TenantAdminInvitationUrlBuilder.TryValidateBaseUrl(_options.TenantAdminAppBaseUrl, false, out var baseUrlError))
+            throw new RetryableDeliveryException("invitation_base_url_invalid", baseUrlError ?? "Tenant Admin application URL is invalid.");
+        var sender = services.GetRequiredService<IApplicationEmailSender>();
+        if (!sender.IsConfigured)
+            throw new RetryableDeliveryException("invitation_email_not_configured", "Invitation email provider is not configured.");
+
+        Guid tenantId; Guid tenantUserId; Guid inviteId;
+        try
+        {
+            using var payload = JsonDocument.Parse(message.PayloadJson);
+            var root = payload.RootElement;
+            if (!root.TryGetProperty("tenantId", out var tenant) || !tenant.TryGetGuid(out tenantId) ||
+                !root.TryGetProperty("tenantUserId", out var user) || !user.TryGetGuid(out tenantUserId) ||
+                !root.TryGetProperty("inviteId", out var inviteElement) || !inviteElement.TryGetGuid(out inviteId))
+                throw new InvalidOperationException("Tenant user invitation outbox payload is invalid.");
+        }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException("Tenant user invitation outbox payload is invalid.");
+        }
+
+        if (message.TenantId != tenantId)
+            throw new InvalidOperationException("Tenant user invitation tenant mismatch.");
+        var invite = await db.UserInvites.SingleOrDefaultAsync(x => x.Id == inviteId, ct)
+            ?? throw new InvalidOperationException("Tenant user invitation is missing.");
+        if (invite.TenantId != tenantId || !invite.Targets(tenantUserId))
+            throw new InvalidOperationException("Tenant user invitation target mismatch.");
+        var tenantUser = await db.TenantUsers.SingleOrDefaultAsync(x => x.Id == tenantUserId && x.TenantId == tenantId, ct)
+            ?? throw new InvalidOperationException("Tenant user invitation recipient is missing.");
+        var now = DateTimeOffset.UtcNow;
+        if (!invite.IsUsableAt(now))
+            throw new InvalidOperationException("Tenant user invitation is no longer deliverable.");
+        var secret = await db.TenantUserInviteDeliverySecrets.SingleOrDefaultAsync(x => x.InviteId == inviteId &&
+            x.TenantId == tenantId && x.TenantUserId == tenantUserId, ct)
+            ?? throw new InvalidOperationException("Tenant user invitation delivery secret is missing.");
+        if (secret.PurgedAt.HasValue || secret.ExpiresAt <= now)
+            throw new InvalidOperationException("Tenant user invitation delivery secret is unavailable.");
+
+        var protector = services.GetRequiredService<IInvitationDeliverySecretProtector>();
+        var rawToken = protector.Unprotect(secret.EncryptedToken, secret.KeyVersion);
+        var url = TenantAdminInvitationUrlBuilder.Build(_options.TenantAdminAppBaseUrl!, rawToken);
+        var send = await sender.SendAsync(new ApplicationEmailMessage(tenantUser.Email, "Set up your account",
+            $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(url)}\">Set up your account</a></p>",
+            "Open the secure account setup link sent in this email.", message.CorrelationId.ToString("D")), ct);
+        if (send.IsFailure)
+            throw new RetryableDeliveryException(send.Error.Code, "Invitation provider rejected the message.");
+        invite.MarkSent(now);
+        secret.Purge(now);
+    }
+
+    private static async Task CancelTenantUserInvitationDeliveryAsync(EPosDbContext db,
+        E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage message, DateTimeOffset now, CancellationToken ct)
+    {
+        using var payload = JsonDocument.Parse(message.PayloadJson);
+        if (!payload.RootElement.TryGetProperty("inviteId", out var inviteIdElement) || !inviteIdElement.TryGetGuid(out var inviteId)) return;
+        var invite = await db.UserInvites.SingleOrDefaultAsync(x => x.Id == inviteId, ct);
+        if (invite is null) return;
+        invite.Cancel(now);
+        var secret = await db.TenantUserInviteDeliverySecrets.SingleOrDefaultAsync(x => x.InviteId == inviteId, ct);
+        secret?.Purge(now);
+        db.AuditLogs.Add(new AuditLog { TenantId = invite.TenantId, EntityType = "TENANT_USER", EntityId = invite.TenantUserId,
+            ActorType = "SYSTEM", Action = "user.invite_delivery_failed", CreatedAt = now });
     }
 
     private async Task DispatchInvitationAsync(IServiceProvider services, EPosDbContext db, Guid operationId, Guid tenantId, CancellationToken ct)

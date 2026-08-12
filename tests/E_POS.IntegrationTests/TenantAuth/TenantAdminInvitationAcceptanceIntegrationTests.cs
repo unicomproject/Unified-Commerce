@@ -250,7 +250,7 @@ public sealed class TenantAdminInvitationAcceptanceIntegrationTests
             TenantStatusConstants.Active, "LKR", "Asia/Colombo", null, null, Now);
         db.Tenants.Add(tenant);
 
-        var user = TenantUser.CreatePendingInvite(ids.UserId, ids.TenantId, ids.Email, "Invite Admin", null, null, Now);
+        var user = TenantUser.CreatePendingInvite(ids.UserId, ids.TenantId, ids.Email, "Invite Admin", null, null, Now, "USR-2026-91001");
         db.TenantUsers.Add(user);
 
         var invite = UserInvite.CreatePending(

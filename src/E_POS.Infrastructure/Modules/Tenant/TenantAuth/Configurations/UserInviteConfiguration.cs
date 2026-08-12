@@ -27,6 +27,7 @@ public sealed class UserInviteConfiguration : IEntityTypeConfiguration<UserInvit
         builder.Property(x => x.NormalizedInvitedPhone).HasColumnName("normalized_invited_phone").HasColumnType("varchar(40)").HasMaxLength(40);
         
         builder.Property(x => x.AcceptedTenantUserId).HasColumnName("accepted_tenant_user_id");
+        builder.Property(x => x.TenantUserId).HasColumnName("tenant_user_id");
         builder.Property(x => x.InitialRoleId).HasColumnName("initial_role_id");
         builder.Property(x => x.InitialOutletId).HasColumnName("initial_outlet_id");
         
@@ -55,6 +56,12 @@ public sealed class UserInviteConfiguration : IEntityTypeConfiguration<UserInvit
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_user_invites_accepted_tenant_user_id_tenant_users");
 
+        builder.HasOne<TenantUser>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_user_invites_tenant_user_id_tenant_users");
+
         builder.HasOne<TenantRole>()
             .WithMany()
             .HasForeignKey(x => x.InitialRoleId)
@@ -73,6 +80,9 @@ public sealed class UserInviteConfiguration : IEntityTypeConfiguration<UserInvit
             .HasFilter("invite_status IN ('PENDING', 'SENT')")
             .IsUnique()
             .HasDatabaseName("uq_user_invites_tenant_id_normalized_invited_email");
+
+        builder.HasIndex(x => x.TenantUserId)
+            .HasDatabaseName("ix_user_invites_tenant_user_id");
     }
 }
 

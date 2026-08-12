@@ -275,7 +275,8 @@ public sealed class TenantResourceLimitPostgreSqlConcurrencyTests
             "admin",
             "admin",
             "HQ",
-            Now));
+            Now,
+            staffCode: $"USR-2026-{Math.Abs(fixture.ActorUserId.GetHashCode()) % 90000 + 10000:00000}"));
 
         for (var i = 1; i <= preSeedOutletCount; i++)
         {

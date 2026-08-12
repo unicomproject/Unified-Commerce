@@ -1,4 +1,5 @@
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Idempotency;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
@@ -35,11 +36,14 @@ using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Application.Common.Email;
 using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
+using E_POS.Infrastructure.Modules.Tenant.AccessControl.Services;
+using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Services;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Options;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Infrastructure.Modules.Shared.Integration;
 using E_POS.Infrastructure.Modules.Shared.Integration.Services;
+using E_POS.Infrastructure.Modules.Shared.Idempotency.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Services;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
@@ -92,6 +96,7 @@ public static class DependencyInjection
 
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.Configure<TenantJwtOptions>(configuration.GetSection(TenantJwtOptions.SectionName));
+        services.Configure<InvitationDeliverySecretOptions>(configuration.GetSection(InvitationDeliverySecretOptions.SectionName));
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
@@ -144,6 +149,11 @@ public static class DependencyInjection
         services.AddScoped<IManualPaymentRepository, ManualPaymentRepository>();
         services.AddScoped<IManualPaymentAccessTokenService, ManualPaymentAccessTokenService>();
         services.AddScoped<IInvitationTokenService, InvitationTokenService>();
+        services.AddSingleton<IInvitationDeliverySecretProtector, AesGcmInvitationDeliverySecretProtector>();
+        services.AddScoped(provider => new Lazy<IInvitationDeliverySecretProtector>(
+            provider.GetRequiredService<IInvitationDeliverySecretProtector>));
+        services.AddScoped<ITenantUserInviteDeliverySecretCleanupService, TenantUserInviteDeliverySecretCleanupService>();
+        services.AddHostedService<TenantUserInviteDeliverySecretCleanupHostedService>();
         services.AddScoped<IManualPaymentEvidenceStorage, AzureManualPaymentEvidenceStorage>();
         services.AddScoped<IManualPaymentEvidenceScanner, ClamAvManualPaymentEvidenceScanner>();
         services.AddScoped<IPaymentProvider, ManualPaymentProvider>();
@@ -179,6 +189,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantFeatureEntitlementEvaluator, TenantFeatureEntitlementEvaluator>();
         services.AddScoped<ITenantSubscriptionLimitResolver, TenantSubscriptionLimitResolver>();
         services.AddScoped<ITenantResourceLimitGuard, TenantResourceLimitGuard>();
+        services.AddScoped<IIdempotencyService, IdempotencyService>();
         services.AddScoped<ITenantUsageCounterRepository, TenantUsageCounterRepository>();
         services.AddScoped<ITenantAuthRepository, TenantAuthRepository>();
         services.AddScoped<ITenantAdminContextRepository, TenantAdminContextRepository>();
@@ -204,6 +215,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminHardwareRepository, TenantAdminHardwareRepository>();
         services.AddScoped<ITenantAdminHardwareAuditLogger, TenantAdminHardwareAuditLogger>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
+        services.AddScoped<ITenantUserStaffCodeService, TenantUserStaffCodeService>();
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();
         services.AddScoped<ITillDeviceAssignmentRepository, TillDeviceAssignmentRepository>();

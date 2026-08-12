@@ -10354,7 +10354,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("created_by_tenant_user_id");
 
                     b.Property<string>("DefaultOutletId")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)")
                         .HasColumnName("default_outlet_id");
@@ -10369,6 +10368,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
                         .HasColumnName("email");
+
+                    b.Property<string>("EmployeeId")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("employee_id");
 
                     b.Property<string>("EncryptedPassword")
                         .IsRequired()
@@ -10423,6 +10427,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(50)")
                         .HasColumnName("source_user_type");
 
+                    b.Property<string>("StaffCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnName("staff_code");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -10461,6 +10471,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_tenant_users_tenant_id_id");
 
+                    b.HasIndex("TenantId", "StaffCode")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_users_tenant_id_staff_code");
+
                     b.HasIndex("TenantId", "UnmaskedPhone")
                         .IsUnique()
                         .HasDatabaseName("uq_tenant_users_tenant_id_unmasked_phone")
@@ -10472,6 +10486,49 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_tenant_users_source_user_type", "source_user_type IN ('admin', 'outlet', 'platform')");
                         });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserCodeSequence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("CurrentValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("current_value");
+
+                    b.Property<string>("SequenceType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("sequence_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenant_user_code_sequences");
+
+                    b.HasIndex("TenantId", "SequenceType", "Year")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_user_code_sequences_scope");
+
+                    b.ToTable("tenant_user_code_sequences", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserPermission", b =>
@@ -23837,6 +23894,70 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantUserInviteDeliverySecret", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EncryptedToken")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("encrypted_token");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("InviteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invite_id");
+
+                    b.Property<string>("KeyVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("key_version");
+
+                    b.Property<DateTimeOffset?>("PurgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("purged_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_user_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenant_user_invite_delivery_secrets");
+
+                    b.HasIndex("InviteId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_user_invite_delivery_secrets_invite_id");
+
+                    b.HasIndex("TenantUserId");
+
+                    b.HasIndex("TenantId", "TenantUserId")
+                        .HasDatabaseName("ix_tenant_user_invite_delivery_secrets_target");
+
+                    b.HasIndex("PurgedAt", "ExpiresAt", "CreatedAt")
+                        .HasDatabaseName("ix_tenant_user_invite_delivery_secrets_cleanup");
+
+                    b.ToTable("tenant_user_invite_delivery_secrets", (string)null);
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -23930,6 +24051,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<Guid?>("TenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_user_id");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -23944,6 +24069,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("InviteTokenHash")
                         .IsUnique()
                         .HasDatabaseName("uq_user_invites_invite_token_hash");
+
+                    b.HasIndex("TenantUserId")
+                        .HasDatabaseName("ix_user_invites_tenant_user_id");
 
                     b.HasIndex("TenantId", "NormalizedInvitedEmail")
                         .IsUnique()
@@ -31978,6 +32106,23 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_refresh_tokens_user_id_tenant_users");
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantUserInviteDeliverySecret", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", null)
+                        .WithMany()
+                        .HasForeignKey("InviteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_user_invite_delivery_secrets_invite");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_user_invite_delivery_secrets_user");
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
@@ -31998,6 +32143,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_user_invites_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_user_invites_tenant_user_id_tenant_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserSetupToken", b =>
