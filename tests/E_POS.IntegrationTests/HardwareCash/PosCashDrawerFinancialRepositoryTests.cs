@@ -307,7 +307,21 @@ public sealed class PosCashDrawerFinancialRepositoryTests
         db.Outlets.Add(Outlet.Create(outlet, tenant, "Outlet", $"OUT-{tag}", "ACTIVE", "STORE", "UTC", true, null, null, null, Now));
         db.Tills.Add(Till.Create(till, tenant, outlet, "Till", "Till", 1, $"TILL-{tag}", "STANDARD", 0m, "LKR", true, "ACTIVE", null, Now));
         db.PosDevices.Add(PosDevice.Create(device, tenant, outlet, $"POS-{tag}", "POS", "TABLET", "ACTIVE", null, Now));
-        db.TenantUsers.Add(TenantUser.Create(user, tenant, $"cashier-{tag}@test.com", "Cashier", null, null, "hash", "salt", "ACTIVE", "cashier", "outlet", "default", Now));
+        db.TenantUsers.Add(TenantUser.Create(
+            user,
+            tenant,
+            $"cashier-{tag}@test.com",
+            "Cashier",
+            null,
+            null,
+            "hash",
+            "salt",
+            "ACTIVE",
+            "cashier",
+            "outlet",
+            "default",
+            Now,
+            staffCode: $"USR-2026-{user:N}"));
         db.TillSessions.Add(TillSession.Open(session, tenant, outlet, till, $"TS-{tag}", DateOnly.FromDateTime(Now.UtcDateTime), user, device, opening, "LKR", null, Now));
         return (tenant, outlet, till, device, user, session);
     }
