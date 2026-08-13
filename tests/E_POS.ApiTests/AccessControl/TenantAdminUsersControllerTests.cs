@@ -5,6 +5,7 @@ using E_POS.Api.Controllers.V1.Tenant.AccessControl;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.AccessControl.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -25,12 +26,14 @@ public sealed class TenantAdminUsersControllerTests
             ApplicationResult<TenantAdminUserDetailResponse>.Success(response));
         var controller = CreateController(service);
         SetTenantClaims(controller, tenantId, userId, "tenant.users.create");
+        controller.Request.Headers["Idempotency-Key"] = "controller-create-key";
 
         var result = await controller.Create(CreateRequest(), CancellationToken.None);
 
         var created = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Equal(tenantId, service.CreateContext?.TenantId);
         Assert.Equal(userId, service.CreateContext?.UserId);
+        Assert.Equal("controller-create-key", service.CreateIdempotencyKey);
     }
 
     [Fact]
@@ -62,6 +65,36 @@ public sealed class TenantAdminUsersControllerTests
 
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResendInvite_WithTenantClaims_ForwardsUserId()
+    {
+        var targetUserId = Guid.NewGuid();
+        var service = new FakeTenantAdminUserService(
+            ApplicationResult<TenantAdminUserDetailResponse>.Success(CreateDetailResponse(targetUserId)));
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.users.invite");
+
+        var result = await controller.ResendInvite(targetUserId, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(targetUserId, service.ResendInviteUserId);
+    }
+
+    [Fact]
+    public async Task RevokeInvite_WithTenantClaims_ForwardsUserId()
+    {
+        var targetUserId = Guid.NewGuid();
+        var service = new FakeTenantAdminUserService(
+            ApplicationResult<TenantAdminUserDetailResponse>.Success(CreateDetailResponse(targetUserId)));
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.users.invite");
+
+        var result = await controller.RevokeInvite(targetUserId, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(targetUserId, service.RevokeInviteUserId);
     }
 
     [Fact]
@@ -141,6 +174,9 @@ public sealed class TenantAdminUsersControllerTests
         public ApplicationResult DeleteResult { get; set; } = ApplicationResult.Success();
         public TenantRequestContext? CreateContext { get; private set; }
         public TenantAdminUserCreateRequest? CreateRequest { get; private set; }
+        public string? CreateIdempotencyKey { get; private set; }
+        public Guid? ResendInviteUserId { get; private set; }
+        public Guid? RevokeInviteUserId { get; private set; }
 
         public Task<ApplicationResult<TenantAdminUserListResponse>> ListAsync(
             TenantRequestContext context,
@@ -160,15 +196,21 @@ public sealed class TenantAdminUsersControllerTests
             TenantRequestContext context,
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<TenantAdminUserCreateOptionsResponse>.Success(
-                new TenantAdminUserCreateOptionsResponse([], [], [])));
+                new TenantAdminUserCreateOptionsResponse(
+                    [],
+                    [],
+                    [],
+                    TenantAdminUserCreateStatusPolicy.SupportedStatuses)));
 
         public Task<ApplicationResult<TenantAdminUserDetailResponse>> CreateAsync(
             TenantRequestContext context,
             TenantAdminUserCreateRequest request,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? idempotencyKey = null)
         {
             CreateContext = context;
             CreateRequest = request;
+            CreateIdempotencyKey = idempotencyKey;
             return Task.FromResult(CreateResult);
         }
 
@@ -184,6 +226,24 @@ public sealed class TenantAdminUsersControllerTests
             TenantAdminUserUpdateRequest request,
             CancellationToken cancellationToken) =>
             Task.FromResult(CreateResult);
+
+        public Task<ApplicationResult<TenantAdminUserDetailResponse>> ResendInviteAsync(
+            TenantRequestContext context,
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            ResendInviteUserId = userId;
+            return Task.FromResult(CreateResult);
+        }
+
+        public Task<ApplicationResult<TenantAdminUserDetailResponse>> RevokeInviteAsync(
+            TenantRequestContext context,
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            RevokeInviteUserId = userId;
+            return Task.FromResult(CreateResult);
+        }
 
         public Task<ApplicationResult> DeleteAsync(
             TenantRequestContext context,

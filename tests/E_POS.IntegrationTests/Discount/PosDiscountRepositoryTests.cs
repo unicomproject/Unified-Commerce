@@ -189,7 +189,7 @@ public sealed class PosDiscountRepositoryTests
         dbContext.TenantUsers.Add(TenantUser.Create(
             command.RequestedByTenantUserId, command.TenantId, "cashier@test.local",
             "Test Cashier", null, null, "hash", "salt", "ACTIVE",
-            "cashier", "outlet", "TEST", Now));
+            "cashier", "outlet", "TEST", Now, staffCode: "USR-2026-92001"));
 
         dbContext.Outlets.Add(Outlet.Create(
             command.OutletId, command.TenantId, "Main Outlet", "MAIN-01",

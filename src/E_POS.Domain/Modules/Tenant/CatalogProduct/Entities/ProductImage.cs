@@ -51,6 +51,36 @@ public class ProductImage : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void SetPrimary(bool isPrimary, Guid? userId, DateTimeOffset now)
+    {
+        IsPrimaryImage = isPrimary;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
+    public void SetSortOrder(int sortOrder, Guid? userId, DateTimeOffset now)
+    {
+        SortOrder = Math.Max(0, sortOrder);
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
+    public void SoftDelete(Guid? userId, DateTimeOffset now)
+    {
+        Status = "DELETED";
+        IsPrimaryImage = false;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
+    public void Reassign(Guid mediaAssetId, Guid? userId, DateTimeOffset now)
+    {
+        MediaAssetId = mediaAssetId;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
     public static ProductImage Create(
         Guid id,
         Guid tenantId,

@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
@@ -166,9 +167,10 @@ public sealed class TenantAdminProductServiceTests
     }
 
     [Fact]
-    public async Task GetCreateOptionsAsync_WithTenantProductsCreate_ReturnsOptions()
+    public async Task GetCreateOptionsAsync_WithLegacyTenantProductsCreateAlone_ReturnsPermissionDenied()
     {
         var createOptions = new TenantAdminProductCreateOptionsResponse(
+            [],
             [],
             [],
             [],
@@ -186,8 +188,8 @@ public sealed class TenantAdminProductServiceTests
             CreateContext([TenantAdminProductPermissions.Create]),
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
-        Assert.Same(createOptions, result.Value);
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.permission_denied", result.Error.Code);
     }
 
     [Fact]
@@ -818,6 +820,7 @@ public sealed class TenantAdminProductServiceTests
             "PIECE",
             null,
             null,
+            null,
             [],
             null,
             10m,
@@ -833,17 +836,29 @@ public sealed class TenantAdminProductServiceTests
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow);
 
+    private class FakeEntitlementEvaluator : ITenantFeatureEntitlementEvaluator
+    {
+        public Task<TenantFeatureEntitlementEvaluation> EvaluateAsync(Guid tenantId, string featureCode, DateTimeOffset evaluationTime, CancellationToken cancellationToken = default) =>
+            Task.FromResult(TenantFeatureEntitlementEvaluation.Allowed(featureCode, featureCode, false, true, false));
+
+        public Task<bool> IsEnabledAsync(Guid tenantId, string featureCode, DateTimeOffset evaluationTime, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+    }
+
     private static TenantAdminProductService CreateService(
         ITenantAdminProductRepository tenantAdminProductRepository,
         FakeProductRepository? productRepository = null,
         ITenantAdminProductAuditLogger? auditLogger = null)
     {
+        var clock = new FakeDateTimeProvider();
+        var accessPolicy = new ProductWizardAccessPolicy(new FakeEntitlementEvaluator(), tenantAdminProductRepository, clock);
         return new TenantAdminProductService(
             productRepository ?? new FakeProductRepository(),
             tenantAdminProductRepository,
             new TenantAdminProductRequestValidator(),
-            new FakeDateTimeProvider(),
-            auditLogger ?? new FakeTenantAdminProductAuditLogger());
+            clock,
+            auditLogger ?? new FakeTenantAdminProductAuditLogger(),
+            accessPolicy);
     }
 
     private static TenantRequestContext CreateContext(string[] permissions) =>
@@ -855,7 +870,7 @@ public sealed class TenantAdminProductServiceTests
             new(0, 0, 0, 0);
 
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
-            new([], [], [], [], [], [], []);
+            new([], [], [], [], [], [], [], []);
 
         public IReadOnlyDictionary<Guid, string> PrimaryImageUrls { get; init; } =
             new Dictionary<Guid, string>();
@@ -996,7 +1011,7 @@ public sealed class TenantAdminProductServiceTests
 
         public Task<TenantAdminProductCreateResponse> CreateProductAsync(
             Guid tenantId,
-            Guid userId,
+            Guid? userId,
             TenantAdminProductCreateRequest request,
             Guid unitId,
             DateTimeOffset now,
@@ -1081,6 +1096,81 @@ public sealed class TenantAdminProductServiceTests
             TenantAdminProductDashboardQuery query,
             CancellationToken cancellationToken) =>
             Task.FromResult(DashboardRaw);
+
+        public bool ActiveCategoryExists { get; init; } = true;
+
+        public bool ProductCodeExists { get; init; }
+
+        public Guid? DefaultInventoryUomId { get; init; } = Guid.NewGuid();
+
+        public SaveProductDraftResult DraftResult { get; init; } =
+            SaveProductDraftResult.Success(new ProductDraftResponse(
+                Guid.NewGuid(),
+                "Draft Product",
+                "DRF-001",
+                ProductConstants.DraftStatus,
+                ProductConstants.DesiredPublishActive,
+                1,
+                DateTimeOffset.UtcNow,
+                1,
+                Guid.NewGuid(),
+                null,
+                null,
+                null,
+                true,
+                false,
+                false,
+                false,
+                false,
+                ProductStructureConstants.Simple,
+                false,
+                []));
+
+        public ProductSetupWizardDto? SetupDto { get; init; }
+
+        public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>("ACTIVE");
+
+        public Task<bool> IsInitialCreationDraftAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<bool> ActiveCategoryExistsAsync(
+            Guid tenantId,
+            Guid categoryId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ActiveCategoryExists);
+
+        public Task<bool> ProductCodeExistsAsync(
+            Guid tenantId,
+            string productCode,
+            Guid? excludeProductId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ProductCodeExists);
+
+        public Task<Guid?> GetDefaultInventoryUomIdAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(DefaultInventoryUomId);
+
+        public Task<bool> HasOperationalHistoryAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<SaveProductDraftResult> SaveProductDraftAsync(
+            Guid tenantId,
+            Guid userId,
+            SaveProductDraftCommand command,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(DraftResult);
+
+        public Task<ProductSetupWizardDto?> GetSetupAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(SetupDto);
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
@@ -1249,6 +1339,14 @@ public sealed class TenantAdminProductServiceTests
             LastProductId = productId;
             LastOutcome = outcome;
             LastStatus = status;
+        }
+
+        public void LogStep2DraftUpdated(
+            Guid tenantId, Guid userId, Guid productId, string oldStructure, string newStructure,
+            bool oldTrackInventory, bool newTrackInventory, bool oldBatchTracking, bool newBatchTracking,
+            bool oldExpiryTracking, bool newExpiryTracking, bool oldSerialTracking, bool newSerialTracking,
+            long rowVersion)
+        {
         }
     }
 }

@@ -9,7 +9,10 @@ public sealed record TenantAdminUserListItemResponse(
     string RoleName,
     string OutletName,
     string Status,
-    DateTimeOffset? LastActiveAt);
+    DateTimeOffset? LastActiveAt,
+    string? RoleDescription = null,
+    IReadOnlyList<OutletOptionResponse>? Outlets = null,
+    int OutletCount = 0);
 
 public sealed record TenantAdminUserListResponse(
     IReadOnlyList<TenantAdminUserListItemResponse> Items,
@@ -20,7 +23,8 @@ public sealed record TenantAdminUserListResponse(
 public sealed record RoleOptionResponse(
     Guid RoleId,
     string RoleName,
-    string RoleCode);
+    string RoleCode,
+    string? RoleDescription = null);
 
 public sealed record OutletOptionResponse(
     Guid OutletId,
@@ -41,7 +45,8 @@ public sealed record PermissionGroupResponse(
 public sealed record TenantAdminUserCreateOptionsResponse(
     IReadOnlyList<RoleOptionResponse> Roles,
     IReadOnlyList<OutletOptionResponse> Outlets,
-    IReadOnlyList<PermissionGroupResponse> PermissionGroups);
+    IReadOnlyList<PermissionGroupResponse> PermissionGroups,
+    IReadOnlyList<string> SupportedStatuses);
 
 public sealed record TenantAdminUserCreateRequest(
     string FullName,
@@ -52,7 +57,11 @@ public sealed record TenantAdminUserCreateRequest(
     bool PermissionOverrideEnabled,
     IReadOnlyList<Guid>? OverriddenPermissionIds,
     bool SendInviteEmail,
-    string? ProfileImageFile = null);
+    string? ProfileImageFile = null,
+    string? EmployeeId = null,
+    string? CreateStatus = null,
+    Guid? ProfileMediaAssetId = null,
+    string? AccountStatus = null);
 
 public sealed record TenantAdminUserUpdateRequest(
     string FullName,
@@ -63,7 +72,9 @@ public sealed record TenantAdminUserUpdateRequest(
     bool PermissionOverrideEnabled,
     IReadOnlyList<Guid>? OverriddenPermissionIds,
     string Status,
-    string? ProfileImageFile = null);
+    string? ProfileImageFile = null,
+    Guid? ProfileMediaAssetId = null,
+    string? ProfileMediaAction = null);
 
 public sealed record TenantAdminUserDetailResponse(
     Guid UserId,
@@ -78,4 +89,14 @@ public sealed record TenantAdminUserDetailResponse(
     IReadOnlyList<Guid> OverriddenPermissionIds,
     DateTimeOffset? LastActiveAt,
     DateTimeOffset CreatedAt,
-    string? ProfileImageUrl);
+    string? ProfileImageUrl,
+    string? RoleDescription = null,
+    int OutletCount = 0,
+    TenantAdminUserAccessSummaryResponse? AccessSummary = null,
+    string? EmployeeId = null,
+    string? StaffCode = null);
+
+public sealed record TenantAdminUserAccessSummaryResponse(
+    int OutletCount,
+    int ModuleCount,
+    int PermissionCount);

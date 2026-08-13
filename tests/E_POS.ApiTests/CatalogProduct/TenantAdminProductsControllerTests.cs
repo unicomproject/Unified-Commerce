@@ -3,7 +3,9 @@ using System.Security.Claims;
 using E_POS.Api.Common;
 using E_POS.Api.Controllers.V1.Tenant.CatalogProduct;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Shared.Media.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using Microsoft.AspNetCore.Authorization;
@@ -64,6 +66,7 @@ public sealed class TenantAdminProductsControllerTests
     public async Task GetCreateOptions_WithTenantProductsCreate_ReturnsOk()
     {
         var options = new TenantAdminProductCreateOptionsResponse(
+            [],
             [],
             [],
             [],
@@ -561,6 +564,7 @@ public sealed class TenantAdminProductsControllerTests
             "PIECE",
             null,
             null,
+            null,
             [],
             null,
             10m,
@@ -591,6 +595,7 @@ public sealed class TenantAdminProductsControllerTests
     {
         var controller = new TenantAdminProductsController(
             service,
+            new FakeCatalogMediaService(),
             new FakeTenantRequestContextFactory());
         controller.ControllerContext = new ControllerContext
         {
@@ -666,7 +671,7 @@ public sealed class TenantAdminProductsControllerTests
 
         public ApplicationResult<TenantAdminProductCreateOptionsResponse> CreateOptionsResult { get; init; } =
             ApplicationResult<TenantAdminProductCreateOptionsResponse>.Success(
-                new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], []));
+                new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []));
 
         public ApplicationResult<TenantAdminProductCreateResponse> CreateResult { get; init; } =
             ApplicationResult<TenantAdminProductCreateResponse>.Success(
@@ -684,6 +689,7 @@ public sealed class TenantAdminProductsControllerTests
                     null,
                     null,
                     "PIECE",
+                    null,
                     null,
                     null,
                     [],
@@ -713,6 +719,7 @@ public sealed class TenantAdminProductsControllerTests
                     null,
                     null,
                     "PIECE",
+                    null,
                     null,
                     null,
                     [],
@@ -824,6 +831,138 @@ public sealed class TenantAdminProductsControllerTests
                         false,
                         false,
                         0)));
+
+        public ApplicationResult<ProductDraftResponse> DraftResult { get; init; } =
+            ApplicationResult<ProductDraftResponse>.Success(
+                new ProductDraftResponse(
+                    Guid.NewGuid(),
+                    "Draft Product",
+                    "DRF-001",
+                    "DRAFT",
+                    "ACTIVE",
+                    1,
+                    DateTimeOffset.UtcNow,
+                    1,
+                    Guid.NewGuid(),
+                    null,
+                    null,
+                    null,
+                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "SIMPLE",
+                    false,
+                    []));
+
+        public ApplicationResult<ProductSetupWizardDto> SetupResult { get; init; } =
+            ApplicationResult<ProductSetupWizardDto>.Success(
+                new ProductSetupWizardDto(
+                    Guid.NewGuid(),
+                    "Draft Product",
+                    "DRF-001",
+                    "DRAFT",
+                    "ACTIVE",
+                    1,
+                    DateTimeOffset.UtcNow,
+                    1,
+                    Guid.NewGuid(),
+                    null,
+                    null,
+                    null,
+                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "SIMPLE",
+                    false,
+                    []));
+
+        public Task<ApplicationResult<ProductDraftResponse>> SaveDraftAsync(
+            TenantRequestContext context,
+            SaveProductDraftRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(DraftResult);
+
+        public Task<ApplicationResult<ProductDraftResponse>> UpdateDraftAsync(
+            TenantRequestContext context,
+            Guid productId,
+            SaveProductDraftRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(DraftResult);
+
+        public Task<ApplicationResult<ProductSetupWizardDto>> GetSetupAsync(
+            TenantRequestContext context,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(SetupResult);
+    }
+
+
+
+    private sealed class FakeCatalogMediaService : ICatalogMediaService
+    {
+        public Task<ApplicationResult<MediaAssetUploadResponse>> UploadProductImageAsync(
+            TenantRequestContext context,
+            Guid productId,
+            ProductImageUploadRequest request,
+            MediaUploadFile file,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<MediaAssetUploadResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
+        public Task<ApplicationResult<StagedProductImageResponse>> StageProductImageAsync(
+            TenantRequestContext context,
+            MediaUploadFile file,
+            Guid? uploadSessionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
+        public Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
+            TenantRequestContext context,
+            Guid productId,
+            ReorderProductImagesRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<ProductImagesMutationResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
+        public Task<ApplicationResult<ProductImagesMutationResponse>> DeleteProductImageAsync(
+            TenantRequestContext context,
+            Guid productId,
+            Guid productImageId,
+            long? expectedRowVersion,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<ProductImagesMutationResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
+        public Task<ApplicationResult<ProductImagesMutationResponse>> ReplaceProductImagesAsync(
+            TenantRequestContext context,
+            Guid productId,
+            long expectedRowVersion,
+            IReadOnlyList<MediaUploadFile>? files,
+            IReadOnlyList<Guid>? stagedMediaAssetIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<ProductImagesMutationResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
+        public Task<ApplicationResult<MediaAssetUploadResponse>> UploadCategoryImageAsync(
+            TenantRequestContext context,
+            Guid categoryId,
+            MediaUploadFile file,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<MediaAssetUploadResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
+        public Task<ApplicationResult<MediaAssetUploadResponse>> UploadBrandLogoAsync(
+            TenantRequestContext context,
+            Guid brandId,
+            MediaUploadFile file,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<MediaAssetUploadResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory

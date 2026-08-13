@@ -86,7 +86,8 @@ public sealed class TenantAdminUsersController : ControllerBase
                 "Invalid tenant context.")));
         }
 
-        var result = await _tenantAdminUserService.CreateAsync(context, request, cancellationToken);
+        var idempotencyKey = Request.Headers["Idempotency-Key"].ToString();
+        var result = await _tenantAdminUserService.CreateAsync(context, request, cancellationToken, idempotencyKey);
         if (result.IsSuccess && result.Value is not null)
         {
             return CreatedAtAction(
@@ -131,6 +132,36 @@ public sealed class TenantAdminUsersController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpPost("{id:guid}/resend-invite")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ResendInvite(Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "user.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminUserService.ResendInviteAsync(context, id, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpPost("{id:guid}/revoke-invite")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> RevokeInvite(Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "user.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminUserService.RevokeInviteAsync(context, id, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
@@ -164,7 +195,8 @@ public sealed class TenantAdminUsersController : ControllerBase
                 StatusCodes.Status403Forbidden,
                 CreateError(error)),
             "user.not_found" or "user.role_not_found" or "user.outlet_not_found" => NotFound(CreateError(error)),
-            "user.duplicate_email" or "user.delete_conflict" or "user.cannot_delete_self" => Conflict(CreateError(error)),
+            "user.duplicate_email" or "user.delete_conflict" or "user.cannot_delete_self" or
+                "user.idempotency_conflict" or "user.idempotency_in_progress" or "user.invite_not_available" => Conflict(CreateError(error)),
             "subscription_limit_reached" or "subscription_limit_configuration_missing" or "subscription_limit_invalid" or "subscription_limit_evaluation_failed" or "subscription_limit_unknown_key" or "subscription_limit_not_enforced" => Conflict(CreateError(error)),
             "user.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error)),

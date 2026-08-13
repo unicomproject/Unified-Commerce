@@ -54,6 +54,7 @@ public sealed class ProductInventorySettingConfiguration : IEntityTypeConfigurat
             t.HasCheckConstraint("ck_product_inventory_settings_expiry_requires_batch", "requires_expiry_tracking = false OR requires_batch_tracking = true");
             t.HasCheckConstraint("ck_product_inventory_settings_batch_requires_stock", "requires_batch_tracking = false OR is_stock_tracked = true");
             t.HasCheckConstraint("ck_product_inventory_settings_serial_requires_stock", "requires_serial_tracking = false OR is_stock_tracked = true");
+            t.HasCheckConstraint("ck_product_inventory_settings_serial_no_batch_or_expiry", "requires_serial_tracking = false OR (requires_batch_tracking = false AND requires_expiry_tracking = false)");
             t.HasCheckConstraint("ck_product_inventory_settings_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
         });
     }

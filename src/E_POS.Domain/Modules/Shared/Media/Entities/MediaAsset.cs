@@ -70,6 +70,18 @@ public sealed class MediaAsset : AuditableEntity
         };
     }
 
+    public void MarkActive(Guid? userId, DateTimeOffset now)
+    {
+        if (Status == "DELETED")
+        {
+            return;
+        }
+
+        Status = "ACTIVE";
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
     public void MarkInactive(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
         if (Status == "DELETED")

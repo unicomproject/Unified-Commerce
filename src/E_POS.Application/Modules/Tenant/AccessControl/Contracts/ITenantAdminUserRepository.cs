@@ -1,6 +1,8 @@
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
+using E_POS.Domain.Modules.Shared.Integration.Entities;
+using E_POS.Domain.Modules.Shared.Audit.Entities;
 
 namespace E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 
@@ -27,6 +29,9 @@ public interface ITenantAdminUserRepository
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PermissionGroupResponse>> GetPermissionGroupsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> actorPermissionCodes,
+        DateTimeOffset now,
         CancellationToken cancellationToken);
 
     Task<bool> RoleBelongsToTenantAsync(
@@ -34,7 +39,19 @@ public interface ITenantAdminUserRepository
         Guid roleId,
         CancellationToken cancellationToken);
 
+    Task<TenantAdminUserAccessValidationResult> ValidateRoleAssignmentAsync(
+        Guid tenantId,
+        Guid roleId,
+        IReadOnlyCollection<string> actorPermissionCodes,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
     Task<bool> OutletsBelongToTenantAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> outletIds,
+        CancellationToken cancellationToken);
+
+    Task<TenantAdminUserAccessValidationResult> ValidateOutletSelectionAsync(
         Guid tenantId,
         IReadOnlyCollection<Guid> outletIds,
         CancellationToken cancellationToken);
@@ -49,12 +66,46 @@ public interface ITenantAdminUserRepository
         IReadOnlyCollection<Guid> permissionIds,
         CancellationToken cancellationToken);
 
+    Task<TenantAdminUserAccessValidationResult> ValidatePermissionOverridesAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> permissionIds,
+        IReadOnlyCollection<string> actorPermissionCodes,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<TenantAdminUserProfileMediaValidationResult> ValidateProfileMediaAsync(
+        Guid tenantId,
+        Guid mediaAssetId,
+        Guid? targetUserId,
+        CancellationToken cancellationToken);
+
     Task<Guid> CreateAsync(
         TenantUser user,
         Guid roleId,
         IReadOnlyCollection<Guid> outletIds,
         IReadOnlyCollection<Guid> overriddenPermissionIds,
         UserInvite? invite,
+        TenantUserInviteDeliverySecret? deliverySecret,
+        IntegrationOutboxMessage? outboxMessage,
+        IReadOnlyCollection<AuditLog> auditLogs,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<TenantAdminUserInviteMutationResult> ResendInviteAsync(
+        Guid tenantId,
+        Guid actorUserId,
+        Guid userId,
+        string inviteTokenHash,
+        string encryptedToken,
+        string keyVersion,
+        DateTimeOffset expiresAt,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<TenantAdminUserInviteMutationResult> RevokeInviteAsync(
+        Guid tenantId,
+        Guid actorUserId,
+        Guid userId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
@@ -79,6 +130,16 @@ public interface ITenantAdminUserRepository
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
+    Task ApplyProfileMediaChangeAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid actorUserId,
+        Guid? previousMediaAssetId,
+        Guid? nextMediaAssetId,
+        string auditAction,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 
     Task<bool> HasSalesReferencesAsync(
@@ -90,4 +151,70 @@ public interface ITenantAdminUserRepository
         Guid tenantId,
         Guid userId,
         CancellationToken cancellationToken);
+}
+
+public sealed record TenantAdminUserAccessValidationResult(
+    bool IsValid,
+    TenantAdminUserAccessValidationFailure Failure = TenantAdminUserAccessValidationFailure.None)
+{
+    public static TenantAdminUserAccessValidationResult Valid { get; } = new(true);
+    public static TenantAdminUserAccessValidationResult Invalid(TenantAdminUserAccessValidationFailure failure) =>
+        new(false, failure);
+}
+
+public enum TenantAdminUserAccessValidationFailure
+{
+    None,
+    RoleNotFound,
+    RoleWrongTenant,
+    RoleInactive,
+    RoleNotDelegable,
+    OutletNotFound,
+    OutletWrongTenant,
+    OutletInactive,
+    PermissionNotFound,
+    PermissionInactive,
+    PermissionNotAssignable,
+    TenantEntitlementMissing,
+    ActorCannotDelegate,
+    InvalidScope
+}
+
+public sealed record TenantAdminUserProfileMediaValidationResult(
+    bool IsValid,
+    TenantAdminUserProfileMediaValidationFailure Failure = TenantAdminUserProfileMediaValidationFailure.None,
+    string? ResolvedUrl = null)
+{
+    public static TenantAdminUserProfileMediaValidationResult Valid(string? resolvedUrl) => new(true, ResolvedUrl: resolvedUrl);
+    public static TenantAdminUserProfileMediaValidationResult Invalid(TenantAdminUserProfileMediaValidationFailure failure) =>
+        new(false, failure);
+}
+
+public enum TenantAdminUserProfileMediaValidationFailure
+{
+    None,
+    NotFound,
+    WrongTenant,
+    NotImage,
+    NotAttachable,
+    Deleted,
+    Expired,
+    IncompatibleOwner
+}
+
+public sealed record TenantAdminUserInviteMutationResult(
+    TenantAdminUserInviteMutationStatus Status,
+    TenantAdminUserDetailResponse? Response = null,
+    Guid? InviteId = null)
+{
+    public static TenantAdminUserInviteMutationResult Success(TenantAdminUserDetailResponse response, Guid? inviteId = null) =>
+        new(TenantAdminUserInviteMutationStatus.Success, response, inviteId);
+}
+
+public enum TenantAdminUserInviteMutationStatus
+{
+    Success,
+    NotFound,
+    NotEligible,
+    NoUsableInvite
 }

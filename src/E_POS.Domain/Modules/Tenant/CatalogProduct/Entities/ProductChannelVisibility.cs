@@ -48,5 +48,13 @@ public class ProductChannelVisibility : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void UpdateFlags(bool isVisible, bool isOrderable, Guid? userId, DateTimeOffset now)
+    {
+        IsVisible = isVisible;
+        IsOrderable = isOrderable;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
 }
 

@@ -113,6 +113,11 @@ public sealed class ProductImageConfiguration : IEntityTypeConfiguration<Product
             .IsUnique()
             .HasDatabaseName("uq_product_images_tenant_id_id");
 
+        builder.HasIndex(x => new { x.TenantId, x.ProductId })
+            .IsUnique()
+            .HasFilter("is_primary_image = true AND status = 'ACTIVE' AND product_variant_id IS NULL")
+            .HasDatabaseName("uq_product_images_tenant_product_primary");
+
         builder.ToTable(t => t.HasCheckConstraint("ck_product_images_sort_order", "sort_order >= 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_product_images_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }

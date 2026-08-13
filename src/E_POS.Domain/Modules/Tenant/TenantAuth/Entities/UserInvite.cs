@@ -11,6 +11,7 @@ public class UserInvite : AuditableEntity
     public string? InvitedPhone { get; protected set; }
     public string? NormalizedInvitedPhone { get; protected set; }
     public Guid? AcceptedTenantUserId { get; protected set; }
+    public Guid? TenantUserId { get; protected set; }
     public Guid? InitialRoleId { get; protected set; }
     public Guid? InitialOutletId { get; protected set; }
     public string InviteTokenHash { get; protected set; } = string.Empty;
@@ -33,7 +34,8 @@ public class UserInvite : AuditableEntity
         Guid? invitedByPlatformUserId,
         string inviteTokenHash,
         DateTimeOffset expiresAt,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? tenantUserId = null)
     {
         return new UserInvite
         {
@@ -42,6 +44,7 @@ public class UserInvite : AuditableEntity
             InvitedEmail = invitedEmail,
             NormalizedInvitedEmail = normalizedInvitedEmail,
             InitialRoleId = initialRoleId,
+            TenantUserId = tenantUserId,
             InvitedByPlatformUserId = invitedByPlatformUserId,
             InviteTokenHash = inviteTokenHash,
             InviteStatus = UserInviteConstants.StatusPending,
@@ -58,6 +61,18 @@ public class UserInvite : AuditableEntity
         CancelledAt = now;
         UpdatedAt = now;
     }
+
+    public void Revoke(DateTimeOffset now)
+    {
+        if (InviteStatus == UserInviteConstants.StatusAccepted)
+            throw new InvalidOperationException("An accepted invitation cannot be revoked.");
+        if (InviteStatus == UserInviteConstants.StatusRevoked) return;
+        InviteStatus = UserInviteConstants.StatusRevoked;
+        CancelledAt = now;
+        UpdatedAt = now;
+    }
+
+    public bool Targets(Guid tenantUserId) => TenantUserId == tenantUserId;
 
     public void MarkSent(DateTimeOffset now)
     {

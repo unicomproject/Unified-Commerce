@@ -102,7 +102,8 @@ public sealed class PlatformDashboardRepositoryTests
             "standard",
             "system",
             "default",
-            Now));
+            Now,
+            staffCode: "USR-2026-96001"));
         dbContext.TenantUsers.Add(TenantUser.Create(
             Guid.Parse("55555555-5555-4555-8555-555555555502"),
             tenantOneId,
@@ -116,7 +117,8 @@ public sealed class PlatformDashboardRepositoryTests
             "standard",
             "system",
             "default",
-            Now));
+            Now,
+            staffCode: "USR-2026-96002"));
 
         await dbContext.SaveChangesAsync();
 

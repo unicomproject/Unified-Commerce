@@ -18,6 +18,15 @@ public static class PlatformPermissionCodes
     public const string TenantsSuspend = "platform.tenants.suspend";
     public const string TenantsEntitlementsUpdate = "platform.tenants.entitlements.update";
 
+    public const string TenantsBootstrapAccess = "platform.tenants.bootstrap.access";
+    public const string TenantsBootstrapOutletsManage = "platform.tenants.bootstrap.outlets.manage";
+    public const string TenantsBootstrapTillsManage = "platform.tenants.bootstrap.tills.manage";
+    public const string TenantsBootstrapRolesManage = "platform.tenants.bootstrap.roles.manage";
+    public const string TenantsBootstrapUsersManage = "platform.tenants.bootstrap.users.manage";
+    public const string TenantsBootstrapProductsManage = "platform.tenants.bootstrap.products.manage";
+    public const string TenantsBootstrapProductsImport = "platform.tenants.bootstrap.products.import";
+    public const string TenantsBootstrapOnlineStoreManage = "platform.tenants.bootstrap.online_store.manage";
+
     public const string SubscriptionPlansView = "platform.subscription_plans.view";
     public const string SubscriptionPlansCreate = "platform.subscription_plans.create";
     public const string SubscriptionPlansEdit = "platform.subscription_plans.edit";
@@ -67,6 +76,14 @@ public static class PlatformPermissionCodes
         TenantsActivate,
         TenantsSuspend,
         TenantsEntitlementsUpdate,
+        TenantsBootstrapAccess,
+        TenantsBootstrapOutletsManage,
+        TenantsBootstrapTillsManage,
+        TenantsBootstrapRolesManage,
+        TenantsBootstrapUsersManage,
+        TenantsBootstrapProductsManage,
+        TenantsBootstrapProductsImport,
+        TenantsBootstrapOnlineStoreManage,
         SubscriptionPlansView,
         SubscriptionPlansCreate,
         SubscriptionPlansEdit,

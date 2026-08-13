@@ -200,7 +200,7 @@ public sealed class Flow4FixtureStore(
             invoiceId, 125m, "LKR", $"MANUAL-{suffix}", now);
         db.SubscriptionPaymentTransactions.Add(payment);
         db.TenantUsers.Add(TenantUser.CreatePendingInvite(adminId, tenantId, $"tenant-admin-{suffix}@example.test",
-            "Tenant Admin", null, null, now));
+            "Tenant Admin", null, null, now, $"USR-{now:yyyy}-99101"));
         db.TenantRoles.Add(TenantRole.Create(roleId, tenantId, roleTemplate.RoleTemplateId, roleTemplate.VersionId,
             "TENANT_ADMIN", "Tenant Admin", "Tenant administrator", false, true, null, now));
         db.TenantUserRoles.Add(TenantUserRole.Create(userRoleId, tenantId, adminId, roleId, null, now));

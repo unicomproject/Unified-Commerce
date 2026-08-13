@@ -1,4 +1,4 @@
-using E_POS.Application.Modules.Tenant.Inventory.Contracts;
+using E_POS.Application.Modules.Tenant.Inventory.Shared.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace E_POS.Infrastructure.Modules.Tenant.Inventory.Services;

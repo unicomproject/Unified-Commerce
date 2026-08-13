@@ -169,8 +169,22 @@ app.UseMiddleware<PaymentAccessRequestRedactionMiddleware>();
 // Convert unexpected runtime failures into safe standard API errors.
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+
 app.UseCors("AllowAll");
 app.UseStaticFiles();
+
+var mediaStoragePath = Path.Combine(AppContext.BaseDirectory, "App_Data", "media-storage");
+if (!Directory.Exists(mediaStoragePath))
+{
+    Directory.CreateDirectory(mediaStoragePath);
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(mediaStoragePath),
+    RequestPath = "/uploads"
+});
 
 if (app.Environment.IsDevelopment())
 {

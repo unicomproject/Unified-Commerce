@@ -1,4 +1,5 @@
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Shared.Media.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Api.Common;
@@ -13,13 +14,16 @@ namespace E_POS.Api.Controllers.V1.Tenant.CatalogProduct;
 public sealed class TenantAdminProductsController : ControllerBase
 {
     private readonly ITenantAdminProductService _tenantAdminProductService;
+    private readonly ICatalogMediaService _catalogMediaService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
     public TenantAdminProductsController(
         ITenantAdminProductService tenantAdminProductService,
+        ICatalogMediaService catalogMediaService,
         ITenantRequestContextFactory tenantRequestContextFactory)
     {
         _tenantAdminProductService = tenantAdminProductService;
+        _catalogMediaService = catalogMediaService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }
 
@@ -228,6 +232,108 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpPost("draft")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SaveDraft(
+        [FromBody] SaveProductDraftRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.SaveDraftAsync(context, request, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Created(
+                $"/api/v1/tenant-admin/products/{result.Value.ProductId}/setup",
+                new { data = result.Value });
+        }
+
+        return ToErrorResult(result.Error);
+    }
+
+    [HttpPut("{id:guid}/draft")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateDraft(
+        Guid id,
+        [FromBody] SaveProductDraftRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.UpdateDraftAsync(context, id, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpGet("{id:guid}/setup")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSetup(Guid id, CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.GetSetupAsync(context, id, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpPost("images/stage")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> StageImage(
+        IFormFile? file,
+        [FromForm] Guid? uploadSessionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(CreateError(new ApplicationError(
+                "media.validation_failed",
+                "Image validation failed.",
+                [new ApplicationFieldError("file", "Image file is required.")])));
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await _catalogMediaService.StageProductImageAsync(
+            context,
+            new MediaUploadFile(
+                stream,
+                file.FileName,
+                file.ContentType,
+                file.Length),
+            uploadSessionId,
+            cancellationToken);
+
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { data = result.Value })
+            : ToMediaErrorResult(result.Error);
+    }
+
     private IActionResult ToActionResult<T>(ApplicationResult<T> result)
     {
         if (result.IsSuccess && result.Value is not null)
@@ -242,16 +348,39 @@ public sealed class TenantAdminProductsController : ControllerBase
     {
         return error.Code switch
         {
-            "product.permission_denied" => StatusCode(
+            "product.permission_denied" or "product.entitlement_denied" or "product.tenant_blocked" => StatusCode(
                 StatusCodes.Status403Forbidden,
                 CreateError(error)),
             "product.invalid_tenant_context" => Unauthorized(CreateError(error)),
-            "product.validation_failed" => BadRequest(CreateError(error)),
+            "product.invalid_product_structure" or
+            "product.track_inventory_required_for_batch" or
+            "product.track_inventory_required_for_expiry" or
+            "product.track_inventory_required_for_serial" or
+            "product.batch_required_for_expiry" or
+            "product.serial_incompatible_with_batch" or
+            "product.serial_incompatible_with_expiry" or
+            "product.row_version_required" or
+            "product.unsafe_product_structure_transition" or
+            "product.unsafe_tracking_change" or
+            "product.validation_failed" or
             "product.delete_blocked" => BadRequest(CreateError(error)),
             "product.not_found" => NotFound(CreateError(error)),
-            "product.duplicate_sku" or "product.duplicate_barcode" => StatusCode(
+            "product.concurrency_conflict" or "product.duplicate_sku" or "product.duplicate_barcode" => StatusCode(
                 StatusCodes.Status409Conflict,
                 CreateError(error)),
+            _ => BadRequest(CreateError(error)),
+        };
+    }
+
+    private IActionResult ToMediaErrorResult(ApplicationError error)
+    {
+        return error.Code switch
+        {
+            "media.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+            "media.file_size_exceeded" => StatusCode(StatusCodes.Status413PayloadTooLarge, CreateError(error)),
+            "media.max_images_exceeded" => BadRequest(CreateError(error)),
+            "media.storage_not_configured" or "media.storage_unavailable" =>
+                StatusCode(StatusCodes.Status503ServiceUnavailable, CreateError(error)),
             _ => BadRequest(CreateError(error)),
         };
     }

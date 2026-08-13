@@ -1,4 +1,5 @@
 using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.Tenant.Inventory.Services;
 
 namespace E_POS.Domain.Modules.Tenant.Inventory.Entities;
 
@@ -36,6 +37,9 @@ public class ProductInventorySetting : AuditableEntity
         Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
+        var (normalizedStock, normalizedBatch, normalizedExpiry, normalizedSerial) =
+            ProductTrackingRules.NormalizeProfile(isStockTracked, requiresBatchTracking, requiresExpiryTracking, requiresSerialTracking);
+
         return new ProductInventorySetting
         {
             Id = id,
@@ -43,11 +47,11 @@ public class ProductInventorySetting : AuditableEntity
             ProductId = productId,
             ProductVariantId = productVariantId,
             InventoryUomId = inventoryUomId,
-            IsStockTracked = isStockTracked,
+            IsStockTracked = normalizedStock,
             AllowNegativeStock = allowNegativeStock,
-            RequiresBatchTracking = requiresBatchTracking,
-            RequiresExpiryTracking = requiresExpiryTracking,
-            RequiresSerialTracking = requiresSerialTracking,
+            RequiresBatchTracking = normalizedBatch,
+            RequiresExpiryTracking = normalizedExpiry,
+            RequiresSerialTracking = normalizedSerial,
             CostingMethod = costingMethod.Trim(),
             Status = status.Trim(),
             CreatedByTenantUserId = createdByTenantUserId,
@@ -67,12 +71,15 @@ public class ProductInventorySetting : AuditableEntity
         Guid? updatedByTenantUserId,
         DateTimeOffset now)
     {
+        var (normalizedStock, normalizedBatch, normalizedExpiry, normalizedSerial) =
+            ProductTrackingRules.NormalizeProfile(isStockTracked, requiresBatchTracking, requiresExpiryTracking, requiresSerialTracking);
+
         InventoryUomId = inventoryUomId;
-        IsStockTracked = isStockTracked;
+        IsStockTracked = normalizedStock;
         AllowNegativeStock = allowNegativeStock;
-        RequiresBatchTracking = requiresBatchTracking;
-        RequiresExpiryTracking = requiresExpiryTracking;
-        RequiresSerialTracking = requiresSerialTracking;
+        RequiresBatchTracking = normalizedBatch;
+        RequiresExpiryTracking = normalizedExpiry;
+        RequiresSerialTracking = normalizedSerial;
         CostingMethod = costingMethod.Trim();
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;

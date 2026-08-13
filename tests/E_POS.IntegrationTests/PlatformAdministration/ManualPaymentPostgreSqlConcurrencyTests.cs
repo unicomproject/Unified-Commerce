@@ -202,7 +202,8 @@ public sealed class ManualPaymentPostgreSqlConcurrencyTests
             ids.PaymentId, ids.InvoiceId, "private-test", $"manual/{ids.EvidenceId:D}.pdf", "proof.pdf", "proof.pdf",
             "application/pdf", 100, new string('1', 64), 1, ManualPaymentConstants.ScanClean, Now.AddMinutes(1)));
         db.TenantUsers.Add(TenantUser.CreatePendingInvite(ids.AdminUserId, ids.TenantId,
-            $"tenant-admin-{ids.Suffix}@example.test", "Tenant Admin", null, null, Now));
+            $"tenant-admin-{ids.Suffix}@example.test", "Tenant Admin", null, null, Now,
+            $"USR-{Now:yyyy}-99201"));
         db.TenantRoles.Add(TenantRole.Create(ids.RoleId, ids.TenantId, roleTemplate.RoleTemplateId,
             roleTemplate.VersionId, "TENANT_ADMIN", "Tenant Admin",
             "Tenant administrator", false, true, null, Now));

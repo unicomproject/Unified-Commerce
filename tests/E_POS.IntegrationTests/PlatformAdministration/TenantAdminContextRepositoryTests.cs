@@ -50,7 +50,8 @@ public sealed class TenantAdminContextRepositoryTests
             "admin",
             "admin",
             "HQ",
-            Now));
+            Now,
+            staffCode: "USR-2026-98001"));
 
         dbContext.PlatformModules.Add(PlatformModule.Create(
             moduleId,
@@ -162,7 +163,8 @@ public sealed class TenantAdminContextRepositoryTests
             "admin",
             "admin",
             "HQ",
-            Now));
+            Now,
+            staffCode: "USR-2026-98002"));
 
         dbContext.PlatformModules.Add(PlatformModule.Create(
             moduleId,

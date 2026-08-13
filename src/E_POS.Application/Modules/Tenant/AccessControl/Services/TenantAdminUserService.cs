@@ -1,11 +1,19 @@
 using System.Net.Mail;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using E_POS.Application.Common.Idempotency;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Shared.Audit.Entities;
+using E_POS.Domain.Modules.Shared.Integration.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
@@ -14,6 +22,8 @@ namespace E_POS.Application.Modules.Tenant.AccessControl.Services;
 
 public sealed class TenantAdminUserService : ITenantAdminUserService
 {
+    private const string CreateUserOperation = "TENANT_ADMIN_CREATE_USER";
+
     private static readonly ApplicationError PermissionDenied = new(
         "user.permission_denied",
         "Permission denied for user management.");
@@ -27,22 +37,43 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
     private static readonly ApplicationError InvalidPermissions = new(
         "user.invalid_permissions",
         "One or more selected permissions are invalid.");
+    private static readonly ApplicationError InvalidIdempotencyKey = new(
+        "user.invalid_idempotency_key",
+        "A valid Idempotency-Key header is required to create a user.");
+    private static readonly ApplicationError InviteNotAvailable = new(
+        "user.invite_not_available",
+        "No usable pending invitation is available for this user.");
+    private static readonly ApplicationError InvalidProfileMedia = new(
+        "user.profile_media_invalid",
+        "Profile image media is not valid for this user.");
 
+    private readonly IIdempotencyService _idempotencyService;
     private readonly ITenantAdminUserRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IPasswordHashService _passwordHashService;
     private readonly ITenantResourceLimitGuard _resourceLimitGuard;
+    private readonly ITenantUserStaffCodeService _staffCodeService;
+    private readonly IInvitationTokenService _invitationTokenService;
+    private readonly Lazy<IInvitationDeliverySecretProtector> _deliverySecretProtector;
 
     public TenantAdminUserService(
+        IIdempotencyService idempotencyService,
         ITenantAdminUserRepository repository,
         IDateTimeProvider dateTimeProvider,
         IPasswordHashService passwordHashService,
-        ITenantResourceLimitGuard resourceLimitGuard)
+        ITenantResourceLimitGuard resourceLimitGuard,
+        ITenantUserStaffCodeService staffCodeService,
+        IInvitationTokenService invitationTokenService,
+        Lazy<IInvitationDeliverySecretProtector> deliverySecretProtector)
     {
+        _idempotencyService = idempotencyService;
         _repository = repository;
         _dateTimeProvider = dateTimeProvider;
         _passwordHashService = passwordHashService;
         _resourceLimitGuard = resourceLimitGuard;
+        _staffCodeService = staffCodeService;
+        _invitationTokenService = invitationTokenService;
+        _deliverySecretProtector = deliverySecretProtector;
     }
 
     public async Task<ApplicationResult<TenantAdminUserListResponse>> ListAsync(
@@ -105,24 +136,69 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             return ApplicationResult<TenantAdminUserCreateOptionsResponse>.Failure(accessError);
         }
 
-        var roles = await _repository.GetRoleOptionsAsync(context.TenantId, cancellationToken);
+        var now = _dateTimeProvider.UtcNow;
+        var roleOptions = await _repository.GetRoleOptionsAsync(context.TenantId, cancellationToken);
+        var roles = new List<RoleOptionResponse>(roleOptions.Count);
+        foreach (var role in roleOptions)
+        {
+            var roleValidation = await _repository.ValidateRoleAssignmentAsync(
+                context.TenantId,
+                role.RoleId,
+                context.Permissions,
+                now,
+                cancellationToken);
+            if (roleValidation.IsValid)
+            {
+                roles.Add(role);
+            }
+        }
         var outlets = await _repository.GetOutletOptionsAsync(context.TenantId, cancellationToken);
-        var permissionGroups = await _repository.GetPermissionGroupsAsync(cancellationToken);
+        var permissionGroups = await _repository.GetPermissionGroupsAsync(
+            context.TenantId,
+            context.Permissions,
+            now,
+            cancellationToken);
 
         return ApplicationResult<TenantAdminUserCreateOptionsResponse>.Success(
-            new TenantAdminUserCreateOptionsResponse(roles, outlets, permissionGroups));
+            new TenantAdminUserCreateOptionsResponse(
+                roles,
+                outlets,
+                permissionGroups,
+                TenantAdminUserCreateStatusPolicy.SupportedStatuses));
     }
 
     public async Task<ApplicationResult<TenantAdminUserDetailResponse>> CreateAsync(
         TenantRequestContext context,
         TenantAdminUserCreateRequest request,
+        CancellationToken cancellationToken,
+        string? idempotencyKey = null)
+    {
+        var keyError = ValidateIdempotencyKey(idempotencyKey);
+        if (keyError is not null)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(keyError);
+        }
+
+        var requestHash = ComputeCreateRequestHash(request);
+        return await _idempotencyService.ExecuteAsync(
+            context.TenantId,
+            context.UserId,
+            CreateUserOperation,
+            idempotencyKey!.Trim(),
+            requestHash,
+            ct => CreateCoreAsync(context, request, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApplicationResult<TenantAdminUserDetailResponse>> CreateCoreAsync(
+        TenantRequestContext context,
+        TenantAdminUserCreateRequest request,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccessAny(
-            context,
-            TenantAdminUserPermissions.Create,
-            TenantAdminUserPermissions.Invite,
-            TenantAdminUserPermissions.Manage);
+        var createStatus = NormalizeCreateStatus(request);
+        var accessError = createStatus == TenantUserConstants.StatusInvited
+            ? ValidateAccessAny(context, TenantAdminUserPermissions.Invite, TenantAdminUserPermissions.Manage)
+            : ValidateAccessAny(context, TenantAdminUserPermissions.Create, TenantAdminUserPermissions.Manage);
         if (accessError is not null)
         {
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(accessError);
@@ -137,17 +213,29 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         {
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(validationError);
         }
+        if (createStatus is null)
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ValidationFailed("Create status must be Inactive or Invited."));
 
-        if (!await _repository.RoleBelongsToTenantAsync(context.TenantId, request.RoleId, cancellationToken))
+        var now = _dateTimeProvider.UtcNow;
+        var roleValidation = await _repository.ValidateRoleAssignmentAsync(
+            context.TenantId,
+            request.RoleId,
+            context.Permissions,
+            now,
+            cancellationToken);
+        if (!roleValidation.IsValid)
         {
-            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(RoleNotFound);
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(roleValidation.Failure));
         }
 
-        var outletIds = request.OutletIds ?? Array.Empty<Guid>();
-        if (outletIds.Count > 0 &&
-            !await _repository.OutletsBelongToTenantAsync(context.TenantId, outletIds, cancellationToken))
+        var outletIds = NormalizeIds(request.OutletIds);
+        var outletValidation = await _repository.ValidateOutletSelectionAsync(
+            context.TenantId,
+            outletIds,
+            cancellationToken);
+        if (!outletValidation.IsValid)
         {
-            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(OutletNotFound);
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(outletValidation.Failure));
         }
 
         var normalizedEmail = TenantUser.NormalizeEmail(request.Email);
@@ -158,37 +246,57 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 "A user with this email already exists for this tenant."));
         }
 
-        var permissionOverrideEnabled = request.PermissionOverrideEnabled &&
-            context.HasPermission(TenantAdminUserPermissions.PermissionOverride);
+        if (request.PermissionOverrideEnabled && !context.HasPermission(TenantAdminUserPermissions.PermissionOverride))
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(PermissionDenied);
+        var permissionOverrideEnabled = request.PermissionOverrideEnabled;
         var overriddenPermissionIds = permissionOverrideEnabled
-            ? (request.OverriddenPermissionIds ?? Array.Empty<Guid>())
-            : Array.Empty<Guid>();
-        if (overriddenPermissionIds.Count > 0 &&
-            !await _repository.PermissionIdsExistAsync(overriddenPermissionIds, cancellationToken))
+            ? NormalizeIds(request.OverriddenPermissionIds)
+            : [];
+        var permissionValidation = await _repository.ValidatePermissionOverridesAsync(
+            context.TenantId,
+            overriddenPermissionIds,
+            context.Permissions,
+            now,
+            cancellationToken);
+        if (!permissionValidation.IsValid)
         {
-            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(InvalidPermissions);
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(permissionValidation.Failure));
         }
 
-        var now = _dateTimeProvider.UtcNow;
+        if (request.ProfileMediaAssetId.HasValue)
+        {
+            var mediaValidation = await _repository.ValidateProfileMediaAsync(
+                context.TenantId,
+                request.ProfileMediaAssetId.Value,
+                targetUserId: null,
+                cancellationToken);
+            if (!mediaValidation.IsValid)
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToProfileMediaError(mediaValidation.Failure));
+            }
+        }
+
         var trimmedFullName = request.FullName.Trim();
         var trimmedPhone = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
         var userId = Guid.NewGuid();
+        var staffCode = await _staffCodeService.GenerateAsync(context.TenantId, now, cancellationToken);
 
         TenantUser user;
         UserInvite? invite = null;
-        var increasesCountedSeat = request.SendInviteEmail;
+        TenantUserInviteDeliverySecret? deliverySecret = null;
+        IntegrationOutboxMessage? outbox = null;
+        var audit = new List<AuditLog>();
+        var increasesCountedSeat = createStatus == TenantUserConstants.StatusInvited;
 
-        if (request.SendInviteEmail)
+        if (increasesCountedSeat)
         {
-            user = TenantUser.CreatePendingInvite(
-                userId,
-                context.TenantId,
-                request.Email.Trim(),
-                trimmedFullName,
-                trimmedPhone,
-                trimmedPhone,
-                now);
+            user = TenantUser.Create(userId, context.TenantId, request.Email.Trim(), trimmedFullName, trimmedPhone, trimmedPhone,
+                TenantUserConstants.PendingInvitePasswordHash, "empty_salt", TenantUserConstants.StatusInvited, "admin", "admin", null, now,
+                request.EmployeeId, staffCode);
 
+            var rawToken = _invitationTokenService.GenerateToken();
+            var protectedToken = _deliverySecretProtector.Value.Protect(rawToken);
+            var inviteTokenHash = _invitationTokenService.HashToken(rawToken);
             invite = UserInvite.CreatePending(
                 Guid.NewGuid(),
                 context.TenantId,
@@ -196,13 +304,19 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 normalizedEmail,
                 request.RoleId,
                 null,
-                Guid.NewGuid().ToString("N"),
+                inviteTokenHash,
                 now.AddDays(7),
-                now);
+                now,
+                userId);
+            deliverySecret = TenantUserInviteDeliverySecret.Create(Guid.NewGuid(), context.TenantId, userId, invite.Id,
+                protectedToken.Ciphertext, protectedToken.KeyVersion, invite.ExpiresAt, now);
+            outbox = IntegrationOutboxMessage.Create(Guid.NewGuid(), "tenant.user_invited", "TENANT_USER", userId, 1,
+                context.TenantId, Guid.NewGuid(), null,
+                JsonSerializer.Serialize(new { tenantId = context.TenantId, tenantUserId = userId, inviteId = invite.Id }),
+                $"tenant.user_invited:{invite.Id:N}", now);
         }
         else
         {
-            var placeholderPassword = _passwordHashService.HashPassword(Guid.NewGuid().ToString("N"));
             user = TenantUser.Create(
                 userId,
                 context.TenantId,
@@ -210,18 +324,34 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 trimmedFullName,
                 trimmedPhone,
                 trimmedPhone,
-                placeholderPassword,
-                "pbkdf2_embedded",
+                TenantUserConstants.PendingInvitePasswordHash,
+                "empty_salt",
                 TenantUserConstants.StatusInactive,
                 "admin",
                 "admin",
-                "HQ",
-                now);
+                null,
+                now,
+                request.EmployeeId,
+                staffCode);
+        }
+
+        if (request.ProfileMediaAssetId.HasValue)
+        {
+            user.SetProfileMediaAsset(request.ProfileMediaAssetId.Value, context.UserId, now);
+        }
+
+        audit.Add(NewAudit(context, userId, "user.created", now));
+        audit.Add(NewAudit(context, userId, "user.access_assigned", now));
+        if (invite is not null) audit.Add(NewAudit(context, userId, "user.invited", now, invite.Id));
+        if (overriddenPermissionIds.Count > 0) audit.Add(NewAudit(context, userId, "user.permission_override_changed", now));
+        if (request.ProfileMediaAssetId.HasValue)
+        {
+            audit.Add(NewAudit(context, userId, "user.profile_image_assigned", now, mediaAssetId: request.ProfileMediaAssetId.Value));
         }
 
         async Task<ApplicationResult<TenantAdminUserDetailResponse>> PersistAsync(CancellationToken ct)
         {
-            await _repository.CreateAsync(user, request.RoleId, outletIds, overriddenPermissionIds, invite, now, ct);
+            await _repository.CreateAsync(user, request.RoleId, outletIds, overriddenPermissionIds, invite, deliverySecret, outbox, audit, now, ct);
             var response = await _repository.GetDetailAsync(context.TenantId, userId, ct);
             return response is null
                 ? ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound)
@@ -313,16 +443,26 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound);
         }
 
-        if (!await _repository.RoleBelongsToTenantAsync(context.TenantId, request.RoleId, cancellationToken))
+        var now = _dateTimeProvider.UtcNow;
+        var roleValidation = await _repository.ValidateRoleAssignmentAsync(
+            context.TenantId,
+            request.RoleId,
+            context.Permissions,
+            now,
+            cancellationToken);
+        if (!roleValidation.IsValid)
         {
-            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(RoleNotFound);
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(roleValidation.Failure));
         }
 
-        var outletIds = request.OutletIds ?? Array.Empty<Guid>();
-        if (outletIds.Count > 0 &&
-            !await _repository.OutletsBelongToTenantAsync(context.TenantId, outletIds, cancellationToken))
+        var outletIds = NormalizeIds(request.OutletIds);
+        var outletValidation = await _repository.ValidateOutletSelectionAsync(
+            context.TenantId,
+            outletIds,
+            cancellationToken);
+        if (!outletValidation.IsValid)
         {
-            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(OutletNotFound);
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(outletValidation.Failure));
         }
 
         var normalizedEmail = TenantUser.NormalizeEmail(request.Email);
@@ -336,18 +476,42 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         var permissionOverrideEnabled = request.PermissionOverrideEnabled &&
             context.HasPermission(TenantAdminUserPermissions.PermissionOverride);
         var overriddenPermissionIds = permissionOverrideEnabled
-            ? (request.OverriddenPermissionIds ?? Array.Empty<Guid>())
-            : Array.Empty<Guid>();
-        if (overriddenPermissionIds.Count > 0 &&
-            !await _repository.PermissionIdsExistAsync(overriddenPermissionIds, cancellationToken))
+            ? NormalizeIds(request.OverriddenPermissionIds)
+            : [];
+        var permissionValidation = await _repository.ValidatePermissionOverridesAsync(
+            context.TenantId,
+            overriddenPermissionIds,
+            context.Permissions,
+            now,
+            cancellationToken);
+        if (!permissionValidation.IsValid)
         {
-            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(InvalidPermissions);
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(permissionValidation.Failure));
         }
 
-        var now = _dateTimeProvider.UtcNow;
         var previousStatus = user.AccountStatus;
         var nextStatus = request.Status.Trim().ToUpperInvariant();
         var increasesSeat = !CountsTowardUserLimit(previousStatus) && CountsTowardUserLimit(nextStatus);
+        var previousProfileMediaAssetId = user.ProfileImageUrl;
+        var profileMediaChange = NormalizeProfileMediaChange(request, previousProfileMediaAssetId);
+        if (!profileMediaChange.IsValid)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ValidationFailed(
+                "Profile media action must be Keep, Replace, or Remove."));
+        }
+
+        if (profileMediaChange.RequiresValidation && profileMediaChange.NextMediaAssetId.HasValue)
+        {
+            var mediaValidation = await _repository.ValidateProfileMediaAsync(
+                context.TenantId,
+                profileMediaChange.NextMediaAssetId.Value,
+                userId,
+                cancellationToken);
+            if (!mediaValidation.IsValid)
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToProfileMediaError(mediaValidation.Failure));
+            }
+        }
 
         async Task PersistUpdateAsync(CancellationToken ct)
         {
@@ -357,6 +521,20 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 request.PhoneNumber?.Trim(),
                 nextStatus,
                 now);
+
+            if (profileMediaChange.ShouldApply)
+            {
+                user.SetProfileMediaAsset(profileMediaChange.NextMediaAssetId, context.UserId, now);
+                await _repository.ApplyProfileMediaChangeAsync(
+                    context.TenantId,
+                    userId,
+                    context.UserId,
+                    previousProfileMediaAssetId,
+                    profileMediaChange.NextMediaAssetId,
+                    profileMediaChange.AuditAction!,
+                    now,
+                    ct);
+            }
 
             await _repository.ReplaceAssignmentsAsync(
                 context.TenantId,
@@ -403,6 +581,61 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             : ApplicationResult<TenantAdminUserDetailResponse>.Success(response);
     }
 
+    public async Task<ApplicationResult<TenantAdminUserDetailResponse>> ResendInviteAsync(
+        TenantRequestContext context,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccessAny(
+            context,
+            TenantAdminUserPermissions.Invite,
+            TenantAdminUserPermissions.Manage);
+        if (accessError is not null)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(accessError);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var rawToken = _invitationTokenService.GenerateToken();
+        var protectedToken = _deliverySecretProtector.Value.Protect(rawToken);
+        var mutation = await _repository.ResendInviteAsync(
+            context.TenantId,
+            context.UserId,
+            userId,
+            _invitationTokenService.HashToken(rawToken),
+            protectedToken.Ciphertext,
+            protectedToken.KeyVersion,
+            now.AddDays(7),
+            now,
+            cancellationToken);
+
+        return ToInviteMutationResult(mutation);
+    }
+
+    public async Task<ApplicationResult<TenantAdminUserDetailResponse>> RevokeInviteAsync(
+        TenantRequestContext context,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccessAny(
+            context,
+            TenantAdminUserPermissions.Invite,
+            TenantAdminUserPermissions.Manage);
+        if (accessError is not null)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(accessError);
+        }
+
+        var mutation = await _repository.RevokeInviteAsync(
+            context.TenantId,
+            context.UserId,
+            userId,
+            _dateTimeProvider.UtcNow,
+            cancellationToken);
+
+        return ToInviteMutationResult(mutation);
+    }
+
     private static bool CountsTowardUserLimit(string? status)
     {
         if (string.IsNullOrWhiteSpace(status))
@@ -413,6 +646,210 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         var normalized = status.Trim().ToUpperInvariant();
         return normalized is TenantUserConstants.StatusActive or TenantUserConstants.StatusInvited;
     }
+
+    private static string? NormalizeCreateStatus(TenantAdminUserCreateRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.CreateStatus) && !string.IsNullOrWhiteSpace(request.AccountStatus) &&
+            !string.Equals(request.CreateStatus.Trim(), request.AccountStatus.Trim(), StringComparison.OrdinalIgnoreCase))
+            return null;
+        var requested = !string.IsNullOrWhiteSpace(request.AccountStatus)
+            ? request.AccountStatus.Trim().ToUpperInvariant()
+            : string.IsNullOrWhiteSpace(request.CreateStatus)
+            ? (request.SendInviteEmail ? TenantUserConstants.StatusInvited : TenantUserConstants.StatusInactive)
+            : request.CreateStatus.Trim().ToUpperInvariant();
+        return TenantAdminUserCreateStatusPolicy.Normalize(requested);
+    }
+
+    private static AuditLog NewAudit(
+        TenantRequestContext context,
+        Guid userId,
+        string action,
+        DateTimeOffset now,
+        Guid? inviteId = null,
+        Guid? mediaAssetId = null) => new()
+    {
+        TenantId = context.TenantId,
+        ActorUserId = context.UserId,
+        ActorType = "TENANT_USER",
+        EntityType = "TENANT_USER",
+        EntityId = userId,
+        Action = action,
+        NewValues = inviteId.HasValue || mediaAssetId.HasValue
+            ? JsonSerializer.Serialize(new { inviteId, mediaAssetId })
+            : null,
+        CreatedAt = now
+    };
+
+    private static IReadOnlyList<Guid> NormalizeIds(IReadOnlyCollection<Guid>? ids) =>
+        ids is null || ids.Count == 0
+            ? []
+            : ids.Where(id => id != Guid.Empty).Distinct().ToList();
+
+    private static string ComputeCreateRequestHash(TenantAdminUserCreateRequest request)
+    {
+        var canonical = new
+        {
+            fullName = request.FullName?.Trim() ?? string.Empty,
+            email = string.IsNullOrWhiteSpace(request.Email)
+                ? string.Empty
+                : TenantUser.NormalizeEmail(request.Email),
+            phoneNumber = NormalizeOptionalText(request.PhoneNumber),
+            employeeId = NormalizeOptionalText(request.EmployeeId),
+            roleId = request.RoleId,
+            accountStatus = NormalizeCreateStatus(request) ?? "INVALID",
+            outletIds = NormalizeIdsForFingerprint(request.OutletIds),
+            permissionOverrideEnabled = request.PermissionOverrideEnabled,
+            overriddenPermissionIds = request.PermissionOverrideEnabled
+                ? NormalizeIdsForFingerprint(request.OverriddenPermissionIds)
+                : [],
+            profileMediaAssetId = request.ProfileMediaAssetId,
+        };
+
+        var json = JsonSerializer.Serialize(canonical);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
+    }
+
+    private static IReadOnlyList<Guid> NormalizeIdsForFingerprint(IReadOnlyCollection<Guid>? ids) =>
+        ids is null || ids.Count == 0
+            ? []
+            : ids.Where(id => id != Guid.Empty).Distinct().OrderBy(id => id).ToArray();
+
+    private static string? NormalizeOptionalText(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static ApplicationError? ValidateIdempotencyKey(string? idempotencyKey)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return InvalidIdempotencyKey;
+        }
+
+        var normalized = idempotencyKey.Trim();
+        if (normalized.Length > 100 || !normalized.All(IsSafeIdempotencyKeyCharacter))
+        {
+            return InvalidIdempotencyKey;
+        }
+
+        return null;
+    }
+
+    private static bool IsSafeIdempotencyKeyCharacter(char value) =>
+        char.IsLetterOrDigit(value) || value is '-' or '_' or '.' or ':';
+
+    private static ApplicationError ToAccessError(TenantAdminUserAccessValidationFailure failure) =>
+        failure switch
+        {
+            TenantAdminUserAccessValidationFailure.RoleNotFound => RoleNotFound,
+            TenantAdminUserAccessValidationFailure.RoleWrongTenant => new ApplicationError(
+                "user.role_wrong_tenant",
+                "Role does not belong to this tenant."),
+            TenantAdminUserAccessValidationFailure.RoleInactive => new ApplicationError(
+                "user.role_inactive",
+                "Role is inactive and cannot be assigned."),
+            TenantAdminUserAccessValidationFailure.RoleNotDelegable => new ApplicationError(
+                "user.role_not_delegable",
+                "You cannot assign a role containing permissions you cannot delegate."),
+            TenantAdminUserAccessValidationFailure.OutletNotFound => OutletNotFound,
+            TenantAdminUserAccessValidationFailure.OutletWrongTenant => new ApplicationError(
+                "user.outlet_wrong_tenant",
+                "One or more selected outlets do not belong to this tenant."),
+            TenantAdminUserAccessValidationFailure.OutletInactive => new ApplicationError(
+                "user.outlet_inactive",
+                "One or more selected outlets are inactive or deleted."),
+            TenantAdminUserAccessValidationFailure.PermissionNotFound => new ApplicationError(
+                "user.permission_not_found",
+                "One or more selected permissions were not found."),
+            TenantAdminUserAccessValidationFailure.PermissionInactive => new ApplicationError(
+                "user.permission_inactive",
+                "One or more selected permissions are inactive."),
+            TenantAdminUserAccessValidationFailure.PermissionNotAssignable => new ApplicationError(
+                "user.permission_not_assignable",
+                "One or more selected permissions cannot be assigned."),
+            TenantAdminUserAccessValidationFailure.TenantEntitlementMissing => new ApplicationError(
+                "user.tenant_entitlement_missing",
+                "Tenant is not entitled to one or more selected permissions."),
+            TenantAdminUserAccessValidationFailure.ActorCannotDelegate => new ApplicationError(
+                "user.permission_not_delegable",
+                "You cannot grant one or more selected permissions."),
+            TenantAdminUserAccessValidationFailure.InvalidScope => new ApplicationError(
+                "user.permission_invalid_scope",
+                "One or more selected permissions are not valid for tenant users."),
+            _ => InvalidPermissions,
+        };
+
+    private static ApplicationError ToProfileMediaError(TenantAdminUserProfileMediaValidationFailure failure) =>
+        failure switch
+        {
+            TenantAdminUserProfileMediaValidationFailure.NotFound => new ApplicationError(
+                "user.profile_media_not_found",
+                "Profile image media was not found."),
+            TenantAdminUserProfileMediaValidationFailure.WrongTenant => new ApplicationError(
+                "user.profile_media_wrong_tenant",
+                "Profile image media does not belong to this tenant."),
+            TenantAdminUserProfileMediaValidationFailure.NotImage => new ApplicationError(
+                "user.profile_media_not_image",
+                "Profile media must be an image."),
+            TenantAdminUserProfileMediaValidationFailure.Deleted => new ApplicationError(
+                "user.profile_media_deleted",
+                "Profile image media has been deleted."),
+            TenantAdminUserProfileMediaValidationFailure.Expired => new ApplicationError(
+                "user.profile_media_expired",
+                "Profile image media is no longer attachable."),
+            TenantAdminUserProfileMediaValidationFailure.IncompatibleOwner => new ApplicationError(
+                "user.profile_media_in_use",
+                "Profile image media is already attached to another record."),
+            TenantAdminUserProfileMediaValidationFailure.NotAttachable => new ApplicationError(
+                "user.profile_media_not_attachable",
+                "Profile image media is not attachable."),
+            _ => InvalidProfileMedia,
+        };
+
+    private static ProfileMediaChange NormalizeProfileMediaChange(
+        TenantAdminUserUpdateRequest request,
+        Guid? previousMediaAssetId)
+    {
+        var action = string.IsNullOrWhiteSpace(request.ProfileMediaAction)
+            ? (request.ProfileMediaAssetId.HasValue ? "REPLACE" : "KEEP")
+            : request.ProfileMediaAction.Trim().ToUpperInvariant();
+
+        return action switch
+        {
+            "KEEP" => ProfileMediaChange.NoChange,
+            "REPLACE" when request.ProfileMediaAssetId.HasValue && request.ProfileMediaAssetId != previousMediaAssetId =>
+                new ProfileMediaChange(true, true, request.ProfileMediaAssetId, previousMediaAssetId.HasValue
+                    ? "user.profile_image_replaced"
+                    : "user.profile_image_assigned"),
+            "REPLACE" when request.ProfileMediaAssetId.HasValue => ProfileMediaChange.NoChange,
+            "REMOVE" when previousMediaAssetId.HasValue =>
+                new ProfileMediaChange(true, false, null, "user.profile_image_removed"),
+            "REMOVE" => ProfileMediaChange.NoChange,
+            _ => ProfileMediaChange.Invalid,
+        };
+    }
+
+    private sealed record ProfileMediaChange(
+        bool IsValid,
+        bool RequiresValidation,
+        Guid? NextMediaAssetId,
+        string? AuditAction)
+    {
+        public bool ShouldApply => IsValid && AuditAction is not null;
+        public static ProfileMediaChange NoChange { get; } = new(true, false, null, null);
+        public static ProfileMediaChange Invalid { get; } = new(false, false, null, null);
+    }
+
+    private static ApplicationResult<TenantAdminUserDetailResponse> ToInviteMutationResult(
+        TenantAdminUserInviteMutationResult mutation) =>
+        mutation.Status switch
+        {
+            TenantAdminUserInviteMutationStatus.Success when mutation.Response is not null =>
+                ApplicationResult<TenantAdminUserDetailResponse>.Success(mutation.Response),
+            TenantAdminUserInviteMutationStatus.NotFound =>
+                ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound),
+            TenantAdminUserInviteMutationStatus.NotEligible or TenantAdminUserInviteMutationStatus.NoUsableInvite =>
+                ApplicationResult<TenantAdminUserDetailResponse>.Failure(InviteNotAvailable),
+            _ => ApplicationResult<TenantAdminUserDetailResponse>.Failure(InviteNotAvailable),
+        };
 
     public async Task<ApplicationResult> DeleteAsync(
         TenantRequestContext context,

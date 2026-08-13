@@ -628,6 +628,166 @@ public sealed class DevelopmentInventoryTopUpService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<int> CleanTestProductsAsync(CancellationToken cancellationToken)
+    {
+        var keywords = new[] { "t-shirt", "tshirt", "shoes", "brown", "marron", "maroon", "untitled product" };
+
+        var allProducts = await _dbContext.Products.ToListAsync(cancellationToken);
+
+        var matchedProducts = allProducts
+            .Where(p => keywords.Any(k =>
+                (p.ProductName != null && p.ProductName.Contains(k, StringComparison.OrdinalIgnoreCase)) ||
+                (p.ProductCode != null && p.ProductCode.Contains(k, StringComparison.OrdinalIgnoreCase))))
+            .ToList();
+
+        if (matchedProducts.Count == 0)
+        {
+            return 0;
+        }
+
+        var productIds = matchedProducts.Select(p => p.Id).ToList();
+
+        // 1. Product Images and Media Assets
+        try
+        {
+            var productImages = await _dbContext.ProductImages
+                .Where(pi => productIds.Contains(pi.ProductId))
+                .ToListAsync(cancellationToken);
+
+            var mediaAssetIds = productImages
+                .Where(pi => pi.MediaAssetId.HasValue)
+                .Select(pi => pi.MediaAssetId!.Value)
+                .Distinct()
+                .ToList();
+
+            _dbContext.ProductImages.RemoveRange(productImages);
+
+            if (mediaAssetIds.Count > 0)
+            {
+                var mediaAssets = await _dbContext.MediaAssets
+                    .Where(m => mediaAssetIds.Contains(m.Id))
+                    .ToListAsync(cancellationToken);
+                _dbContext.MediaAssets.RemoveRange(mediaAssets);
+            }
+        }
+        catch { }
+
+        try
+        {
+            var stagedAssets = await _dbContext.MediaAssets
+                .Where(m => m.Status == "STAGED")
+                .ToListAsync(cancellationToken);
+            if (stagedAssets.Count > 0)
+            {
+                _dbContext.MediaAssets.RemoveRange(stagedAssets);
+            }
+        }
+        catch { }
+
+        // 2. Product Categories
+        try
+        {
+            var categories = await _dbContext.ProductCategories
+                .Where(pc => productIds.Contains(pc.ProductId))
+                .ToListAsync(cancellationToken);
+            _dbContext.ProductCategories.RemoveRange(categories);
+        }
+        catch { }
+
+        // 3. Product Channel Visibility
+        try
+        {
+            var channels = await _dbContext.ProductChannelVisibilities
+                .Where(pc => productIds.Contains(pc.ProductId))
+                .ToListAsync(cancellationToken);
+            _dbContext.ProductChannelVisibilities.RemoveRange(channels);
+        }
+        catch { }
+
+        // 4. Product Inventory Settings
+        try
+        {
+            var invSettings = await _dbContext.ProductInventorySettings
+                .Where(pis => productIds.Contains(pis.ProductId))
+                .ToListAsync(cancellationToken);
+            _dbContext.ProductInventorySettings.RemoveRange(invSettings);
+        }
+        catch { }
+
+        // 5. Product Unit Settings & Conversions
+        try
+        {
+            var unitSettings = await _dbContext.ProductUnitSettings
+                .Where(pus => productIds.Contains(pus.ProductId))
+                .ToListAsync(cancellationToken);
+            _dbContext.ProductUnitSettings.RemoveRange(unitSettings);
+        }
+        catch { }
+
+        try
+        {
+            var unitConversions = await _dbContext.ProductUnitConversions
+                .Where(puc => productIds.Contains(puc.ProductId))
+                .ToListAsync(cancellationToken);
+            _dbContext.ProductUnitConversions.RemoveRange(unitConversions);
+        }
+        catch { }
+
+        // 6. Barcodes & Variants
+        try
+        {
+            var barcodes = await _dbContext.ProductBarcodes
+                .Where(pb => productIds.Contains(pb.ProductId))
+                .ToListAsync(cancellationToken);
+            _dbContext.ProductBarcodes.RemoveRange(barcodes);
+        }
+        catch { }
+
+        try
+        {
+            var variants = await _dbContext.ProductVariants
+                .Where(pv => productIds.Contains(pv.ProductId))
+                .ToListAsync(cancellationToken);
+            _dbContext.ProductVariants.RemoveRange(variants);
+        }
+        catch { }
+
+        // 7. Combos / Bundles
+        try
+        {
+            var comboDefs = await _dbContext.ComboDefinitions
+                .Where(cd => productIds.Contains(cd.ProductId))
+                .ToListAsync(cancellationToken);
+            var comboDefIds = comboDefs.Select(c => c.Id).ToList();
+
+            if (comboDefIds.Count > 0)
+            {
+                var comboComps = await _dbContext.ComboComponents
+                    .Where(cc => comboDefIds.Contains(cc.ComboDefinitionId))
+                    .ToListAsync(cancellationToken);
+                _dbContext.ComboComponents.RemoveRange(comboComps);
+                _dbContext.ComboDefinitions.RemoveRange(comboDefs);
+            }
+        }
+        catch { }
+
+        // 8. Discount Policy Targets
+        try
+        {
+            var targets = await _dbContext.DiscountPolicyTargets
+                .Where(dpt => dpt.ProductId.HasValue && productIds.Contains(dpt.ProductId.Value))
+                .ToListAsync(cancellationToken);
+            _dbContext.DiscountPolicyTargets.RemoveRange(targets);
+        }
+        catch { }
+
+        // 9. Delete Products
+        _dbContext.Products.RemoveRange(matchedProducts);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return matchedProducts.Count;
+    }
+
     private static void Set<T>(object entity, string propertyName, T value)
     {
         var prop = entity.GetType().GetProperty(

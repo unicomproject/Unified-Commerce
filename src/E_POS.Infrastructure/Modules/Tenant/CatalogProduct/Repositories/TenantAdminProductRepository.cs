@@ -1,13 +1,17 @@
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.Inventory.Constants;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Infrastructure.Persistence;
+using E_POS.Infrastructure.Persistence.Seed;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
@@ -15,10 +19,17 @@ namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 public sealed partial class TenantAdminProductRepository : ITenantAdminProductRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly ICodeSequenceRepository _codeSequenceRepository;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public TenantAdminProductRepository(EPosDbContext dbContext)
+    public TenantAdminProductRepository(
+        EPosDbContext dbContext,
+        ICodeSequenceRepository codeSequenceRepository,
+        IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _codeSequenceRepository = codeSequenceRepository;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<TenantAdminProductSummaryResponse> GetSummaryAsync(
@@ -27,7 +38,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
     {
         var products = _dbContext.Products
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus);
+            .Where(x => x.TenantId == tenantId &&
+                        x.Status != ProductConstants.ArchivedStatus &&
+                        (x.Status != ProductConstants.DraftStatus || x.DraftSavedAt != null));
 
         var totalProducts = await products.CountAsync(cancellationToken);
         var activeProducts = await products.CountAsync(
@@ -125,7 +138,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 row.ProductVariantId,
                 row.SortOrder,
                 row.IsPrimaryImage,
-                ImageUrl = row.MediaPublicUrl,
+                ImageUrl = _mediaReadUrlResolver?.ResolveReadUrl(row.MediaPublicUrl) ?? row.MediaPublicUrl,
             })
             .Where(row => !string.IsNullOrWhiteSpace(row.ImageUrl))
             .GroupBy(row => row.ProductId)
@@ -185,17 +198,23 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 x.BrandCode))
             .ToListAsync(cancellationToken);
 
+        var decimalUomTypes = new[] { "WEIGHT", "VOLUME", "LENGTH" };
+        var decimalUomCodes = new[] { "KG", "G", "L", "ML", "M" };
+
         var units = await _dbContext.UnitOfMeasures
             .AsNoTracking()
             .Where(x =>
                 (x.TenantId == null || x.TenantId == tenantId) &&
-                x.Status != "DELETED")
+                x.Status == "ACTIVE")
             .OrderBy(x => x.TenantId == null ? 0 : 1)
             .ThenBy(x => x.UomCode)
             .Select(x => new TenantAdminProductUnitOptionResponse(
                 x.Id,
                 x.UomCode,
-                x.UomName))
+                x.UomName,
+                x.UomType,
+                x.Symbol,
+                decimalUomTypes.Contains(x.UomType.ToUpper()) || decimalUomCodes.Contains(x.UomCode.ToUpper())))
             .ToListAsync(cancellationToken);
 
         var taxes = await _dbContext.TaxClasses
@@ -233,6 +252,28 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 x.OptionType))
             .ToListAsync(cancellationToken);
 
+        var allowedChannelCodes = new[]
+        {
+            PlatformSalesChannelSeedConstants.PosChannelCode,
+            "ONLINE",
+            "PHYSICAL",
+        };
+
+        var salesChannels = await (
+            from channel in _dbContext.SalesChannels.AsNoTracking()
+            join platform in _dbContext.PlatformSalesChannels.AsNoTracking()
+                on channel.PlatformSalesChannelId equals platform.Id
+            where channel.TenantId == tenantId &&
+                  channel.Status == "ACTIVE" &&
+                  allowedChannelCodes.Contains(platform.ChannelCode)
+            orderby channel.SortOrder, platform.ChannelCode
+            select new TenantAdminProductSalesChannelOptionResponse(
+                channel.Id,
+                platform.ChannelCode,
+                string.IsNullOrWhiteSpace(channel.CustomName) ? platform.DefaultName : channel.CustomName,
+                platform.ChannelType))
+            .ToListAsync(cancellationToken);
+
         return new TenantAdminProductCreateOptionsResponse(
             categories,
             subCategories,
@@ -240,7 +281,8 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             units,
             taxes,
             outlets,
-            variantOptionTemplates);
+            variantOptionTemplates,
+            salesChannels);
     }
 
     public async Task<TenantAdminProductFilterOptionsResponse> GetFilterOptionsAsync(
@@ -495,7 +537,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .Select(row => new
             {
                 Row = row,
-                ImageUrl = row.MediaPublicUrl,
+                ImageUrl = _mediaReadUrlResolver?.ResolveReadUrl(row.MediaPublicUrl) ?? row.MediaPublicUrl,
             })
             .Where(item => !string.IsNullOrWhiteSpace(item.ImageUrl))
             .OrderBy(item => item.Row.ProductVariantId.HasValue ? 1 : 0)
@@ -653,6 +695,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             product.BrandId,
             unitType,
             product.ShortDescription,
+            product.LongDescription,
             imageUrl,
             productImages,
             CostPrice: null,
@@ -739,7 +782,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             request.BrandId,
             returnPolicyId: null,
             request.ShortDescription,
-            longDescription: null,
+            longDescription: string.IsNullOrWhiteSpace(request.LongDescription) ? null : request.LongDescription.Trim(),
             isSellable: true,
             isTaxable: request.TaxId.HasValue,
             normalizedStatus,
@@ -1072,23 +1115,16 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 }
 
                 var quantityPerOutlet = request.OpeningStockQuantity!.Value / request.OutletIds.Count;
-                var balance = InventoryBalance.Create(
-                    Guid.NewGuid(),
+                await ApplyOpeningStockAsync(
                     tenantId,
-                    inventoryLocationId.Value,
                     productId,
+                    inventoryLocationId.Value,
                     defaultVariantId,
                     productBatchId,
-                    now);
-
-                balance.AdjustQuantities(
                     quantityPerOutlet,
-                    reservedDelta: 0,
-                    damagedDelta: 0,
-                    quarantineDelta: 0,
-                    now);
-
-                await _dbContext.InventoryBalances.AddAsync(balance, cancellationToken);
+                    userId,
+                    now,
+                    cancellationToken);
             }
         }
 
@@ -1375,7 +1411,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
     public async Task<TenantAdminProductCreateResponse> CreateProductAsync(
         Guid tenantId,
-        Guid userId,
+        Guid? userId,
         TenantAdminProductCreateRequest request,
         Guid unitId,
         DateTimeOffset now,
@@ -1410,33 +1446,36 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
         await _dbContext.Products.AddAsync(product, cancellationToken);
 
-        var categoryLinks = new List<ProductCategory>
+        if (request.CategoryId != Guid.Empty)
         {
-            ProductCategory.Create(
-                Guid.NewGuid(),
-                tenantId,
-                productId,
-                request.CategoryId,
-                isPrimaryCategory: request.SubCategoryId == null,
-                sortOrder: 0,
-                userId,
-                now),
-        };
+            var categoryLinks = new List<ProductCategory>
+            {
+                ProductCategory.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    productId,
+                    request.CategoryId,
+                    isPrimaryCategory: request.SubCategoryId == null,
+                    sortOrder: 0,
+                    userId,
+                    now),
+            };
 
-        if (request.SubCategoryId.HasValue)
-        {
-            categoryLinks.Add(ProductCategory.Create(
-                Guid.NewGuid(),
-                tenantId,
-                productId,
-                request.SubCategoryId.Value,
-                isPrimaryCategory: true,
-                sortOrder: 1,
-                userId,
-                now));
+            if (request.SubCategoryId.HasValue)
+            {
+                categoryLinks.Add(ProductCategory.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    productId,
+                    request.SubCategoryId.Value,
+                    isPrimaryCategory: true,
+                    sortOrder: 1,
+                    userId,
+                    now));
+            }
+
+            await _dbContext.ProductCategories.AddRangeAsync(categoryLinks, cancellationToken);
         }
-
-        await _dbContext.ProductCategories.AddRangeAsync(categoryLinks, cancellationToken);
 
         Guid? defaultVariantId = null;
         var variantDefinitions = BuildVariantDefinitions(request);
@@ -1488,6 +1527,11 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             }
 
             var defaultPriceListId = await GetDefaultPriceListIdAsync(tenantId, cancellationToken);
+            if (!defaultPriceListId.HasValue)
+            {
+                defaultPriceListId = await EnsureDefaultPriceListAsync(tenantId, userId, now, cancellationToken);
+            }
+
             if (defaultPriceListId.HasValue)
             {
                 var priceListItem = PriceListItem.Create(
@@ -1565,26 +1609,29 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
                 if (!inventoryLocationId.HasValue)
                 {
+                    inventoryLocationId = await EnsureDefaultSellableInventoryLocationAsync(
+                        tenantId,
+                        outletId,
+                        userId,
+                        now,
+                        cancellationToken);
+                }
+
+                if (!inventoryLocationId.HasValue)
+                {
                     continue;
                 }
 
-                var balance = InventoryBalance.Create(
-                    Guid.NewGuid(),
+                await ApplyOpeningStockAsync(
                     tenantId,
-                    inventoryLocationId.Value,
                     productId,
+                    inventoryLocationId.Value,
                     defaultVariantId,
                     productBatchId,
-                    now);
-
-                balance.AdjustQuantities(
                     quantityPerOutlet,
-                    reservedDelta: 0,
-                    damagedDelta: 0,
-                    quarantineDelta: 0,
-                    now);
-
-                await _dbContext.InventoryBalances.AddAsync(balance, cancellationToken);
+                    userId,
+                    now,
+                    cancellationToken);
             }
         }
 
@@ -1595,6 +1642,76 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             request.ProductName.Trim(),
             request.Sku.Trim(),
             normalizedStatus);
+    }
+
+    private async Task ApplyOpeningStockAsync(
+        Guid tenantId,
+        Guid productId,
+        Guid inventoryLocationId,
+        Guid? defaultVariantId,
+        Guid? productBatchId,
+        decimal quantity,
+        Guid? userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var balance = InventoryBalance.Create(
+            Guid.NewGuid(),
+            tenantId,
+            inventoryLocationId,
+            productId,
+            defaultVariantId,
+            productBatchId,
+            now);
+
+        var quantityBefore = balance.OnHandQuantity;
+        var movementNumber = await _codeSequenceRepository.GetNextCodeAsync(
+            tenantId,
+            InventoryConstants.StockMovementSequenceKey,
+            InventoryConstants.StockMovementPrefix,
+            InventoryConstants.StockMovementPadding,
+            now,
+            cancellationToken);
+
+        var movementId = Guid.NewGuid();
+        var movement = StockMovement.Create(
+            movementId,
+            tenantId,
+            movementNumber,
+            balance.Id,
+            StockMovementConstants.StockIn,
+            quantityBefore,
+            quantity,
+            unitCost: null,
+            totalCost: null,
+            reasonCode: InventoryConstants.OpeningStockReason,
+            referenceNumberSnapshot: null,
+            idempotencyKey: null,
+            movementNote: "Product opening stock",
+            occurredAt: now,
+            createdByTenantUserId: userId,
+            now);
+
+        balance.AdjustQuantities(
+            quantity,
+            reservedDelta: 0,
+            damagedDelta: 0,
+            quarantineDelta: 0,
+            now);
+
+        await _dbContext.InventoryBalances.AddAsync(balance, cancellationToken);
+        await _dbContext.StockMovements.AddAsync(movement, cancellationToken);
+
+        var reference = StockMovementReference.Create(
+            Guid.NewGuid(),
+            tenantId,
+            movementId,
+            InventoryConstants.ProductOpeningStockReferenceType,
+            productId,
+            referenceLineId: null,
+            now);
+
+        await _dbContext.StockMovementReferences.AddAsync(reference, cancellationToken);
     }
 
     private static List<VariantDefinition> BuildVariantDefinitions(TenantAdminProductCreateRequest request)
@@ -1635,6 +1752,68 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    private async Task<Guid> EnsureDefaultPriceListAsync(
+        Guid tenantId,
+        Guid? userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var priceListId = Guid.NewGuid();
+        var priceList = PriceList.Create(
+            priceListId,
+            tenantId,
+            "DEFAULT",
+            "Default Price List",
+            "STANDARD",
+            "LKR",
+            priceIncludesTax: false,
+            isDefaultPriceList: true,
+            priority: 1,
+            validFrom: null,
+            validUntil: null,
+            status: "ACTIVE",
+            userId,
+            now);
+
+        await _dbContext.PriceLists.AddAsync(priceList, cancellationToken);
+        return priceListId;
+    }
+
+    private async Task<Guid?> EnsureDefaultSellableInventoryLocationAsync(
+        Guid tenantId,
+        Guid outletId,
+        Guid? userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var outletExists = await _dbContext.Outlets.AsNoTracking()
+            .AnyAsync(x => x.Id == outletId && x.TenantId == tenantId, cancellationToken);
+        if (!outletExists)
+        {
+            return null;
+        }
+
+        var locationId = Guid.NewGuid();
+        var location = InventoryLocation.Create(
+            locationId,
+            tenantId,
+            outletId,
+            parentInventoryLocationId: null,
+            locationCode: "MAIN",
+            locationName: "Main Floor",
+            locationType: "SALES",
+            isSellableLocation: true,
+            isReturnLocation: true,
+            isReceivingLocation: true,
+            isQuarantineLocation: false,
+            status: "ACTIVE",
+            userId,
+            now);
+
+        await _dbContext.InventoryLocations.AddAsync(location, cancellationToken);
+        return locationId;
+    }
+
     private static string GenerateSlug(string name, string code)
     {
         var normalizedName = new string(name
@@ -1667,7 +1846,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
     {
         var productsQuery = _dbContext.Products
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus);
+            .Where(x => x.TenantId == tenantId &&
+                        x.Status != ProductConstants.ArchivedStatus &&
+                        (x.Status != ProductConstants.DraftStatus || x.DraftSavedAt != null));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -1700,7 +1881,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
         var catalogTotalCount = await _dbContext.Products
             .AsNoTracking()
-            .CountAsync(x => x.TenantId == tenantId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
+            .CountAsync(x => x.TenantId == tenantId &&
+                             x.Status != ProductConstants.ArchivedStatus &&
+                             (x.Status != ProductConstants.DraftStatus || x.DraftSavedAt != null), cancellationToken);
 
         var sortCol = sortBy?.Trim().ToUpperInvariant() ?? "PRODUCTNAME";
         var sortDir = sortDirection?.Trim().ToUpperInvariant() ?? "ASC";

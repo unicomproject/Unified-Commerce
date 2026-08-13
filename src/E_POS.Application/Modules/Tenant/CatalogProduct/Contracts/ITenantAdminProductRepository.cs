@@ -63,7 +63,7 @@ public interface ITenantAdminProductRepository
 
     Task<TenantAdminProductCreateResponse> CreateProductAsync(
         Guid tenantId,
-        Guid userId,
+        Guid? userId,
         TenantAdminProductCreateRequest request,
         Guid unitId,
         DateTimeOffset now,
@@ -123,5 +123,46 @@ public interface ITenantAdminProductRepository
     Task<TenantAdminProductDashboardRawData> GetDashboardAsync(
         Guid tenantId,
         TenantAdminProductDashboardQuery query,
+        CancellationToken cancellationToken);
+
+    Task<bool> ActiveCategoryExistsAsync(
+        Guid tenantId,
+        Guid categoryId,
+        CancellationToken cancellationToken);
+
+    Task<bool> ProductCodeExistsAsync(
+        Guid tenantId,
+        string productCode,
+        Guid? excludeProductId,
+        CancellationToken cancellationToken);
+
+    Task<Guid?> GetDefaultInventoryUomIdAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task<string?> GetTenantStatusAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task<bool> IsInitialCreationDraftAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken);
+
+    Task<SaveProductDraftResult> SaveProductDraftAsync(
+        Guid tenantId,
+        Guid userId,
+        SaveProductDraftCommand command,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<ProductSetupWizardDto?> GetSetupAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken);
+
+    Task<bool> HasOperationalHistoryAsync(
+        Guid tenantId,
+        Guid productId,
         CancellationToken cancellationToken);
 }

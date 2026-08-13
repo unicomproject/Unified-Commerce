@@ -1,3 +1,5 @@
+using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Services;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Services;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
@@ -5,12 +7,16 @@ using E_POS.Application.Modules.Tenant.TenantFoundation.Services;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
-using E_POS.Application.Modules.Tenant.Inventory.Contracts;
-using E_POS.Application.Modules.Tenant.Inventory.Contracts.CurrentStock;
-using E_POS.Application.Modules.Tenant.Inventory.Contracts.Dashboard;
-using E_POS.Application.Modules.Tenant.Inventory.Services.CurrentStock;
-using E_POS.Application.Modules.Tenant.Inventory.Services.Dashboard;
-using E_POS.Application.Modules.Tenant.Inventory.Validators;
+using E_POS.Application.Modules.Tenant.Inventory.Shared.Contracts;
+using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Contracts.Repositories;
+using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Contracts.Services;
+using E_POS.Application.Modules.Tenant.Inventory.Dashboard.Contracts.Repositories;
+using E_POS.Application.Modules.Tenant.Inventory.Dashboard.Contracts.Services;
+using E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Contracts.Services;
+using E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Services;
+using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Services;
+using E_POS.Application.Modules.Tenant.Inventory.Dashboard.Services;
+using E_POS.Application.Modules.Tenant.Inventory.Shared.Validators;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Validators;
@@ -59,11 +65,14 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddScoped<IRequestCorrelationAccessor, RequestCorrelationAccessor>();
         services.AddScoped<IPlatformAuthRequestValidator, PlatformAuthRequestValidator>();
         services.AddScoped<IPlatformAuthService, PlatformAuthService>();
         services.AddScoped<IPlatformPermissionChecker, PlatformPermissionChecker>();
         services.AddScoped<IPlatformDashboardService, PlatformDashboardService>();
         services.AddScoped<IPlatformTenantService, PlatformTenantService>();
+        services.AddScoped<PlatformSelectedTenantAccessPolicy>();
+        services.AddScoped<IPlatformTenantBootstrapService, PlatformTenantBootstrapService>();
         services.AddScoped<IPlatformTenantOnboardingService, PlatformTenantOnboardingService>();
         services.AddScoped<IPlatformPermissionCatalogService, PlatformPermissionCatalogService>();
         services.AddScoped<IPlatformModulesCatalogService, PlatformModulesCatalogService>();
@@ -96,10 +105,12 @@ public static class DependencyInjection
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
+        services.AddScoped<ProductWizardAccessPolicy>();
         services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ICurrentStockService, CurrentStockService>();
         services.AddScoped<IInventoryRequestValidator, InventoryRequestValidator>();
+        services.AddScoped<IOpeningStockService, OpeningStockService>();
         services.AddScoped<ICatalogMediaService, CatalogMediaService>();
         services.AddScoped<IPosProductCatalogService, PosProductCatalogService>();
         services.AddScoped<IPosCustomerService, PosCustomerService>();

@@ -50,6 +50,9 @@ public sealed class EPosDbContext : DbContext
     public DbSet<PlatformSalesChannel> PlatformSalesChannels => Set<PlatformSalesChannel>();
     public DbSet<PlatformTenantOnboardingDraft> PlatformTenantOnboardingDrafts => Set<PlatformTenantOnboardingDraft>();
     public DbSet<PlatformTenantOnboardingOperation> PlatformTenantOnboardingOperations => Set<PlatformTenantOnboardingOperation>();
+    public DbSet<PlatformTenantBootstrapProductImportBatch> PlatformTenantBootstrapProductImportBatches => Set<PlatformTenantBootstrapProductImportBatch>();
+    public DbSet<PlatformTenantBootstrapProductImportRow> PlatformTenantBootstrapProductImportRows => Set<PlatformTenantBootstrapProductImportRow>();
+    public DbSet<PlatformTenantBootstrapIdempotencyRecord> PlatformTenantBootstrapIdempotencyRecords => Set<PlatformTenantBootstrapIdempotencyRecord>();
 
     // Tenant Foundation
     public DbSet<BusinessType> BusinessTypes => Set<BusinessType>();
@@ -99,6 +102,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantRole> TenantRoles => Set<TenantRole>();
     public DbSet<TenantRolePermission> TenantRolePermissions => Set<TenantRolePermission>();
     public DbSet<TenantUser> TenantUsers => Set<TenantUser>();
+    public DbSet<TenantUserCodeSequence> TenantUserCodeSequences => Set<TenantUserCodeSequence>();
     public DbSet<TenantUserPermission> TenantUserPermissions => Set<TenantUserPermission>();
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
 
@@ -109,6 +113,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantLoginAudit> TenantLoginAudits => Set<TenantLoginAudit>();
     public DbSet<TenantRefreshToken> TenantRefreshTokens => Set<TenantRefreshToken>();
     public DbSet<UserInvite> UserInvites => Set<UserInvite>();
+    public DbSet<TenantUserInviteDeliverySecret> TenantUserInviteDeliverySecrets => Set<TenantUserInviteDeliverySecret>();
     public DbSet<UserSetupToken> UserSetupTokens => Set<UserSetupToken>();
     public DbSet<IntegrationOutboxMessage> IntegrationOutboxMessages => Set<IntegrationOutboxMessage>();
 
@@ -168,7 +173,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<ProductVariantOptionValue> ProductVariantOptionValues => Set<ProductVariantOptionValue>();
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
     public DbSet<ProductRatingSummary> ProductRatingSummaries => Set<ProductRatingSummary>();
-
+    public DbSet<ProductUnitSetting> ProductUnitSettings => Set<ProductUnitSetting>();
+    public DbSet<ProductUnitConversion> ProductUnitConversions => Set<ProductUnitConversion>();
     public DbSet<ReturnPolicy> ReturnPolicies => Set<ReturnPolicy>();
     public DbSet<ReturnPolicyTemplate> ReturnPolicyTemplates => Set<ReturnPolicyTemplate>();
     public DbSet<UnitOfMeasure> UnitOfMeasures => Set<UnitOfMeasure>();

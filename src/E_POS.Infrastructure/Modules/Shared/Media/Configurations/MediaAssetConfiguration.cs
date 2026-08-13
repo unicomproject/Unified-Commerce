@@ -147,6 +147,6 @@ public sealed class MediaAssetConfiguration : IEntityTypeConfiguration<MediaAsse
         builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_width_px", "width_px IS NULL OR width_px > 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_height_px", "height_px IS NULL OR height_px > 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_asset_type", "asset_type IN ('IMAGE')"));
-        builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETE_PENDING', 'DELETED')"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_media_assets_status", "status IN ('ACTIVE', 'INACTIVE', 'STAGED', 'DELETE_PENDING', 'DELETED')"));
     }
 }
