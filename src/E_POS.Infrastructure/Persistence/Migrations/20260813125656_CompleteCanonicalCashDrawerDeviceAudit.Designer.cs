@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260813125656_CompleteCanonicalCashDrawerDeviceAudit")]
+    partial class CompleteCanonicalCashDrawerDeviceAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3254,192 +3257,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UpdatedByPlatformUserId");
 
                     b.ToTable("platform_settings", (string)null);
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapIdempotencyRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("IdempotencyKeyHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("idempotency_key_hash");
-
-                    b.Property<string>("OperationType")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("operation_type");
-
-                    b.Property<string>("RequestHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("request_hash");
-
-                    b.Property<string>("ResponseJson")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("response_json");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_platform_tenant_bootstrap_idempotency_records");
-
-                    b.HasIndex("TenantId", "OperationType", "IdempotencyKeyHash")
-                        .IsUnique()
-                        .HasDatabaseName("uq_bootstrap_idempotency_tenant_operation_key");
-
-                    b.ToTable("platform_tenant_bootstrap_idempotency_records", (string)null);
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapProductImportBatch", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("ActorPlatformUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_platform_user_id");
-
-                    b.Property<int>("CommittedRows")
-                        .HasColumnType("integer")
-                        .HasColumnName("committed_rows");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("IdempotencyKeyHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("idempotency_key_hash");
-
-                    b.Property<int>("InvalidRows")
-                        .HasColumnType("integer")
-                        .HasColumnName("invalid_rows");
-
-                    b.Property<int>("SkippedRows")
-                        .HasColumnType("integer")
-                        .HasColumnName("skipped_rows");
-
-                    b.Property<string>("SourceFileName")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("character varying(260)")
-                        .HasColumnName("source_file_name");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
-                    b.Property<string>("TemplateVersion")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("template_version");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<int>("TotalRows")
-                        .HasColumnType("integer")
-                        .HasColumnName("total_rows");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<int>("ValidRows")
-                        .HasColumnType("integer")
-                        .HasColumnName("valid_rows");
-
-                    b.HasKey("Id")
-                        .HasName("pk_platform_tenant_bootstrap_product_import_batches");
-
-                    b.HasIndex("TenantId", "Status")
-                        .HasDatabaseName("ix_bootstrap_import_batches_tenant_status");
-
-                    b.ToTable("platform_tenant_bootstrap_product_import_batches", (string)null);
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapProductImportRow", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("CommittedProductId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("committed_product_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("ErrorCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("error_code");
-
-                    b.Property<string>("ErrorDetail")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("error_detail");
-
-                    b.Property<Guid>("ImportBatchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("import_batch_id");
-
-                    b.Property<bool>("IsValid")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_valid");
-
-                    b.Property<string>("RawRowJson")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("raw_row_json");
-
-                    b.Property<int>("RowNumber")
-                        .HasColumnType("integer")
-                        .HasColumnName("row_number");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_platform_tenant_bootstrap_product_import_rows");
-
-                    b.HasIndex("ImportBatchId", "RowNumber")
-                        .IsUnique()
-                        .HasDatabaseName("uq_bootstrap_import_rows_batch_row");
-
-                    b.ToTable("platform_tenant_bootstrap_product_import_rows", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingDraft", b =>
@@ -7483,7 +7300,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_media_assets_height_px", "height_px IS NULL OR height_px > 0");
 
-                            t.HasCheckConstraint("ck_media_assets_status", "status IN ('ACTIVE', 'INACTIVE', 'STAGED', 'DELETE_PENDING', 'DELETED')");
+                            t.HasCheckConstraint("ck_media_assets_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETE_PENDING', 'DELETED')");
 
                             t.HasCheckConstraint("ck_media_assets_width_px", "width_px IS NULL OR width_px > 0");
                         });
@@ -10540,6 +10357,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("created_by_tenant_user_id");
 
                     b.Property<string>("DefaultOutletId")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)")
                         .HasColumnName("default_outlet_id");
@@ -10554,11 +10372,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
                         .HasColumnName("email");
-
-                    b.Property<string>("EmployeeId")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("employee_id");
 
                     b.Property<string>("EncryptedPassword")
                         .IsRequired()
@@ -10613,12 +10426,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(50)")
                         .HasColumnName("source_user_type");
 
-                    b.Property<string>("StaffCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("staff_code");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -10657,10 +10464,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_tenant_users_tenant_id_id");
 
-                    b.HasIndex("TenantId", "StaffCode")
-                        .IsUnique()
-                        .HasDatabaseName("uq_tenant_users_tenant_id_staff_code");
-
                     b.HasIndex("TenantId", "UnmaskedPhone")
                         .IsUnique()
                         .HasDatabaseName("uq_tenant_users_tenant_id_unmasked_phone")
@@ -10672,49 +10475,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_tenant_users_source_user_type", "source_user_type IN ('admin', 'outlet', 'platform')");
                         });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserCodeSequence", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<long>("CurrentValue")
-                        .HasColumnType("bigint")
-                        .HasColumnName("current_value");
-
-                    b.Property<string>("SequenceType")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)")
-                        .HasColumnName("sequence_type");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<int>("Year")
-                        .HasColumnType("integer")
-                        .HasColumnName("year");
-
-                    b.HasKey("Id")
-                        .HasName("pk_tenant_user_code_sequences");
-
-                    b.HasIndex("TenantId", "SequenceType", "Year")
-                        .IsUnique()
-                        .HasDatabaseName("uq_tenant_user_code_sequences_scope");
-
-                    b.ToTable("tenant_user_code_sequences", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserPermission", b =>
@@ -11934,11 +11694,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("current_setup_step");
 
-                    b.Property<string>("DesiredPublishStatus")
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("desired_publish_status");
-
                     b.Property<DateTimeOffset?>("DraftSavedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("draft_saved_at");
@@ -12051,8 +11806,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("products", null, t =>
                         {
-                            t.HasCheckConstraint("ck_products_desired_publish_status", "desired_publish_status IS NULL OR desired_publish_status IN ('ACTIVE','INACTIVE')");
-
                             t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 8");
 
                             t.HasCheckConstraint("ck_products_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
@@ -12949,10 +12702,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "MediaAssetId")
                         .HasDatabaseName("ix_product_images_tenant_id_media_asset_id");
 
-                    b.HasIndex("TenantId", "ProductId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_product_images_tenant_product_primary")
-                        .HasFilter("is_primary_image = true AND status = 'ACTIVE' AND product_variant_id IS NULL");
+                    b.HasIndex("TenantId", "ProductId");
 
                     b.HasIndex("TenantId", "ProductVariantId");
 
@@ -13601,211 +13351,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_product_reviews_rating_value", "rating_value BETWEEN 1 AND 5");
 
                             t.HasCheckConstraint("ck_product_reviews_status", "status IN ('PENDING', 'APPROVED', 'REJECTED', 'DELETED')");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductUnitConversion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<decimal>("ConversionToBaseFactor")
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("conversion_to_base_factor");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid?>("CreatedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_tenant_user_id");
-
-                    b.Property<bool>("IsBaseUnit")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_base_unit");
-
-                    b.Property<bool>("IsOuterPackUnit")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_outer_pack_unit");
-
-                    b.Property<bool>("IsPurchaseUnit")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_purchase_unit");
-
-                    b.Property<bool>("IsSellingUnit")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_selling_unit");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("product_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasDefaultValue("ACTIVE")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<string>("UnitLevel")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("unit_level");
-
-                    b.Property<Guid>("UomId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("uom_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid?>("UpdatedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by_tenant_user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_product_unit_conversions");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("UomId");
-
-                    b.HasIndex("TenantId", "ProductId")
-                        .HasDatabaseName("idx_product_unit_conversions_tenant_product");
-
-                    b.HasIndex("TenantId", "ProductId", "UomId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_product_unit_conversions_tenant_product_uom");
-
-                    b.ToTable("product_unit_conversions", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_product_unit_conversions_factor", "conversion_to_base_factor > 0");
-
-                            t.HasCheckConstraint("ck_product_unit_conversions_level", "unit_level IN ('BASE', 'SELLING', 'PURCHASE', 'OUTER_PACK')");
-
-                            t.HasCheckConstraint("ck_product_unit_conversions_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
-                        });
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductUnitSetting", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<bool>("AllowDecimalQuantity")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("allow_decimal_quantity");
-
-                    b.Property<Guid?>("BaseUomId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("base_uom_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid?>("CreatedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_tenant_user_id");
-
-                    b.Property<decimal?>("ItemsPerPurchaseUnit")
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("items_per_purchase_unit");
-
-                    b.Property<Guid?>("OuterPackUomId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("outer_pack_uom_id");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("product_id");
-
-                    b.Property<decimal?>("PurchaseUnitsPerOuterPack")
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("purchase_units_per_outer_pack");
-
-                    b.Property<Guid?>("PurchaseUomId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("purchase_uom_id");
-
-                    b.Property<Guid?>("SellingUomId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("selling_uom_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasDefaultValue("ACTIVE")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<string>("UnitModel")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("unit_model");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid?>("UpdatedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by_tenant_user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_product_unit_settings");
-
-                    b.HasIndex("BaseUomId");
-
-                    b.HasIndex("OuterPackUomId");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("PurchaseUomId");
-
-                    b.HasIndex("SellingUomId");
-
-                    b.HasIndex("TenantId", "ProductId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_product_unit_settings_tenant_product");
-
-                    b.ToTable("product_unit_settings", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_product_unit_settings_outer_pack_factor", "purchase_units_per_outer_pack IS NULL OR purchase_units_per_outer_pack > 0");
-
-                            t.HasCheckConstraint("ck_product_unit_settings_purchase_factor", "items_per_purchase_unit IS NULL OR items_per_purchase_unit > 0");
-
-                            t.HasCheckConstraint("ck_product_unit_settings_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
-
-                            t.HasCheckConstraint("ck_product_unit_settings_unit_model", "unit_model IN ('SINGLE_UNIT', 'MULTIPLE_UNITS')");
                         });
                 });
 
@@ -17539,8 +17084,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_product_inventory_settings_batch_requires_stock", "requires_batch_tracking = false OR is_stock_tracked = true");
 
                             t.HasCheckConstraint("ck_product_inventory_settings_expiry_requires_batch", "requires_expiry_tracking = false OR requires_batch_tracking = true");
-
-                            t.HasCheckConstraint("ck_product_inventory_settings_serial_no_batch_or_expiry", "requires_serial_tracking = false OR (requires_batch_tracking = false AND requires_expiry_tracking = false)");
 
                             t.HasCheckConstraint("ck_product_inventory_settings_serial_requires_stock", "requires_serial_tracking = false OR is_stock_tracked = true");
 
@@ -24313,70 +23856,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantUserInviteDeliverySecret", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("EncryptedToken")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("encrypted_token");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<Guid>("InviteId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("invite_id");
-
-                    b.Property<string>("KeyVersion")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)")
-                        .HasColumnName("key_version");
-
-                    b.Property<DateTimeOffset?>("PurgedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("purged_at");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid>("TenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_user_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_tenant_user_invite_delivery_secrets");
-
-                    b.HasIndex("InviteId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_tenant_user_invite_delivery_secrets_invite_id");
-
-                    b.HasIndex("TenantUserId");
-
-                    b.HasIndex("TenantId", "TenantUserId")
-                        .HasDatabaseName("ix_tenant_user_invite_delivery_secrets_target");
-
-                    b.HasIndex("PurgedAt", "ExpiresAt", "CreatedAt")
-                        .HasDatabaseName("ix_tenant_user_invite_delivery_secrets_cleanup");
-
-                    b.ToTable("tenant_user_invite_delivery_secrets", (string)null);
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -24470,10 +23949,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
-                    b.Property<Guid?>("TenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_user_id");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -24488,9 +23963,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("InviteTokenHash")
                         .IsUnique()
                         .HasDatabaseName("uq_user_invites_invite_token_hash");
-
-                    b.HasIndex("TenantUserId")
-                        .HasDatabaseName("ix_user_invites_tenant_user_id");
 
                     b.HasIndex("TenantId", "NormalizedInvitedEmail")
                         .IsUnique()
@@ -26195,16 +25667,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedByPlatformUserId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_platform_settings_updated_by_platform_user_id_platform_users");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapProductImportRow", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapProductImportBatch", null)
-                        .WithMany()
-                        .HasForeignKey("ImportBatchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_bootstrap_import_rows_batch");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingDraft", b =>
@@ -28824,71 +28286,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_reviews_tenant_id_tenants");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductUnitConversion", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_product_unit_conversions_product_id_products");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_product_unit_conversions_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", null)
-                        .WithMany()
-                        .HasForeignKey("UomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_product_unit_conversions_uom_id_unit_of_measures");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductUnitSetting", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", null)
-                        .WithMany()
-                        .HasForeignKey("BaseUomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_product_unit_settings_base_uom_id_unit_of_measures");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", null)
-                        .WithMany()
-                        .HasForeignKey("OuterPackUomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_product_unit_settings_outer_pack_uom_id_unit_of_measures");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_product_unit_settings_product_id_products");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", null)
-                        .WithMany()
-                        .HasForeignKey("PurchaseUomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_product_unit_settings_purchase_uom_id_unit_of_measures");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", null)
-                        .WithMany()
-                        .HasForeignKey("SellingUomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_product_unit_settings_selling_uom_id_unit_of_measures");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_product_unit_settings_tenant_id_tenants");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", b =>
@@ -32607,23 +32004,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenant_refresh_tokens_user_id_tenant_users");
                 });
 
-            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.TenantUserInviteDeliverySecret", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", null)
-                        .WithMany()
-                        .HasForeignKey("InviteId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_tenant_user_invite_delivery_secrets_invite");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
-                        .WithMany()
-                        .HasForeignKey("TenantUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_tenant_user_invite_delivery_secrets_user");
-                });
-
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserInvite", b =>
                 {
                     b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
@@ -32644,12 +32024,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_user_invites_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
-                        .WithMany()
-                        .HasForeignKey("TenantUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_user_invites_tenant_user_id_tenant_users");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.TenantAuth.Entities.UserSetupToken", b =>

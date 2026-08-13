@@ -9,6 +9,7 @@ using E_POS.Domain.Modules.Tenant.Payment.Constants;
 using E_POS.Domain.Modules.Tenant.Payment.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
 using E_POS.Domain.Modules.Tenant.Discount.Entities;
+using E_POS.Domain.Modules.Tenant.Discount.Constants;
 using E_POS.Application.Modules.Tenant.Discount.Services;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Persistence;
@@ -154,12 +155,25 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         var taxPercentByVariant = await ResolveTaxPercentsAsync(
             tenantId, variants.Select(x => new TaxLookupInput(x.VariantId, x.ProductId)).ToList(),
             now, cancellationToken);
+        var automaticPromotions = await ResolveAutomaticPromotionsAsync(
+            tenantId, sessionResolution.Snapshot!.OutletId,
+            normalizedLines.Select(line => new AutomaticPromotionInput(
+                line.VariantId, variantsById[line.VariantId].ProductId, line.Qty,
+                ResolveNetUnitPrice(
+                    pricesByVariant[line.VariantId].SellingPrice,
+                    priceList.PriceIncludesTax,
+                    variantsById[line.VariantId].IsTaxable
+                        ? taxPercentByVariant.GetValueOrDefault(line.VariantId)?.RatePercent ?? 0m
+                        : 0m))).ToList(),
+            now, request.DiscountApplicationId, cancellationToken);
 
         foreach (var line in normalizedLines)
         {
             var variant = variantsById[line.VariantId];
             var unitPrice = pricesByVariant[line.VariantId].SellingPrice;
 
+            var promotion = automaticPromotions.GetValueOrDefault(line.VariantId);
+            var automaticDiscount = promotion?.DiscountAmount ?? 0m;
             var grossLineAmount = unitPrice * line.Qty;
             var taxPercent = variant.IsTaxable && taxPercentByVariant.TryGetValue(line.VariantId, out var tax)
                 ? tax.RatePercent
@@ -169,7 +183,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 : grossLineAmount;
             subtotal += lineSubtotal;
             itemCount += line.Qty;
-            var lineTax = lineSubtotal * taxPercent / 100m;
+            var taxableSubtotal = Math.Max(0m, lineSubtotal - automaticDiscount);
+            var lineTax = taxableSubtotal * taxPercent / 100m;
             taxTotal += lineTax;
             calculatedLines.Add(new CalculatedCheckoutLine(line.VariantId, lineSubtotal, lineTax));
 
@@ -181,12 +196,17 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             responseLines.Add(new PosCalculatedCartLineDto(
                 line.ClientLineId, variant.ProductId, variant.VariantId, variant.ProductName,
                 variant.VariantName, variant.Sku, variant.SalesUomId, variant.UomCode, line.Qty,
-                line.LineNote, ToMoney(unitPrice), 0, ToMoney(lineTax),
-                ToMoney(lineSubtotal + lineTax),
+                line.LineNote, ToMoney(unitPrice), ToMoney(automaticDiscount), ToMoney(lineTax),
+                ToMoney(taxableSubtotal + lineTax),
                 availableByVariant.TryGetValue(line.VariantId, out var available) && available < line.Qty
                     ? "insufficient_stock" : "available",
                 availableByVariant.TryGetValue(line.VariantId, out available) && available < line.Qty
-                    ? "pos_checkout.insufficient_stock" : null));
+                    ? "pos_checkout.insufficient_stock" : null,
+                ToMoney(unitPrice), ToMoney(automaticDiscount),
+                ToMoney(unitPrice - automaticDiscount / line.Qty),
+                promotion is null ? null : new PosAppliedPromotionDto(
+                    promotion.PolicyId, promotion.PolicyCode, promotion.PolicyName,
+                    promotion.CalculationMethod, promotion.DiscountValue)));
         }
 
         if (itemCount == 0)
@@ -221,10 +241,14 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             return new PosCheckoutCalculationResult(discountResolution.ErrorCode, null);
         }
 
-        var discountAmount = discountResolution.Application?.DiscountAmountSnapshot ?? 0m;
-        if (discountAmount > 0m && subtotal > 0m)
+        var automaticDiscountAmount = automaticPromotions.Values.Sum(x => x.DiscountAmount);
+        var manualDiscountAmount = discountResolution.Application?.DiscountAmountSnapshot ?? 0m;
+        if (automaticDiscountAmount > 0m && manualDiscountAmount > 0m)
+            return new PosCheckoutCalculationResult("pos_checkout.discount_stacking_not_allowed", null);
+        var discountAmount = automaticDiscountAmount + manualDiscountAmount;
+        if (manualDiscountAmount > 0m && subtotal > 0m)
             taxTotal = AllocateDiscountToTax(
-                calculatedLines, discountResolution.Application!, discountAmount);
+                calculatedLines, discountResolution.Application!, manualDiscountAmount);
         var discount = ToMoney(discountAmount);
         var summary = new PosCheckoutSummaryResponseDto(
             new PosCheckoutBillingSummaryDto(
@@ -233,7 +257,9 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 discount,
                 ToMoney(taxTotal),
                 ToMoney(subtotal - discountAmount + taxTotal),
-                priceList.CurrencyCode),
+                priceList.CurrencyCode,
+                ToMoney(automaticDiscountAmount),
+                ToMoney(manualDiscountAmount)),
             new PosCheckoutSaleDetailsDto(
                 FormatSaleType(request.SaleType),
                 itemCount,
@@ -382,6 +408,19 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         var taxPercentByVariant = await ResolveTaxPercentsAsync(
             tenantId, variants.Select(x => new TaxLookupInput(x.VariantId, x.ProductId)).ToList(),
             now, cancellationToken);
+        var automaticPromotions = await ResolveAutomaticPromotionsAsync(
+            tenantId, session.OutletId,
+            normalizedLines.Select(line =>
+            {
+                var variant = variantsById[line.VariantId];
+                var taxPercent = variant.IsTaxable
+                    ? taxPercentByVariant.GetValueOrDefault(line.VariantId)?.RatePercent ?? 0m
+                    : 0m;
+                return new AutomaticPromotionInput(
+                    line.VariantId, variant.ProductId, line.Qty,
+                    ResolveNetUnitPrice(priceRowsByVariant[line.VariantId].SellingPrice,
+                        priceList.PriceIncludesTax, taxPercent));
+            }).ToList(), now, request.DiscountApplicationId, cancellationToken);
 
         foreach (var line in normalizedLines)
         {
@@ -401,7 +440,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 ? listedUnitPrice * 100m / (100m + taxPercent)
                 : listedUnitPrice;
             var lineSubtotal = unitPrice * quantity;
-            var lineTax = lineSubtotal * taxPercent / 100m;
+            var automaticDiscount = automaticPromotions.GetValueOrDefault(line.VariantId)?.DiscountAmount ?? 0m;
+            var lineTax = Math.Max(0m, lineSubtotal - automaticDiscount) * taxPercent / 100m;
 
             if (availableByVariant.TryGetValue(line.VariantId, out var availableQuantity) &&
                 availableQuantity < quantity)
@@ -419,7 +459,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 quantity,
                 unitPrice,
                 lineSubtotal,
-                0m,
+                automaticDiscount,
                 lineTax,
                 priceRow.PriceListItemId,
                 taxDetail));
@@ -435,10 +475,14 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         }
 
         var discountApplication = discountResolution.Application;
-        var discountTotal = discountApplication?.DiscountAmountSnapshot ?? 0m;
-        if (discountTotal > 0m && subtotal > 0m)
+        var automaticDiscountTotal = automaticPromotions.Values.Sum(x => x.DiscountAmount);
+        var manualDiscountTotal = discountApplication?.DiscountAmountSnapshot ?? 0m;
+        if (automaticDiscountTotal > 0m && manualDiscountTotal > 0m)
+            return new PosCheckoutStartPaymentResult("pos_checkout.discount_stacking_not_allowed", null);
+        var discountTotal = automaticDiscountTotal + manualDiscountTotal;
+        if (manualDiscountTotal > 0m && subtotal > 0m)
         {
-            var remainingDiscount = discountTotal;
+            var remainingDiscount = manualDiscountTotal;
             var eligibleIndexes = builtLines
                 .Select((line, index) => new { line, index })
                 .Where(x => discountApplication!.DiscountScope == "ORDER" ||
@@ -457,7 +501,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 {
                     lineDiscount = eligiblePosition == eligibleIndexes.Count - 1
                             ? remainingDiscount
-                            : Math.Round(discountTotal * line.LineSubtotal / eligibleSubtotal, 4,
+                            : Math.Round(manualDiscountTotal * line.LineSubtotal / eligibleSubtotal, 4,
                                 MidpointRounding.AwayFromZero);
                     lineDiscount = Math.Min(Math.Min(lineDiscount, remainingDiscount), line.LineSubtotal);
                     remainingDiscount -= lineDiscount;
@@ -466,7 +510,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 var adjustedTax = line.LineSubtotal > 0m
                     ? line.LineTax * (line.LineSubtotal - lineDiscount) / line.LineSubtotal
                     : 0m;
-                builtLines[index] = line with { LineDiscount = lineDiscount, LineTax = adjustedTax };
+                builtLines[index] = line with { LineDiscount = line.LineDiscount + lineDiscount, LineTax = adjustedTax };
             }
             taxTotal = builtLines.Sum(x => x.LineTax);
         }
@@ -832,18 +876,31 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 discountSalesOrderLineId = responseLines[targetLineIndex].SaleLineId;
         }
 
-        var receiptDiscountLines = discountApplication is null
-            ? Array.Empty<PosReceiptDiscountLineDto>()
-            : new[]
+        var receiptDiscountLines = automaticPromotions
+            .Where(entry => entry.Value.DiscountAmount > 0m)
+            .Select(entry =>
             {
+                var lineIndex = builtLines.FindIndex(line => line.VariantId == entry.Key);
+                return new PosReceiptDiscountLineDto(
+                    "ITEM",
+                    lineIndex >= 0 ? responseLines[lineIndex].SaleLineId : null,
+                    entry.Value.PolicyName,
+                    entry.Value.PolicyCode,
+                    entry.Value.PolicyId.ToString(),
+                    ToMoney(entry.Value.DiscountAmount));
+            })
+            .ToList();
+        if (discountApplication is not null)
+        {
+            receiptDiscountLines.Add(
                 new PosReceiptDiscountLineDto(
                     discountApplication.DiscountScope == "ORDER" ? "TRANSACTION" : "ITEM",
                     discountSalesOrderLineId,
                     discountApplication.PolicyNameSnapshot,
                     discountApplication.PolicyCodeSnapshot,
                     null,
-                    ToMoney(discountApplication.DiscountAmountSnapshot))
-            };
+                    ToMoney(discountApplication.DiscountAmountSnapshot)));
+        }
         var receiptTaxLines = builtLines
             .Where(x => x.TaxDetail is not null && x.LineTax > 0)
             .GroupBy(x => new
@@ -1000,6 +1057,19 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         receipt.AssignTemplateVersion(templateVersionId);
 
         _dbContext.Receipts.Add(receipt);
+        foreach (var entry in automaticPromotions.Where(x => x.Value.DiscountAmount > 0m))
+        {
+            var lineIndex = builtLines.FindIndex(line => line.VariantId == entry.Key);
+            var saleLineId = lineIndex >= 0 ? responseLines[lineIndex].SaleLineId : (Guid?)null;
+            _dbContext.SalesOrderDiscounts.Add(SalesOrderDiscount.CreateForPosSale(
+                Guid.NewGuid(), tenantId, saleId, saleLineId,
+                entry.Value.PolicyId, entry.Value.DiscountTypeId, "LINE",
+                entry.Value.PolicyCode, entry.Value.PolicyName,
+                entry.Value.CalculationMethod, entry.Value.DiscountValue,
+                entry.Value.DiscountAmount, null,
+                entry.Value.RequiresManagerApproval, null, null,
+                tenantUserId, now));
+        }
         if (discountApplication is not null)
         {
             _dbContext.SalesOrderDiscounts.Add(SalesOrderDiscount.CreateForPosSale(
@@ -1465,8 +1535,167 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         string TaxClassName);
     private sealed record ResolvedTax(string TaxCode, string TaxName, decimal RatePercent);
     private sealed record CalculatedCheckoutLine(Guid VariantId, decimal Subtotal, decimal Tax);
+    private sealed record AutomaticPromotionInput(
+        Guid VariantId, Guid ProductId, int Quantity, decimal NetUnitPrice);
+    private sealed record ResolvedAutomaticPromotion(
+        Guid PolicyId, Guid DiscountTypeId, string PolicyCode, string PolicyName,
+        string CalculationMethod, decimal DiscountValue, decimal DiscountAmount,
+        bool RequiresManagerApproval);
     private sealed record IdempotentPaymentResolution(
         bool Found, PosCheckoutStartPaymentResponseDto? Payment);
+
+    private static decimal ResolveNetUnitPrice(
+        decimal sellingPrice, bool priceIncludesTax, decimal taxPercent) =>
+        priceIncludesTax && taxPercent > 0m
+            ? sellingPrice * 100m / (100m + taxPercent)
+            : sellingPrice;
+
+    private async Task<Dictionary<Guid, ResolvedAutomaticPromotion>> ResolveAutomaticPromotionsAsync(
+        Guid tenantId,
+        Guid outletId,
+        IReadOnlyList<AutomaticPromotionInput> inputs,
+        DateTimeOffset now,
+        Guid? manualDiscountApplicationId,
+        CancellationToken cancellationToken)
+    {
+        if (inputs.Count == 0) return [];
+
+        var salesChannelId = await (
+                from channel in _dbContext.SalesChannels.AsNoTracking()
+                join platform in _dbContext.PlatformSalesChannels.AsNoTracking()
+                    on channel.PlatformSalesChannelId equals platform.Id
+                where channel.TenantId == tenantId && channel.Status == ActiveStatus &&
+                      platform.ChannelCode == "POS"
+                select channel.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var policies = await _dbContext.DiscountPolicies.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status == ActiveStatus &&
+                        x.DiscountScope == "LINE" &&
+                        (!x.StartsAt.HasValue || x.StartsAt <= now) &&
+                        (!x.EndsAt.HasValue || x.EndsAt >= now))
+            .ToListAsync(cancellationToken);
+        Guid? manualPolicyId = null;
+        if (manualDiscountApplicationId.HasValue)
+        {
+            manualPolicyId = await _dbContext.PosDiscountApplications.AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.Id == manualDiscountApplicationId.Value)
+                .Select(x => (Guid?)x.DiscountPolicyId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        policies = policies
+            .Where(x => !ManualDiscountPolicyCodes.Contains(x.DiscountPolicyCode) &&
+                        x.Id != manualPolicyId &&
+                        !x.RequiresManagerApproval)
+            .ToList();
+        if (policies.Count == 0) return [];
+
+        var policyIds = policies.Select(x => x.Id).ToList();
+        var outletLinks = await _dbContext.DiscountPolicyOutlets.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && policyIds.Contains(x.DiscountPolicyId) &&
+                        x.Status == ActiveStatus)
+            .ToListAsync(cancellationToken);
+        var channelLinks = await _dbContext.DiscountPolicyChannels.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && policyIds.Contains(x.DiscountPolicyId) &&
+                        x.Status == ActiveStatus)
+            .ToListAsync(cancellationToken);
+        policies = policies.Where(policy =>
+            (!outletLinks.Any(x => x.DiscountPolicyId == policy.Id) ||
+             outletLinks.Any(x => x.DiscountPolicyId == policy.Id && x.OutletId == outletId)) &&
+            (!channelLinks.Any(x => x.DiscountPolicyId == policy.Id) ||
+             channelLinks.Any(x => x.DiscountPolicyId == policy.Id && x.SalesChannelId == salesChannelId)))
+            .ToList();
+        if (policies.Count == 0) return [];
+
+        policyIds = policies.Select(x => x.Id).ToList();
+        var targets = await _dbContext.DiscountPolicyTargets.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && policyIds.Contains(x.DiscountPolicyId) &&
+                        x.Status == ActiveStatus)
+            .ToListAsync(cancellationToken);
+        var policiesWithConditions = await _dbContext.DiscountPolicyConditions.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && policyIds.Contains(x.DiscountPolicyId) &&
+                        x.Status == ActiveStatus)
+            .Select(x => x.DiscountPolicyId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var methods = await _dbContext.DiscountTypes.AsNoTracking()
+            .Where(x => x.Status == ActiveStatus &&
+                        policies.Select(p => p.DiscountTypeId).Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.CalculationMethod, cancellationToken);
+
+        var productIds = inputs.Select(x => x.ProductId).Distinct().ToList();
+        var categoryLinks = await _dbContext.ProductCategories.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId))
+            .Select(x => new { x.ProductId, x.CategoryId })
+            .ToListAsync(cancellationToken);
+        var collectionLinks = await _dbContext.ProductCollections.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId))
+            .Select(x => new { x.ProductId, x.CollectionId })
+            .ToListAsync(cancellationToken);
+        var brandByProduct = await _dbContext.Products.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.BrandId, cancellationToken);
+
+        var result = new Dictionary<Guid, ResolvedAutomaticPromotion>();
+        foreach (var input in inputs)
+        {
+            var categories = categoryLinks.Where(x => x.ProductId == input.ProductId)
+                .Select(x => x.CategoryId).ToHashSet();
+            var collections = collectionLinks.Where(x => x.ProductId == input.ProductId)
+                .Select(x => x.CollectionId).ToHashSet();
+            var brandId = brandByProduct.GetValueOrDefault(input.ProductId);
+            var candidates = new List<(DiscountPolicy Policy, string Method, decimal Amount)>();
+
+            foreach (var policy in policies)
+            {
+                if (policiesWithConditions.Contains(policy.Id) ||
+                    policy.MinOrderAmount is > 0m ||
+                    (policy.MinQuantity.HasValue && input.Quantity < policy.MinQuantity.Value) ||
+                    !methods.TryGetValue(policy.DiscountTypeId, out var method)) continue;
+
+                var policyTargets = targets.Where(x => x.DiscountPolicyId == policy.Id).ToList();
+                bool Matches(DiscountPolicyTarget target) => target.TargetType switch
+                {
+                    "PRODUCT" => target.ProductId == input.ProductId,
+                    "PRODUCT_VARIANT" => target.ProductVariantId == input.VariantId,
+                    "CATEGORY" => target.CategoryId.HasValue && categories.Contains(target.CategoryId.Value),
+                    "BRAND" => target.BrandId.HasValue && target.BrandId == brandId,
+                    "COLLECTION" => target.CollectionId.HasValue && collections.Contains(target.CollectionId.Value),
+                    _ => false
+                };
+                if (policyTargets.Where(x => x.TargetMode == "EXCLUDE").Any(Matches)) continue;
+                var includes = policyTargets.Where(x => x.TargetMode == "INCLUDE").ToList();
+                if (includes.Count > 0 && !includes.Any(Matches)) continue;
+
+                var lineBase = input.NetUnitPrice * input.Quantity;
+                var amount = method switch
+                {
+                    "PERCENTAGE" => lineBase * policy.DiscountValue / 100m,
+                    "FIXED_AMOUNT" => policy.DiscountValue * input.Quantity,
+                    _ => 0m
+                };
+                if (policy.MaxDiscountAmount.HasValue)
+                    amount = Math.Min(amount, policy.MaxDiscountAmount.Value);
+                amount = Math.Min(Math.Max(amount, 0m), lineBase);
+                if (amount > 0m) candidates.Add((policy, method, amount));
+            }
+
+            var best = candidates.OrderByDescending(x => x.Amount)
+                .ThenByDescending(x => x.Policy.Priority)
+                .ThenBy(x => x.Policy.EndsAt ?? DateTimeOffset.MaxValue)
+                .ThenBy(x => x.Policy.Id)
+                .FirstOrDefault();
+            if (best.Policy is not null)
+            {
+                result[input.VariantId] = new ResolvedAutomaticPromotion(
+                    best.Policy.Id, best.Policy.DiscountTypeId,
+                    best.Policy.DiscountPolicyCode, best.Policy.DiscountPolicyName,
+                    best.Method, best.Policy.DiscountValue, best.Amount,
+                    best.Policy.RequiresManagerApproval);
+            }
+        }
+        return result;
+    }
 
     private async Task<DiscountApplicationResolution> ResolveDiscountApplicationAsync(
         Guid tenantId,
