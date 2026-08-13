@@ -38,7 +38,7 @@ public sealed class TenantAdminContextService : ITenantAdminContextService
         var fullName = BuildFullName(data.FirstName, data.LastName);
 
         var dto = new TenantAdminContextDto(
-            Tenant: new TenantAdminContextTenantDto(data.TenantId, data.TenantName),
+            Tenant: new TenantAdminContextTenantDto(data.TenantId, data.TenantName, data.TenantLogoUrl),
             User: new TenantAdminContextUserDto(data.UserId, fullName),
             Roles: data.Roles,
             Outlets: data.Outlets,
