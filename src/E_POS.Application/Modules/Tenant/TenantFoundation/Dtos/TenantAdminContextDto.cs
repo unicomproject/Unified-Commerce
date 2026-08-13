@@ -17,7 +17,7 @@ public sealed record TenantAdminContextDto(
     IReadOnlyList<string> EffectivePermissionCodes,
     TenantAdminContextSubscriptionDto Subscription);
 
-public sealed record TenantAdminContextTenantDto(Guid Id, string Name);
+public sealed record TenantAdminContextTenantDto(Guid Id, string Name, string? LogoUrl);
 public sealed record TenantAdminContextUserDto(Guid Id, string FullName);
 public sealed record TenantAdminContextRoleDto(Guid Id, string Name);
 public sealed record TenantAdminContextOutletDto(Guid Id, string Name);
