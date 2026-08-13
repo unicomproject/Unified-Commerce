@@ -93,6 +93,82 @@ public sealed class PlatformTenantBootstrapCreateUserAndCategoryTests
     }
 
     [Fact]
+    public async Task GetOutletOptions_ReturnsActiveOutlets_WhenTenantSuspended()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        SeedTenant(dbContext, tenantId, status: TenantStatusConstants.Suspended);
+        dbContext.Outlets.Add(Outlet.Create(
+            outletId,
+            tenantId,
+            "Main Store",
+            "OUT-001",
+            "ACTIVE",
+            "STORE",
+            "Asia/Colombo",
+            true,
+            null,
+            null,
+            null,
+            Now));
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var result = await service.GetOutletOptionsAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value!);
+        Assert.Equal(outletId, result.Value![0].OutletId);
+    }
+
+    [Fact]
+    public async Task GetRoleOptions_IncludesSystemTenantAdminRole()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var adminRoleId = Guid.NewGuid();
+        SeedTenant(dbContext, tenantId);
+        dbContext.TenantRoles.Add(TenantRole.Create(
+            adminRoleId,
+            tenantId,
+            null,
+            null,
+            "TENANT_ADMIN",
+            "Tenant Admin",
+            null,
+            isCustom: false,
+            isActive: true,
+            createdByTenantUserId: null,
+            Now));
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var result = await service.GetRoleOptionsAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var role = Assert.Single(result.Value!);
+        Assert.Equal(adminRoleId, role.RoleId);
+        Assert.True(role.IsSystem);
+    }
+
+    [Fact]
+    public async Task GetPermissionOptions_ReturnsEntitledCodes()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        SeedTenant(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var result = await service.GetPermissionOptionsAsync(tenantId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(result.Value!, item => item.PermissionCode == "tenant.settings.manage");
+        Assert.Contains(result.Value!, item => item.PermissionCode == "tenant.dashboard.view");
+    }
+
+    [Fact]
     public async Task CreateProduct_WithCrossTenantCategory_ReturnsDependencyMissing()
     {
         await using var dbContext = CreateDbContext();
@@ -275,14 +351,18 @@ public sealed class PlatformTenantBootstrapCreateUserAndCategoryTests
         return new EPosDbContext(options);
     }
 
-    private static void SeedTenant(EPosDbContext dbContext, Guid tenantId, string tenantCode = "BOOT-001")
+    private static void SeedTenant(
+        EPosDbContext dbContext,
+        Guid tenantId,
+        string tenantCode = "BOOT-001",
+        string status = TenantStatusConstants.Active)
     {
         dbContext.Tenants.Add(Tenant.Create(
             tenantId,
             tenantCode,
             tenantCode.ToLowerInvariant(),
             "Bootstrap Tenant",
-            TenantStatusConstants.Active,
+            status,
             "LKR",
             "Asia/Colombo",
             "en-LK",

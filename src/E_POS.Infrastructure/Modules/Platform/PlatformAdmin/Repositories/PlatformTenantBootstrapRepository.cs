@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
@@ -93,6 +94,40 @@ public sealed class PlatformTenantBootstrapRepository : IPlatformTenantBootstrap
             customRoleCount,
             tenantUserCount,
             activeOrDraftProductCount);
+    }
+
+    public async Task<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>> ListOutletOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Outlets
+            .AsNoTracking()
+            .Where(outlet =>
+                outlet.TenantId == tenantId &&
+                outlet.Status == OutletConstants.ActiveStatus)
+            .OrderBy(outlet => outlet.OutletName)
+            .Select(outlet => new PlatformTenantBootstrapOutletOptionDto(
+                outlet.Id,
+                outlet.OutletName,
+                outlet.OutletCode,
+                outlet.Status))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>> ListRoleOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.TenantRoles
+            .AsNoTracking()
+            .Where(role => role.TenantId == tenantId && role.IsActive)
+            .OrderBy(role => role.RoleName)
+            .Select(role => new PlatformTenantBootstrapRoleOptionDto(
+                role.Id,
+                role.RoleName,
+                role.RoleCode,
+                role.IsCustom != true))
+            .ToListAsync(cancellationToken);
     }
 
     public Task<bool> OutletBelongsToTenantAsync(

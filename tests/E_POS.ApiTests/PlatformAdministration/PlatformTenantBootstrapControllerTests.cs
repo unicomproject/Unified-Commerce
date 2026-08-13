@@ -47,6 +47,79 @@ public sealed class PlatformTenantBootstrapControllerTests
     }
 
     [Fact]
+    public async Task GetOutletOptions_WithAuthenticatedUser_ReturnsOk()
+    {
+        var options = new List<PlatformTenantBootstrapOutletOptionDto>
+        {
+            new(Guid.NewGuid(), "Main", "OUT-1", "ACTIVE")
+        };
+        var controller = CreateController(new FakeBootstrapService
+        {
+            OutletOptionsResult = ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>.Success(options)
+        });
+        SetPlatformClaims(controller);
+
+        var result = await controller.GetOutletOptions(TenantId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var payload = Assert.IsType<LegacyApiResponse<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>>(ok.Value);
+        Assert.True(payload.Success);
+        Assert.Same(options, payload.Data);
+    }
+
+    [Fact]
+    public async Task GetOutletOptions_WithoutUser_ReturnsUnauthorized()
+    {
+        var controller = CreateController(new FakeBootstrapService());
+
+        var result = await controller.GetOutletOptions(TenantId, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetRoleOptions_WithAuthenticatedUser_ReturnsOk()
+    {
+        var options = new List<PlatformTenantBootstrapRoleOptionDto>
+        {
+            new(Guid.NewGuid(), "Tenant Admin", "TENANT_ADMIN", true)
+        };
+        var controller = CreateController(new FakeBootstrapService
+        {
+            RoleOptionsResult = ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>.Success(options)
+        });
+        SetPlatformClaims(controller);
+
+        var result = await controller.GetRoleOptions(TenantId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var payload = Assert.IsType<LegacyApiResponse<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>>(ok.Value);
+        Assert.True(payload.Success);
+        Assert.Same(options, payload.Data);
+    }
+
+    [Fact]
+    public async Task GetPermissionOptions_WithAuthenticatedUser_ReturnsOk()
+    {
+        var options = new List<PlatformTenantBootstrapPermissionOptionDto>
+        {
+            new("tenant.settings.manage")
+        };
+        var controller = CreateController(new FakeBootstrapService
+        {
+            PermissionOptionsResult = ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>.Success(options)
+        });
+        SetPlatformClaims(controller);
+
+        var result = await controller.GetPermissionOptions(TenantId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var payload = Assert.IsType<LegacyApiResponse<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>>(ok.Value);
+        Assert.True(payload.Success);
+        Assert.Same(options, payload.Data);
+    }
+
+    [Fact]
     public async Task CreateOutlet_WithSuccess_ReturnsCreated()
     {
         var response = new PlatformTenantBootstrapOutletResponse(
@@ -300,6 +373,9 @@ public sealed class PlatformTenantBootstrapControllerTests
     private sealed class FakeBootstrapService : IPlatformTenantBootstrapService
     {
         public ApplicationResult<PlatformTenantBootstrapSummaryResponse>? SummaryResult { get; init; }
+        public ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>? OutletOptionsResult { get; init; }
+        public ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>? RoleOptionsResult { get; init; }
+        public ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>? PermissionOptionsResult { get; init; }
         public ApplicationResult<PlatformTenantBootstrapOutletResponse>? OutletResult { get; init; }
         public ApplicationResult<PlatformTenantBootstrapTillResponse>? TillResult { get; init; }
         public ApplicationResult<PlatformTenantBootstrapRoleResponse>? RoleResult { get; init; }
@@ -314,6 +390,27 @@ public sealed class PlatformTenantBootstrapControllerTests
             Guid platformUserId,
             CancellationToken cancellationToken) =>
             Task.FromResult(SummaryResult ?? ApplicationResult<PlatformTenantBootstrapSummaryResponse>.Failure(
+                new ApplicationError("platform_tenants.not_found", "Tenant not found.")));
+
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>> GetOutletOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OutletOptionsResult ?? ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>.Failure(
+                new ApplicationError("platform_tenants.not_found", "Tenant not found.")));
+
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>> GetRoleOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(RoleOptionsResult ?? ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>.Failure(
+                new ApplicationError("platform_tenants.not_found", "Tenant not found.")));
+
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>> GetPermissionOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(PermissionOptionsResult ?? ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>.Failure(
                 new ApplicationError("platform_tenants.not_found", "Tenant not found.")));
 
         public Task<ApplicationResult<PlatformTenantBootstrapOutletResponse>> CreateOutletAsync(

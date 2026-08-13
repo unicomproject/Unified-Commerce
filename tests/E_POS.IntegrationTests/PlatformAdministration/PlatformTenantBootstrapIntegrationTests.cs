@@ -58,6 +58,127 @@ public sealed class PlatformTenantBootstrapIntegrationTests
     }
 
     [Fact]
+    public async Task ListOutletOptionsAsync_ReturnsActiveOutletsForTenantOnly()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var activeOutletId = Guid.NewGuid();
+        var inactiveOutletId = Guid.NewGuid();
+        var foreignOutletId = Guid.NewGuid();
+        SeedTenant(dbContext, tenantA, TenantStatusConstants.Active);
+        SeedTenant(dbContext, tenantB, TenantStatusConstants.Active, "BOOT-002");
+        dbContext.Outlets.Add(Outlet.Create(
+            activeOutletId,
+            tenantA,
+            "Main Store",
+            "OUT-001",
+            "ACTIVE",
+            "STORE",
+            "Asia/Colombo",
+            true,
+            null,
+            null,
+            null,
+            Now));
+        dbContext.Outlets.Add(Outlet.Create(
+            inactiveOutletId,
+            tenantA,
+            "Inactive Store",
+            "OUT-002",
+            "INACTIVE",
+            "STORE",
+            "Asia/Colombo",
+            true,
+            null,
+            null,
+            null,
+            Now));
+        dbContext.Outlets.Add(Outlet.Create(
+            foreignOutletId,
+            tenantB,
+            "Foreign Store",
+            "OUT-F1",
+            "ACTIVE",
+            "STORE",
+            "Asia/Colombo",
+            true,
+            null,
+            null,
+            null,
+            Now));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new PlatformTenantBootstrapRepository(dbContext);
+        var options = await repository.ListOutletOptionsAsync(tenantA, CancellationToken.None);
+
+        Assert.Single(options);
+        Assert.Equal(activeOutletId, options[0].OutletId);
+        Assert.Equal("Main Store", options[0].OutletName);
+        Assert.Equal("OUT-001", options[0].OutletCode);
+        Assert.Equal("ACTIVE", options[0].Status);
+    }
+
+    [Fact]
+    public async Task ListRoleOptionsAsync_ReturnsActiveRolesIncludingSystemTenantAdmin()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var adminRoleId = Guid.NewGuid();
+        var customRoleId = Guid.NewGuid();
+        var inactiveRoleId = Guid.NewGuid();
+        SeedTenant(dbContext, tenantId, TenantStatusConstants.Active);
+        dbContext.TenantRoles.Add(TenantRole.Create(
+            adminRoleId,
+            tenantId,
+            null,
+            null,
+            "TENANT_ADMIN",
+            "Tenant Admin",
+            "System admin",
+            isCustom: false,
+            isActive: true,
+            createdByTenantUserId: null,
+            Now));
+        dbContext.TenantRoles.Add(TenantRole.Create(
+            customRoleId,
+            tenantId,
+            null,
+            null,
+            "STORE_MANAGER",
+            "Store Manager",
+            "Custom role",
+            isCustom: true,
+            isActive: true,
+            createdByTenantUserId: null,
+            Now));
+        dbContext.TenantRoles.Add(TenantRole.Create(
+            inactiveRoleId,
+            tenantId,
+            null,
+            null,
+            "RETIRED",
+            "Retired",
+            null,
+            isCustom: true,
+            isActive: false,
+            createdByTenantUserId: null,
+            Now));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new PlatformTenantBootstrapRepository(dbContext);
+        var options = await repository.ListRoleOptionsAsync(tenantId, CancellationToken.None);
+
+        Assert.Equal(2, options.Count);
+        var admin = Assert.Single(options, role => role.RoleId == adminRoleId);
+        Assert.True(admin.IsSystem);
+        Assert.Equal("TENANT_ADMIN", admin.RoleCode);
+        var custom = Assert.Single(options, role => role.RoleId == customRoleId);
+        Assert.False(custom.IsSystem);
+        Assert.DoesNotContain(options, role => role.RoleId == inactiveRoleId);
+    }
+
+    [Fact]
     public async Task PermissionSeed_IncludesSelectedTenantBootstrapPermissions()
     {
         await using var dbContext = CreateDbContext();

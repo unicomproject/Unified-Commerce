@@ -191,6 +191,54 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
                 modules));
     }
 
+    public async Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>> GetOutletOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        var access = await _accessPolicy.AuthorizeReadAsync(platformUserId, tenantId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>.Failure(access.Error);
+        }
+
+        var items = await _bootstrapRepository.ListOutletOptionsAsync(tenantId, cancellationToken);
+        return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>.Success(items);
+    }
+
+    public async Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>> GetRoleOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        var access = await _accessPolicy.AuthorizeReadAsync(platformUserId, tenantId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>.Failure(access.Error);
+        }
+
+        var items = await _bootstrapRepository.ListRoleOptionsAsync(tenantId, cancellationToken);
+        return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>.Success(items);
+    }
+
+    public async Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>> GetPermissionOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        var access = await _accessPolicy.AuthorizeReadAsync(platformUserId, tenantId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>.Failure(access.Error);
+        }
+
+        var codes = await ListEntitledTenantPermissionCodesAsync(tenantId, cancellationToken);
+        var items = codes
+            .Select(code => new PlatformTenantBootstrapPermissionOptionDto(code))
+            .ToList();
+        return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>.Success(items);
+    }
+
     public async Task<ApplicationResult<PlatformTenantBootstrapOutletResponse>> CreateOutletAsync(
         Guid tenantId,
         Guid platformUserId,
@@ -761,9 +809,10 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
             Status = string.IsNullOrWhiteSpace(request.Status) ? "ACTIVE" : request.Status.Trim().ToUpperInvariant()
         };
 
+        // Platform actor must not be written into tenant_users FK columns (published_by / created_by).
         var created = await _tenantAdminProductRepository.CreateProductAsync(
             tenantId,
-            platformUserId,
+            userId: null,
             mappedRequest,
             unitId.Value,
             now,
@@ -1326,6 +1375,25 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
         IReadOnlyList<string> requestedPermissionCodes,
         CancellationToken cancellationToken)
     {
+        var allowed = await BuildEntitledTenantPermissionCodeSetAsync(tenantId, cancellationToken);
+
+        return requestedPermissionCodes
+            .Where(code => allowed.Contains(code))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<string>> ListEntitledTenantPermissionCodesAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var allowed = await BuildEntitledTenantPermissionCodeSetAsync(tenantId, cancellationToken);
+        return allowed.OrderBy(code => code, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private async Task<HashSet<string>> BuildEntitledTenantPermissionCodeSetAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
         var now = _dateTimeProvider.UtcNow;
         var effectiveFeatures = new List<string>();
         foreach (var featureCode in BootstrapFeatureCodes)
@@ -1339,10 +1407,7 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
         var plan = TenantAdminBootstrapPermissionCatalog.Resolve(effectiveFeatures);
         var allowed = new HashSet<string>(plan.PermissionCodes, StringComparer.OrdinalIgnoreCase);
         allowed.UnionWith(TenantAdminBootstrapPermissionCatalog.BasePermissionCodes);
-
-        return requestedPermissionCodes
-            .Where(code => allowed.Contains(code))
-            .ToList();
+        return allowed;
     }
 
     private static readonly string[] BootstrapFeatureCodes =

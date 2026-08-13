@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
@@ -107,6 +108,16 @@ public sealed class PlatformSelectedTenantAccessPolicyTests
             Guid tenantId,
             CancellationToken cancellationToken) =>
             Task.FromResult(new PlatformTenantBootstrapFootprintCounts(0, 0, 0, 1, 0));
+
+        public Task<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>> ListOutletOptionsAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>([]);
+
+        public Task<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>> ListRoleOptionsAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>([]);
 
         public Task<bool> OutletBelongsToTenantAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken) =>
             Task.FromResult(false);

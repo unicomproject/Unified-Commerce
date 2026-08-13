@@ -235,6 +235,24 @@ public sealed class PlatformTenantBootstrapHttpPipelineTests
                             true, true, true, 0, 0, 0, 1, 0, false, true, true, true, true, true,
                             OnlineStoreEntitled: false, OnlineStoreStatus: null, CanManageOnlineStore: false)))));
 
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>> GetOutletOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>.Success([]));
+
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>> GetRoleOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>.Success([]));
+
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>> GetPermissionOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>.Success([]));
+
         public Task<ApplicationResult<PlatformTenantBootstrapOutletResponse>> CreateOutletAsync(
             Guid tenantId,
             Guid platformUserId,

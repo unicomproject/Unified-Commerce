@@ -1411,7 +1411,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
     public async Task<TenantAdminProductCreateResponse> CreateProductAsync(
         Guid tenantId,
-        Guid userId,
+        Guid? userId,
         TenantAdminProductCreateRequest request,
         Guid unitId,
         DateTimeOffset now,
@@ -1527,6 +1527,11 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             }
 
             var defaultPriceListId = await GetDefaultPriceListIdAsync(tenantId, cancellationToken);
+            if (!defaultPriceListId.HasValue)
+            {
+                defaultPriceListId = await EnsureDefaultPriceListAsync(tenantId, userId, now, cancellationToken);
+            }
+
             if (defaultPriceListId.HasValue)
             {
                 var priceListItem = PriceListItem.Create(
@@ -1601,6 +1606,16 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                     .OrderByDescending(x => x.IsSellableLocation)
                     .Select(x => (Guid?)x.Id)
                     .FirstOrDefaultAsync(cancellationToken);
+
+                if (!inventoryLocationId.HasValue)
+                {
+                    inventoryLocationId = await EnsureDefaultSellableInventoryLocationAsync(
+                        tenantId,
+                        outletId,
+                        userId,
+                        now,
+                        cancellationToken);
+                }
 
                 if (!inventoryLocationId.HasValue)
                 {
@@ -1735,6 +1750,68 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .Where(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == "ACTIVE")
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<Guid> EnsureDefaultPriceListAsync(
+        Guid tenantId,
+        Guid? userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var priceListId = Guid.NewGuid();
+        var priceList = PriceList.Create(
+            priceListId,
+            tenantId,
+            "DEFAULT",
+            "Default Price List",
+            "STANDARD",
+            "LKR",
+            priceIncludesTax: false,
+            isDefaultPriceList: true,
+            priority: 1,
+            validFrom: null,
+            validUntil: null,
+            status: "ACTIVE",
+            userId,
+            now);
+
+        await _dbContext.PriceLists.AddAsync(priceList, cancellationToken);
+        return priceListId;
+    }
+
+    private async Task<Guid?> EnsureDefaultSellableInventoryLocationAsync(
+        Guid tenantId,
+        Guid outletId,
+        Guid? userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var outletExists = await _dbContext.Outlets.AsNoTracking()
+            .AnyAsync(x => x.Id == outletId && x.TenantId == tenantId, cancellationToken);
+        if (!outletExists)
+        {
+            return null;
+        }
+
+        var locationId = Guid.NewGuid();
+        var location = InventoryLocation.Create(
+            locationId,
+            tenantId,
+            outletId,
+            parentInventoryLocationId: null,
+            locationCode: "MAIN",
+            locationName: "Main Floor",
+            locationType: "SALES",
+            isSellableLocation: true,
+            isReturnLocation: true,
+            isReceivingLocation: true,
+            isQuarantineLocation: false,
+            status: "ACTIVE",
+            userId,
+            now);
+
+        await _dbContext.InventoryLocations.AddAsync(location, cancellationToken);
+        return locationId;
     }
 
     private static string GenerateSlug(string name, string code)

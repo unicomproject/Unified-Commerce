@@ -21,6 +21,14 @@ public interface IPlatformTenantBootstrapRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>> ListOutletOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>> ListRoleOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
     Task<bool> OutletBelongsToTenantAsync(
         Guid tenantId,
         Guid outletId,
@@ -139,6 +147,21 @@ public sealed record PlatformTenantBootstrapFootprintCounts(
 public interface IPlatformTenantBootstrapService
 {
     Task<ApplicationResult<PlatformTenantBootstrapSummaryResponse>> GetSummaryAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>> GetOutletOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>> GetRoleOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>> GetPermissionOptionsAsync(
         Guid tenantId,
         Guid platformUserId,
         CancellationToken cancellationToken);

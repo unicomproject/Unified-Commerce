@@ -63,8 +63,8 @@ public sealed class TenantSubscriptionHistoryConfiguration : IEntityTypeConfigur
 
         builder.Property(x => x.ChangeType)
             .HasColumnName("change_type")
-            .HasColumnType("varchar(40)")
-            .HasMaxLength(40);
+            .HasColumnType("varchar(80)")
+            .HasMaxLength(80);
 
         builder.Property(x => x.Reason)
             .HasColumnName("reason")
