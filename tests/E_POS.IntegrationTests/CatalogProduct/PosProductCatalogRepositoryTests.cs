@@ -1457,6 +1457,143 @@ public sealed class PosProductCatalogRepositoryTests
     }
 
     [Fact]
+    public async Task ListProductsAsync_ManualLineDiscountPolicies_AreNotCatalogOffers()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        var product = Product.Create(productId, tenantId, "P-MANUAL", "Manual envelope product",
+            "manual-envelope-product", "STANDARD", "SIMPLE", null, null, null, "Desc", null,
+            true, true, ProductConstants.ActiveStatus, null, Now);
+        dbContext.Products.Add(product);
+        var variant = ProductVariant.Create(variantId, tenantId, productId, "DEFAULT",
+            "Manual envelope product", "SKU-MANUAL", Guid.NewGuid(), Guid.NewGuid(), true, true,
+            false, ProductConstants.ActiveStatus, null, Now);
+        dbContext.ProductVariants.Add(variant);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 2800m);
+
+        var fixedType = CreateEntity<DiscountType>();
+        Set(fixedType, "Id", Guid.NewGuid());
+        Set(fixedType, "CalculationMethod", "FIXED_AMOUNT");
+        Set(fixedType, "Status", "ACTIVE");
+        dbContext.DiscountTypes.Add(fixedType);
+
+        var percentageType = CreateEntity<DiscountType>();
+        Set(percentageType, "Id", Guid.NewGuid());
+        Set(percentageType, "CalculationMethod", "PERCENTAGE");
+        Set(percentageType, "Status", "ACTIVE");
+        dbContext.DiscountTypes.Add(percentageType);
+
+        foreach (var definition in new[]
+                 {
+                     (Id: Guid.NewGuid(), TypeId: fixedType.Id, Code: "POS_MANUAL_FIXED_LINE",
+                         Name: "Manual Line Fixed Discount", Value: 10000m),
+                     (Id: Guid.NewGuid(), TypeId: percentageType.Id, Code: "POS_MANUAL_PERCENTAGE_LINE",
+                         Name: "Manual Line Percentage Discount", Value: 50m)
+                 })
+        {
+            var policy = CreateEntity<DiscountPolicy>();
+            Set(policy, "Id", definition.Id);
+            Set(policy, "TenantId", tenantId);
+            Set(policy, "DiscountTypeId", definition.TypeId);
+            Set(policy, "DiscountPolicyCode", definition.Code);
+            Set(policy, "DiscountPolicyName", definition.Name);
+            Set(policy, "DiscountScope", "LINE");
+            Set(policy, "DiscountValue", definition.Value);
+            Set(policy, "Status", "ACTIVE");
+            dbContext.DiscountPolicies.Add(policy);
+        }
+
+        await SeedPlatformSalesChannelAsync(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var catalog = await repository.ListProductsAsync(
+            tenantId, deviceId, null, null, CancellationToken.None);
+        var offers = await repository.ListProductsAsync(
+            tenantId, deviceId, null, null, CancellationToken.None, segment: "offers");
+
+        Assert.True(catalog.IsSuccess);
+        var summary = Assert.Single(catalog.Products);
+        Assert.False(summary.HasOffer);
+        Assert.Null(summary.OfferPolicyId);
+        Assert.Null(summary.OfferPrice);
+        Assert.Null(summary.DiscountLabel);
+        Assert.True(offers.IsSuccess);
+        Assert.Empty(offers.Products);
+    }
+
+    [Fact]
+    public async Task ListProductsAsync_OffersSegment_AutomaticFixedPolicy_RemainsVisible()
+    {
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        await SeedDeviceAsync(dbContext, tenantId, outletId, deviceId);
+
+        dbContext.Products.Add(Product.Create(productId, tenantId, "P-AUTO", "Automatic offer product",
+            "automatic-offer-product", "STANDARD", "SIMPLE", null, null, null, "Desc", null,
+            true, true, ProductConstants.ActiveStatus, null, Now));
+        dbContext.ProductVariants.Add(ProductVariant.Create(variantId, tenantId, productId, "DEFAULT",
+            "Automatic offer product", "SKU-AUTO", Guid.NewGuid(), Guid.NewGuid(), true, true,
+            false, ProductConstants.ActiveStatus, null, Now));
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 5000m);
+
+        var type = CreateEntity<DiscountType>();
+        Set(type, "Id", Guid.NewGuid());
+        Set(type, "CalculationMethod", "FIXED_AMOUNT");
+        Set(type, "Status", "ACTIVE");
+        dbContext.DiscountTypes.Add(type);
+
+        var policy = CreateEntity<DiscountPolicy>();
+        Set(policy, "Id", Guid.NewGuid());
+        Set(policy, "TenantId", tenantId);
+        Set(policy, "DiscountTypeId", type.Id);
+        Set(policy, "DiscountPolicyCode", "AUTO_PRODUCT_500");
+        Set(policy, "DiscountPolicyName", "Automatic LKR 500 Off");
+        Set(policy, "DiscountScope", "LINE");
+        Set(policy, "DiscountValue", 500m);
+        Set(policy, "Status", "ACTIVE");
+        dbContext.DiscountPolicies.Add(policy);
+
+        var target = CreateEntity<DiscountPolicyTarget>();
+        Set(target, "Id", Guid.NewGuid());
+        Set(target, "TenantId", tenantId);
+        Set(target, "DiscountPolicyId", policy.Id);
+        Set(target, "TargetType", "PRODUCT");
+        Set(target, "TargetMode", "INCLUDE");
+        Set(target, "ProductId", productId);
+        Set(target, "Status", "ACTIVE");
+        dbContext.DiscountPolicyTargets.Add(target);
+
+        await SeedPlatformSalesChannelAsync(dbContext, tenantId);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new PosProductCatalogRepository(dbContext);
+        var result = await repository.ListProductsAsync(
+            tenantId, deviceId, null, null, CancellationToken.None, segment: "offers");
+
+        Assert.True(result.IsSuccess);
+        var summary = Assert.Single(result.Products);
+        Assert.True(summary.HasOffer);
+        Assert.Equal("FIXED_AMOUNT", summary.OfferType);
+        Assert.Equal(policy.Id, summary.OfferPolicyId);
+        Assert.Equal(5000, summary.OriginalPrice);
+        Assert.Equal(4500, summary.OfferPrice);
+        Assert.Equal("LKR 500 OFF", summary.DiscountLabel);
+    }
+
+    [Fact]
     public async Task ListProductsAsync_OffersSegment_ResolvesDiscountPolicies_PercentageAndFixed()
     {
         var tenantId = Guid.NewGuid();
