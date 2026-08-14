@@ -44,6 +44,7 @@ public sealed class ProductWizardAccessPolicy
         TenantRequestContext context,
         Guid? productId,
         bool isCreateAction,
+        E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.SaveProductDraftRequest? request,
         CancellationToken cancellationToken)
     {
         if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
@@ -88,6 +89,30 @@ public sealed class ProductWizardAccessPolicy
         if (!context.HasPermission(requiredPermission))
         {
             return PermissionDenied;
+        }
+
+        if (request?.CurrentSetupStep == E_POS.Application.Modules.Tenant.CatalogProduct.Constants.ProductWizardStage.ProductConfiguration)
+        {
+            if (!context.HasPermission(TenantAdminProductPermissions.VariantsManage))
+            {
+                return PermissionDenied;
+            }
+
+            var hasMediaMutation = request.VariantConfiguration?.Options?.Any(o => o.Values?.Any(v => v.ImageMediaAssetId.HasValue) == true) == true ||
+                                   request.VariantConfiguration?.Variants?.Any(v => v.ExactImageMediaAssetId.HasValue) == true;
+
+            if (hasMediaMutation && !context.HasPermission(TenantAdminProductPermissions.ProductMediaManage))
+            {
+                return PermissionDenied;
+            }
+        }
+
+        if (request?.CurrentSetupStep == E_POS.Application.Modules.Tenant.CatalogProduct.Constants.ProductWizardStage.BarcodeSku)
+        {
+            if (!context.HasPermission(TenantAdminProductPermissions.BarcodesManage))
+            {
+                return PermissionDenied;
+            }
         }
 
         return null;

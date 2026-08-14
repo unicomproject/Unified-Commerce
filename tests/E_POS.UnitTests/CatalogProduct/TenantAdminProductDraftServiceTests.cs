@@ -56,7 +56,7 @@ public class TenantAdminProductDraftServiceTests
         public ProductSetupWizardDto? SetupDto { get; init; }
 
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
-            new([], [], [], [], [], [], [], []);
+            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []);
 
         public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult<string?>(TenantStatus);
@@ -108,6 +108,26 @@ public class TenantAdminProductDraftServiceTests
         public Task<ProductSetupWizardDto?> GetSetupAsync(
             Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
             Task.FromResult(SetupDto);
+
+        public Task<IReadOnlyList<BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> productIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationProductProjection>>([]);
+
+        public Task<IReadOnlyList<BundleValidationVariantProjection>> GetVariantsForBundleValidationAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> variantIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationVariantProjection>>([]);
+
+        public Task<IReadOnlyList<BundleValidationUomProjection>> GetComponentUomValidationDataAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> componentProductIds,
+            IReadOnlyCollection<Guid> componentVariantIds,
+            IReadOnlyCollection<Guid> componentUomIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationUomProjection>>([]);
 
         public Task<TenantAdminProductSummaryResponse> GetSummaryAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult(new TenantAdminProductSummaryResponse(0, 0, 0, 0));

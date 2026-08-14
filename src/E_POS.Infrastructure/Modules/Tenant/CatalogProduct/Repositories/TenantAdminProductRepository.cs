@@ -1998,4 +1998,24 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         string? Barcode,
         decimal SellingPrice,
         decimal? DiscountPrice);
+
+    public Task<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationProductProjection>>([]);
+
+    public Task<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationVariantProjection>> GetVariantsForBundleValidationAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> variantIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationVariantProjection>>([]);
+
+    public Task<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationUomProjection>> GetComponentUomValidationDataAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> componentProductIds,
+        IReadOnlyCollection<Guid> componentVariantIds,
+        IReadOnlyCollection<Guid> componentUomIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationUomProjection>>([]);
 }

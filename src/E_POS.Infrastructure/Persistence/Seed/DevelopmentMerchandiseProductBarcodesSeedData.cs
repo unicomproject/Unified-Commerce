@@ -22,7 +22,7 @@ public static class DevelopmentMerchandiseProductBarcodesSeedData
               AND product.product_code IN (
                   'MER-001', 'MER-002', 'MER-003', 'MER-004', 'MER-005',
                   'MER-006', 'MER-007', 'MER-008', 'MER-009', 'MER-010',
-                  'MER-011', 'MER-012', 'MER-013', 'MER-014', 'MER-015'
+                  'MER-011', 'MER-012', 'MER-013', 'MER-014', 'MER-015', 'MER-016'
               )
               AND variant.status = 'ACTIVE'
         ),
@@ -92,7 +92,7 @@ public static class DevelopmentMerchandiseProductBarcodesSeedData
                 AND product_code IN (
                     'MER-001', 'MER-002', 'MER-003', 'MER-004', 'MER-005',
                     'MER-006', 'MER-007', 'MER-008', 'MER-009', 'MER-010',
-                    'MER-011', 'MER-012', 'MER-013', 'MER-014', 'MER-015'
+                    'MER-011', 'MER-012', 'MER-013', 'MER-014', 'MER-015', 'MER-016'
                 )
           );
         """;

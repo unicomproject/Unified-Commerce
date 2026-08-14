@@ -165,4 +165,21 @@ public interface ITenantAdminProductRepository
         Guid tenantId,
         Guid productId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<BundleValidationVariantProjection>> GetVariantsForBundleValidationAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> variantIds,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<BundleValidationUomProjection>> GetComponentUomValidationDataAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> componentProductIds,
+        IReadOnlyCollection<Guid> componentVariantIds,
+        IReadOnlyCollection<Guid> componentUomIds,
+        CancellationToken cancellationToken);
 }

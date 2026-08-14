@@ -870,7 +870,7 @@ public sealed class TenantAdminProductServiceTests
             new(0, 0, 0, 0);
 
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
-            new([], [], [], [], [], [], [], []);
+            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []);
 
         public IReadOnlyDictionary<Guid, string> PrimaryImageUrls { get; init; } =
             new Dictionary<Guid, string>();
@@ -1171,6 +1171,26 @@ public sealed class TenantAdminProductServiceTests
             Guid productId,
             CancellationToken cancellationToken) =>
             Task.FromResult(SetupDto);
+
+        public Task<IReadOnlyList<BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> productIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationProductProjection>>([]);
+
+        public Task<IReadOnlyList<BundleValidationVariantProjection>> GetVariantsForBundleValidationAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> variantIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationVariantProjection>>([]);
+
+        public Task<IReadOnlyList<BundleValidationUomProjection>> GetComponentUomValidationDataAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> componentProductIds,
+            IReadOnlyCollection<Guid> componentVariantIds,
+            IReadOnlyCollection<Guid> componentUomIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationUomProjection>>([]);
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider

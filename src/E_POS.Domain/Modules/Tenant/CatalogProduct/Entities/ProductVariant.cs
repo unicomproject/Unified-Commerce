@@ -109,5 +109,46 @@ public class ProductVariant : AuditableEntity
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
+
+    public void PermanentTombstone(Guid? deletedByUserId, DateTimeOffset now)
+    {
+        Status = ProductConstants.ArchivedStatus;
+        UpdatedByTenantUserId = deletedByUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateDisplayLabel(string label, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        VariantName = label.Trim();
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateInclusion(bool isSellable, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        IsSellable = isSellable;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateUom(Guid stockUomId, Guid salesUomId, bool allowFractional, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        StockUomId = stockUomId;
+        SalesUomId = salesUomId;
+        AllowFractionalQuantity = allowFractional;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateSku(string? sku, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Sku = sku?.Trim();
+        if (string.IsNullOrWhiteSpace(Sku))
+        {
+            Sku = null;
+        }
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
 }
 

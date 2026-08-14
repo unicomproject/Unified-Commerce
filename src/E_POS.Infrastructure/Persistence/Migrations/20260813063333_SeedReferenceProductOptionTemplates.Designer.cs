@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260813063333_SeedReferenceProductOptionTemplates")]
+    partial class SeedReferenceProductOptionTemplates
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -12053,7 +12056,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_products_desired_publish_status", "desired_publish_status IS NULL OR desired_publish_status IN ('ACTIVE','INACTIVE')");
 
-                            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 7");
+                            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 8");
 
                             t.HasCheckConstraint("ck_products_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
                         });
@@ -12458,21 +12461,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductVariantId");
 
-                    b.HasIndex("UomId");
-
                     b.HasIndex("TenantId", "Barcode")
                         .IsUnique()
                         .HasDatabaseName("uq_product_barcodes_tenant_id_barcode");
-
-                    b.HasIndex("TenantId", "ProductId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_product_barcodes_tenant_id_product_id_primary")
-                        .HasFilter("product_variant_id IS NULL AND is_primary_barcode = true AND status <> 'DELETED'");
-
-                    b.HasIndex("TenantId", "ProductVariantId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_product_barcodes_tenant_id_product_variant_id_primary")
-                        .HasFilter("product_variant_id IS NOT NULL AND is_primary_barcode = true AND status <> 'DELETED'");
 
                     b.ToTable("product_barcodes", null, t =>
                         {
@@ -28535,12 +28526,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_barcodes_product_variant_id_product_variants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", null)
-                        .WithMany()
-                        .HasForeignKey("UomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_product_barcodes_uom_id_unit_of_measures");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductCategory", b =>

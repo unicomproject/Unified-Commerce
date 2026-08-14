@@ -1,3 +1,4 @@
+
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
@@ -452,6 +453,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             context,
             productId: null,
             isCreateAction: true,
+            request,
             cancellationToken);
         if (accessError is not null)
         {
@@ -471,6 +473,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             context,
             productId,
             isCreateAction: false,
+            request,
             cancellationToken);
         if (accessError is not null)
         {
@@ -611,6 +614,25 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             }
         }
 
+        if (currentStage == ProductWizardStage.ProductConfiguration && 
+            string.Equals(resolvedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase) && 
+            request.BundleConfiguration != null)
+        {
+            var bundleErrors = await ValidateBundleConfigurationAsync(
+                context.TenantId,
+                productId,
+                request.BundleConfiguration,
+                cancellationToken);
+
+            if (bundleErrors.Count > 0)
+            {
+                return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                    "product.bundle.validation_failed",
+                    "Bundle configuration validation failed.",
+                    bundleErrors));
+            }
+        }
+
         var trackInventory = isSkip ? (resolvedStructure != ProductStructureConstants.Bundle) : request.TrackInventory;
         var batchTracking = isSkip ? false : request.BatchTracking;
         var expiryTracking = isSkip ? false : request.ExpiryTracking;
@@ -666,7 +688,13 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             request.PurchaseUnitsPerOuterPack,
             request.AllowDecimalQuantity,
             isExplicitDraftSave,
-            request.WizardAction);
+            request.WizardAction,
+            request.VariantConfiguration,
+            request.BundleConfiguration,
+            request.BaseSku,
+            request.ParentProductBarcode,
+            request.VariantIdentifiers,
+            request.AdditionalBarcodes);
 
         var result = await _tenantAdminProductRepository.SaveProductDraftAsync(
             context.TenantId,
@@ -686,7 +714,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
 
         if (currentStage == ProductWizardStage.ProductTypeTracking)
         {
-            if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalizedStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
             {
                 return ProductWizardStage.ProductConfiguration;
             }
@@ -1124,5 +1153,138 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                context.HasPermission(ProductConstants.ManagePermission)
             ? null
             : PermissionDenied;
+    }
+
+    private async Task<IReadOnlyList<ApplicationFieldError>> ValidateBundleConfigurationAsync(
+        Guid tenantId,
+        Guid? currentBundleProductId,
+        BundleConfigurationDto configuration,
+        CancellationToken cancellationToken)
+    {
+        var errors = new List<ApplicationFieldError>();
+
+        if (configuration.Components == null || configuration.Components.Count == 0)
+        {
+            return errors;
+        }
+
+        var distinctProductIds = configuration.Components.Select(c => c.ComponentProductId).Distinct().ToList();
+        var distinctVariantIds = configuration.Components.Where(c => c.ComponentVariantId.HasValue).Select(c => c.ComponentVariantId!.Value).Distinct().ToList();
+        var distinctUomIds = configuration.Components.Select(c => c.ComponentUomId).Distinct().ToList();
+
+        var productsList = await _tenantAdminProductRepository.GetProductsForBundleValidationAsync(tenantId, distinctProductIds, cancellationToken);
+        var products = productsList.ToDictionary(p => p.ProductId);
+
+        var variantsList = await _tenantAdminProductRepository.GetVariantsForBundleValidationAsync(tenantId, distinctVariantIds, cancellationToken);
+        var variants = variantsList.ToDictionary(v => v.ProductVariantId);
+
+        var uomsList = await _tenantAdminProductRepository.GetComponentUomValidationDataAsync(tenantId, distinctProductIds, distinctVariantIds, distinctUomIds, cancellationToken);
+
+        var seenIdentities = new HashSet<string>();
+
+        for (int i = 0; i < configuration.Components.Count; i++)
+        {
+            var component = configuration.Components[i];
+
+            if (!products.TryGetValue(component.ComponentProductId, out var compProduct))
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.component_no_longer_eligible"));
+                continue;
+            }
+
+            if (currentBundleProductId.HasValue && component.ComponentProductId == currentBundleProductId.Value)
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.self_reference_not_allowed"));
+            }
+
+            if (compProduct.ProductStructure == ProductStructureConstants.Bundle)
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.nested_bundle_not_allowed"));
+            }
+
+            if (compProduct.Status == ProductConstants.InactiveStatus)
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.component_inactive"));
+            }
+            else if (compProduct.Status == ProductConstants.ArchivedStatus)
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.component_archived"));
+            }
+            else if (compProduct.Status == ProductConstants.DeletedStatus || compProduct.Status == ProductConstants.DraftStatus)
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.component_no_longer_eligible"));
+            }
+            else if (!compProduct.IsSellable)
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.component_no_longer_eligible"));
+            }
+
+            if (!compProduct.TrackInventory)
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.component_not_inventory_tracked"));
+            }
+
+            string identity = $"{component.ComponentProductId}";
+
+            if (compProduct.ProductStructure == ProductStructureConstants.Variant)
+            {
+                if (!component.ComponentVariantId.HasValue)
+                {
+                    errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentVariantId", "product.bundle.exact_variant_required"));
+                }
+                else
+                {
+                    identity = $"{component.ComponentProductId}_{component.ComponentVariantId.Value}";
+
+                    if (!variants.TryGetValue(component.ComponentVariantId.Value, out var compVariant))
+                    {
+                        errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentVariantId", "product.bundle.component_no_longer_eligible"));
+                    }
+                    else
+                    {
+                        if (compVariant.ProductId != component.ComponentProductId)
+                        {
+                            errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentVariantId", "product.bundle.variant_product_mismatch"));
+                        }
+
+                        if (compVariant.Status == ProductConstants.ArchivedStatus || compVariant.Status == ProductConstants.DeletedStatus || compVariant.Status == ProductConstants.InactiveStatus || !compVariant.Included)
+                        {
+                            errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentVariantId", "product.bundle.component_no_longer_eligible"));
+                        }
+                    }
+                }
+            }
+            else if (compProduct.ProductStructure == ProductStructureConstants.Simple)
+            {
+                if (component.ComponentVariantId.HasValue)
+                {
+                    errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentVariantId", "product.bundle.variant_product_mismatch"));
+                }
+            }
+
+            var validUom = uomsList.FirstOrDefault(u => 
+                u.UomId == component.ComponentUomId && 
+                u.ComponentProductId == component.ComponentProductId && 
+                ((u.ComponentVariantId == component.ComponentVariantId) || (!u.ComponentVariantId.HasValue && !component.ComponentVariantId.HasValue)));
+
+            if (validUom == null)
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentUomId", "product.bundle.component_uom_invalid"));
+            }
+            else
+            {
+                if (!validUom.AllowDecimalQuantity && (component.RequiredQuantity % 1 != 0))
+                {
+                    errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].requiredQuantity", "product.bundle.component_quantity_precision_invalid"));
+                }
+            }
+
+            if (!seenIdentities.Add(identity))
+            {
+                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.duplicate_component"));
+            }
+        }
+
+        return errors;
     }
 }

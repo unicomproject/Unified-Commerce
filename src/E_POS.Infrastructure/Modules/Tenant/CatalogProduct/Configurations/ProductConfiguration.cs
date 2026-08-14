@@ -184,7 +184,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.ToTable(t => 
         {
             t.HasCheckConstraint("ck_products_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
-            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 8");
+            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 7");
             t.HasCheckConstraint(
                 "ck_products_desired_publish_status",
                 "desired_publish_status IS NULL OR desired_publish_status IN ('ACTIVE','INACTIVE')");

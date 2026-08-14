@@ -48,5 +48,56 @@ public class ProductBarcode : AuditableEntity
             UpdatedAt = now
         };
     }
+    public void UpdateIdentifier(string barcode, string barcodeType, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Barcode = barcode.Trim();
+        BarcodeType = barcodeType.Trim().ToUpperInvariant();
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void AssignVariant(Guid? productVariantId, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        ProductVariantId = productVariantId;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void AssignUom(Guid? uomId, decimal quantityPerScan, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        UomId = uomId;
+        QuantityPerScan = quantityPerScan;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void SetPrimary(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        IsPrimaryBarcode = true;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void ClearPrimary(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        IsPrimaryBarcode = false;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void Deactivate(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = "INACTIVE";
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void Delete(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = "DELETED";
+        IsPrimaryBarcode = false; // Primary should not be deleted, or at least release the flag
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
 }
 

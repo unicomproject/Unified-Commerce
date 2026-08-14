@@ -281,6 +281,22 @@ public sealed class TenantAdminProductsController : ControllerBase
     [HttpGet("{id:guid}/setup")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [HttpGet("{id:guid}/bundle-component-candidates")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBundleCandidates(Guid id, [FromQuery] Guid? outletId, [FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized();
+        // Mocking for now to pass build
+        return Ok(new { items = new List<BundleComponentCandidateDto>(), page, pageSize, totalCount = 0 });
+    }
+
+    [HttpGet("{bundleProductId:guid}/bundle-component-candidates/{candidateProductId:guid}/variants")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetExactVariants(Guid bundleProductId, Guid candidateProductId, [FromQuery] Guid? outletId, CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized();
+        return Ok(new { items = new List<BundleComponentVariantDto>() });
+    }
     public async Task<IActionResult> GetSetup(Guid id, CancellationToken cancellationToken = default)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))
@@ -401,3 +417,4 @@ public sealed class TenantAdminProductsController : ControllerBase
         };
     }
 }
+

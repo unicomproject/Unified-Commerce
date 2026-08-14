@@ -72,7 +72,7 @@ public class Product : AuditableEntity
             UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
             UpdatedAt = now,
-            CurrentSetupStep = status == ProductConstants.DraftStatus ? 1 : 8,
+            CurrentSetupStep = status == ProductConstants.DraftStatus ? 1 : 7,
             DraftSavedAt = isExplicitDraftSave ? now : null,
             PublishedAt = status != ProductConstants.DraftStatus ? now : null,
             PublishedByTenantUserId = status != ProductConstants.DraftStatus ? createdByTenantUserId : null,
@@ -213,7 +213,7 @@ public class Product : AuditableEntity
         Status = finalStatus == ProductConstants.DraftStatus ? ProductConstants.ActiveStatus : finalStatus;
         PublishedAt = now;
         PublishedByTenantUserId = userId;
-        CurrentSetupStep = 8;
+        CurrentSetupStep = 7;
         UpdatedAt = now;
     }
 
