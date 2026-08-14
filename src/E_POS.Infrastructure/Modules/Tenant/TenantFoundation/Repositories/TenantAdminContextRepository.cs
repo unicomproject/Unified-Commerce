@@ -50,6 +50,24 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             return null;
         }
 
+        var tenantLogoUrl = await (
+                from profile in _dbContext.TenantProfiles.AsNoTracking()
+                join media in _dbContext.MediaAssets.AsNoTracking()
+                    on new
+                    {
+                        profile.TenantId,
+                        MediaAssetId = profile.LogoMediaAssetId
+                    }
+                    equals new
+                    {
+                        media.TenantId,
+                        MediaAssetId = (Guid?)media.Id
+                    }
+                where profile.TenantId == tenantId &&
+                      media.Status == "ACTIVE"
+                select media.PublicUrl)
+            .FirstOrDefaultAsync(cancellationToken);
+
         // Roles assigned to this user
         var roles = await (
             from userRole in _dbContext.TenantUserRoles.AsNoTracking()
@@ -182,6 +200,7 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
         return new TenantAdminContextData(
             TenantId: userInfo.TenantId,
             TenantName: userInfo.TenantName,
+            TenantLogoUrl: tenantLogoUrl,
             TenantTimezone: string.IsNullOrWhiteSpace(userInfo.TenantTimezone) ? "UTC" : userInfo.TenantTimezone,
             CurrencyCode: string.IsNullOrWhiteSpace(userInfo.CurrencyCode) ? "LKR" : userInfo.CurrencyCode,
             Locale: string.IsNullOrWhiteSpace(userInfo.Locale) ? "en-LK" : userInfo.Locale,

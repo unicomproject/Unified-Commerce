@@ -74,6 +74,95 @@ public sealed class PosCheckoutRepositoryTests
         Assert.Empty(result.Summary.ValidationMessages);
     }
 
+    [Theory]
+    [InlineData(1, 2800, 700, 2100)]
+    [InlineData(2, 5600, 1400, 4200)]
+    public async Task CalculateSummaryAsync_WithEligibleAutomaticPercentageOffer_ReturnsAuthoritativeTotals(
+        int quantity, int expectedSubtotal, int expectedDiscount, int expectedTotal)
+    {
+        var tenantId = Guid.NewGuid(); var outletId = Guid.NewGuid(); var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid(); var userId = Guid.NewGuid();
+        var productId = Guid.NewGuid(); var variantId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedDeviceContext(dbContext, tenantId, outletId, tillId, deviceId, userId, Now, true);
+        SeedTenantUser(dbContext, tenantId, userId, "Cashier 001");
+        SeedOpenTillSession(dbContext, tenantId, outletId, tillId, deviceId, userId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 2800m);
+        SeedSellableProduct(dbContext, tenantId, productId, variantId);
+        SeedAutomaticPercentageOffer(dbContext, tenantId, productId, 25m, "ACTIVE", Now.AddHours(-1), Now.AddHours(1));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateRepository(dbContext).CalculateSummaryAsync(
+            tenantId, userId, [PaymentPermissions.AcceptCash],
+            new(deviceId, "NewSale", null, [new(variantId, quantity)]),
+            Now, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expectedSubtotal, result.Summary!.BillingSummary.Subtotal);
+        Assert.Equal(expectedDiscount, result.Summary.BillingSummary.AutomaticDiscount);
+        Assert.Equal(expectedTotal, result.Summary.BillingSummary.TotalPayable);
+        var line = Assert.Single(result.Summary.Lines!);
+        Assert.Equal(2800, line.BaseUnitPrice);
+        Assert.Equal(expectedDiscount, line.AutomaticDiscount);
+        Assert.Equal(2100, line.EffectiveUnitPrice);
+        Assert.NotNull(line.AppliedPromotion);
+    }
+
+    [Fact]
+    public async Task CalculateSummaryAsync_EchoesClientLineIdOnCalculatedLine()
+    {
+        var tenantId = Guid.NewGuid(); var outletId = Guid.NewGuid(); var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid(); var userId = Guid.NewGuid();
+        var productId = Guid.NewGuid(); var variantId = Guid.NewGuid();
+        var clientLineId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedDeviceContext(dbContext, tenantId, outletId, tillId, deviceId, userId, Now, true);
+        SeedTenantUser(dbContext, tenantId, userId, "Cashier 001");
+        SeedOpenTillSession(dbContext, tenantId, outletId, tillId, deviceId, userId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 2800m);
+        SeedSellableProduct(dbContext, tenantId, productId, variantId);
+        SeedAutomaticPercentageOffer(dbContext, tenantId, productId, 25m, "ACTIVE", Now.AddHours(-1), Now.AddHours(1));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateRepository(dbContext).CalculateSummaryAsync(
+            tenantId, userId, [PaymentPermissions.AcceptCash],
+            new(deviceId, "NewSale", null, [new(variantId, 1, ClientLineId: clientLineId)]),
+            Now, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var line = Assert.Single(result.Summary!.Lines!);
+        Assert.Equal(clientLineId, line.ClientLineId);
+        Assert.Equal(2100, line.EffectiveUnitPrice);
+    }
+
+    [Theory]
+    [InlineData("INACTIVE", -1, 1)]
+    [InlineData("ACTIVE", -2, -1)]
+    public async Task CalculateSummaryAsync_WithInactiveOrExpiredOffer_DoesNotApply(
+        string status, int startsHours, int endsHours)
+    {
+        var tenantId = Guid.NewGuid(); var outletId = Guid.NewGuid(); var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid(); var userId = Guid.NewGuid();
+        var productId = Guid.NewGuid(); var variantId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedDeviceContext(dbContext, tenantId, outletId, tillId, deviceId, userId, Now, true);
+        SeedTenantUser(dbContext, tenantId, userId, "Cashier 001");
+        SeedOpenTillSession(dbContext, tenantId, outletId, tillId, deviceId, userId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 2800m);
+        SeedSellableProduct(dbContext, tenantId, productId, variantId);
+        SeedAutomaticPercentageOffer(dbContext, tenantId, productId, 25m, status,
+            Now.AddHours(startsHours), Now.AddHours(endsHours));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateRepository(dbContext).CalculateSummaryAsync(
+            tenantId, userId, [PaymentPermissions.AcceptCash],
+            new(deviceId, "NewSale", null, [new(variantId, 1)]), Now, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, result.Summary!.BillingSummary.AutomaticDiscount);
+        Assert.Equal(2800, result.Summary.BillingSummary.TotalPayable);
+    }
+
     [Fact]
     public async Task CalculateSummaryAsync_WhenTillSessionNotOpen_ReturnsFailure()
     {
@@ -915,6 +1004,23 @@ public sealed class PosCheckoutRepositoryTests
         }
 
         await dbContext.SaveChangesAsync();
+    }
+
+    private static void SeedAutomaticPercentageOffer(
+        EPosDbContext dbContext, Guid tenantId, Guid productId, decimal value,
+        string status, DateTimeOffset startsAt, DateTimeOffset endsAt)
+    {
+        var type = DiscountType.Create(Guid.NewGuid(), "AUTO_PERCENT", "Automatic percentage",
+            "PERCENTAGE", true, "ACTIVE", Now);
+        var policy = DiscountPolicy.Create(Guid.NewGuid(), tenantId, type.Id,
+            "AUTO25", "25% automatic offer", null, "LINE", value, "LKR", null,
+            null, null, false, false, null, 10, startsAt, endsAt, status, null, Now);
+        var target = DiscountPolicyTarget.Create(Guid.NewGuid(), tenantId, policy.Id,
+            "PRODUCT", "INCLUDE", productId, null, null, null, null,
+            "ACTIVE", null, Now);
+        dbContext.DiscountTypes.Add(type);
+        dbContext.DiscountPolicies.Add(policy);
+        dbContext.DiscountPolicyTargets.Add(target);
     }
 
     private static void Set<T>(object entity, string propertyName, T value)

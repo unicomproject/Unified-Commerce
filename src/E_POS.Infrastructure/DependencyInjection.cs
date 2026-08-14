@@ -139,6 +139,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformDashboardRepository, PlatformDashboardRepository>();
         services.AddScoped<IPlatformDashboardHealthProbe, PlatformDashboardHealthProbe>();
         services.AddScoped<IPlatformTenantRepository, PlatformTenantRepository>();
+        services.AddScoped<IPlatformTenantBootstrapRepository, PlatformTenantBootstrapRepository>();
         services.AddScoped<IPlatformTenantOnboardingRepository, PlatformTenantOnboardingRepository>();
         services.AddSingleton<IValidateOptions<TenantOnboardingOutboxOptions>, TenantOnboardingOutboxOptionsValidator>();
         services.AddSingleton<IValidateOptions<AzureCommunicationEmailOptions>, ProductionAzureCommunicationEmailOptionsValidator>();

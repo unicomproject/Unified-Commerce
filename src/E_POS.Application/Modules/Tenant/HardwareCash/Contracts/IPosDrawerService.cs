@@ -36,4 +36,13 @@ public interface IPosDrawerService
         TenantRequestContext context,
         Guid requestId,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PosCashDrawerSummaryDto>> GetFinancialSummaryAsync(
+        TenantRequestContext context, Guid deviceId, CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PosCashDrawerMovementPageDto>> GetFinancialMovementsAsync(
+        TenantRequestContext context, Guid deviceId, int page, int pageSize, CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PosCashDrawerMovementDto>> CreateFinancialMovementAsync(
+        TenantRequestContext context, CreatePosCashMovementRequest request, CancellationToken cancellationToken);
 }

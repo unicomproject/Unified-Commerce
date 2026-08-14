@@ -1,6 +1,7 @@
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -34,6 +35,12 @@ public sealed class TillCashMovementConfiguration : IEntityTypeConfiguration<Til
         builder.Property(x => x.TillSessionId)
             .HasColumnName("till_session_id")
             .IsRequired();
+
+        builder.Property(x => x.PosDeviceId)
+            .HasColumnName("pos_device_id");
+
+        builder.Property(x => x.RequestId)
+            .HasColumnName("request_id");
 
         builder.Property(x => x.MovementType)
             .HasColumnName("movement_type")
@@ -90,13 +97,28 @@ public sealed class TillCashMovementConfiguration : IEntityTypeConfiguration<Til
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_till_cash_movements_performed_by_tenant_user_id_tenant_users");
 
+        builder.HasOne<PosDevice>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.PosDeviceId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_till_cash_movements_pos_device_id_pos_devices");
+
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_till_cash_movements_tenant_id_id");
 
+        builder.HasIndex(x => new { x.TenantId, x.RequestId })
+            .IsUnique()
+            .HasFilter("request_id IS NOT NULL")
+            .HasDatabaseName("uq_till_cash_movements_tenant_request_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.TillSessionId, x.PerformedAt })
+            .HasDatabaseName("ix_till_cash_movements_session_performed_at");
+
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_till_cash_movements_movement_type", "movement_type IN ('CASH_IN', 'CASH_OUT', 'OPENING_FLOAT', 'CLOSING_REMOVE')");
+            t.HasCheckConstraint("ck_till_cash_movements_movement_type", "movement_type IN ('CASH_IN', 'CASH_OUT', 'CASH_DROP', 'OPENING_FLOAT', 'CLOSING_REMOVE')");
             t.HasCheckConstraint("ck_till_cash_movements_amount", "amount > 0");
         });
     }

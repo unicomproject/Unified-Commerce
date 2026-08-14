@@ -53,10 +53,8 @@ public static class PlatformAdminPermissionSeedApplicator
             .Where(x => PlatformPermissionCodes.All.Contains(x.PermissionCode))
             .ToListAsync(cancellationToken);
 
-        var rolePermissionIndex = 1;
         foreach (var permission in permissions)
         {
-            var rolePermissionId = Guid.Parse($"67000000-0000-0000-0000-{rolePermissionIndex:D12}");
             var exists = await dbContext.PlatformRolePermissions.AnyAsync(
                 x => x.PlatformRoleId == superAdminRole.Id &&
                      x.PlatformPermissionId == permission.Id &&
@@ -66,14 +64,12 @@ public static class PlatformAdminPermissionSeedApplicator
             if (!exists)
             {
                 dbContext.PlatformRolePermissions.Add(PlatformRolePermission.Create(
-                    rolePermissionId,
+                    Guid.NewGuid(),
                     superAdminRole.Id,
                     permission.Id,
                     "TM-EPOS super administrator permission seed.",
                     now));
             }
-
-            rolePermissionIndex++;
         }
 
         var platformUser = await dbContext.PlatformUsers

@@ -1,3 +1,4 @@
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
@@ -108,7 +109,7 @@ public sealed class TenantAdminProductImageProjectionTests
             sortOrder: -10);
 
         await dbContext.SaveChangesAsync();
-        var repository = new TenantAdminProductRepository(dbContext);
+        var repository = new TenantAdminProductRepository(dbContext, new UnusedCodeSequenceRepository());
 
         var result = await repository.GetPrimaryImageUrlsAsync(
             tenantId,
@@ -209,7 +210,7 @@ public sealed class TenantAdminProductImageProjectionTests
             status: ProductConstants.InactiveStatus);
 
         await dbContext.SaveChangesAsync();
-        var repository = new TenantAdminProductRepository(dbContext);
+        var repository = new TenantAdminProductRepository(dbContext, new UnusedCodeSequenceRepository());
 
         var result = await repository.GetDetailAsync(tenantId, productId, CancellationToken.None);
 
@@ -321,5 +322,17 @@ public sealed class TenantAdminProductImageProjectionTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new EPosDbContext(options);
+    }
+
+    private sealed class UnusedCodeSequenceRepository : ICodeSequenceRepository
+    {
+        public Task<string> GetNextCodeAsync(
+            Guid tenantId,
+            string sequenceKey,
+            string prefix,
+            int paddingLength,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult($"{prefix}000001");
     }
 }

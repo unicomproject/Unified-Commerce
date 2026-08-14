@@ -13,6 +13,7 @@ public interface ITenantAdminContextRepository
 public sealed record TenantAdminContextData(
     Guid TenantId,
     string TenantName,
+    string? TenantLogoUrl,
     string TenantTimezone,
     string CurrencyCode,
     string Locale,

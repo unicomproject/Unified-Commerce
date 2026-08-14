@@ -3350,6 +3350,192 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_settings", (string)null);
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapIdempotencyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("IdempotencyKeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("idempotency_key_hash");
+
+                    b.Property<string>("OperationType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("operation_type");
+
+                    b.Property<string>("RequestHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<string>("ResponseJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("response_json");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_platform_tenant_bootstrap_idempotency_records");
+
+                    b.HasIndex("TenantId", "OperationType", "IdempotencyKeyHash")
+                        .IsUnique()
+                        .HasDatabaseName("uq_bootstrap_idempotency_tenant_operation_key");
+
+                    b.ToTable("platform_tenant_bootstrap_idempotency_records", (string)null);
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapProductImportBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorPlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_platform_user_id");
+
+                    b.Property<int>("CommittedRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("committed_rows");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("IdempotencyKeyHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("idempotency_key_hash");
+
+                    b.Property<int>("InvalidRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("invalid_rows");
+
+                    b.Property<int>("SkippedRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("skipped_rows");
+
+                    b.Property<string>("SourceFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)")
+                        .HasColumnName("source_file_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TemplateVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("template_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_rows");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("ValidRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("valid_rows");
+
+                    b.HasKey("Id")
+                        .HasName("pk_platform_tenant_bootstrap_product_import_batches");
+
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("ix_bootstrap_import_batches_tenant_status");
+
+                    b.ToTable("platform_tenant_bootstrap_product_import_batches", (string)null);
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapProductImportRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("CommittedProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("committed_product_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("error_code");
+
+                    b.Property<string>("ErrorDetail")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("error_detail");
+
+                    b.Property<Guid>("ImportBatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("import_batch_id");
+
+                    b.Property<bool>("IsValid")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_valid");
+
+                    b.Property<string>("RawRowJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("raw_row_json");
+
+                    b.Property<int>("RowNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_number");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_platform_tenant_bootstrap_product_import_rows");
+
+                    b.HasIndex("ImportBatchId", "RowNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_bootstrap_import_rows_batch_row");
+
+                    b.ToTable("platform_tenant_bootstrap_product_import_rows", (string)null);
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingDraft", b =>
                 {
                     b.Property<Guid>("Id")
@@ -22229,6 +22415,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("performed_by_tenant_user_id");
 
+                    b.Property<Guid?>("PosDeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pos_device_id");
+
                     b.Property<string>("Reason")
                         .HasMaxLength(250)
                         .HasColumnType("varchar(250)")
@@ -22238,6 +22428,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)")
                         .HasColumnName("reference_number");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -22256,13 +22450,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_till_cash_movements_tenant_id_id");
 
-                    b.HasIndex("TenantId", "TillSessionId");
+                    b.HasIndex("TenantId", "PosDeviceId");
+
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_till_cash_movements_tenant_request_id")
+                        .HasFilter("request_id IS NOT NULL");
+
+                    b.HasIndex("TenantId", "TillSessionId", "PerformedAt")
+                        .HasDatabaseName("ix_till_cash_movements_session_performed_at");
 
                     b.ToTable("till_cash_movements", null, t =>
                         {
                             t.HasCheckConstraint("ck_till_cash_movements_amount", "amount > 0");
 
-                            t.HasCheckConstraint("ck_till_cash_movements_movement_type", "movement_type IN ('CASH_IN', 'CASH_OUT', 'OPENING_FLOAT', 'CLOSING_REMOVE')");
+                            t.HasCheckConstraint("ck_till_cash_movements_movement_type", "movement_type IN ('CASH_IN', 'CASH_OUT', 'CASH_DROP', 'OPENING_FLOAT', 'CLOSING_REMOVE')");
                         });
                 });
 
@@ -26117,6 +26319,16 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedByPlatformUserId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_platform_settings_updated_by_platform_user_id_platform_users");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapProductImportRow", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantBootstrapProductImportBatch", null)
+                        .WithMany()
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bootstrap_import_rows_batch");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformTenantOnboardingDraft", b =>
@@ -31827,6 +32039,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_till_cash_movements_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PosDeviceId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_till_cash_movements_pos_device_id_pos_devices");
 
                     b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
                         .WithMany()

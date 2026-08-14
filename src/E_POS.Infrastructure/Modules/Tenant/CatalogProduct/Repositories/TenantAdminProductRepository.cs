@@ -1,9 +1,11 @@
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.Inventory.Constants;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -17,11 +19,16 @@ namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 public sealed partial class TenantAdminProductRepository : ITenantAdminProductRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly ICodeSequenceRepository _codeSequenceRepository;
     private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public TenantAdminProductRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
+    public TenantAdminProductRepository(
+        EPosDbContext dbContext,
+        ICodeSequenceRepository codeSequenceRepository,
+        IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _codeSequenceRepository = codeSequenceRepository;
         _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
@@ -1108,23 +1115,16 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 }
 
                 var quantityPerOutlet = request.OpeningStockQuantity!.Value / request.OutletIds.Count;
-                var balance = InventoryBalance.Create(
-                    Guid.NewGuid(),
+                await ApplyOpeningStockAsync(
                     tenantId,
-                    inventoryLocationId.Value,
                     productId,
+                    inventoryLocationId.Value,
                     defaultVariantId,
                     productBatchId,
-                    now);
-
-                balance.AdjustQuantities(
                     quantityPerOutlet,
-                    reservedDelta: 0,
-                    damagedDelta: 0,
-                    quarantineDelta: 0,
-                    now);
-
-                await _dbContext.InventoryBalances.AddAsync(balance, cancellationToken);
+                    userId,
+                    now,
+                    cancellationToken);
             }
         }
 
@@ -1411,7 +1411,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
     public async Task<TenantAdminProductCreateResponse> CreateProductAsync(
         Guid tenantId,
-        Guid userId,
+        Guid? userId,
         TenantAdminProductCreateRequest request,
         Guid unitId,
         DateTimeOffset now,
@@ -1446,33 +1446,36 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
         await _dbContext.Products.AddAsync(product, cancellationToken);
 
-        var categoryLinks = new List<ProductCategory>
+        if (request.CategoryId != Guid.Empty)
         {
-            ProductCategory.Create(
-                Guid.NewGuid(),
-                tenantId,
-                productId,
-                request.CategoryId,
-                isPrimaryCategory: request.SubCategoryId == null,
-                sortOrder: 0,
-                userId,
-                now),
-        };
+            var categoryLinks = new List<ProductCategory>
+            {
+                ProductCategory.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    productId,
+                    request.CategoryId,
+                    isPrimaryCategory: request.SubCategoryId == null,
+                    sortOrder: 0,
+                    userId,
+                    now),
+            };
 
-        if (request.SubCategoryId.HasValue)
-        {
-            categoryLinks.Add(ProductCategory.Create(
-                Guid.NewGuid(),
-                tenantId,
-                productId,
-                request.SubCategoryId.Value,
-                isPrimaryCategory: true,
-                sortOrder: 1,
-                userId,
-                now));
+            if (request.SubCategoryId.HasValue)
+            {
+                categoryLinks.Add(ProductCategory.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    productId,
+                    request.SubCategoryId.Value,
+                    isPrimaryCategory: true,
+                    sortOrder: 1,
+                    userId,
+                    now));
+            }
+
+            await _dbContext.ProductCategories.AddRangeAsync(categoryLinks, cancellationToken);
         }
-
-        await _dbContext.ProductCategories.AddRangeAsync(categoryLinks, cancellationToken);
 
         Guid? defaultVariantId = null;
         var variantDefinitions = BuildVariantDefinitions(request);
@@ -1524,6 +1527,11 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             }
 
             var defaultPriceListId = await GetDefaultPriceListIdAsync(tenantId, cancellationToken);
+            if (!defaultPriceListId.HasValue)
+            {
+                defaultPriceListId = await EnsureDefaultPriceListAsync(tenantId, userId, now, cancellationToken);
+            }
+
             if (defaultPriceListId.HasValue)
             {
                 var priceListItem = PriceListItem.Create(
@@ -1601,26 +1609,29 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
                 if (!inventoryLocationId.HasValue)
                 {
+                    inventoryLocationId = await EnsureDefaultSellableInventoryLocationAsync(
+                        tenantId,
+                        outletId,
+                        userId,
+                        now,
+                        cancellationToken);
+                }
+
+                if (!inventoryLocationId.HasValue)
+                {
                     continue;
                 }
 
-                var balance = InventoryBalance.Create(
-                    Guid.NewGuid(),
+                await ApplyOpeningStockAsync(
                     tenantId,
-                    inventoryLocationId.Value,
                     productId,
+                    inventoryLocationId.Value,
                     defaultVariantId,
                     productBatchId,
-                    now);
-
-                balance.AdjustQuantities(
                     quantityPerOutlet,
-                    reservedDelta: 0,
-                    damagedDelta: 0,
-                    quarantineDelta: 0,
-                    now);
-
-                await _dbContext.InventoryBalances.AddAsync(balance, cancellationToken);
+                    userId,
+                    now,
+                    cancellationToken);
             }
         }
 
@@ -1631,6 +1642,76 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             request.ProductName.Trim(),
             request.Sku.Trim(),
             normalizedStatus);
+    }
+
+    private async Task ApplyOpeningStockAsync(
+        Guid tenantId,
+        Guid productId,
+        Guid inventoryLocationId,
+        Guid? defaultVariantId,
+        Guid? productBatchId,
+        decimal quantity,
+        Guid? userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var balance = InventoryBalance.Create(
+            Guid.NewGuid(),
+            tenantId,
+            inventoryLocationId,
+            productId,
+            defaultVariantId,
+            productBatchId,
+            now);
+
+        var quantityBefore = balance.OnHandQuantity;
+        var movementNumber = await _codeSequenceRepository.GetNextCodeAsync(
+            tenantId,
+            InventoryConstants.StockMovementSequenceKey,
+            InventoryConstants.StockMovementPrefix,
+            InventoryConstants.StockMovementPadding,
+            now,
+            cancellationToken);
+
+        var movementId = Guid.NewGuid();
+        var movement = StockMovement.Create(
+            movementId,
+            tenantId,
+            movementNumber,
+            balance.Id,
+            StockMovementConstants.StockIn,
+            quantityBefore,
+            quantity,
+            unitCost: null,
+            totalCost: null,
+            reasonCode: InventoryConstants.OpeningStockReason,
+            referenceNumberSnapshot: null,
+            idempotencyKey: null,
+            movementNote: "Product opening stock",
+            occurredAt: now,
+            createdByTenantUserId: userId,
+            now);
+
+        balance.AdjustQuantities(
+            quantity,
+            reservedDelta: 0,
+            damagedDelta: 0,
+            quarantineDelta: 0,
+            now);
+
+        await _dbContext.InventoryBalances.AddAsync(balance, cancellationToken);
+        await _dbContext.StockMovements.AddAsync(movement, cancellationToken);
+
+        var reference = StockMovementReference.Create(
+            Guid.NewGuid(),
+            tenantId,
+            movementId,
+            InventoryConstants.ProductOpeningStockReferenceType,
+            productId,
+            referenceLineId: null,
+            now);
+
+        await _dbContext.StockMovementReferences.AddAsync(reference, cancellationToken);
     }
 
     private static List<VariantDefinition> BuildVariantDefinitions(TenantAdminProductCreateRequest request)
@@ -1669,6 +1750,68 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .Where(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == "ACTIVE")
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<Guid> EnsureDefaultPriceListAsync(
+        Guid tenantId,
+        Guid? userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var priceListId = Guid.NewGuid();
+        var priceList = PriceList.Create(
+            priceListId,
+            tenantId,
+            "DEFAULT",
+            "Default Price List",
+            "STANDARD",
+            "LKR",
+            priceIncludesTax: false,
+            isDefaultPriceList: true,
+            priority: 1,
+            validFrom: null,
+            validUntil: null,
+            status: "ACTIVE",
+            userId,
+            now);
+
+        await _dbContext.PriceLists.AddAsync(priceList, cancellationToken);
+        return priceListId;
+    }
+
+    private async Task<Guid?> EnsureDefaultSellableInventoryLocationAsync(
+        Guid tenantId,
+        Guid outletId,
+        Guid? userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var outletExists = await _dbContext.Outlets.AsNoTracking()
+            .AnyAsync(x => x.Id == outletId && x.TenantId == tenantId, cancellationToken);
+        if (!outletExists)
+        {
+            return null;
+        }
+
+        var locationId = Guid.NewGuid();
+        var location = InventoryLocation.Create(
+            locationId,
+            tenantId,
+            outletId,
+            parentInventoryLocationId: null,
+            locationCode: "MAIN",
+            locationName: "Main Floor",
+            locationType: "SALES",
+            isSellableLocation: true,
+            isReturnLocation: true,
+            isReceivingLocation: true,
+            isQuarantineLocation: false,
+            status: "ACTIVE",
+            userId,
+            now);
+
+        await _dbContext.InventoryLocations.AddAsync(location, cancellationToken);
+        return locationId;
     }
 
     private static string GenerateSlug(string name, string code)

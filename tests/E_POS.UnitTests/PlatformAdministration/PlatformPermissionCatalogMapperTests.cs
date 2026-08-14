@@ -9,13 +9,13 @@ namespace E_POS.UnitTests.PlatformAdministration;
 public sealed class PlatformPermissionCatalogMapperTests
 {
     [Fact]
-    public void BuildFlat_IncludesAllThirtySevenOptionAPermissions()
+    public void BuildFlat_IncludesAllFortyFiveOptionAPermissions()
     {
         var permissions = CreateSeedPermissions();
 
         var flat = PlatformPermissionCatalogMapper.BuildFlat(permissions);
 
-        Assert.Equal(37, flat.TotalCount);
+        Assert.Equal(45, flat.TotalCount);
         Assert.Equal(
             PlatformPermissionCodes.All.OrderBy(x => x, StringComparer.Ordinal),
             flat.Permissions.Select(permission => permission.Code).OrderBy(x => x, StringComparer.Ordinal));
@@ -34,8 +34,8 @@ public sealed class PlatformPermissionCatalogMapperTests
 
         var flat = PlatformPermissionCatalogMapper.BuildFlat(permissions);
 
-        Assert.Equal(38, permissions.Count);
-        Assert.Equal(37, flat.TotalCount);
+        Assert.Equal(46, permissions.Count); // 45 Option A + bootstrap admin access (filtered out of flat)
+        Assert.Equal(45, flat.TotalCount);
         Assert.DoesNotContain(
             flat.Permissions,
             permission => permission.Code == PlatformBootstrapPermissionCodes.AdminAccess);
@@ -55,7 +55,7 @@ public sealed class PlatformPermissionCatalogMapperTests
             catalog.Modules.Select(module => module.Key).ToList());
 
         var tenantModule = catalog.Modules.Single(module => module.Key == "tenants");
-        Assert.Equal(["entitlements", "general"], tenantModule.Features.Select(feature => feature.Key).ToList());
+        Assert.Equal(["bootstrap", "entitlements", "general"], tenantModule.Features.Select(feature => feature.Key).ToList());
 
         var rolesModule = catalog.Modules.Single(module => module.Key == "roles");
         Assert.Equal(["general", "permissions"], rolesModule.Features.Select(feature => feature.Key).ToList());

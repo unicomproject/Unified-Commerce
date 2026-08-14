@@ -1,3 +1,5 @@
+using System.Data;
+using System.Text.Json;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
@@ -6,6 +8,7 @@ using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 
@@ -13,6 +16,14 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
 {
     private const string TillSessionNumberPrefix = "TS-";
     private const int TillSessionNumberPadding = 4;
+    private static readonly HashSet<string> ApprovedMismatchReasons = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CASH_HANDLING_MISMATCH",
+        "COUNTING_ERROR",
+        "CASH_MISSING",
+        "CASH_OVER",
+        "OTHER"
+    };
 
     private readonly EPosDbContext _dbContext;
     private readonly ICodeSequenceRepository _codeSequenceRepository;
@@ -54,7 +65,17 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
             deviceId,
             deviceContext.Assignment.TillId);
 
-        return ResolveSuccess(MapSnapshot(session));
+        var closeSummary = await CalculateExpectedCashAsync(tenantId, session, cancellationToken);
+        var tillName = await _dbContext.Tills.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Id == session.TillId)
+            .Select(x => x.TillName)
+            .SingleOrDefaultAsync(cancellationToken);
+        var openedByName = await _dbContext.TenantUsers.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Id == session.OpenedByTenantUserId)
+            .Select(x => x.DisplayName ?? x.FullName)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return ResolveSuccess(MapSnapshot(session, closeSummary.ExpectedCash, tillName, openedByName));
     }
 
     public async Task<OpenTillRepositoryResult> OpenTillAsync(
@@ -153,6 +174,17 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
             return CloseFailure("till_session.invalid_counted_cash");
         }
 
+        var normalizedReason = NormalizeMismatchReason(command.MismatchReason);
+        if (command.ClosingNote?.Trim().Length > 500)
+        {
+            return CloseFailure("till_session.closing_note_too_long");
+        }
+
+        if (normalizedReason is not null && !ApprovedMismatchReasons.Contains(normalizedReason))
+        {
+            return CloseFailure("till_session.invalid_mismatch_reason");
+        }
+
         var deviceContext = await ResolveTrustedDeviceAssignmentAsync(tenantId, command.DeviceId, cancellationToken);
         if (!deviceContext.IsSuccess || deviceContext.Assignment is null)
         {
@@ -169,63 +201,200 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
             return CloseFailure("till_session.till_mismatch");
         }
 
-        var session = await FindOpenSessionAsync(tenantId, command.TillId, cancellationToken);
-        if (session is null)
+        await using var transaction = _dbContext.Database.IsRelational()
+            ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        try
         {
-            _logger.LogDebug(
-                "Till close rejected: no open session for till {TillId}.",
-                command.TillId);
-            return CloseFailure("till_session.not_open");
+            var session = await FindOpenSessionAsync(tenantId, command.TillId, cancellationToken);
+            if (session is null)
+            {
+                _logger.LogDebug(
+                    "Till close rejected: no open session for till {TillId}.",
+                    command.TillId);
+                return CloseFailure("till_session.already_closed");
+            }
+
+            if (await _dbContext.CashReconciliations.AsNoTracking()
+                .AnyAsync(x => x.TenantId == tenantId && x.TillSessionId == session.Id, cancellationToken))
+            {
+                return CloseFailure("till_session.already_closed");
+            }
+
+            var calculation = await CalculateExpectedCashAsync(tenantId, session, cancellationToken);
+            var expectedCash = calculation.ExpectedCash;
+            if (expectedCash < 0)
+            {
+                return CloseFailure("till_session.invalid_expected_cash");
+            }
+
+            var cashDifference = command.CountedCash - expectedCash;
+            if (cashDifference != 0 && normalizedReason is null)
+            {
+                return CloseFailure("till_session.mismatch_reason_required");
+            }
+
+            var closingNote = BuildClosingNote(normalizedReason, command.ClosingNote);
+            var reconciliation = CashReconciliation.Create(
+                Guid.NewGuid(),
+                tenantId,
+                session.Id,
+                $"REC-{session.SessionNumber}",
+                expectedCash,
+                command.CountedCash,
+                cashDifference,
+                session.CurrencyCode,
+                cashDifference == 0 ? null : normalizedReason,
+                JsonSerializer.Serialize(calculation),
+                now);
+            reconciliation.Submit(tenantUserId, now);
+            session.Close(tenantUserId, command.DeviceId, closingNote, now);
+
+            var closedEvent = TillSessionEvent.RecordClosed(
+                Guid.NewGuid(),
+                tenantId,
+                session.Id,
+                tenantUserId,
+                command.DeviceId,
+                command.CountedCash,
+                session.CurrencyCode,
+                closingNote,
+                now);
+
+            _dbContext.CashReconciliations.Add(reconciliation);
+            _dbContext.TillSessionEvents.Add(closedEvent);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            _logger.LogInformation(
+                "Till close committed for tenant {TenantId}, session {SessionId}, till {TillId}, device {DeviceId}, difference {Difference}.",
+                tenantId, session.Id, command.TillId, command.DeviceId, cashDifference);
+
+            return CloseSuccess(new ClosedTillSessionDbSnapshot(
+                SessionId: session.Id,
+                OutletId: session.OutletId,
+                TillId: session.TillId,
+                OpeningFloat: session.OpeningFloatAmount,
+                ExpectedCash: expectedCash,
+                CountedCash: command.CountedCash,
+                CashDifference: cashDifference,
+                Status: session.Status,
+                OpenedAt: session.OpenedAt,
+                ClosedAt: session.ClosedAt ?? now,
+                ClosingNote: session.ClosingNote));
+        }
+        catch (Exception exception) when (IsConcurrentClose(exception))
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            _dbContext.ChangeTracker.Clear();
+            _logger.LogWarning(exception,
+                "Concurrent till close rejected for tenant {TenantId}, till {TillId}, device {DeviceId}.",
+                tenantId, command.TillId, command.DeviceId);
+            return CloseFailure("till_session.already_closed");
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            _dbContext.ChangeTracker.Clear();
+            throw;
+        }
+    }
+
+    private async Task<ExpectedCashCalculation> CalculateExpectedCashAsync(
+        Guid tenantId,
+        TillSession session,
+        CancellationToken cancellationToken)
+    {
+        var cashPayments = await (
+            from payment in _dbContext.SalesPayments.AsNoTracking()
+            join method in _dbContext.PaymentMethods.AsNoTracking()
+                on payment.PaymentMethodId equals method.Id
+            where payment.TenantId == tenantId &&
+                  method.TenantId == tenantId &&
+                  payment.TillSessionId == session.Id &&
+                  payment.CurrencyCode == session.CurrencyCode &&
+                  method.MethodCode == "CASH" &&
+                  (payment.PaymentStatus == "PAID" ||
+                   payment.PaymentStatus == "PARTIALLY_REFUNDED" ||
+                   payment.PaymentStatus == "REFUNDED")
+            select new { payment.PaymentNumber, payment.PaidAmount, payment.RefundedAmount })
+            .ToListAsync(cancellationToken);
+
+        var paymentReferences = cashPayments.Select(x => x.PaymentNumber).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var movements = await _dbContext.TillCashMovements.AsNoTracking()
+            .Where(x => x.TenantId == tenantId &&
+                        x.TillSessionId == session.Id &&
+                        x.CurrencyCode == session.CurrencyCode)
+            .ToListAsync(cancellationToken);
+        var configuredTypes = await _dbContext.CashMovementTypes.AsNoTracking()
+            .Where(x => (x.TenantId == null || x.TenantId == tenantId) && x.Status == "ACTIVE")
+            .ToListAsync(cancellationToken);
+
+        bool AffectsExpectedCash(string code)
+        {
+            var configured = configuredTypes
+                .Where(x => string.Equals(x.MovementTypeCode, code, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.TenantId == tenantId)
+                .FirstOrDefault();
+            return configured?.AffectsExpectedCash ??
+                   code is "CASH_IN" or "CASH_OUT" or "CASH_DROP" or "OPENING_FLOAT" or "CLOSING_REMOVE";
         }
 
-        var expectedCash = command.ExpectedCash ?? session.OpeningFloatAmount;
-        if (expectedCash < 0)
-        {
-            return CloseFailure("till_session.invalid_expected_cash");
-        }
+        var includedMovements = movements
+            .Where(x => AffectsExpectedCash(x.MovementType))
+            .Where(x => !(x.MovementType == "CASH_IN" &&
+                          x.ReferenceNumber is not null &&
+                          paymentReferences.Contains(x.ReferenceNumber)))
+            .ToList();
+        var cashPaymentsTotal = cashPayments.Sum(x => x.PaidAmount);
+        var cashRefundsTotal = cashPayments.Sum(x => x.RefundedAmount);
+        var cashIn = includedMovements.Where(x => x.MovementType == "CASH_IN").Sum(x => x.Amount);
+        var cashOut = includedMovements.Where(x => x.MovementType == "CASH_OUT").Sum(x => x.Amount);
+        var cashDrops = includedMovements.Where(x => x.MovementType == "CASH_DROP").Sum(x => x.Amount);
+        var openingAdjustments = includedMovements.Where(x => x.MovementType == "OPENING_FLOAT").Sum(x => x.Amount);
+        var closingRemovals = includedMovements.Where(x => x.MovementType == "CLOSING_REMOVE").Sum(x => x.Amount);
 
-        var cashDifference = command.CountedCash - expectedCash;
-        if (cashDifference != 0 && string.IsNullOrWhiteSpace(command.MismatchReason))
-        {
-            return CloseFailure("till_session.mismatch_reason_required");
-        }
-
-        var closingNote = BuildClosingNote(command.MismatchReason, command.ClosingNote);
-        session.Close(tenantUserId, command.DeviceId, closingNote, now);
-
-        var closedEvent = TillSessionEvent.RecordClosed(
-            Guid.NewGuid(),
-            tenantId,
-            session.Id,
-            tenantUserId,
-            command.DeviceId,
-            command.CountedCash,
-            session.CurrencyCode,
-            closingNote,
-            now);
-
-        _dbContext.TillSessionEvents.Add(closedEvent);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        _logger.LogDebug(
-            "Till closed for tenant {TenantId}: session {SessionId}, till {TillId}, counted {CountedCash}.",
-            tenantId,
-            session.Id,
-            command.TillId,
-            command.CountedCash);
-
-        return CloseSuccess(new ClosedTillSessionDbSnapshot(
-            SessionId: session.Id,
-            OutletId: session.OutletId,
-            TillId: session.TillId,
+        return new ExpectedCashCalculation(
+            Version: 1,
+            CurrencyCode: session.CurrencyCode,
             OpeningFloat: session.OpeningFloatAmount,
-            ExpectedCash: expectedCash,
-            CountedCash: command.CountedCash,
-            CashDifference: cashDifference,
-            Status: session.Status,
-            OpenedAt: session.OpenedAt,
-            ClosedAt: session.ClosedAt ?? now,
-            ClosingNote: session.ClosingNote));
+            CashPayments: cashPaymentsTotal,
+            CashIn: cashIn,
+            CashOut: cashOut,
+            OpeningAdjustments: openingAdjustments,
+            ClosingRemovals: closingRemovals,
+            ExpectedCash: session.OpeningFloatAmount + cashPaymentsTotal - cashRefundsTotal + cashIn + openingAdjustments - cashOut - cashDrops - closingRemovals);
+    }
+
+    private static string? NormalizeMismatchReason(string? reason) =>
+        string.IsNullOrWhiteSpace(reason)
+            ? null
+            : reason.Trim().Replace(' ', '_').ToUpperInvariant();
+
+    private static bool IsConcurrentClose(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is PostgresException postgres &&
+                postgres.SqlState is PostgresErrorCodes.UniqueViolation or
+                    PostgresErrorCodes.SerializationFailure or
+                    PostgresErrorCodes.DeadlockDetected)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string? BuildClosingNote(string? mismatchReason, string? closingNote)
@@ -309,7 +478,11 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
             .OrderByDescending(x => x.OpenedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-    private static CurrentTillSessionDbSnapshot MapSnapshot(TillSession session) =>
+    private static CurrentTillSessionDbSnapshot MapSnapshot(
+        TillSession session,
+        decimal expectedCash = 0,
+        string? tillName = null,
+        string? openedByName = null) =>
         new(
             SessionId: session.Id,
             OutletId: session.OutletId,
@@ -318,7 +491,11 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
             OpeningFloat: session.OpeningFloatAmount,
             Status: session.Status,
             OpenedAt: session.OpenedAt,
-            OpeningNote: session.OpeningNote);
+            OpeningNote: session.OpeningNote,
+            CurrencyCode: session.CurrencyCode,
+            ExpectedCash: expectedCash,
+            TillName: tillName,
+            OpenedByName: openedByName);
 
     private static CurrentTillSessionResolveResult ResolveSuccess(CurrentTillSessionDbSnapshot snapshot) =>
         new(true, null, snapshot);
@@ -339,6 +516,17 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
         new(false, errorCode, null);
 
     private sealed record DeviceAssignmentSnapshot(Guid TillId, Guid OutletId);
+
+    private sealed record ExpectedCashCalculation(
+        int Version,
+        string CurrencyCode,
+        decimal OpeningFloat,
+        decimal CashPayments,
+        decimal CashIn,
+        decimal CashOut,
+        decimal OpeningAdjustments,
+        decimal ClosingRemovals,
+        decimal ExpectedCash);
 
     private sealed record DeviceAssignmentContextResult(bool IsSuccess, string? ErrorCode, DeviceAssignmentSnapshot? Assignment)
     {
