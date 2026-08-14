@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
@@ -60,15 +60,52 @@ public sealed class StorefrontProductListingRepository : StorefrontProductReposi
             };
         }
 
-        var productIds = products.Select(x => x.Product.Id).ToList();
+        var allProductIds = products.Select(x => x.Product.Id).ToList();
         var now = DateTimeOffset.UtcNow;
         var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
-        var ratingsByProduct = await GetRatingsByProductAsync(tenantId, productIds, cancellationToken);
-        var pricesByProduct = await GetProductPricesByProductAsync(tenantId, productIds, currencyCode, now, cancellationToken);
-        var imagesByProduct = await GetPrimaryImagesByProductAsync(tenantId, productIds, cancellationToken);
-        var inventoryByProduct = await GetInventoryByProductAsync(tenantId, productIds, cancellationToken);
+        var normalizedSort = sort?.Trim().ToLowerInvariant();
 
-        var productModels = products.Select(row =>
+        Dictionary<Guid, decimal?>? pricesByProduct = null;
+        Dictionary<Guid, ProductRatingSummary>? ratingsByProduct = null;
+
+        var needsPrices = normalizedSort == "price_asc" || normalizedSort == "price_desc";
+        var needsRatings = normalizedSort == "rating_desc" || string.IsNullOrEmpty(normalizedSort) || (normalizedSort != "price_asc" && normalizedSort != "price_desc" && normalizedSort != "newest");
+
+        if (needsPrices)
+            pricesByProduct = await GetProductPricesByProductAsync(tenantId, allProductIds, currencyCode, now, cancellationToken);
+
+        if (needsRatings)
+            ratingsByProduct = await GetRatingsByProductAsync(tenantId, allProductIds, cancellationToken);
+
+        var sortItems = products.Select(row =>
+        {
+            var pId = row.Product.Id;
+            var price = pricesByProduct != null && pricesByProduct.TryGetValue(pId, out var p) ? p : null;
+            var rating = ratingsByProduct != null && ratingsByProduct.TryGetValue(pId, out var r) ? r : null;
+
+            return new ProductListingSortItem(
+                row.Product,
+                price,
+                row.SortOrder,
+                rating?.AverageRating ?? 0m,
+                rating?.TotalReviews ?? 0);
+        });
+
+        var pagedSortItems = SortProductListings(sortItems, sort)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        var pagedProductIds = pagedSortItems.Select(x => x.Product.Id).ToList();
+        
+        pricesByProduct ??= await GetProductPricesByProductAsync(tenantId, pagedProductIds, currencyCode, now, cancellationToken);
+        ratingsByProduct ??= await GetRatingsByProductAsync(tenantId, pagedProductIds, cancellationToken);
+        
+        var imagesByProduct = await GetPrimaryImagesByProductAsync(tenantId, pagedProductIds, cancellationToken);
+        var inventoryByProduct = await GetInventoryByProductAsync(tenantId, pagedProductIds, cancellationToken);
+        var optionsByProduct = await GetVariantOptionsByProductAsync(tenantId, pagedProductIds, cancellationToken);
+
+        var items = pagedSortItems.Select(row =>
         {
             var product = row.Product;
             ratingsByProduct.TryGetValue(product.Id, out var rating);
@@ -77,32 +114,24 @@ public sealed class StorefrontProductListingRepository : StorefrontProductReposi
             var hasInventory = inventoryByProduct.TryGetValue(product.Id, out var availableQuantity);
             var averageRating = rating?.AverageRating ?? 0m;
             var reviewCount = rating?.TotalReviews ?? 0;
+            
+            var productOptions = optionsByProduct.TryGetValue(product.Id, out var opts) ? opts : new ProductVariantOptions([], [], []);
 
-            return new ProductListingSortItem(
-                StorefrontProductMapper.ToListReadModel(
-                    product,
-                    sellingPrice,
-                    primaryImageUrl,
-                    averageRating,
-                    reviewCount,
-                    !hasInventory || availableQuantity > 0m,
-                    currencyCode),
-                row.SortOrder,
-                product.CreatedAt,
+            return StorefrontProductMapper.ToListReadModel(
+                product,
+                sellingPrice,
+                primaryImageUrl,
                 averageRating,
-                reviewCount);
+                reviewCount,
+                !hasInventory || availableQuantity > 0m,
+                currencyCode,
+                BuildSelectableOptions(productOptions));
         }).ToList();
-
-        var items = SortProductListings(productModels, sort)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(x => x.Model)
-            .ToList();
 
         return new StorefrontPagedReadModel<StorefrontProductListReadModel>
         {
             Items = items,
-            TotalCount = productModels.Count,
+            TotalCount = products.Count,
             Page = page,
             PageSize = pageSize
         };

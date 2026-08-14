@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
@@ -89,36 +89,107 @@ public sealed class StorefrontProductSearchRepository : StorefrontProductReposit
             }
         }
 
-        productIds = products.Select(x => x.Id).ToList();
+        var allProductIds = products.Select(x => x.Id).ToList();
         var now = DateTimeOffset.UtcNow;
         var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
-        var prices = await GetProductPricesByProductAsync(tenantId, productIds, currencyCode, now, cancellationToken);
-        var ratings = await GetRatingsByProductAsync(tenantId, productIds, cancellationToken);
-        var images = await GetPrimaryImagesByProductAsync(tenantId, productIds, cancellationToken);
-        var inventory = await GetInventoryByProductAsync(tenantId, productIds, cancellationToken);
+        var normalizedSort = request.Sort?.Trim().ToLowerInvariant();
 
-        var listingItems = products.Select(product =>
+        var needsPrices = request.MinPrice.HasValue || request.MaxPrice.HasValue || normalizedSort == "price_asc" || normalizedSort == "price_desc";
+        var needsRatings = normalizedSort == "rating_desc" || string.IsNullOrEmpty(normalizedSort) || (normalizedSort != "price_asc" && normalizedSort != "price_desc" && normalizedSort != "newest");
+        var needsInventory = request.InStock.HasValue;
+
+        Dictionary<Guid, decimal?>? pricesByProduct = null;
+        Dictionary<Guid, ProductRatingSummary>? ratingsByProduct = null;
+        Dictionary<Guid, decimal>? inventoryByProduct = null;
+
+        if (needsPrices)
+            pricesByProduct = await GetProductPricesByProductAsync(tenantId, allProductIds, currencyCode, now, cancellationToken);
+        
+        if (needsRatings)
+            ratingsByProduct = await GetRatingsByProductAsync(tenantId, allProductIds, cancellationToken);
+
+        if (needsInventory)
+            inventoryByProduct = await GetInventoryByProductAsync(tenantId, allProductIds, cancellationToken);
+
+        var filteredProducts = products.AsEnumerable();
+        if (request.MinPrice.HasValue || request.MaxPrice.HasValue)
         {
-            prices.TryGetValue(product.Id, out var price);
-            ratings.TryGetValue(product.Id, out var rating);
-            images.TryGetValue(product.Id, out var image);
-            var hasInventory = inventory.TryGetValue(product.Id, out var quantity);
+            filteredProducts = filteredProducts.Where(p => 
+            {
+                var price = pricesByProduct != null && pricesByProduct.TryGetValue(p.Id, out var pVal) ? pVal : null;
+                if (request.MinPrice.HasValue && (price == null || price.Value < request.MinPrice.Value)) return false;
+                if (request.MaxPrice.HasValue && (price == null || price.Value > request.MaxPrice.Value)) return false;
+                return true;
+            });
+        }
+        
+        if (request.InStock.HasValue)
+        {
+            filteredProducts = filteredProducts.Where(p => 
+            {
+                var hasInventory = false;
+                var qty = 0m;
+                if (inventoryByProduct != null)
+                {
+                    hasInventory = inventoryByProduct.TryGetValue(p.Id, out qty);
+                }
+                var inStock = !hasInventory || qty > 0m;
+                return inStock == request.InStock.Value;
+            });
+        }
+
+        var sortItems = filteredProducts.Select(product =>
+        {
+            var pId = product.Id;
+            var price = pricesByProduct != null && pricesByProduct.TryGetValue(pId, out var p) ? p : null;
+            var rating = ratingsByProduct != null && ratingsByProduct.TryGetValue(pId, out var r) ? r : null;
+
             return new ProductListingSortItem(
-                StorefrontProductMapper.ToListReadModel(product, price, image, rating?.AverageRating ?? 0m,
-                    rating?.TotalReviews ?? 0, !hasInventory || quantity > 0m, currencyCode),
-                0, product.CreatedAt, rating?.AverageRating ?? 0m, rating?.TotalReviews ?? 0);
+                product,
+                price,
+                0,
+                rating?.AverageRating ?? 0m,
+                rating?.TotalReviews ?? 0);
         }).ToList();
 
-        if (request.MinPrice.HasValue) listingItems = listingItems.Where(x => x.Model.Price >= request.MinPrice.Value).ToList();
-        if (request.MaxPrice.HasValue) listingItems = listingItems.Where(x => x.Model.Price <= request.MaxPrice.Value).ToList();
-        if (request.InStock.HasValue) listingItems = listingItems.Where(x => x.Model.IsInStock == request.InStock.Value).ToList();
-
-        var totalProducts = listingItems.Count;
-        var productPage = SortProductListings(listingItems, request.Sort)
+        var totalProducts = sortItems.Count;
+        
+        var pagedSortItems = SortProductListings(sortItems, request.Sort)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(x => x.Model)
             .ToList();
+
+        var pagedProductIds = pagedSortItems.Select(x => x.Product.Id).ToList();
+        
+        pricesByProduct ??= await GetProductPricesByProductAsync(tenantId, pagedProductIds, currencyCode, now, cancellationToken);
+        ratingsByProduct ??= await GetRatingsByProductAsync(tenantId, pagedProductIds, cancellationToken);
+        inventoryByProduct ??= await GetInventoryByProductAsync(tenantId, pagedProductIds, cancellationToken);
+        
+        var imagesByProduct = await GetPrimaryImagesByProductAsync(tenantId, pagedProductIds, cancellationToken);
+        var optionsByProduct = await GetVariantOptionsByProductAsync(tenantId, pagedProductIds, cancellationToken);
+
+        var productPage = pagedSortItems.Select(row =>
+        {
+            var product = row.Product;
+            ratingsByProduct.TryGetValue(product.Id, out var rating);
+            pricesByProduct.TryGetValue(product.Id, out var sellingPrice);
+            imagesByProduct.TryGetValue(product.Id, out var primaryImageUrl);
+            var hasInventory = inventoryByProduct.TryGetValue(product.Id, out var availableQuantity);
+            var averageRating = rating?.AverageRating ?? 0m;
+            var reviewCount = rating?.TotalReviews ?? 0;
+            
+            var productOptions = optionsByProduct.TryGetValue(product.Id, out var opts) ? opts : new ProductVariantOptions([], [], []);
+
+            return StorefrontProductMapper.ToListReadModel(
+                product,
+                sellingPrice,
+                primaryImageUrl,
+                averageRating,
+                reviewCount,
+                !hasInventory || availableQuantity > 0m,
+                currencyCode,
+                BuildSelectableOptions(productOptions));
+        }).ToList();
 
         var categoryRows = await (from category in DbContext.Set<Category>().AsNoTracking()
                                   join mediaAsset in DbContext.Set<MediaAsset>().AsNoTracking()

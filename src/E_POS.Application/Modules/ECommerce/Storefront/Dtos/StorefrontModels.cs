@@ -25,6 +25,7 @@ public class StorefrontProductListReadModel
     public int ReviewCount { get; set; }
     public bool IsInStock { get; set; }
     public string? Badge { get; set; }
+    public IReadOnlyList<StorefrontProductOptionReadModel> Options { get; set; } = [];
 }
 
 public class StorefrontProductDetailReadModel

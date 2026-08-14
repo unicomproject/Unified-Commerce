@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
@@ -79,6 +79,7 @@ public sealed class StorefrontCheckoutSessionRepository : StorefrontCheckoutRepo
                 .ToListAsync(cancellationToken);
 
             var isStale = existingSession.SelectedOutletId != request.SelectedOutletId ||
+                          existingSession.RequestedCollectionAt != request.RequestedCollectionAt ||
                           existingLines.Count != items.Count ||
                           existingLines.Any(el =>
                           {
@@ -143,6 +144,32 @@ public sealed class StorefrontCheckoutSessionRepository : StorefrontCheckoutRepo
             cart.ChargeAmount,
             expiresAt,
             now);
+
+        if (request.RequestedCollectionAt.HasValue)
+        {
+            var requestedAtUtc = request.RequestedCollectionAt.Value.ToUniversalTime();
+            var collection = await ValidateCollectionAsync(
+                tenantId, outlet.Id, outlet.Timezone, requestedAtUtc, now, cancellationToken);
+            if (collection.ErrorCode is not null) return Failure(collection.ErrorCode);
+            
+            checkout.SelectCollection(
+                outlet.Id,
+                requestedAtUtc,
+                collection.RequestedCollectionEndAt!.Value,
+                outlet.Timezone,
+                now);
+            
+            DbContext.CheckoutEvents.Add(CheckoutEvent.Record(
+                Guid.NewGuid(), tenantId, checkoutId, "COLLECTION_SELECTION_UPDATED", "SUCCEEDED",
+                JsonSerializer.Serialize(new
+                {
+                    outletId = outlet.Id,
+                    requestedCollectionAt = requestedAtUtc,
+                    requestedCollectionEndAt = collection.RequestedCollectionEndAt
+                }),
+                now));
+        }
+
         DbContext.CheckoutSessions.Add(checkout);
 
         foreach (var item in items)
