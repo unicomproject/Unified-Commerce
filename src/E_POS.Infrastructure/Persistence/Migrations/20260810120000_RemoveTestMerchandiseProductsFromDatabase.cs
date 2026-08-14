@@ -19,6 +19,10 @@ public partial class RemoveTestMerchandiseProductsFromDatabase : Migration
                 target_ids uuid[];
                 target_variant_ids uuid[];
             BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'products') THEN
+                    RETURN;
+                END IF;
+
                 -- 1. Find all target product IDs by keyword or seed ID
                 SELECT array_agg(id) INTO target_ids FROM products 
                 WHERE id IN ('cccc0004-0004-4000-8000-000000000001','cccc0004-0005-4000-8000-000000000001','cccc0004-0006-4000-8000-000000000001','cccc0004-0007-4000-8000-000000000001','cccc0004-000e-4000-8000-000000000001')
