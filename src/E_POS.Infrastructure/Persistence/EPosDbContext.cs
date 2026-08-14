@@ -281,6 +281,7 @@ public sealed class EPosDbContext : DbContext
 
     // Storefront
     public DbSet<StorefrontBanner> StorefrontBanners => Set<StorefrontBanner>();
+    public DbSet<StorefrontPolicy> StorefrontPolicies => Set<StorefrontPolicy>();
 
     // Shared Media
     public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();

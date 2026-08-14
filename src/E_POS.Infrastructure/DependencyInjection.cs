@@ -52,7 +52,9 @@ using E_POS.Infrastructure.Modules.Shared.Idempotency.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Services;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.Tenant.OnlineStoreSetup.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.OnlineStoreSetup.Services;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -293,6 +295,7 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontFulfillmentRepository, StorefrontFulfillmentRepository>();
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
+        services.AddScoped<ITenantAdminOnlineStoreService, TenantAdminOnlineStoreService>();
         services.AddScoped<IStorefrontCartRepository, StorefrontCartRepository>();
         services.AddScoped<IStorefrontCheckoutSessionRepository, StorefrontCheckoutSessionRepository>();
         services.AddScoped<IStorefrontCheckoutConfirmationRepository, StorefrontCheckoutConfirmationRepository>();

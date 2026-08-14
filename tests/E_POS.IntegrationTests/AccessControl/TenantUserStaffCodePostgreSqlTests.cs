@@ -236,7 +236,7 @@ public sealed class TenantUserStaffCodePostgreSqlTests
 
         var migrator = db.Database.GetService<IMigrator>();
         var script = migrator.GenerateScript(
-            "20260810120000_AddTenantUserInviteSecurityFoundation",
+            "20260810120500_EnsureTargetPosLoginBrandingProfile",
             "20260810143000_CompleteTenantUserStaffCodeRollout");
         await using (var connection = new NpgsqlConnection(harness.ConnectionString))
         {
@@ -391,7 +391,15 @@ public sealed class TenantUserStaffCodePostgreSqlTests
             );
 
             INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-            VALUES ('20260810120000_AddTenantUserInviteSecurityFoundation', '10.0.0');
+            VALUES
+                ('20260810120000_AddTenantUserInviteSecurityFoundation', '10.0.0'),
+                ('20260810120000_RemoveTestMerchandiseProductsFromDatabase', '10.0.0'),
+                ('20260810120000_SeedPosLoginBrandingSettingDefinitions', '10.0.0'),
+                ('20260810120100_NormalizePosLoginOptionalMediaDefaults', '10.0.0'),
+                ('20260810120200_SeedPosLoginBrandingDevelopmentFixtures', '10.0.0'),
+                ('20260810120300_CorrectPosLoginBrandingSubtitleTemplate', '10.0.0'),
+                ('20260810120400_SeedTargetPosLoginBrandingAssets', '10.0.0'),
+                ('20260810120500_EnsureTargetPosLoginBrandingProfile', '10.0.0');
             """);
     }
 
