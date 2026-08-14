@@ -4,6 +4,7 @@ using E_POS.Api.Common;
 using E_POS.Api.Extensions;
 using E_POS.Api.Middleware;
 using E_POS.Application;
+using Microsoft.EntityFrameworkCore;
 using E_POS.Application.Common.Security;
 using E_POS.Infrastructure;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
@@ -209,6 +210,8 @@ app.MapGet("/api/v1/health", () =>
     });
 })
 .WithName("HealthCheck");
+
+
 
 await DevelopmentPlatformAdminTestAccountSeedHost.RunIfDevelopmentAsync(app);
 

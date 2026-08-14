@@ -171,32 +171,26 @@ public static class DevelopmentMerchandiseCatalogSeedData
 
         INSERT INTO product_images (
             id, tenant_id, product_id, product_variant_id, sales_channel_id,
-            image_storage_key, image_url, alt_text, image_purpose, mime_type,
-            file_size_bytes, width_px, height_px, checksum_hash, sort_order,
+            alt_text, image_purpose, sort_order,
             is_primary_image, status, created_by_tenant_user_id, updated_by_tenant_user_id,
             created_at, updated_at
         )
         VALUES
-            ('cccc0008-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0001-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-001-team-jersey.png', 'https://img.magnific.com/premium-photo/3d-sportswear-jersey-shirt-template-design-mockup_1174662-7390.jpg?w=2000', 'Team Jersey product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0002-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-002-training-jersey.png', 'https://img.magnific.com/premium-photo/3d-sportswear-jersey-shirt-template-design-mockup_1174662-7361.jpg?w=1380', 'Training Jersey product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-0003-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0003-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-003-match-shorts.png', 'https://media.sketchfab.com/models/69cc6043c37d430e89b94111fc857699/thumbnails/75a6cabd36f84e22965dd56d60d21013/ced7e1c0046e4a40a245a95f4223b207.jpeg', 'Match Shorts product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0001-4000-8000-000000000001', NULL, NULL, 'Team Jersey product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0002-4000-8000-000000000001', NULL, NULL, 'Training Jersey product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0003-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0003-4000-8000-000000000001', NULL, NULL, 'Match Shorts product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
 
-            ('cccc0008-0008-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0008-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-008-fan-scarf.png', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdH_jMhQP8NpADYWW8bYe5nQ1ZKFlxNHRLDXNlc-XYOQ&s=10', 'Fan Scarf product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-0009-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0009-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-009-club-keychain.png', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRn9lWmJgsHEg-M7ifVAvWJKUP6cNu42yJNTBYFMNtov7IB0LbTdaXnsHs&s=10', 'Club Keychain product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-000a-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000a-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-010-stadium-lanyard.png', 'https://placehold.co/640x480/png?text=Stadium+Lanyard', 'Stadium Lanyard product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-000b-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000b-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-011-match-football.png', 'https://placehold.co/640x480/png?text=Match+Football', 'Match Football product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-000c-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000c-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-012-training-basketball.png', 'https://placehold.co/640x480/png?text=Training+Basketball', 'Training Basketball product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-000d-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000d-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-013-water-bottle.png', 'https://placehold.co/640x480/png?text=Water+Bottle', 'Water Bottle product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0008-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0008-4000-8000-000000000001', NULL, NULL, 'Fan Scarf product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0009-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0009-4000-8000-000000000001', NULL, NULL, 'Club Keychain product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-000a-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000a-4000-8000-000000000001', NULL, NULL, 'Stadium Lanyard product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-000b-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000b-4000-8000-000000000001', NULL, NULL, 'Match Football product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-000c-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000c-4000-8000-000000000001', NULL, NULL, 'Training Basketball product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-000d-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000d-4000-8000-000000000001', NULL, NULL, 'Water Bottle product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
 
-            ('cccc0008-000f-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000f-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-015-silicone-wristband.png', 'https://www.amazon.nl/-/en/Football-Inspirational-Adjustable-Wristbands-Stainless/dp/B07R1WSTM7', 'Silicone Wristband product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now())
+            ('cccc0008-000f-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000f-4000-8000-000000000001', NULL, NULL, 'Silicone Wristband product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now())
         ON CONFLICT (id) DO UPDATE
-        SET image_storage_key = EXCLUDED.image_storage_key,
-            image_url = EXCLUDED.image_url,
-            alt_text = EXCLUDED.alt_text,
+        SET alt_text = EXCLUDED.alt_text,
             image_purpose = EXCLUDED.image_purpose,
-            mime_type = EXCLUDED.mime_type,
-            width_px = EXCLUDED.width_px,
-            height_px = EXCLUDED.height_px,
             sort_order = EXCLUDED.sort_order,
             is_primary_image = EXCLUDED.is_primary_image,
             status = 'ACTIVE',
@@ -206,32 +200,26 @@ public static class DevelopmentMerchandiseCatalogSeedData
     public const string ProductImageUpSql = """
         INSERT INTO product_images (
             id, tenant_id, product_id, product_variant_id, sales_channel_id,
-            image_storage_key, image_url, alt_text, image_purpose, mime_type,
-            file_size_bytes, width_px, height_px, checksum_hash, sort_order,
+            alt_text, image_purpose, sort_order,
             is_primary_image, status, created_by_tenant_user_id, updated_by_tenant_user_id,
             created_at, updated_at
         )
         VALUES
-            ('cccc0008-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0001-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-001-team-jersey.png', 'https://img.magnific.com/premium-photo/3d-sportswear-jersey-shirt-template-design-mockup_1174662-7390.jpg?w=2000', 'Team Jersey product image', 'CATALOG', 'image/jpeg', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0002-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-002-training-jersey.png', 'https://img.magnific.com/premium-photo/3d-sportswear-jersey-shirt-template-design-mockup_1174662-7361.jpg?w=1380', 'Training Jersey product image', 'CATALOG', 'image/jpeg', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-0003-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0003-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-003-match-shorts.png', 'https://media.sketchfab.com/models/69cc6043c37d430e89b94111fc857699/thumbnails/75a6cabd36f84e22965dd56d60d21013/ced7e1c0046e4a40a245a95f4223b207.jpeg', 'Match Shorts product image', 'CATALOG', 'image/jpeg', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0001-4000-8000-000000000001', NULL, NULL, 'Team Jersey product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0002-4000-8000-000000000001', NULL, NULL, 'Training Jersey product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0003-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0003-4000-8000-000000000001', NULL, NULL, 'Match Shorts product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
 
-            ('cccc0008-0008-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0008-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-008-fan-scarf.png', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdH_jMhQP8NpADYWW8bYe5nQ1ZKFlxNHRLDXNlc-XYOQ&s=10', 'Fan Scarf product image', 'CATALOG', 'image/jpeg', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-0009-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0009-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-009-club-keychain.png', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRn9lWmJgsHEg-M7ifVAvWJKUP6cNu42yJNTBYFMNtov7IB0LbTdaXnsHs&s=10', 'Club Keychain product image', 'CATALOG', 'image/jpeg', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-000a-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000a-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-010-stadium-lanyard.png', 'https://placehold.co/640x480/png?text=Stadium+Lanyard', 'Stadium Lanyard product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-000b-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000b-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-011-match-football.png', 'https://placehold.co/640x480/png?text=Match+Football', 'Match Football product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-000c-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000c-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-012-training-basketball.png', 'https://placehold.co/640x480/png?text=Training+Basketball', 'Training Basketball product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
-            ('cccc0008-000d-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000d-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-013-water-bottle.png', 'https://placehold.co/640x480/png?text=Water+Bottle', 'Water Bottle product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0008-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0008-4000-8000-000000000001', NULL, NULL, 'Fan Scarf product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-0009-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0009-4000-8000-000000000001', NULL, NULL, 'Club Keychain product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-000a-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000a-4000-8000-000000000001', NULL, NULL, 'Stadium Lanyard product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-000b-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000b-4000-8000-000000000001', NULL, NULL, 'Match Football product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-000c-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000c-4000-8000-000000000001', NULL, NULL, 'Training Basketball product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
+            ('cccc0008-000d-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000d-4000-8000-000000000001', NULL, NULL, 'Water Bottle product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now()),
 
-            ('cccc0008-000f-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000f-4000-8000-000000000001', NULL, NULL, 'seed/merchandise/mer-015-silicone-wristband.png', 'https://placehold.co/640x480/png?text=Silicone+Wristband', 'Silicone Wristband product image', 'CATALOG', 'image/png', NULL, 640, 480, NULL, 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now())
+            ('cccc0008-000f-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000f-4000-8000-000000000001', NULL, NULL, 'Silicone Wristband product image', 'CATALOG', 0, true, 'ACTIVE', '99999999-0003-4000-8000-000000000001', '99999999-0003-4000-8000-000000000001', now(), now())
         ON CONFLICT (id) DO UPDATE
-        SET image_storage_key = EXCLUDED.image_storage_key,
-            image_url = EXCLUDED.image_url,
-            alt_text = EXCLUDED.alt_text,
+        SET alt_text = EXCLUDED.alt_text,
             image_purpose = EXCLUDED.image_purpose,
-            mime_type = EXCLUDED.mime_type,
-            width_px = EXCLUDED.width_px,
-            height_px = EXCLUDED.height_px,
             sort_order = EXCLUDED.sort_order,
             is_primary_image = EXCLUDED.is_primary_image,
             status = 'ACTIVE',

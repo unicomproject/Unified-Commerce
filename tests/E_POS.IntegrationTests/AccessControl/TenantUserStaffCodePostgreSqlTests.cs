@@ -22,8 +22,6 @@ using E_POS.Infrastructure.Modules.Tenant.AccessControl.Services;
 using E_POS.Infrastructure.Persistence;
 using E_POS.IntegrationTests.TestSupport;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using Xunit;
 
@@ -234,16 +232,7 @@ public sealed class TenantUserStaffCodePostgreSqlTests
                 ({Guid.NewGuid()}, {tenantId}, 'invalid@example.test', 'Invalid User', 'hash', 'salt', 'ACTIVE', 'standard', 'system', {Now.AddMinutes(-1)}, {Now.AddMinutes(-1)}, 'legacy-01');
             """);
 
-        var migrator = db.Database.GetService<IMigrator>();
-        var script = migrator.GenerateScript(
-            "20260810120000_AddTenantUserInviteSecurityFoundation",
-            "20260810143000_CompleteTenantUserStaffCodeRollout");
-        await using (var connection = new NpgsqlConnection(harness.ConnectionString))
-        {
-            await connection.OpenAsync();
-            await using var command = new NpgsqlCommand(script, connection);
-            await command.ExecuteNonQueryAsync();
-        }
+        await ApplyStaffCodeRolloutMigrationAsync(db);
 
         var staffCodes = await db.TenantUsers
             .AsNoTracking()
@@ -392,6 +381,116 @@ public sealed class TenantUserStaffCodePostgreSqlTests
 
             INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
             VALUES ('20260810120000_AddTenantUserInviteSecurityFoundation', '10.0.0');
+            """);
+    }
+
+    private static async Task ApplyStaffCodeRolloutMigrationAsync(EPosDbContext db)
+    {
+        // Execute only CompleteTenantUserStaffCodeRollout (see migration Up method).
+        await db.Database.ExecuteSqlRawAsync("""
+            WITH valid_existing AS (
+                SELECT
+                    tenant_id,
+                    substring(staff_code from 5 for 4)::integer AS code_year,
+                    substring(staff_code from 10 for 5)::integer AS code_value
+                FROM tenant_users
+                WHERE staff_code ~ '^USR-[0-9]{{4}}-[0-9]{{5}}$'
+            ),
+            max_existing AS (
+                SELECT tenant_id, code_year, max(code_value) AS max_code_value
+                FROM valid_existing
+                GROUP BY tenant_id, code_year
+            ),
+            needs_backfill AS (
+                SELECT
+                    id,
+                    tenant_id,
+                    date_part('year', created_at AT TIME ZONE 'UTC')::integer AS code_year,
+                    created_at
+                FROM tenant_users
+                WHERE staff_code IS NULL
+                   OR btrim(staff_code) = ''
+                   OR staff_code !~ '^USR-[0-9]{{4}}-[0-9]{{5}}$'
+            ),
+            numbered AS (
+                SELECT
+                    n.id,
+                    n.tenant_id,
+                    n.code_year,
+                    coalesce(m.max_code_value, 0)
+                        + row_number() OVER (
+                            PARTITION BY n.tenant_id, n.code_year
+                            ORDER BY n.created_at, n.id
+                          ) AS next_code_value
+                FROM needs_backfill n
+                LEFT JOIN max_existing m
+                  ON m.tenant_id = n.tenant_id
+                 AND m.code_year = n.code_year
+            )
+            UPDATE tenant_users u
+               SET staff_code = 'USR-' || numbered.code_year::text || '-' || lpad(numbered.next_code_value::text, 5, '0'),
+                   updated_at = greatest(u.updated_at, u.created_at)
+              FROM numbered
+             WHERE u.id = numbered.id;
+            """);
+
+        await db.Database.ExecuteSqlRawAsync("""
+            WITH parsed AS (
+                SELECT
+                    tenant_id,
+                    substring(staff_code from 5 for 4)::integer AS code_year,
+                    substring(staff_code from 10 for 5)::bigint AS code_value
+                FROM tenant_users
+                WHERE staff_code ~ '^USR-[0-9]{{4}}-[0-9]{{5}}$'
+            ),
+            max_codes AS (
+                SELECT tenant_id, code_year, max(code_value) AS current_value
+                FROM parsed
+                GROUP BY tenant_id, code_year
+            ),
+            sequenced AS (
+                SELECT
+                    tenant_id,
+                    code_year,
+                    current_value,
+                    md5('TENANT_USER_STAFF_CODE:' || tenant_id::text || ':' || code_year::text) AS hash_value
+                FROM max_codes
+            )
+            INSERT INTO tenant_user_code_sequences (
+                id,
+                tenant_id,
+                sequence_type,
+                year,
+                current_value,
+                created_at,
+                updated_at
+            )
+            SELECT
+                (substring(hash_value from 1 for 8) || '-' ||
+                 substring(hash_value from 9 for 4) || '-' ||
+                 substring(hash_value from 13 for 4) || '-' ||
+                 substring(hash_value from 17 for 4) || '-' ||
+                 substring(hash_value from 21 for 12))::uuid,
+                tenant_id,
+                'TENANT_USER_STAFF_CODE',
+                code_year,
+                current_value,
+                now(),
+                now()
+            FROM sequenced
+            ON CONFLICT (tenant_id, sequence_type, year)
+            DO UPDATE SET
+                current_value = greatest(tenant_user_code_sequences.current_value, excluded.current_value),
+                updated_at = excluded.updated_at;
+            """);
+
+        await db.Database.ExecuteSqlRawAsync("""
+            DROP INDEX IF EXISTS uq_tenant_users_tenant_id_staff_code;
+            ALTER TABLE tenant_users ALTER COLUMN staff_code SET NOT NULL;
+            CREATE UNIQUE INDEX uq_tenant_users_tenant_id_staff_code
+                ON tenant_users (tenant_id, staff_code);
+            CREATE INDEX IF NOT EXISTS ix_tenant_user_invite_delivery_secrets_cleanup
+                ON tenant_user_invite_delivery_secrets (purged_at, expires_at, created_at);
             """);
     }
 

@@ -337,7 +337,7 @@ public sealed class StorefrontServiceTests
 
         Assert.True(result.IsSuccess);
         var options = Assert.IsType<StorefrontCollectionOptionsReadModel>(result.Value);
-        Assert.Equal(Now.AddMinutes(90), options.EarliestCollectionAt);
+        Assert.Equal(new DateTimeOffset(2026, 7, 13, 9, 30, 0, TimeSpan.Zero), options.EarliestCollectionAt);
         Assert.Collection(
             options.Dates,
             monday =>

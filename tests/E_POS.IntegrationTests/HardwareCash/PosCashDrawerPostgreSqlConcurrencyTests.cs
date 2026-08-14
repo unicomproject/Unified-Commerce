@@ -94,7 +94,8 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
 
         db.TenantUsers.Add(TenantUser.Create(
             ids.UserId, ids.TenantId, $"cd-{ids.Suffix}@example.test", "Cashier",
-            null, null, "hash", "salt", "ACTIVE", "cashier", "outlet", "default", Now));
+            null, null, "hash", "salt", "ACTIVE", "cashier", "outlet", "default", Now,
+            staffCode: "USR-2026-95002"));
         db.TillSessions.Add(TillSession.Open(
             ids.SessionId, ids.TenantId, ids.OutletId, ids.TillId, $"TS-{ids.Suffix}",
             DateOnly.FromDateTime(Now.UtcDateTime), ids.UserId, ids.DeviceId, 25000m, "LKR", null, Now));

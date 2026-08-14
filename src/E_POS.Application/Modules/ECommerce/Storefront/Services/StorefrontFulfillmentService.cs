@@ -111,6 +111,12 @@ public sealed class StorefrontFulfillmentService : IStorefrontFulfillmentService
             });
         }
 
+        // Bookable ASAP time must be a window start (opening + N * pickupWindowMinutes),
+        // not raw now+lead — checkout validation rejects non-aligned times.
+        var earliestBookableAt = dates.Count > 0 && dates[0].Windows.Count > 0
+            ? dates[0].Windows[0].StartAt.ToUniversalTime()
+            : earliestCollectionAt;
+
         return ApplicationResult<StorefrontCollectionOptionsReadModel>.Success(new StorefrontCollectionOptionsReadModel
         {
             OutletId = configuration.OutletId,
@@ -120,7 +126,7 @@ public sealed class StorefrontFulfillmentService : IStorefrontFulfillmentService
             PickupWindowMinutes = configuration.PickupWindowMinutes.Value,
             CutoffTime = configuration.CutoffTime,
             GeneratedAt = generatedAt,
-            EarliestCollectionAt = earliestCollectionAt,
+            EarliestCollectionAt = earliestBookableAt,
             Dates = dates
         });
     }
