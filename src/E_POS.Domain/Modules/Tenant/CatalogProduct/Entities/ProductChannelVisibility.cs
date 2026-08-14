@@ -56,5 +56,23 @@ public class ProductChannelVisibility : AuditableEntity
         UpdatedByTenantUserId = userId;
         UpdatedAt = now;
     }
+
+    public void Update(
+        bool isVisible,
+        bool isOrderable,
+        DateTimeOffset? availableFrom,
+        DateTimeOffset? availableUntil,
+        string status,
+        Guid? userId,
+        DateTimeOffset now)
+    {
+        IsVisible = isVisible;
+        IsOrderable = isOrderable;
+        AvailableFrom = availableFrom;
+        AvailableUntil = availableUntil;
+        Status = status.Trim().ToUpperInvariant();
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
 }
 

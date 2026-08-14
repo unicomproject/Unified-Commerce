@@ -16,6 +16,8 @@ public partial class SeedTenantAdminProductMediaPermissions : Migration
             INSERT INTO permission_definitions (
                 id,
                 permission_code,
+                module_id,
+                feature_id,
                 action_type,
                 description,
                 is_system,
@@ -23,12 +25,35 @@ public partial class SeedTenantAdminProductMediaPermissions : Migration
                 created_at,
                 updated_at
             )
-            VALUES
-                ('77777777-0063-4000-8000-000000000001'::uuid, 'catalog.product_media.manage', 'update', 'Manage product images and media uploads', true, true, now(), now()),
-                ('77777777-0064-4000-8000-000000000001'::uuid, 'catalog.product_channels.manage', 'update', 'Manage product channel visibility', true, true, now(), now()),
-                ('77777777-0065-4000-8000-000000000001'::uuid, 'tenant.product_media.manage', 'update', 'Manage tenant product media', true, true, now(), now())
+            SELECT
+                seed.id,
+                seed.permission_code,
+                product_template.module_id,
+                product_template.feature_id,
+                seed.action_type,
+                seed.description,
+                true,
+                true,
+                now(),
+                now()
+            FROM (
+                VALUES
+                    ('77777777-0063-4000-8000-000000000001'::uuid, 'catalog.product_media.manage', 'update', 'Manage product images and media uploads'),
+                    ('77777777-0064-4000-8000-000000000001'::uuid, 'catalog.product_channels.manage', 'update', 'Manage product channel visibility'),
+                    ('77777777-0065-4000-8000-000000000001'::uuid, 'tenant.product_media.manage', 'update', 'Manage tenant product media')
+            ) AS seed(id, permission_code, action_type, description)
+            CROSS JOIN (
+                SELECT module_id, feature_id
+                FROM permission_definitions
+                WHERE permission_code = 'catalog.products.view'
+                ORDER BY created_at
+                LIMIT 1
+            ) AS product_template
             ON CONFLICT (permission_code) DO UPDATE
-            SET description = EXCLUDED.description,
+            SET module_id = EXCLUDED.module_id,
+                feature_id = EXCLUDED.feature_id,
+                action_type = EXCLUDED.action_type,
+                description = EXCLUDED.description,
                 is_active = true,
                 updated_at = now();
 
@@ -63,7 +88,13 @@ public partial class SeedTenantAdminProductMediaPermissions : Migration
                 ON tenant_roles.role_code = mapping.role_code
             JOIN permission_definitions
                 ON permission_definitions.permission_code = mapping.permission_code
-            ON CONFLICT (tenant_id, role_id, permission_id) DO NOTHING;
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM tenant_role_permissions existing_permission
+                WHERE existing_permission.tenant_id = tenant_roles.tenant_id
+                  AND existing_permission.role_id = tenant_roles.id
+                  AND existing_permission.permission_id = permission_definitions.id
+            );
             """);
     }
 

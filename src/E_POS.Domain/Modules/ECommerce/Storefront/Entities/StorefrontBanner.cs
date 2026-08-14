@@ -68,4 +68,39 @@ public class StorefrontBanner : AuditableEntity
             actionUrl,
             sortOrder,
             status);
-    }}
+    }
+
+    public void Update(
+        string bannerType,
+        string title,
+        string? subtitle,
+        Guid? imageMediaAssetId,
+        string? actionText,
+        string? actionUrl,
+        int sortOrder,
+        string status,
+        DateTimeOffset now)
+    {
+        BannerType = bannerType.Trim().ToUpperInvariant();
+        Title = title.Trim();
+        Subtitle = string.IsNullOrWhiteSpace(subtitle) ? null : subtitle.Trim();
+        ImageMediaAssetId = imageMediaAssetId;
+        ActionText = string.IsNullOrWhiteSpace(actionText) ? null : actionText.Trim();
+        ActionUrl = string.IsNullOrWhiteSpace(actionUrl) ? null : actionUrl.Trim();
+        SortOrder = sortOrder;
+        Status = status.Trim().ToUpperInvariant();
+        UpdatedAt = now;
+    }
+
+    public void SetStatus(string status, DateTimeOffset now)
+    {
+        Status = status.Trim().ToUpperInvariant();
+        UpdatedAt = now;
+    }
+
+    public void Reorder(int sortOrder, DateTimeOffset now)
+    {
+        SortOrder = sortOrder;
+        UpdatedAt = now;
+    }
+}
