@@ -108,6 +108,33 @@ public sealed class PosCheckoutRepositoryTests
         Assert.NotNull(line.AppliedPromotion);
     }
 
+    [Fact]
+    public async Task CalculateSummaryAsync_EchoesClientLineIdOnCalculatedLine()
+    {
+        var tenantId = Guid.NewGuid(); var outletId = Guid.NewGuid(); var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid(); var userId = Guid.NewGuid();
+        var productId = Guid.NewGuid(); var variantId = Guid.NewGuid();
+        var clientLineId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedDeviceContext(dbContext, tenantId, outletId, tillId, deviceId, userId, Now, true);
+        SeedTenantUser(dbContext, tenantId, userId, "Cashier 001");
+        SeedOpenTillSession(dbContext, tenantId, outletId, tillId, deviceId, userId);
+        await SeedDefaultPriceListAsync(dbContext, tenantId, productId, variantId, 2800m);
+        SeedSellableProduct(dbContext, tenantId, productId, variantId);
+        SeedAutomaticPercentageOffer(dbContext, tenantId, productId, 25m, "ACTIVE", Now.AddHours(-1), Now.AddHours(1));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateRepository(dbContext).CalculateSummaryAsync(
+            tenantId, userId, [PaymentPermissions.AcceptCash],
+            new(deviceId, "NewSale", null, [new(variantId, 1, ClientLineId: clientLineId)]),
+            Now, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var line = Assert.Single(result.Summary!.Lines!);
+        Assert.Equal(clientLineId, line.ClientLineId);
+        Assert.Equal(2100, line.EffectiveUnitPrice);
+    }
+
     [Theory]
     [InlineData("INACTIVE", -1, 1)]
     [InlineData("ACTIVE", -2, -1)]
