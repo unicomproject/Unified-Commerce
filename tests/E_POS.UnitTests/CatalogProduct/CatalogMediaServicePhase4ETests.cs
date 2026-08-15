@@ -156,12 +156,88 @@ public sealed class CatalogMediaServicePhase4ETests
         Assert.Single(storage.Uploads);
     }
 
+    [Fact]
+    public async Task UploadBrandLogoAsync_WithJpeg_Succeeds()
+    {
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = CreateBrand(null) };
+        var storage = new FakeMediaObjectStorage();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider());
+        await using var stream = new MemoryStream(CreateOnePixelJpeg());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.UpdatePermission]), BrandId,
+            new MediaUploadFile(stream, "brand.jpg", "image/jpeg", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(storage.Uploads);
+    }
+
+    [Theory]
+    [InlineData("brand.webp", "image/webp")]
+    [InlineData("brand.png", "image/webp")]
+    public async Task UploadBrandLogoAsync_WithWebP_IsRejected(string fileName, string contentType)
+    {
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = CreateBrand(null) };
+        var storage = new FakeMediaObjectStorage();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider());
+        await using var stream = new MemoryStream(CreateOnePixelWebP());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.UpdatePermission]), BrandId,
+            new MediaUploadFile(stream, fileName, contentType, stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("media.unsupported_media_type", result.Error.Code);
+        Assert.Empty(storage.Uploads);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogoAsync_OverTwoMegabytes_IsRejected()
+    {
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = CreateBrand(null) };
+        var storage = new FakeMediaObjectStorage();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider());
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.UpdatePermission]), BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", 2 * 1024 * 1024 + 1), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("media.file_size_exceeded", result.Error.Code);
+        Assert.Empty(storage.Uploads);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogoAsync_WithoutUpdateOrManagePermission_FailsBeforeMutation()
+    {
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = CreateBrand(null) };
+        var storage = new FakeMediaObjectStorage();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider());
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([]), BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("media.permission_denied", result.Error.Code);
+        Assert.Empty(storage.Uploads);
+        Assert.Empty(repository.MediaAssets);
+    }
+
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string> permissions) =>
         new(TenantId, UserId, permissions);
 
     private static byte[] CreateOnePixelPng() =>
         Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
+
+    private static byte[] CreateOnePixelWebP() =>
+        Convert.FromBase64String("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/vuUAAA=");
+
+    private static byte[] CreateOnePixelJpeg() =>
+        Convert.FromBase64String("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EB//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EB//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EB//2Q==");
 
     private static Category CreateCategory(Guid? imageMediaAssetId)
     {

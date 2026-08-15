@@ -8,4 +8,6 @@ public sealed record BrandResponse(
     Guid? LogoMediaAssetId,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+    string? Description = null,
+    int SortOrder = 0);

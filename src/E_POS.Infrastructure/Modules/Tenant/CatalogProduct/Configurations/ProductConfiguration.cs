@@ -155,6 +155,13 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_products_tenant_id_tenants");
 
+        builder.HasOne<Brand>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.BrandId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_products_brand_tenant");
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser>()
             .WithMany()
             .HasForeignKey(x => new { x.TenantId, x.PublishedByTenantUserId })
@@ -180,6 +187,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_products_tenant_id_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.BrandId })
+            .HasDatabaseName("ix_products_tenant_id_brand_id");
 
         builder.ToTable(t => 
         {

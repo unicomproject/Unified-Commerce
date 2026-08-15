@@ -17,6 +17,43 @@ public sealed class BrandCollectionServiceTests
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly DateTimeOffset Now = new(2026, 7, 3, 10, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(149, true)]
+    [InlineData(150, true)]
+    [InlineData(151, false)]
+    public void BrandCreateValidation_EnforcesNameMaximum(int length, bool valid)
+    {
+        var error = new BrandRequestValidator().ValidateCreate(
+            new BrandCreateRequest("CODE", new string('N', length), null, null, null, BrandConstants.ActiveStatus));
+
+        Assert.Equal(valid, error is null);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(255, true)]
+    [InlineData(256, false)]
+    public void BrandCreateValidation_EnforcesOptionalDescriptionMaximum(int? length, bool valid)
+    {
+        var description = length.HasValue ? new string('D', length.Value) : null;
+        var error = new BrandRequestValidator().ValidateCreate(
+            new BrandCreateRequest("CODE", "Name", null, description, null, BrandConstants.ActiveStatus));
+
+        Assert.Equal(valid, error is null);
+    }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(25, true)]
+    [InlineData(-1, false)]
+    public void BrandCreateValidation_RequiresNonnegativeSortOrder(int sortOrder, bool valid)
+    {
+        var error = new BrandRequestValidator().ValidateCreate(
+            new BrandCreateRequest("CODE", "Name", null, null, null, BrandConstants.ActiveStatus, sortOrder));
+
+        Assert.Equal(valid, error is null);
+    }
+
     [Fact]
     public async Task BrandCreateAsync_WithoutCreateOrManagePermission_ReturnsPermissionDenied()
     {
@@ -45,6 +82,20 @@ public sealed class BrandCollectionServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal("ACME", repository.AddedBrand?.BrandCode);
         Assert.Equal(TenantId, repository.AddedBrand?.TenantId);
+    }
+
+    [Fact]
+    public async Task BrandGetByIdAfterMutationAsync_WithUpdateButNoViewPermission_ReturnsDetail()
+    {
+        var brand = Brand.Create(Guid.NewGuid(), TenantId, "ACME", "Acme", "acme", "Detail", null, BrandConstants.ActiveStatus, UserId, Now, 4);
+        var service = new BrandService(new FakeBrandRepository { EditableBrand = brand }, new BrandRequestValidator(), new FakeDateTimeProvider());
+
+        var result = await service.GetByIdAfterMutationAsync(
+            CreateContext([BrandConstants.UpdatePermission]), brand.Id, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Detail", result.Value!.Description);
+        Assert.Equal(4, result.Value.SortOrder);
     }
 
     [Fact]
@@ -186,7 +237,7 @@ public sealed class BrandCollectionServiceTests
         public Task<BrandResponse?> GetByIdAsync(Guid tenantId, Guid brandId, bool includeDeleted, CancellationToken cancellationToken)
         {
             var brand = AddedBrand ?? EditableBrand;
-            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, brand!.BrandCode, brand.BrandName, null, brand.LogoMediaAssetId, brand.Status, brand.CreatedAt, brand.UpdatedAt));
+            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, brand!.BrandCode, brand.BrandName, null, brand.LogoMediaAssetId, brand.Status, brand.CreatedAt, brand.UpdatedAt, brand.Description, brand.SortOrder));
         }
 
         public Task<Brand?> GetEditableAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)

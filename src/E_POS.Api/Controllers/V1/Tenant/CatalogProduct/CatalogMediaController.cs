@@ -281,7 +281,7 @@ public sealed class CatalogMediaController : ControllerBase
             return ToErrorResult(uploadResult.Error);
         }
 
-        var brandResult = await _brandService.GetByIdAsync(context, brandId, cancellationToken);
+        var brandResult = await _brandService.GetByIdAfterMutationAsync(context, brandId, cancellationToken);
         return brandResult.IsSuccess && brandResult.Value is not null
             ? Ok(new { data = brandResult.Value })
             : ToErrorResult(brandResult.Error ?? uploadResult.Error);

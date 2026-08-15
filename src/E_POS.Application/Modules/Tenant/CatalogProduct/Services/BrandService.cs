@@ -62,7 +62,8 @@ public sealed class BrandService : IBrandService
             request.Description,
             request.Status,
             context.UserId,
-            now);
+            now,
+            request.SortOrder);
 
         if (mediaAsset is not null)
         {
@@ -89,6 +90,15 @@ public sealed class BrandService : IBrandService
     public async Task<ApplicationResult<BrandResponse>> GetByIdAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken)
     {
         var accessError = ValidateAccess(context, BrandConstants.ViewPermission);
+        if (accessError is not null) return ApplicationResult<BrandResponse>.Failure(accessError);
+
+        var response = await _repository.GetByIdAsync(context.TenantId, brandId, false, cancellationToken);
+        return response is null ? ApplicationResult<BrandResponse>.Failure(NotFound) : ApplicationResult<BrandResponse>.Success(response);
+    }
+
+    public async Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccess(context, BrandConstants.UpdatePermission);
         if (accessError is not null) return ApplicationResult<BrandResponse>.Failure(accessError);
 
         var response = await _repository.GetByIdAsync(context.TenantId, brandId, false, cancellationToken);
@@ -129,7 +139,8 @@ public sealed class BrandService : IBrandService
             request.Description,
             request.Status,
             context.UserId,
-            now);
+            now,
+            request.SortOrder);
 
         if (shouldClearMedia)
         {

@@ -62,8 +62,13 @@ public sealed class BrandRepository : IBrandRepository
                               JoinedMediaAssetId = mediaAsset == null ? null : (Guid?)mediaAsset.Id,
                               MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
                               MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+                              ProductCount = _dbContext.Products.Count(product =>
+                                  product.TenantId == tenantId &&
+                                  product.BrandId == brand.Id &&
+                                  product.Status != "ARCHIVED"),
                           })
-            .OrderBy(x => x.Brand.BrandCode)
+            .OrderBy(x => x.Brand.SortOrder)
+            .ThenBy(x => x.Brand.BrandCode)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -84,7 +89,8 @@ public sealed class BrandRepository : IBrandRepository
                     hasActiveMedia ? x.JoinedMediaAssetId : null,
                     x.Brand.Status,
                     x.Brand.CreatedAt,
-                    x.Brand.UpdatedAt);
+                    x.Brand.UpdatedAt,
+                    x.ProductCount);
             })
             .ToList();
 
@@ -132,7 +138,9 @@ public sealed class BrandRepository : IBrandRepository
             hasActiveMedia ? row.JoinedMediaAssetId : null,
             row.Brand.Status,
             row.Brand.CreatedAt,
-            row.Brand.UpdatedAt);
+            row.Brand.UpdatedAt,
+            row.Brand.Description,
+            row.Brand.SortOrder);
     }
 
     public Task<Brand?> GetEditableAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)

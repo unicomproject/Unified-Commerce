@@ -16,6 +16,7 @@ namespace E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 public sealed class CatalogMediaService : ICatalogMediaService
 {
     private const long MaxImageFileSizeBytes = 5 * 1024 * 1024;
+    private const long MaxBrandLogoFileSizeBytes = 2 * 1024 * 1024;
     private const string AssetTypeImage = "IMAGE";
     private const string ActiveStatus = "ACTIVE";
 
@@ -761,7 +762,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
         var previousMediaAssetId = brand.LogoMediaAssetId;
 
-        var preparedResult = await PrepareImageAsync(file, cancellationToken);
+        var preparedResult = await PrepareImageAsync(file, cancellationToken, MaxBrandLogoFileSizeBytes, allowWebP: false);
         if (preparedResult.Error is not null)
         {
             return ApplicationResult<MediaAssetUploadResponse>.Failure(preparedResult.Error);
@@ -844,7 +845,9 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
     private async Task<PrepareImageResult> PrepareImageAsync(
         MediaUploadFile file,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long maxFileSizeBytes = MaxImageFileSizeBytes,
+        bool allowWebP = true)
     {
         var fieldErrors = new List<ApplicationFieldError>();
 
@@ -858,27 +861,27 @@ public sealed class CatalogMediaService : ICatalogMediaService
             fieldErrors.Add(new ApplicationFieldError("file", "Image file cannot be empty."));
         }
 
-        if (file.Length > MaxImageFileSizeBytes)
+        if (file.Length > maxFileSizeBytes)
         {
             return PrepareImageResult.Failed(new ApplicationError(
                 "media.file_size_exceeded",
                 "Image file size exceeds the allowed limit.",
-                [new ApplicationFieldError("file", "Image file size exceeds the allowed 5 MB limit.")]));
+                [new ApplicationFieldError("file", $"Image file size exceeds the allowed {maxFileSizeBytes / (1024 * 1024)} MB limit.")]));
         }
 
         var declaredContentType = NormalizeContentType(file.ContentType);
-        if (!string.IsNullOrWhiteSpace(declaredContentType) && declaredContentType != "application/octet-stream" && !IsAllowedMimeType(declaredContentType))
+        if (!string.IsNullOrWhiteSpace(declaredContentType) && declaredContentType != "application/octet-stream" && !IsAllowedMimeType(declaredContentType, allowWebP))
         {
             return PrepareImageResult.Failed(new ApplicationError(
                 "media.unsupported_media_type",
-                "Only JPEG, PNG and WebP images are allowed.",
-                [new ApplicationFieldError("contentType", "Only JPEG, PNG and WebP images are allowed.")]));
+                allowWebP ? "Only JPEG, PNG and WebP images are allowed." : "Only JPEG and PNG images are allowed.",
+                [new ApplicationFieldError("contentType", allowWebP ? "Only JPEG, PNG and WebP images are allowed." : "Only JPEG and PNG images are allowed.")]));
         }
 
         var originalFileName = NormalizeFileName(file.FileName);
         var fileExtension = Path.GetExtension(originalFileName).ToLowerInvariant();
 
-        var memory = new MemoryStream(capacity: (int)Math.Min(file.Length, MaxImageFileSizeBytes));
+        var memory = new MemoryStream(capacity: (int)Math.Min(file.Length, maxFileSizeBytes));
         await file.Content.CopyToAsync(memory, cancellationToken);
         if (memory.Length <= 0)
         {
@@ -888,13 +891,13 @@ public sealed class CatalogMediaService : ICatalogMediaService
             ]));
         }
 
-        if (memory.Length > MaxImageFileSizeBytes)
+        if (memory.Length > maxFileSizeBytes)
         {
             await memory.DisposeAsync();
             return PrepareImageResult.Failed(new ApplicationError(
                 "media.file_size_exceeded",
                 "Image file size exceeds the allowed limit.",
-                [new ApplicationFieldError("file", "Image file size exceeds the allowed 5 MB limit.")]));
+                [new ApplicationFieldError("file", $"Image file size exceeds the allowed {maxFileSizeBytes / (1024 * 1024)} MB limit.")]));
         }
 
         var bytes = memory.ToArray();
@@ -908,21 +911,21 @@ public sealed class CatalogMediaService : ICatalogMediaService
             ]));
         }
 
-        if (!IsAllowedMimeType(mimeType))
+        if (!IsAllowedMimeType(mimeType, allowWebP))
         {
             await memory.DisposeAsync();
             return PrepareImageResult.Failed(new ApplicationError(
                 "media.unsupported_media_type",
-                "Only JPEG, PNG and WebP images are allowed.",
-                [new ApplicationFieldError("contentType", "Only JPEG, PNG and WebP images are allowed.")]));
+                allowWebP ? "Only JPEG, PNG and WebP images are allowed." : "Only JPEG and PNG images are allowed.",
+                [new ApplicationFieldError("contentType", allowWebP ? "Only JPEG, PNG and WebP images are allowed." : "Only JPEG and PNG images are allowed.")]));
         }
 
         // If byte signature auto-detected the true format (e.g. WebP/PNG) or extension is missing/mismatched for auto-probed type, adjust fileExtension
-        if (string.IsNullOrWhiteSpace(fileExtension) || fileExtension == "." || (mimeType != declaredContentType && IsAllowedMimeType(mimeType)))
+        if (string.IsNullOrWhiteSpace(fileExtension) || fileExtension == "." || (mimeType != declaredContentType && IsAllowedMimeType(mimeType, allowWebP)))
         {
             fileExtension = ResolveStorageExtension(mimeType);
         }
-        else if (!IsAllowedExtensionForMimeType(fileExtension, mimeType))
+        else if (!IsAllowedExtensionForMimeType(fileExtension, mimeType, allowWebP))
         {
             await memory.DisposeAsync();
             return PrepareImageResult.Failed(ValidationFailed([
@@ -1105,15 +1108,15 @@ public sealed class CatalogMediaService : ICatalogMediaService
         return string.IsNullOrWhiteSpace(name) ? "upload" : name;
     }
 
-    private static bool IsAllowedMimeType(string mimeType) =>
-        mimeType is "image/jpeg" or "image/png" or "image/webp";
+    private static bool IsAllowedMimeType(string mimeType, bool allowWebP = true) =>
+        mimeType is "image/jpeg" or "image/png" || (allowWebP && mimeType == "image/webp");
 
-    private static bool IsAllowedExtensionForMimeType(string extension, string mimeType) =>
+    private static bool IsAllowedExtensionForMimeType(string extension, string mimeType, bool allowWebP = true) =>
         extension switch
         {
             ".jpg" or ".jpeg" or ".jfif" or ".pjpeg" or ".pjp" => mimeType is "image/jpeg" or "image/pjpeg" or "image/jfif",
             ".png" => mimeType == "image/png",
-            ".webp" => mimeType == "image/webp",
+            ".webp" => allowWebP && mimeType == "image/webp",
             _ => true
         };
 

@@ -159,6 +159,12 @@ public sealed class BrandCollectionControllerTests
             return Task.FromResult(CreateResult);
         }
 
+        public Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken)
+        {
+            Context = context;
+            return Task.FromResult(CreateResult);
+        }
+
         public Task<ApplicationResult<BrandResponse>> UpdateAsync(TenantRequestContext context, Guid brandId, BrandUpdateRequest request, CancellationToken cancellationToken)
         {
             Context = context;

@@ -58,6 +58,11 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
             .HasColumnType("text")
             .IsRequired(false);
 
+        builder.Property(x => x.SortOrder)
+            .HasColumnName("sort_order")
+            .HasDefaultValue(0)
+            .IsRequired();
+
         builder.Property(x => x.LogoMediaAssetId)
             .HasColumnName("logo_media_asset_id")
             .IsRequired(false);
@@ -116,7 +121,14 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
         builder.HasIndex(x => new { x.TenantId, x.LogoMediaAssetId })
             .HasDatabaseName("ix_brands_tenant_id_logo_media_asset_id");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_brands_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')")); 
+        builder.HasIndex(x => new { x.TenantId, x.SortOrder, x.BrandCode })
+            .HasDatabaseName("ix_brands_tenant_id_sort_order_brand_code");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_brands_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+            t.HasCheckConstraint("ck_brands_sort_order", "sort_order >= 0");
+        });
     }
 }
 
