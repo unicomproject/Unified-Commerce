@@ -1,4 +1,5 @@
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.ECommerce.Storefront.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
@@ -65,6 +66,15 @@ public static class TenantAdminBootstrapPermissionCatalog
             ],
             [PlatformTenantFeatureCodes.OnlineStore] =
             [
+                TenantAdminOnlineStorePermissions.View,
+                TenantAdminOnlineStorePermissions.Manage,
+                TenantAdminOnlineStorePermissions.Publish,
+                TenantAdminOnlineStorePermissions.DomainsManage,
+                TenantAdminOnlineStorePermissions.BrandingManage,
+                TenantAdminOnlineStorePermissions.SupportManage,
+                TenantAdminOnlineStorePermissions.FulfillmentManage,
+                TenantAdminOnlineStorePermissions.CatalogManage,
+                TenantAdminOnlineStorePermissions.PoliciesManage,
                 "fulfillment.orders.view",
                 "fulfillment.orders.manage"
             ],
@@ -75,6 +85,7 @@ public static class TenantAdminBootstrapPermissionCatalog
             ],
             [PlatformTenantFeatureCodes.ClickCollect] =
             [
+                TenantAdminOnlineStorePermissions.FulfillmentManage,
                 "fulfillment.orders.view",
                 "fulfillment.orders.manage"
             ],

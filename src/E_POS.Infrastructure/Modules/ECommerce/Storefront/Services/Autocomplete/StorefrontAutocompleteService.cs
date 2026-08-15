@@ -49,7 +49,8 @@ public sealed class StorefrontAutocompleteService : IStorefrontAutocompleteServi
                 IsInStock = true,
                 Rating = 0m,
                 ReviewCount = 0,
-                ShortDescription = string.Empty
+                ShortDescription = string.Empty,
+                Options = []
             })
             .ToList();
 

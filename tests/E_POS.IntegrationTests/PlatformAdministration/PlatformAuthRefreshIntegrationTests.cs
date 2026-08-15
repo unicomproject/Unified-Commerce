@@ -45,7 +45,7 @@ public sealed class PlatformAuthRefreshIntegrationTests
 
         Assert.True(refresh.IsSuccess);
         Assert.NotEqual(login.Value.AccessToken, refresh.Value!.AccessToken);
-        Assert.Equal(44, refresh.Value.Permissions.Count);
+        Assert.Equal(45, refresh.Value.Permissions.Count);
 
         var usedTokenCount = await dbContext.PlatformRefreshTokens.CountAsync(
             x => x.Status == PlatformAuthConstants.UsedTokenStatus);
@@ -125,7 +125,7 @@ public sealed class PlatformAuthRefreshIntegrationTests
             CancellationToken.None);
 
         Assert.True(login.IsSuccess);
-        Assert.Equal(44, login.Value!.Permissions.Count);
+        Assert.Equal(45, login.Value!.Permissions.Count);
     }
 
     [Fact]

@@ -232,7 +232,26 @@ public sealed class PlatformTenantBootstrapHttpPipelineTests
                         tenantId, "Tenant", "TEN-001", "ACTIVE", "Starter"),
                     PlatformSelectedTenantSetupHubStatusEvaluator.Evaluate(
                         new PlatformSelectedTenantSetupHubStatusEvaluator.Input(
-                            true, true, true, 0, 0, 0, 1, 0, false, true, true, true, true, true)))));
+                            true, true, true, 0, 0, 0, 1, 0, false, true, true, true, true, true,
+                            OnlineStoreEntitled: false, OnlineStoreStatus: null, CanManageOnlineStore: false)))));
+
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>> GetOutletOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>.Success([]));
+
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>> GetRoleOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>.Success([]));
+
+        public Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>> GetPermissionOptionsAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>.Success([]));
 
         public Task<ApplicationResult<PlatformTenantBootstrapOutletResponse>> CreateOutletAsync(
             Guid tenantId,
@@ -319,5 +338,28 @@ public sealed class PlatformTenantBootstrapHttpPipelineTests
             Guid importId,
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<byte[]>.Success([]));
+
+        public Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> GetOnlineStoreAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Success(
+                new PlatformTenantBootstrapOnlineStoreResponse(
+                    true, "DRAFT", "MATCH_TENANT", false, false, null)));
+
+        public Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> UpsertOnlineStoreAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            PlatformTenantBootstrapOnlineStoreUpsertRequest request,
+            string idempotencyKey,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Success(
+                new PlatformTenantBootstrapOnlineStoreResponse(
+                    true,
+                    request.StoreStatus,
+                    request.TaxDisplayMode ?? "MATCH_TENANT",
+                    false,
+                    false,
+                    null)));
     }
 }

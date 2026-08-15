@@ -35,6 +35,7 @@ public static class PlatformAdminPermissionsSeedData
         new(Guid.Parse("62000000-0000-0000-0000-000000000042"), PlatformPermissionCodes.TenantsBootstrapUsersManage, "Bootstrap Users", "Add bootstrap tenant users for a selected tenant."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000043"), PlatformPermissionCodes.TenantsBootstrapProductsManage, "Bootstrap Products", "Create bootstrap products for a selected tenant."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000044"), PlatformPermissionCodes.TenantsBootstrapProductsImport, "Bootstrap Product Import", "Import bootstrap products via CSV for a selected tenant."),
+        new(Guid.Parse("62000000-0000-0000-0000-000000000045"), PlatformPermissionCodes.TenantsBootstrapOnlineStoreManage, "Bootstrap Online Store", "Configure initial Online Store bootstrap settings for a selected tenant."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000008"), PlatformPermissionCodes.SubscriptionPlansView, "View Subscription Plans", "View platform subscription plans."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000009"), PlatformPermissionCodes.SubscriptionPlansCreate, "Create Subscription Plans", "Create platform subscription plans."),
         new(Guid.Parse("62000000-0000-0000-0000-000000000010"), PlatformPermissionCodes.SubscriptionPlansEdit, "Edit Subscription Plans", "Edit platform subscription plans."),

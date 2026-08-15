@@ -4551,20 +4551,20 @@ public sealed class PosReturnRepository : IPosReturnRepository
             }
             else
             {
-                query = searchType switch
-                {
-                    "invoice" => query.Where(x =>
+            query = searchType switch
+            {
+                "invoice" => query.Where(x =>
                     x.Receipt.ReceiptNumber.ToLower().Contains(normalizedSearch) ||
                     x.Order.OrderNumber.ToLower().Contains(normalizedSearch)),
-                    "sale" => query.Where(x =>
+                "sale" => query.Where(x =>
                     x.Order.OrderNumber.ToLower().Contains(normalizedSearch)),
-                    "customer" => query.Where(x =>
+                "customer" => query.Where(x =>
                     (x.Order.CustomerNameSnapshot != null &&
                      x.Order.CustomerNameSnapshot.ToLower().Contains(normalizedSearch)) ||
                     (x.Customer != null &&
                      x.Customer.Name.ToLower().Contains(normalizedSearch))),
-                    _ => query
-                };
+                _ => query
+            };
             }
         }
 
@@ -4900,7 +4900,7 @@ public sealed class PosReturnRepository : IPosReturnRepository
                 windowPassed ? "PASSED" : "FAILED",
                 windowPassed ? "INFO" : "ERROR",
                 windowPassed
-                    ? null
+                ? null
                     : "One or more selected items are outside the return window.",
                 false),
             new(

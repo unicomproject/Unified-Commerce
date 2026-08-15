@@ -34,9 +34,9 @@ public sealed class PriceListConfiguration : IEntityTypeConfiguration<PriceList>
         builder.Property(x => x.PriceListName).HasColumnName("price_list_name").HasColumnType("varchar(150)").HasMaxLength(150).IsRequired();
         builder.Property(x => x.PriceListType).HasColumnName("price_list_type").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
         builder.Property(x => x.CurrencyCode).HasColumnName("currency_code").HasColumnType("char(3)").HasMaxLength(3).IsRequired();
-        builder.Property(x => x.PriceIncludesTax).HasColumnName("price_includes_tax").HasDefaultValue(false).IsRequired();
-        builder.Property(x => x.IsDefaultPriceList).HasColumnName("is_default_price_list").HasDefaultValue(false).IsRequired();
-        builder.Property(x => x.Priority).HasColumnName("priority").HasDefaultValue(0).IsRequired();
+        builder.Property(x => x.PriceIncludesTax).HasColumnName("price_includes_tax").IsRequired();
+        builder.Property(x => x.IsDefaultPriceList).HasColumnName("is_default_price_list").IsRequired();
+        builder.Property(x => x.Priority).HasColumnName("priority").IsRequired();
         builder.Property(x => x.ValidFrom).HasColumnName("valid_from").HasColumnType("timestamp with time zone").IsRequired(false);
         builder.Property(x => x.ValidUntil).HasColumnName("valid_until").HasColumnType("timestamp with time zone").IsRequired(false);
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(30)").HasMaxLength(30).IsRequired();

@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
@@ -149,7 +149,8 @@ public abstract class StorefrontCheckoutRepositoryBase
         }
 
         var requestedUtc = requestedCollectionAt.ToUniversalTime();
-        if (requestedUtc < now.ToUniversalTime().AddMinutes(configuration.PreparationLeadMinutes.Value))
+        // Allow a 5-minute grace period for network latency and user think-time
+        if (requestedUtc < now.ToUniversalTime().AddMinutes(configuration.PreparationLeadMinutes.Value - 5))
             return CollectionValidationResult.Failure("storefront_checkout.collection_time_unavailable");
 
         var localNow = TimeZoneInfo.ConvertTime(now, timezone);

@@ -2,11 +2,14 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -91,6 +94,40 @@ public sealed class PlatformTenantBootstrapRepository : IPlatformTenantBootstrap
             customRoleCount,
             tenantUserCount,
             activeOrDraftProductCount);
+    }
+
+    public async Task<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>> ListOutletOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Outlets
+            .AsNoTracking()
+            .Where(outlet =>
+                outlet.TenantId == tenantId &&
+                outlet.Status == OutletConstants.ActiveStatus)
+            .OrderBy(outlet => outlet.OutletName)
+            .Select(outlet => new PlatformTenantBootstrapOutletOptionDto(
+                outlet.Id,
+                outlet.OutletName,
+                outlet.OutletCode,
+                outlet.Status))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>> ListRoleOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.TenantRoles
+            .AsNoTracking()
+            .Where(role => role.TenantId == tenantId && role.IsActive)
+            .OrderBy(role => role.RoleName)
+            .Select(role => new PlatformTenantBootstrapRoleOptionDto(
+                role.Id,
+                role.RoleName,
+                role.RoleCode,
+                role.IsCustom != true))
+            .ToListAsync(cancellationToken);
     }
 
     public Task<bool> OutletBelongsToTenantAsync(
@@ -247,6 +284,79 @@ public sealed class PlatformTenantBootstrapRepository : IPlatformTenantBootstrap
         await _dbContext.PlatformTenantBootstrapIdempotencyRecords.AddAsync(record, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<string?> GetOnlineStoreDefaultsJsonAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return await (
+            from setting in _dbContext.TenantSettings.AsNoTracking()
+            join definition in _dbContext.SettingDefinitions.AsNoTracking()
+                on setting.SettingDefinitionId equals definition.Id
+            where setting.TenantId == tenantId &&
+                  (definition.SettingKey == TenantSettingKeys.OnlineStoreDefaults ||
+                   definition.Id == TenantSettingDefinitionSeed.OnlineStoreDefaultsId)
+            select setting.SettingValue)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task UpsertOnlineStoreDefaultsAsync(
+        Guid tenantId,
+        string defaultsJson,
+        Guid? platformUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var definitionId = await _dbContext.SettingDefinitions
+            .AsNoTracking()
+            .Where(definition =>
+                definition.SettingKey == TenantSettingKeys.OnlineStoreDefaults ||
+                definition.Id == TenantSettingDefinitionSeed.OnlineStoreDefaultsId)
+            .Select(definition => (Guid?)definition.Id)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? TenantSettingDefinitionSeed.OnlineStoreDefaultsId;
+
+        var existing = await _dbContext.TenantSettings
+            .FirstOrDefaultAsync(
+                setting => setting.TenantId == tenantId && setting.SettingDefinitionId == definitionId,
+                cancellationToken);
+
+        if (existing is not null)
+        {
+            existing.UpdateValue(defaultsJson, now);
+        }
+        else
+        {
+            await _dbContext.TenantSettings.AddAsync(
+                TenantSetting.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    definitionId,
+                    defaultsJson,
+                    platformUserId,
+                    now),
+                cancellationToken);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<bool> HasClickCollectCollectionConfiguredAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken) =>
+        (
+            from mapping in _dbContext.FulfillmentMethodOutlets.AsNoTracking()
+            join method in _dbContext.FulfillmentMethods.AsNoTracking()
+                on mapping.FulfillmentMethodId equals method.Id
+            join outlet in _dbContext.Outlets.AsNoTracking()
+                on mapping.OutletId equals outlet.Id
+            where outlet.TenantId == tenantId &&
+                  method.TenantId == tenantId &&
+                  mapping.Status == OutletConstants.ActiveStatus &&
+                  method.Status == OutletConstants.ActiveStatus &&
+                  method.MethodType == OutletConstants.PickupMethodType
+            select mapping.Id)
+            .AnyAsync(cancellationToken);
 
     public async Task<Guid?> ResolveBrandIdByCodeAsync(
         Guid tenantId,

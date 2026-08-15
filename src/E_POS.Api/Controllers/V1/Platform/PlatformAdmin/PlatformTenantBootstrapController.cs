@@ -33,6 +33,45 @@ public sealed class PlatformTenantBootstrapController : ControllerBase
         return ToActionResult(result, "Selected-tenant bootstrap summary loaded successfully.");
     }
 
+    [HttpGet("options/outlets")]
+    [ProducesResponseType(typeof(LegacyApiResponse<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOutletOptions(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError("platform_auth.invalid_session", "Invalid platform session.")));
+        }
+
+        var result = await _bootstrapService.GetOutletOptionsAsync(tenantId, platformUserId, cancellationToken);
+        return ToActionResult(result, "Selected-tenant outlet options loaded successfully.");
+    }
+
+    [HttpGet("options/roles")]
+    [ProducesResponseType(typeof(LegacyApiResponse<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRoleOptions(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError("platform_auth.invalid_session", "Invalid platform session.")));
+        }
+
+        var result = await _bootstrapService.GetRoleOptionsAsync(tenantId, platformUserId, cancellationToken);
+        return ToActionResult(result, "Selected-tenant role options loaded successfully.");
+    }
+
+    [HttpGet("options/permissions")]
+    [ProducesResponseType(typeof(LegacyApiResponse<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPermissionOptions(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError("platform_auth.invalid_session", "Invalid platform session.")));
+        }
+
+        var result = await _bootstrapService.GetPermissionOptionsAsync(tenantId, platformUserId, cancellationToken);
+        return ToActionResult(result, "Selected-tenant permission options loaded successfully.");
+    }
+
     [HttpPost("outlets")]
     [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantBootstrapOutletResponse>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateOutlet(
@@ -274,6 +313,45 @@ public sealed class PlatformTenantBootstrapController : ControllerBase
         }
 
         return File(result.Value!, "text/csv", $"bootstrap-import-{importId:N}-errors.csv");
+    }
+
+    [HttpGet("online-store")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantBootstrapOnlineStoreResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOnlineStore(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError("platform_auth.invalid_session", "Invalid platform session.")));
+        }
+
+        var result = await _bootstrapService.GetOnlineStoreAsync(tenantId, platformUserId, cancellationToken);
+        return ToActionResult(result, "Selected-tenant online store bootstrap loaded successfully.");
+    }
+
+    [HttpPut("online-store")]
+    [ProducesResponseType(typeof(LegacyApiResponse<PlatformTenantBootstrapOnlineStoreResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpsertOnlineStore(
+        Guid tenantId,
+        [FromBody] PlatformTenantBootstrapOnlineStoreUpsertRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId))
+        {
+            return Unauthorized(CreateLegacyError(new ApplicationError("platform_auth.invalid_session", "Invalid platform session.")));
+        }
+
+        if (!TryGetRequiredIdempotencyKey(out var idempotencyKey, out var missingKeyResult))
+        {
+            return missingKeyResult!;
+        }
+
+        var result = await _bootstrapService.UpsertOnlineStoreAsync(
+            tenantId,
+            platformUserId,
+            request,
+            idempotencyKey,
+            cancellationToken);
+        return ToActionResult(result, "Bootstrap online store saved successfully.");
     }
 
     private IActionResult ToActionResult<T>(ApplicationResult<T> result, string successMessage)

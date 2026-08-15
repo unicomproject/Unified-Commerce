@@ -88,6 +88,7 @@ public sealed class PosTillsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CloseTill(
         [FromBody] CloseTillRequest request,
         CancellationToken cancellationToken)
@@ -117,8 +118,8 @@ public sealed class PosTillsController : ControllerBase
         {
             "till_session.not_found" or "till_session.device_not_found" or "till_session.till_not_assigned" or "till_session.till_not_found" or "till_session.not_open" => NotFound(CreateError(error)),
             "till_session.permission_denied" or "till_session.device_not_trusted" or "till_session.till_mismatch" or "till_session.till_inactive" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
-            "till_session.already_open" => Conflict(CreateError(error)),
-            "till_session.mismatch_reason_required" or "till_session.invalid_counted_cash" or "till_session.invalid_expected_cash" => BadRequest(CreateError(error)),
+            "till_session.already_open" or "till_session.already_closed" => Conflict(CreateError(error)),
+            "till_session.mismatch_reason_required" or "till_session.invalid_mismatch_reason" or "till_session.closing_note_too_long" or "till_session.invalid_counted_cash" or "till_session.invalid_expected_cash" => BadRequest(CreateError(error)),
             "till_session.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
         };

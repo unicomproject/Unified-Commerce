@@ -1,4 +1,7 @@
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using Microsoft.EntityFrameworkCore;
+using E_POS.Infrastructure.Persistence;
+using E_POS.Infrastructure.Persistence.Seed;
 
 namespace E_POS.Api.Extensions;
 
@@ -24,6 +27,9 @@ public static class DevelopmentPlatformAdminTestAccountSeedHost
         try
         {
             using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<EPosDbContext>();
+            await db.Database.ExecuteSqlRawAsync(DevelopmentMerchandiseCatalogSeedData.UpSql, cancellationToken);
+            
             var seeder = scope.ServiceProvider.GetRequiredService<IDevelopmentPlatformAdminTestAccountSeeder>();
             await seeder.SeedAsync(cancellationToken);
         }

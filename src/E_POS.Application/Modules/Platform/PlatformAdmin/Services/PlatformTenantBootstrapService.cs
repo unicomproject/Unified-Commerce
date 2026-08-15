@@ -37,6 +37,12 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
     private const string UserCreateOperation = "user_create";
     private const string ProductImportCommitOperation = "products_import_commit";
     private const string ProductCreateOperation = "product_create";
+    private const string OnlineStoreUpsertOperation = "online_store_upsert";
+    private const string StoreStatusDraft = "DRAFT";
+    private const string StoreStatusActive = "ACTIVE";
+    private const string TaxDisplayModeMatchTenant = "MATCH_TENANT";
+    private const string ClickCollectDependencyNotice =
+        "Click & Collect is entitled but collection points are not configured yet. That remains a Tenant Admin task. Online Store readiness can still be saved.";
 
     private static readonly JsonSerializerOptions IdempotencyJsonOptions = new()
     {
@@ -149,6 +155,10 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
             tenantId, PlatformTenantFeatureCodes.TillManagement, now, cancellationToken);
         var productEntitled = await _featureEntitlementEvaluator.IsEnabledAsync(
             tenantId, PlatformTenantFeatureCodes.ProductCatalog, now, cancellationToken);
+        var onlineStoreEntitled = await _featureEntitlementEvaluator.IsEnabledAsync(
+            tenantId, PlatformTenantFeatureCodes.OnlineStore, now, cancellationToken);
+        var onlineStoreDefaults = ParseOnlineStoreDefaults(
+            await _bootstrapRepository.GetOnlineStoreDefaultsJsonAsync(tenantId, cancellationToken));
 
         var modules = PlatformSelectedTenantSetupHubStatusEvaluator.Evaluate(
             new PlatformSelectedTenantSetupHubStatusEvaluator.Input(
@@ -165,7 +175,10 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
                 await _permissionChecker.HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantsBootstrapTillsManage, cancellationToken),
                 await _permissionChecker.HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantsBootstrapRolesManage, cancellationToken),
                 await _permissionChecker.HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantsBootstrapUsersManage, cancellationToken),
-                await _permissionChecker.HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantsBootstrapProductsManage, cancellationToken)));
+                await _permissionChecker.HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantsBootstrapProductsManage, cancellationToken),
+                onlineStoreEntitled,
+                onlineStoreDefaults.StoreStatus,
+                await _permissionChecker.HasPermissionAsync(platformUserId, PlatformPermissionCodes.TenantsBootstrapOnlineStoreManage, cancellationToken)));
 
         return ApplicationResult<PlatformTenantBootstrapSummaryResponse>.Success(
             new PlatformTenantBootstrapSummaryResponse(
@@ -176,6 +189,54 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
                     access.Value.Snapshot.LifecycleStatus,
                     access.Value.Snapshot.PlanName),
                 modules));
+    }
+
+    public async Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>> GetOutletOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        var access = await _accessPolicy.AuthorizeReadAsync(platformUserId, tenantId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>.Failure(access.Error);
+        }
+
+        var items = await _bootstrapRepository.ListOutletOptionsAsync(tenantId, cancellationToken);
+        return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>.Success(items);
+    }
+
+    public async Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>> GetRoleOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        var access = await _accessPolicy.AuthorizeReadAsync(platformUserId, tenantId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>.Failure(access.Error);
+        }
+
+        var items = await _bootstrapRepository.ListRoleOptionsAsync(tenantId, cancellationToken);
+        return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>.Success(items);
+    }
+
+    public async Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>> GetPermissionOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        var access = await _accessPolicy.AuthorizeReadAsync(platformUserId, tenantId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>.Failure(access.Error);
+        }
+
+        var codes = await ListEntitledTenantPermissionCodesAsync(tenantId, cancellationToken);
+        var items = codes
+            .Select(code => new PlatformTenantBootstrapPermissionOptionDto(code))
+            .ToList();
+        return ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>.Success(items);
     }
 
     public async Task<ApplicationResult<PlatformTenantBootstrapOutletResponse>> CreateOutletAsync(
@@ -748,9 +809,10 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
             Status = string.IsNullOrWhiteSpace(request.Status) ? "ACTIVE" : request.Status.Trim().ToUpperInvariant()
         };
 
+        // Platform actor must not be written into tenant_users FK columns (published_by / created_by).
         var created = await _tenantAdminProductRepository.CreateProductAsync(
             tenantId,
-            platformUserId,
+            userId: null,
             mappedRequest,
             unitId.Value,
             now,
@@ -1111,9 +1173,225 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
             Conflict with { Message = "Unable to generate a unique outlet code." });
     }
 
+    public async Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> GetOnlineStoreAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        var access = await _accessPolicy.AuthorizeReadAsync(platformUserId, tenantId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Failure(access.Error);
+        }
+
+        if (!await _permissionChecker.HasPermissionAsync(
+                platformUserId, PlatformPermissionCodes.TenantsBootstrapOnlineStoreManage, cancellationToken))
+        {
+            return ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Failure(
+                PlatformSelectedTenantAccessPolicy.AccessDenied);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        if (!await _featureEntitlementEvaluator.IsEnabledAsync(
+                tenantId, PlatformTenantFeatureCodes.OnlineStore, now, cancellationToken))
+        {
+            return ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Failure(NotEntitled);
+        }
+
+        return ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Success(
+            await BuildOnlineStoreResponseAsync(tenantId, entitled: true, cancellationToken));
+    }
+
+    public async Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> UpsertOnlineStoreAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        PlatformTenantBootstrapOnlineStoreUpsertRequest request,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var requestHash = HashRequest(request);
+        var replay = await TryReplayOrConflictAsync<PlatformTenantBootstrapOnlineStoreResponse>(
+            tenantId, OnlineStoreUpsertOperation, idempotencyKey, requestHash, cancellationToken);
+        if (replay is not null)
+        {
+            return replay;
+        }
+
+        var access = await _accessPolicy.AuthorizeMutationAsync(
+            platformUserId, tenantId, PlatformPermissionCodes.TenantsBootstrapOnlineStoreManage, cancellationToken);
+        if (access.IsFailure)
+        {
+            return ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Failure(access.Error);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        if (!await _featureEntitlementEvaluator.IsEnabledAsync(
+                tenantId, PlatformTenantFeatureCodes.OnlineStore, now, cancellationToken))
+        {
+            return ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Failure(NotEntitled);
+        }
+
+        var validationError = ValidateOnlineStoreUpsertRequest(request);
+        if (validationError is not null)
+        {
+            return ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Failure(validationError);
+        }
+
+        var storeStatus = request.StoreStatus.Trim();
+        var taxDisplayMode = string.IsNullOrWhiteSpace(request.TaxDisplayMode)
+            ? TaxDisplayModeMatchTenant
+            : request.TaxDisplayMode.Trim();
+
+        var defaultsJson = JsonSerializer.Serialize(
+            new OnlineStoreDefaultsPayload(storeStatus, taxDisplayMode),
+            IdempotencyJsonOptions);
+
+        await _bootstrapRepository.UpsertOnlineStoreDefaultsAsync(
+            tenantId,
+            defaultsJson,
+            platformUserId,
+            now,
+            cancellationToken);
+
+        var response = await BuildOnlineStoreResponseAsync(tenantId, entitled: true, cancellationToken);
+
+        await _tenantRepository.AddAuditLogAsync(
+            tenantId,
+            platformUserId,
+            "platform.tenant_bootstrap.online_store_configured",
+            $"Bootstrap online store configured with status '{storeStatus}'.",
+            null,
+            now,
+            "OnlineStoreSettings",
+            null,
+            before: null,
+            after: response,
+            _correlationAccessor.CorrelationId,
+            cancellationToken);
+
+        await SaveIdempotencyAsync(
+            tenantId,
+            OnlineStoreUpsertOperation,
+            idempotencyKey,
+            requestHash,
+            response,
+            now,
+            cancellationToken);
+
+        return ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>.Success(response);
+    }
+
+    private async Task<PlatformTenantBootstrapOnlineStoreResponse> BuildOnlineStoreResponseAsync(
+        Guid tenantId,
+        bool entitled,
+        CancellationToken cancellationToken)
+    {
+        var now = _dateTimeProvider.UtcNow;
+        var defaults = ParseOnlineStoreDefaults(
+            await _bootstrapRepository.GetOnlineStoreDefaultsJsonAsync(tenantId, cancellationToken));
+        var clickCollectEntitled = await _featureEntitlementEvaluator.IsEnabledAsync(
+            tenantId, PlatformTenantFeatureCodes.ClickCollect, now, cancellationToken);
+        var clickCollectConfigured = clickCollectEntitled &&
+            await _bootstrapRepository.HasClickCollectCollectionConfiguredAsync(tenantId, cancellationToken);
+        var dependencyNotice = clickCollectEntitled && !clickCollectConfigured
+            ? ClickCollectDependencyNotice
+            : null;
+
+        return new PlatformTenantBootstrapOnlineStoreResponse(
+            entitled,
+            defaults.StoreStatus,
+            defaults.TaxDisplayMode,
+            clickCollectEntitled,
+            clickCollectConfigured,
+            dependencyNotice);
+    }
+
+    private static ApplicationError? ValidateOnlineStoreUpsertRequest(PlatformTenantBootstrapOnlineStoreUpsertRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.StoreStatus) ||
+            (!string.Equals(request.StoreStatus.Trim(), StoreStatusDraft, StringComparison.Ordinal) &&
+             !string.Equals(request.StoreStatus.Trim(), StoreStatusActive, StringComparison.Ordinal)))
+        {
+            return ValidationFailed with
+            {
+                Message = "Store status must be DRAFT or ACTIVE.",
+                FieldErrors =
+                [
+                    new ApplicationFieldError("storeStatus", "Store status must be DRAFT or ACTIVE.")
+                ]
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.TaxDisplayMode) &&
+            !string.Equals(request.TaxDisplayMode.Trim(), TaxDisplayModeMatchTenant, StringComparison.Ordinal))
+        {
+            return ValidationFailed with
+            {
+                Message = "Tax display mode must be MATCH_TENANT.",
+                FieldErrors =
+                [
+                    new ApplicationFieldError("taxDisplayMode", "Tax display mode must be MATCH_TENANT.")
+                ]
+            };
+        }
+
+        return null;
+    }
+
+    private static OnlineStoreDefaultsPayload ParseOnlineStoreDefaults(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new OnlineStoreDefaultsPayload(StoreStatusDraft, TaxDisplayModeMatchTenant);
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<OnlineStoreDefaultsPayload>(json, IdempotencyJsonOptions);
+            if (parsed is null)
+            {
+                return new OnlineStoreDefaultsPayload(StoreStatusDraft, TaxDisplayModeMatchTenant);
+            }
+
+            var storeStatus = string.Equals(parsed.StoreStatus, StoreStatusActive, StringComparison.Ordinal)
+                ? StoreStatusActive
+                : StoreStatusDraft;
+            var taxDisplayMode = string.IsNullOrWhiteSpace(parsed.TaxDisplayMode)
+                ? TaxDisplayModeMatchTenant
+                : parsed.TaxDisplayMode;
+
+            return new OnlineStoreDefaultsPayload(storeStatus, taxDisplayMode);
+        }
+        catch (JsonException)
+        {
+            return new OnlineStoreDefaultsPayload(StoreStatusDraft, TaxDisplayModeMatchTenant);
+        }
+    }
+
+    private sealed record OnlineStoreDefaultsPayload(string StoreStatus, string TaxDisplayMode);
+
     private async Task<IReadOnlyList<string>> ResolveEntitledTenantPermissionCodesAsync(
         Guid tenantId,
         IReadOnlyList<string> requestedPermissionCodes,
+        CancellationToken cancellationToken)
+    {
+        var allowed = await BuildEntitledTenantPermissionCodeSetAsync(tenantId, cancellationToken);
+
+        return requestedPermissionCodes
+            .Where(code => allowed.Contains(code))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<string>> ListEntitledTenantPermissionCodesAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var allowed = await BuildEntitledTenantPermissionCodeSetAsync(tenantId, cancellationToken);
+        return allowed.OrderBy(code => code, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private async Task<HashSet<string>> BuildEntitledTenantPermissionCodeSetAsync(
+        Guid tenantId,
         CancellationToken cancellationToken)
     {
         var now = _dateTimeProvider.UtcNow;
@@ -1129,10 +1407,7 @@ public sealed class PlatformTenantBootstrapService : IPlatformTenantBootstrapSer
         var plan = TenantAdminBootstrapPermissionCatalog.Resolve(effectiveFeatures);
         var allowed = new HashSet<string>(plan.PermissionCodes, StringComparer.OrdinalIgnoreCase);
         allowed.UnionWith(TenantAdminBootstrapPermissionCatalog.BasePermissionCodes);
-
-        return requestedPermissionCodes
-            .Where(code => allowed.Contains(code))
-            .ToList();
+        return allowed;
     }
 
     private static readonly string[] BootstrapFeatureCodes =
