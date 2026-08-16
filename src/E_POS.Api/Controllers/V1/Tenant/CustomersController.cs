@@ -1,7 +1,7 @@
 using E_POS.Api.Common;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.ECommerce.Customer.Contracts;
-using E_POS.Application.Modules.ECommerce.Customer.Dtos;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

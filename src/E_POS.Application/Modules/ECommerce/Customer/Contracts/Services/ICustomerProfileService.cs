@@ -1,7 +1,7 @@
-﻿using E_POS.Application.Common.Models;
+using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 
-namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+namespace E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 
 public interface ICustomerProfileService
 {

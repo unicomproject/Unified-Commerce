@@ -6,7 +6,7 @@ using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace E_POS.Api.Controllers.V1.ECommerce.CustomerAuth;
+namespace E_POS.Api.Controllers.V1.ECommerce.Customer;
 
 [ApiController]
 [Route("api/v1/ecommerce/storefront/customer/addresses")]

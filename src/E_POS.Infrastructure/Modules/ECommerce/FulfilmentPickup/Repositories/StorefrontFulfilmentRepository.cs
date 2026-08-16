@@ -1,5 +1,5 @@
 using System.Data;
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
@@ -7,9 +7,9 @@ using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
+namespace E_POS.Infrastructure.Modules.ECommerce.FulfilmentPickup.Repositories;
 
-public sealed class StorefrontFulfillmentRepository : IStorefrontFulfillmentRepository
+public sealed class StorefrontFulfilmentRepository : IStorefrontFulfilmentRepository
 {
     private static readonly string[] RequiredCollectionFeatures =
     [
@@ -19,7 +19,7 @@ public sealed class StorefrontFulfillmentRepository : IStorefrontFulfillmentRepo
 
     private readonly EPosDbContext _dbContext;
 
-    public StorefrontFulfillmentRepository(EPosDbContext dbContext)
+    public StorefrontFulfilmentRepository(EPosDbContext dbContext)
     {
         _dbContext = dbContext;
     }

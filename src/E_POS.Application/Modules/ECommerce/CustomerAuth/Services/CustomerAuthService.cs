@@ -1,7 +1,8 @@
-﻿using System.Net;
+using System.Net;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 
 namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Services;

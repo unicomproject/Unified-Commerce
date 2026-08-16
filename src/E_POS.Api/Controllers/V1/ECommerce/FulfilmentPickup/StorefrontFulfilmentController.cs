@@ -1,15 +1,15 @@
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
-namespace E_POS.Api.Controllers.V1.ECommerce.Storefront;
+namespace E_POS.Api.Controllers.V1.ECommerce.FulfilmentPickup;
 
 [ApiController]
 [Route("api/v1/ecommerce/storefront/fulfillment")]
-public class StorefrontFulfillmentController : ControllerBase
+public class StorefrontFulfilmentController : ControllerBase
 {
-    private readonly IStorefrontFulfillmentService _storefrontFulfillmentService;
+    private readonly IStorefrontFulfilmentService _storefrontFulfillmentService;
 
-    public StorefrontFulfillmentController(IStorefrontFulfillmentService storefrontFulfillmentService)
+    public StorefrontFulfilmentController(IStorefrontFulfilmentService storefrontFulfillmentService)
     {
         _storefrontFulfillmentService = storefrontFulfillmentService;
     }

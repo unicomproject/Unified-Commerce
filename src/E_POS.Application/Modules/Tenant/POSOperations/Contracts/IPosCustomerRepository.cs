@@ -1,7 +1,7 @@
-using E_POS.Application.Modules.ECommerce.Customer.Dtos;
+using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 
-namespace E_POS.Application.Modules.ECommerce.Customer.Contracts;
+namespace E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 
 public interface IPosCustomerRepository
 {

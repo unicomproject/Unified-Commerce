@@ -1,11 +1,13 @@
-﻿using System.Net;
+using System.Net;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Email;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
+using E_POS.Application.Modules.ECommerce.Customer.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services.Support;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
@@ -751,3 +753,5 @@ public sealed class CustomerAuthServiceTests
         public DateTimeOffset UtcNow => Now;
     }
 }
+
+

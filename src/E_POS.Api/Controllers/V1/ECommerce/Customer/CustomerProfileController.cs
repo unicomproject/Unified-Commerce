@@ -1,13 +1,14 @@
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using System.Security.Claims;
 using E_POS.Api.Extensions;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace E_POS.Api.Controllers.V1.ECommerce.CustomerAuth;
+namespace E_POS.Api.Controllers.V1.ECommerce.Customer;
 
 [ApiController]
 [Authorize(Policy = "CustomerOnly")]
@@ -63,3 +64,4 @@ public sealed class CustomerProfileController : CustomerControllerBase
         return BadRequest(CreateError(result.Error));
     }
 }
+

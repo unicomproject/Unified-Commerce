@@ -1,6 +1,6 @@
-﻿using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
+using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 
-namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+namespace E_POS.Application.Modules.ECommerce.Customer.Contracts.Interfaces;
 
 public interface ICustomerProfileRepository
 {

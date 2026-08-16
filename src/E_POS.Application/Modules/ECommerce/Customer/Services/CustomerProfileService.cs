@@ -1,12 +1,12 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Mappers;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services.Support;
 
-namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
+namespace E_POS.Application.Modules.ECommerce.Customer.Services;
 
 public sealed class CustomerProfileService : ICustomerProfileService
 {

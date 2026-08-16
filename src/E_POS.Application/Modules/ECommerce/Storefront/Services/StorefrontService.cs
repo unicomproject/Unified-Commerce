@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Services;
@@ -9,14 +10,14 @@ public sealed class StorefrontService : IStorefrontService
     private readonly IStorefrontBannerService _bannerService;
     private readonly IStorefrontCategoryService _categoryService;
     private readonly IStorefrontProductService _productService;
-    private readonly IStorefrontFulfillmentService _fulfillmentService;
+    private readonly IStorefrontFulfilmentService _fulfillmentService;
     private readonly IStorefrontTenantService _tenantService;
 
     public StorefrontService(
         IStorefrontBannerService bannerService,
         IStorefrontCategoryService categoryService,
         IStorefrontProductService productService,
-        IStorefrontFulfillmentService fulfillmentService,
+        IStorefrontFulfilmentService fulfillmentService,
         IStorefrontTenantService tenantService)
     {
         _bannerService = bannerService;

@@ -1,9 +1,10 @@
-﻿using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Interfaces;
 using E_POS.Infrastructure.Persistence;
+using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Repositories;
 using Microsoft.EntityFrameworkCore;
 using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 
-namespace E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Repositories;
+namespace E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
 
 public sealed class CustomerProfileRepository : CustomerAuthRepositoryBase, ICustomerProfileRepository
 {
