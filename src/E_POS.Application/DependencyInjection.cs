@@ -133,6 +133,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminTillService, TenantAdminTillService>();
         services.AddScoped<ITenantAdminHardwareService, TenantAdminHardwareService>();
         services.AddScoped<ITenantAdminUserService, TenantAdminUserService>();
+        services.AddScoped<ITenantAdminRoleService, TenantAdminRoleService>();
         services.AddScoped<ITillService, TillService>();
         services.AddScoped<IPosDeviceService, PosDeviceService>();
         services.AddScoped<ITillDeviceAssignmentService, TillDeviceAssignmentService>();

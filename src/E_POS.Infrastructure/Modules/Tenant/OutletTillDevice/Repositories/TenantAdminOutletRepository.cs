@@ -3,6 +3,7 @@ using E_POS.Application.Modules.Tenant.OutletTillDevice.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Options;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Infrastructure.Persistence;
@@ -20,15 +21,18 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
     private readonly EPosDbContext _dbContext;
     private readonly IOptionsSnapshot<TillMonitoringOptions> _options;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IMediaReadUrlResolver _mediaReadUrlResolver;
 
     public TenantAdminOutletRepository(
         EPosDbContext dbContext,
         IOptionsSnapshot<TillMonitoringOptions> options,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IMediaReadUrlResolver mediaReadUrlResolver)
     {
         _dbContext = dbContext;
         _options = options;
         _dateTimeProvider = dateTimeProvider;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<TenantAdminOutletListResponse> ListAsync(
@@ -55,6 +59,14 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
                 ImageUrl = _dbContext.MediaAssets
                     .Where(media => media.TenantId == tenantId && media.Id == outlet.PrimaryImageMediaAssetId)
                     .Select(media => media.PublicUrl)
+                    .FirstOrDefault(),
+                ImageStorageKey = _dbContext.MediaAssets
+                    .Where(media => media.TenantId == tenantId && media.Id == outlet.PrimaryImageMediaAssetId)
+                    .Select(media => media.StorageKey)
+                    .FirstOrDefault(),
+                ImageContainerName = _dbContext.MediaAssets
+                    .Where(media => media.TenantId == tenantId && media.Id == outlet.PrimaryImageMediaAssetId)
+                    .Select(media => media.ContainerName)
                     .FirstOrDefault(),
                 ManagerId = _dbContext.OutletUserRoles
                     .Where(assignment => assignment.TenantId == tenantId && assignment.OutletId == outlet.Id && assignment.IsPrimaryManager && assignment.RevokedAt == null)
@@ -125,14 +137,16 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
         var avatarMediaIds = managers.Where(m => m.ProfileImageUrl.HasValue).Select(m => m.ProfileImageUrl!.Value).Distinct().ToList();
         var avatars = await _dbContext.MediaAssets.AsNoTracking()
              .Where(m => avatarMediaIds.Contains(m.Id))
-             .Select(m => new { m.Id, m.PublicUrl })
+             .Select(m => new { m.Id, m.PublicUrl, m.StorageKey, m.ContainerName })
              .ToListAsync(cancellationToken);
 
         var responseRows = pageRows.Select(row => 
         {
             var manager = row.ManagerId.HasValue ? managers.FirstOrDefault(m => m.Id == row.ManagerId.Value) : null;
-            var avatarUrl = manager?.ProfileImageUrl.HasValue == true ? avatars.FirstOrDefault(a => a.Id == manager.ProfileImageUrl.Value)?.PublicUrl : null;
-            return MapListRow(row, manager?.Name, avatarUrl);
+            var avatar = manager?.ProfileImageUrl.HasValue == true ? avatars.FirstOrDefault(a => a.Id == manager.ProfileImageUrl.Value) : null;
+            row.ImageUrl = _mediaReadUrlResolver.ResolveReadUrl(row.ImageContainerName, row.ImageStorageKey, row.ImageUrl);
+            var resolvedAvatarUrl = _mediaReadUrlResolver.ResolveReadUrl(avatar?.ContainerName, avatar?.StorageKey, avatar?.PublicUrl);
+            return MapListRow(row, manager?.Name, resolvedAvatarUrl);
         }).ToList();
 
         return new TenantAdminOutletListResponse(
@@ -1080,6 +1094,8 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
         public string Type { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string? ImageUrl { get; set; }
+        public string? ImageStorageKey { get; set; }
+        public string? ImageContainerName { get; set; }
         public Guid? ManagerId { get; set; }
         public string? ManagerName { get; set; }
         public string? ManagerAvatarUrl { get; set; }

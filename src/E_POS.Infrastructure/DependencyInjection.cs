@@ -232,6 +232,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminHardwareRepository, TenantAdminHardwareRepository>();
         services.AddScoped<ITenantAdminHardwareAuditLogger, TenantAdminHardwareAuditLogger>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
+        services.AddScoped<ITenantAdminRoleRepository, TenantAdminRoleRepository>();
         services.AddScoped<ITenantUserStaffCodeService, TenantUserStaffCodeService>();
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();

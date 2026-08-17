@@ -51,4 +51,25 @@ public class TenantRole : AuditableEntity
         UpdatedByTenantUserId = updatedBy;
         UpdatedAt = now;
     }
+
+    public void Update(
+        string roleName,
+        string roleCode,
+        string? roleDescription,
+        Guid updatedBy,
+        DateTimeOffset now)
+    {
+        RoleName = roleName.Trim();
+        RoleCode = roleCode.Trim();
+        RoleDescription = string.IsNullOrWhiteSpace(roleDescription) ? null : roleDescription.Trim();
+        UpdatedByTenantUserId = updatedBy;
+        UpdatedAt = now;
+    }
+
+    public void SetActive(bool isActive, Guid updatedBy, DateTimeOffset now)
+    {
+        IsActive = isActive;
+        UpdatedByTenantUserId = updatedBy;
+        UpdatedAt = now;
+    }
 }

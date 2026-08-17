@@ -440,7 +440,7 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
 
     public async Task<ApplicationResult<OnlineStoreClickCollectResponse>> GetClickCollectAsync(TenantRequestContext context, CancellationToken cancellationToken)
     {
-        var access = await RequireAsync<OnlineStoreClickCollectResponse>(context, TenantAdminOnlineStorePermissions.View, PlatformTenantFeatureCodes.ClickCollect, cancellationToken);
+        var access = await RequireAsync<OnlineStoreClickCollectResponse>(context, TenantAdminOnlineStorePermissions.View, PlatformTenantFeatureCodes.ClickCollect, cancellationToken, TenantAdminOnlineStorePermissions.FulfillmentManage);
         if (access is not null) return access;
         var outlets = await BuildCollectionOutletsAsync(context.TenantId, cancellationToken);
         return ApplicationResult<OnlineStoreClickCollectResponse>.Success(new OnlineStoreClickCollectResponse(outlets.Any(x => x.Status == Active), outlets.Count, outlets));
@@ -463,7 +463,7 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
 
     public async Task<ApplicationResult<IReadOnlyList<OnlineStoreCollectionOutletDto>>> ListCollectionOutletsAsync(TenantRequestContext context, CancellationToken cancellationToken)
     {
-        var access = await RequireAsync<IReadOnlyList<OnlineStoreCollectionOutletDto>>(context, TenantAdminOnlineStorePermissions.View, PlatformTenantFeatureCodes.ClickCollect, cancellationToken);
+        var access = await RequireAsync<IReadOnlyList<OnlineStoreCollectionOutletDto>>(context, TenantAdminOnlineStorePermissions.View, PlatformTenantFeatureCodes.ClickCollect, cancellationToken, TenantAdminOnlineStorePermissions.FulfillmentManage);
         if (access is not null) return access;
         return ApplicationResult<IReadOnlyList<OnlineStoreCollectionOutletDto>>.Success(await BuildCollectionOutletsAsync(context.TenantId, cancellationToken));
     }
@@ -868,9 +868,10 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         foreach (var primary in primaries) primary.SetPrimary(false, null, now);
     }
 
-    private async Task<ApplicationResult<T>?> RequireAsync<T>(TenantRequestContext context, string permission, string featureCode, CancellationToken cancellationToken)
+    private async Task<ApplicationResult<T>?> RequireAsync<T>(TenantRequestContext context, string permission, string featureCode, CancellationToken cancellationToken, string? fallbackPermission = null)
     {
-        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty || !context.HasPermission(permission))
+        var hasPermission = context.HasPermission(permission) || (fallbackPermission is not null && context.HasPermission(fallbackPermission));
+        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty || !hasPermission)
             return ApplicationResult<T>.Failure(new ApplicationError("online_store.permission_denied", "Permission denied."));
         if (!await _entitlements.IsEnabledAsync(context.TenantId, featureCode, _clock.UtcNow, cancellationToken))
             return ApplicationResult<T>.Failure(new ApplicationError("online_store.entitlement_denied", "Feature entitlement is not enabled."));
