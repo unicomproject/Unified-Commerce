@@ -40,6 +40,9 @@ internal static class CustomerAuthErrors
     public static readonly ApplicationError InvalidGoogleToken =
         new("customer_auth.invalid_google_token", "Invalid Google sign-in token.");
 
+    public static readonly ApplicationError GoogleVerificationUnavailable =
+        new("customer_auth.google_verification_unavailable", "Google sign-in could not be verified in time. Please try again.");
+
     public static ApplicationError ValidationFailed(string message) =>
         new("customer_auth.validation_failed", message);
 

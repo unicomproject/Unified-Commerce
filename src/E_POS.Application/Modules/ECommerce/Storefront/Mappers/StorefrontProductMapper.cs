@@ -9,6 +9,7 @@ public static class StorefrontProductMapper
         Product product,
         ProductRatingSummary? rating,
         decimal? sellingPrice,
+        decimal? originalPrice,
         string currencyCode,
         string? primaryImageUrl)
     {
@@ -18,6 +19,7 @@ public static class StorefrontProductMapper
             Name = product.ProductName,
             Slug = product.ProductSlug,
             Price = sellingPrice ?? 0m,
+            OriginalPrice = originalPrice,
             CurrencyCode = currencyCode,
             ImageUrl = primaryImageUrl ?? string.Empty,
             Rating = rating?.AverageRating ?? 0m,
@@ -26,14 +28,15 @@ public static class StorefrontProductMapper
     }
 
     public static IEnumerable<StorefrontProductReadModel> ToBestSellerReadModels(
-        this IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)> products)
+        this IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, decimal? OriginalPrice, string CurrencyCode, string? PrimaryImageUrl)> products)
     {
-        return products.Select(x => ToBestSellerReadModel(x.Product, x.Rating, x.SellingPrice, x.CurrencyCode, x.PrimaryImageUrl));
+        return products.Select(x => ToBestSellerReadModel(x.Product, x.Rating, x.SellingPrice, x.OriginalPrice, x.CurrencyCode, x.PrimaryImageUrl));
     }
 
     public static StorefrontProductListReadModel ToListReadModel(
         Product product,
         decimal? sellingPrice,
+        decimal? originalPrice,
         string? primaryImageUrl,
         decimal averageRating,
         int reviewCount,
@@ -48,6 +51,7 @@ public static class StorefrontProductMapper
             Slug = product.ProductSlug,
             ShortDescription = product.ShortDescription ?? string.Empty,
             Price = sellingPrice ?? 0m,
+            OriginalPrice = originalPrice,
             CurrencyCode = currencyCode,
             ImageUrl = primaryImageUrl ?? string.Empty,
             Rating = averageRating,
@@ -92,6 +96,7 @@ public static class StorefrontProductMapper
         ProductVariant variant,
         IDictionary<string, string> optionValues,
         decimal price,
+        decimal? originalPrice,
         bool isInStock,
         string currencyCode)
     {
@@ -102,6 +107,7 @@ public static class StorefrontProductMapper
             VariantName = variant.VariantName,
             OptionValues = optionValues,
             Price = price,
+            OriginalPrice = originalPrice,
             CurrencyCode = currencyCode,
             IsDefault = variant.IsDefaultVariant,
             IsInStock = isInStock
@@ -111,6 +117,7 @@ public static class StorefrontProductMapper
     public static StorefrontProductDetailReadModel ToDetailReadModel(
         Product product,
         decimal price,
+        decimal? originalPrice,
         string currencyCode,
         ProductRatingSummary? rating,
         bool isInStock,
@@ -134,6 +141,7 @@ public static class StorefrontProductMapper
             ShortDescription = product.ShortDescription ?? string.Empty,
             LongDescription = product.LongDescription ?? string.Empty,
             Price = price,
+            OriginalPrice = originalPrice,
             CurrencyCode = currencyCode,
             Rating = averageRating,
             ReviewCount = reviewCount,

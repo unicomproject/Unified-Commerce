@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
@@ -52,7 +52,8 @@ public sealed class StorefrontProductDetailRepository : StorefrontProductReposit
         var isInStock = variantModels.Count > 0
             ? variantModels.Any(x => x.IsInStock)
             : !inventoryRows.Any() || inventoryRows.Sum(x => x.AvailableQuantity) > 0m;
-        var detailPrice = productPrice ?? variantModels.Select(x => (decimal?)x.Price).FirstOrDefault() ?? 0m;
+        var detailPrice = productPrice?.SellingPrice ?? variantModels.Select(x => (decimal?)x.Price).FirstOrDefault() ?? 0m;
+        var detailOriginalPrice = productPrice?.OriginalPrice ?? variantModels.Select(x => x.OriginalPrice).FirstOrDefault();
 
         var categoryQuery = await (
             from pc in DbContext.Set<ProductCategory>().AsNoTracking()
@@ -83,6 +84,7 @@ public sealed class StorefrontProductDetailRepository : StorefrontProductReposit
         return StorefrontProductMapper.ToDetailReadModel(
             product,
             detailPrice,
+            detailOriginalPrice,
             currencyCode,
             rating,
             isInStock,

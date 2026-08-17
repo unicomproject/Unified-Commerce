@@ -68,9 +68,7 @@ using E_POS.Infrastructure.Modules.Tenant.PricingTax.Repositories;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Discount.Repositories;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
-using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
-using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
@@ -111,7 +109,7 @@ public static class DependencyInjection
         services.Configure<InvitationDeliverySecretOptions>(configuration.GetSection(InvitationDeliverySecretOptions.SectionName));
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
-        services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
+        services.Configure<E_POS.Infrastructure.Modules.Shared.Media.Options.AzureBlobStorageOptions>(configuration.GetSection(E_POS.Infrastructure.Modules.Shared.Media.Options.AzureBlobStorageOptions.SectionName));
         services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));

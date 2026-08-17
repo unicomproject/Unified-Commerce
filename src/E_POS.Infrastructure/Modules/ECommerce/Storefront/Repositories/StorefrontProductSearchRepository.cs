@@ -167,7 +167,7 @@ public sealed class StorefrontProductSearchRepository : StorefrontProductReposit
         var productPage = pagedProducts.Select(product =>
         {
             ratingsByProduct.TryGetValue(product.Id, out var rating);
-            pricesByProduct.TryGetValue(product.Id, out var sellingPrice);
+            var prices = pricesByProduct.TryGetValue(product.Id, out var p) ? p : (null, null);
             imagesByProduct.TryGetValue(product.Id, out var primaryImageUrl);
             var hasInventory = inventoryByProduct.TryGetValue(product.Id, out var availableQuantity);
             var averageRating = rating?.AverageRating ?? 0m;
@@ -177,7 +177,8 @@ public sealed class StorefrontProductSearchRepository : StorefrontProductReposit
 
             return StorefrontProductMapper.ToListReadModel(
                 product,
-                sellingPrice,
+                prices.SellingPrice,
+                prices.OriginalPrice,
                 primaryImageUrl,
                 averageRating,
                 reviewCount,

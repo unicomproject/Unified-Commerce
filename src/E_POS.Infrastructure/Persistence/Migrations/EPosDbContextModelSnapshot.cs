@@ -1067,6 +1067,15 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("locked_until");
 
+                    b.Property<DateTimeOffset?>("OtpExpiryUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("otp_expiry_utc");
+
+                    b.Property<string>("OtpHash")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("otp_hash");
+
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")

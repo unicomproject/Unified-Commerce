@@ -46,6 +46,7 @@ public sealed class CurrentStockController : InventoryBaseController
         var result = await _currentStockService.ExportCurrentStockAsync(context, query, cancellationToken);
         if (!result.IsSuccess) return ToActionResult(result);
         
+        if (result.Value == null) return NotFound();
         return File(result.Value, "text/csv", $"current_stock_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
     }
 
