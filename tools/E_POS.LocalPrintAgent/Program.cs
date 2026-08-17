@@ -12,11 +12,19 @@ using E_POS.LocalPrintAgent.Validation;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseContentRoot(AppContext.BaseDirectory);
 builder.Host.UseWindowsService(options => options.ServiceName = "E_POS.LocalPrintAgent");
 
 var startupOptions = builder.Configuration
     .GetSection(PrintAgentOptions.SectionName)
     .Get<PrintAgentOptions>() ?? new PrintAgentOptions();
+if (!LocalApiKeyPolicy.IsAcceptable(startupOptions.LocalApiKey, out var keyReason))
+{
+    throw new InvalidOperationException(
+        $"PrintAgent:LocalApiKey failed production validation: {keyReason} " +
+        "Supply a store-specific secret via PrintAgent__LocalApiKey (or the Windows Service environment).");
+}
+
 builder.WebHost.UseUrls(startupOptions.ListenUrl);
 builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = startupOptions.RequestBodyLimit);
@@ -28,8 +36,8 @@ builder.Services.AddSingleton(rollingFileLogger);
 builder.Services.AddOptions<PrintAgentOptions>()
     .Bind(builder.Configuration.GetSection(PrintAgentOptions.SectionName))
     .ValidateDataAnnotations()
-    .Validate(x => !string.Equals(x.LocalApiKey, "CHANGE_ME", StringComparison.OrdinalIgnoreCase),
-        "PrintAgent:LocalApiKey must be supplied securely and cannot use a placeholder.")
+    .Validate(x => LocalApiKeyPolicy.IsAcceptable(x.LocalApiKey, out _),
+        "PrintAgent:LocalApiKey must be a non-empty store-specific secret (≥24 chars) and cannot use a placeholder.")
     .Validate(x => x.AllowedNetworkRanges.Length > 0,
         "PrintAgent:AllowedNetworkRanges must contain at least one explicit CIDR range.")
     .Validate(x =>
@@ -154,21 +162,48 @@ app.MapGet("/health/live", () => Results.Ok(new
 app.MapGet("/health/ready", async (
     IPrinterService printer,
     IPrintRequestStore store,
+    IOptions<PrintAgentOptions> options,
     CancellationToken cancellationToken) =>
 {
+    var keyOk = LocalApiKeyPolicy.IsAcceptable(options.Value.LocalApiKey, out _);
+    var rangesOk = options.Value.AllowedNetworkRanges.Length > 0;
+    try
+    {
+        _ = new NetworkRangeAllowList(options.Value.AllowedNetworkRanges);
+    }
+    catch (FormatException)
+    {
+        rangesOk = false;
+    }
+
     var storeReady = await store.ProbeAsync(cancellationToken);
     var health = await printer.GetHealthAsync(cancellationToken);
-    var ready = storeReady && health.PrinterExists && health.Ready;
-    return Results.Json(new AgentReadiness(
+    var configurationValid = keyOk && rangesOk &&
+                             !string.IsNullOrWhiteSpace(options.Value.PrinterName);
+    var ready = configurationValid && storeReady && health.PrinterExists && health.Ready;
+    var detail = ready
+        ? null
+        : !configurationValid
+            ? "Mandatory production configuration is invalid."
+            : !storeReady
+                ? "Idempotency storage is not writable."
+                : !health.PrinterExists
+                    ? "Configured Windows printer was not found."
+                    : "Configured printer is not ready.";
+    return Results.Json(new
+        {
             ready,
-            ready ? "ready" : "not_ready",
-            ThisAssembly.Version,
-            PrintAgentOptions.ApiVersion,
-            PrintAgentOptions.ReceiptContractVersion,
+            status = ready ? "ready" : "not_ready",
+            agentVersion = ThisAssembly.Version,
+            apiVersion = PrintAgentOptions.ApiVersion,
+            receiptContractVersion = PrintAgentOptions.ReceiptContractVersion,
+            configurationValid,
             storeReady,
-            health.PrinterExists,
-            health.Ready,
-            ready ? null : "Configuration, idempotency storage, or printer readiness requires attention."),
+            printerConfigured = !string.IsNullOrWhiteSpace(options.Value.PrinterName),
+            printerExists = health.PrinterExists,
+            printerReady = health.Ready,
+            detail
+        },
         statusCode: ready ? 200 : 503);
 });
 
@@ -373,10 +408,12 @@ app.MapPost("/api/drawer/open", async (
     try
     {
         var bytes = pulseBuilder.Build(request);
+        var hex = Convert.ToHexString(bytes);
         app.Logger.LogInformation(
-            "Drawer pulse submission started. requestId={RequestId} operationId={OperationId} purpose={Purpose} printer={PrinterName}",
+            "Drawer pulse submission started. requestId={RequestId} operationId={OperationId} purpose={Purpose} printer={PrinterName} port={DrawerPort} onMs={PulseOn} offMs={PulseOff} bytesHex={BytesHex} byteCount={ByteCount}",
             request.RequestId, request.DrawerOperationId, request.DrawerPurpose,
-            options.Value.PrinterName);
+            options.Value.PrinterName, request.DrawerPort,
+            request.PulseOnTime, request.PulseOffTime, hex, bytes.Length);
         result = await printer.PrintRawAsync(
             $"Cash drawer {request.DrawerOperationId}", bytes, cancellationToken);
     }
@@ -393,10 +430,13 @@ app.MapPost("/api/drawer/open", async (
         throw;
     }
 
+    // Shared RAW spooler returns code "printed"; drawer public contract uses
+    // drawer_pulse_accepted so clients do not conflate with receipt printing.
+    var drawerResultCode = result.Success ? "drawer_pulse_accepted" : result.Code;
     await requestStore.CompleteAsync(
-        request.RequestId, result.Success, result.Code, cancellationToken);
+        request.RequestId, result.Success, drawerResultCode, cancellationToken);
     var response = new DrawerOpenApiResponse(
-        result.Success, result.Code,
+        result.Success, drawerResultCode,
         result.Success
             ? "Drawer pulse was accepted by the Windows spooler; verify the drawer physically."
             : result.Message,
