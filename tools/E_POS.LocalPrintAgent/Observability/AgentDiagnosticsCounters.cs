@@ -59,6 +59,21 @@ public sealed class AgentDiagnosticsCounters
 
 public static class ThisAssembly
 {
-    public static string Version =>
-        typeof(ThisAssembly).Assembly.GetName().Version?.ToString() ?? "unknown";
+    public static string Version
+    {
+        get
+        {
+            var informational = typeof(ThisAssembly).Assembly
+                .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault()?.InformationalVersion;
+            if (!string.IsNullOrWhiteSpace(informational))
+            {
+                var plus = informational.IndexOf('+');
+                return plus > 0 ? informational[..plus] : informational;
+            }
+
+            return typeof(ThisAssembly).Assembly.GetName().Version?.ToString() ?? "unknown";
+        }
+    }
 }

@@ -50,5 +50,6 @@ public sealed class DrawerOpenRequestValidatorTests
 
     private static DrawerOpenRequest Valid() => new(
         "1", Guid.NewGuid(), Guid.NewGuid(), "cashSale",
-        "POSPrinter POS80", "drawerPin2", 50, 100);
+        "POSPrinter POS80", "drawerPin2", 50, 100,
+        RequestedAt: DateTimeOffset.UtcNow);
 }

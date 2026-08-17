@@ -633,15 +633,18 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             cancellationToken);
 
         string? customerNameSnapshot = null;
+        string? customerPhoneSnapshot = null;
         if (request.CustomerId is { } selectedCustomerId && selectedCustomerId != Guid.Empty)
         {
-            customerNameSnapshot = await _dbContext.Customers
+            var customerRow = await _dbContext.Customers
                 .AsNoTracking()
                 .Where(x => x.TenantId == tenantId &&
                             x.Id == selectedCustomerId &&
                             x.Status == ActiveStatus)
-                .Select(x => x.Name)
+                .Select(x => new { x.Name, x.Phone })
                 .FirstOrDefaultAsync(cancellationToken);
+            customerNameSnapshot = customerRow?.Name;
+            customerPhoneSnapshot = customerRow?.Phone;
         }
 
         var reportingOutlet = await _dbContext.Outlets
@@ -1135,7 +1138,10 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             receiptDiscountLines,
             receiptTaxLines,
             receiptCopyPolicy,
-            ReceiptDataJson: receiptDataJson);
+            ReceiptDataJson: receiptDataJson,
+            CustomerId: request.CustomerId,
+            CustomerName: customerNameSnapshot,
+            CustomerPhone: customerPhoneSnapshot);
 
         return new PosCheckoutStartPaymentResult(null, response);
     }
@@ -1868,7 +1874,10 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             ToMoney(order.TotalAmount), ToMoney(payment.TenderedAmount ?? payment.PaidAmount),
             ToMoney(payment.ChangeAmount), methodCode.ToLowerInvariant(), order.CurrencyCode,
             "completed", "completed", payment.PaidAt ?? payment.InitiatedAt, payment.Id, lines,
-            ReceiptDataJson: receipt.ReceiptDataJson));
+            ReceiptDataJson: receipt.ReceiptDataJson,
+            CustomerId: order.CustomerId,
+            CustomerName: order.CustomerNameSnapshot,
+            CustomerPhone: order.CustomerPhoneSnapshot));
     }
 
     private async Task<PosReceiptCopyPolicyDto> ResolveReceiptCopyPolicyAsync(

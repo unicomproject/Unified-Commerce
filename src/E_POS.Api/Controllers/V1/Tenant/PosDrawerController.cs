@@ -113,7 +113,8 @@ public sealed class PosDrawerController : ControllerBase
                 Conflict(Error(error)),
             "pos_drawer.till_session_not_open" or "pos_drawer.approval_required" or 
             "pos_drawer.invalid_approver_credentials" or "pos_drawer.manual_open_disabled" or
-            "pos_drawer.purpose_disabled" or "pos_drawer.configuration_invalid" => 
+            "pos_drawer.purpose_disabled" or "pos_drawer.configuration_invalid" or
+            "pos_drawer.invalid_status" =>
                 UnprocessableEntity(Error(error)),
             _ => BadRequest(Error(error))
         };
@@ -179,6 +180,42 @@ public sealed class PosCashDrawerController : ControllerBase
             "cash_drawer.insufficient_expected_cash" => UnprocessableEntity(payload),
             _ => BadRequest(payload)
         };
+    }
+
+    private object Error(string code, string message) => new
+    {
+        code, message, details = Array.Empty<string>(), traceId = HttpContext.TraceIdentifier, timestamp = DateTimeOffset.UtcNow
+    };
+}
+
+[ApiController]
+[Authorize(Policy = "TenantOnly")]
+[Route("api/v1/pos/cash-movement-types")]
+public sealed class PosCashMovementTypesController : ControllerBase
+{
+    private readonly IPosDrawerService _service;
+    private readonly ITenantRequestContextFactory _contextFactory;
+
+    public PosCashMovementTypesController(IPosDrawerService service, ITenantRequestContextFactory contextFactory)
+    {
+        _service = service;
+        _contextFactory = contextFactory;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Get([FromQuery] string direction = "IN", CancellationToken cancellationToken = default)
+    {
+        if (!_contextFactory.TryCreate(User, out var context))
+            return Unauthorized(Error("cash_drawer.invalid_context", "Invalid tenant context."));
+
+        var result = await _service.GetMovementTypesAsync(context, direction, cancellationToken);
+        if (result.IsSuccess && result.Value is not null) return Ok(new { data = result.Value });
+
+        var error = result.Error;
+        var payload = Error(error.Code, error.Message);
+        return error.Code == "cash_drawer.permission_denied"
+            ? StatusCode(StatusCodes.Status403Forbidden, payload)
+            : BadRequest(payload);
     }
 
     private object Error(string code, string message) => new

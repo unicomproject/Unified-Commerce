@@ -6,7 +6,7 @@ public sealed class PrintAgentOptions
 {
     public const string SectionName = "PrintAgent";
     public const string ApiVersion = "1";
-    public const string ReceiptContractVersion = "2";
+    public const string ReceiptContractVersion = "3";
 
     [Required, Url]
     public string ListenUrl { get; init; } = "http://0.0.0.0:9101";
@@ -27,6 +27,13 @@ public sealed class PrintAgentOptions
 
     [Required, MinLength(24)]
     public string LocalApiKey { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Maximum age of a drawer-open request (client <c>requestedAt</c>).
+    /// Prevents delayed/stale pulses after reconnect.
+    /// </summary>
+    [Range(5, 600)]
+    public int DrawerRequestMaxAgeSeconds { get; init; } = 120;
 
     [Required, MinLength(1)]
     public string IdempotencyDirectory { get; init; } = "data/print-requests";

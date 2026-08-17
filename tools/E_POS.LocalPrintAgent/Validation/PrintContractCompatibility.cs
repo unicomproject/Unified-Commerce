@@ -10,6 +10,7 @@ public static class PrintContractCompatibility
          request.ApiVersion == PrintAgentOptions.ApiVersion) &&
         (request.ReceiptContractVersion is null ||
          request.ReceiptContractVersion == "1" ||
+         request.ReceiptContractVersion == "2" ||
          request.ReceiptContractVersion ==
          PrintAgentOptions.ReceiptContractVersion);
 }

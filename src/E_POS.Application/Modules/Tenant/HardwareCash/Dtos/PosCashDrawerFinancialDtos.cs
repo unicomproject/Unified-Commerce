@@ -25,7 +25,19 @@ public sealed record PosCashDrawerMovementDto(
     string? Reason,
     string? Reference,
     string PerformedBy,
-    DateTimeOffset PerformedAt);
+    DateTimeOffset PerformedAt,
+    string? MovementNumber = null,
+    Guid? MovementTypeId = null,
+    string? MovementTypeName = null,
+    decimal? CurrentExpectedCash = null);
+
+public sealed record PosCashMovementTypeDto(
+    Guid MovementTypeId,
+    string Code,
+    string Name,
+    string Direction,
+    bool RequiresReason,
+    bool AffectsExpectedCash);
 
 public sealed record PosCashDrawerMovementPageDto(
     IReadOnlyList<PosCashDrawerMovementDto> Items,
@@ -37,8 +49,6 @@ public sealed record PosCashDrawerMovementPageDto(
 public sealed record CreatePosCashMovementRequest(
     Guid RequestId,
     Guid DeviceId,
-    Guid TillSessionId,
-    string MovementType,
+    Guid MovementTypeId,
     decimal Amount,
-    string Reason,
-    string? ReferenceNumber = null);
+    string? Note = null);

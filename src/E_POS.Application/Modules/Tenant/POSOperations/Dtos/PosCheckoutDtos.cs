@@ -172,5 +172,9 @@ public sealed record PosCheckoutStartPaymentResponseDto(
     string? TaxRegistrationNumber = null,
     string? TaxInvoiceLabel = null,
     Guid? DrawerOperationId = null,
+    Guid? DrawerRequestId = null,
     CashDrawerSettingsDto? CashDrawerSettings = null,
-    string? ReceiptDataJson = null);
+    string? ReceiptDataJson = null,
+    Guid? CustomerId = null,
+    string? CustomerName = null,
+    string? CustomerPhone = null);

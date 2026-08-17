@@ -13,7 +13,7 @@ namespace E_POS.IntegrationTests.HardwareCash;
 
 /// <summary>
 /// Exercises PosDrawerRepository.CreateFinancialMovementAsync against PostgreSQL to prove
-/// tenant-scoped request-id uniqueness (uq_till_cash_movements_tenant_request_id) under
+/// tenant-scoped request-id uniqueness (uq_cash_movements_tenant_id_request_id) under
 /// concurrent duplicate submission. Soft-skips when local PostgreSQL is unreachable.
 /// </summary>
 public sealed class PosCashDrawerPostgreSqlConcurrencyTests
@@ -28,11 +28,11 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
         if (!await CanConnectAsync()) return;
 
         var ids = FixtureIds.Create();
-        await SeedFixtureAsync(ids);
+        await SeedFixtureAsync(ids, openingFloat: 25000m, direction: "IN", code: "CONCURRENT_FLOAT");
         try
         {
             var request = new CreatePosCashMovementRequest(
-                ids.RequestId, ids.DeviceId, ids.SessionId, "CASH_IN", 1000m, "Concurrent float", "REF-CONC");
+                ids.RequestId, ids.DeviceId, ids.MovementTypeId, 1000m, "Concurrent float");
 
             await using var firstDb = CreateDb();
             await using var secondDb = CreateDb();
@@ -47,8 +47,59 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
             Assert.Equal(results[0].Movement!.MovementId, results[1].Movement!.MovementId);
 
             await using var assertDb = CreateDb();
-            Assert.Equal(1, await assertDb.TillCashMovements.CountAsync(
+            Assert.Equal(1, await assertDb.CashMovements.CountAsync(
                 x => x.TenantId == ids.TenantId && x.RequestId == ids.RequestId));
+        }
+        finally
+        {
+            await CleanupAsync(ids);
+        }
+    }
+
+    [Fact]
+    public async Task CreateOutMovement_ConcurrentOverDrop_AllowsExactlyOneAndLeavesExpectedCashCorrect()
+    {
+        if (!await CanConnectAsync()) return;
+
+        var ids = FixtureIds.Create();
+        const decimal opening = 10000m;
+        const decimal drop = 7000m;
+        await SeedFixtureAsync(ids, openingFloat: opening, direction: "OUT", code: "CASH_DROP");
+        try
+        {
+            var requestA = new CreatePosCashMovementRequest(
+                Guid.NewGuid(), ids.DeviceId, ids.MovementTypeId, drop, "Drop A");
+            var requestB = new CreatePosCashMovementRequest(
+                Guid.NewGuid(), ids.DeviceId, ids.MovementTypeId, drop, "Drop B");
+
+            await using var firstDb = CreateDb();
+            await using var secondDb = CreateDb();
+            var first = new PosDrawerRepository(firstDb);
+            var second = new PosDrawerRepository(secondDb);
+
+            var results = await Task.WhenAll(
+                first.CreateFinancialMovementAsync(ids.TenantId, ids.UserId, ids.TillId, requestA, Now, default),
+                second.CreateFinancialMovementAsync(ids.TenantId, ids.UserId, ids.TillId, requestB, Now, default));
+
+            var successes = results.Where(x => x.ErrorCode is null).ToList();
+            var failures = results.Where(x => x.ErrorCode is not null).ToList();
+            Assert.Single(successes);
+            Assert.Single(failures);
+            Assert.Equal("cash_drawer.insufficient_expected_cash", failures[0].ErrorCode);
+            Assert.Equal(opening - drop, successes[0].Movement!.CurrentExpectedCash);
+
+            await using var assertDb = CreateDb();
+            var rows = await assertDb.CashMovements
+                .Where(x => x.TenantId == ids.TenantId)
+                .ToListAsync();
+            Assert.Single(rows);
+            Assert.Equal(drop, rows[0].Amount);
+
+            var summary = await new PosDrawerRepository(assertDb)
+                .GetFinancialSummaryAsync(ids.TenantId, ids.SessionId, default);
+            Assert.NotNull(summary);
+            Assert.Equal(opening - drop, summary!.CurrentExpectedCash);
+            Assert.True(summary.CurrentExpectedCash >= 0m);
         }
         finally
         {
@@ -73,7 +124,11 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
         }
     }
 
-    private static async Task SeedFixtureAsync(FixtureIds ids)
+    private static async Task SeedFixtureAsync(
+        FixtureIds ids,
+        decimal openingFloat,
+        string direction,
+        string code)
     {
         await using var db = CreateDb();
         db.Tenants.Add(Tenant.Create(
@@ -96,9 +151,12 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
             ids.UserId, ids.TenantId, $"cd-{ids.Suffix}@example.test", "Cashier",
             null, null, "hash", "salt", "ACTIVE", "cashier", "outlet", "default", Now,
             staffCode: "USR-2026-95002"));
+        db.CashMovementTypes.Add(CashMovementType.Create(
+            ids.MovementTypeId, ids.TenantId, code, $"Concurrent {code}", direction,
+            true, true, false, "ACTIVE", Now));
         db.TillSessions.Add(TillSession.Open(
             ids.SessionId, ids.TenantId, ids.OutletId, ids.TillId, $"TS-{ids.Suffix}",
-            DateOnly.FromDateTime(Now.UtcDateTime), ids.UserId, ids.DeviceId, 25000m, "LKR", null, Now));
+            DateOnly.FromDateTime(Now.UtcDateTime), ids.UserId, ids.DeviceId, openingFloat, "LKR", null, Now));
         await db.SaveChangesAsync();
 
         await db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -116,7 +174,8 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("""
-            DELETE FROM till_cash_movements WHERE tenant_id = @tenant;
+            DELETE FROM cash_movements WHERE tenant_id = @tenant;
+            DELETE FROM cash_movement_types WHERE tenant_id = @tenant;
             DELETE FROM till_device_assignments WHERE tenant_id = @tenant;
             DELETE FROM till_sessions WHERE tenant_id = @tenant;
             DELETE FROM pos_devices WHERE tenant_id = @tenant;
@@ -137,6 +196,7 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
         Guid UserId,
         Guid SessionId,
         Guid RequestId,
+        Guid MovementTypeId,
         string Suffix)
     {
         public static FixtureIds Create()
@@ -144,7 +204,7 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
             var suffix = Guid.NewGuid().ToString("N")[..8];
             return new(
                 Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-                Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), suffix);
+                Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), suffix);
         }
     }
 }
