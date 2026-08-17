@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using E_POS.Api.Extensions;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
@@ -15,7 +15,7 @@ namespace E_POS.Api.Controllers.V1.ECommerce.CustomerAuth;
 
 [ApiController]
 [Route("api/v1/ecommerce/storefront/auth")]
-public sealed class CustomerAuthController : ControllerBase
+public sealed class CustomerAuthController : CustomerControllerBase
 {
     private const string RefreshTokenCookieName = "customer_refresh_token";
     private const string RefreshTokenCookiePath = "/api/v1/ecommerce/storefront/auth";
@@ -280,15 +280,6 @@ public sealed class CustomerAuthController : ControllerBase
     {
         success = true,
         message
-    };
-
-    private object CreateError(ApplicationError error) => new
-    {
-        success = false,
-        message = error.Message,
-        errorCode = error.Code,
-        errors = Array.Empty<string>(),
-        traceId = HttpContext.TraceIdentifier
     };
 
     private void AppendRefreshTokenCookie(CustomerAuthTokenResult result)

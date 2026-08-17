@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -198,6 +199,11 @@ public sealed class PlatformTenantBootstrapHttpPipelineTests
                     ["CustomerJwt:Audience"] = "TM-EPOS-Customer",
                     ["CustomerJwt:SigningKey"] = "DEV_ONLY_CUSTOMER_JWT_SIGNING_KEY_32_CHARS_MINIMUM"
                 });
+            });
+
+            builder.ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
             });
 
             builder.ConfigureServices(services =>

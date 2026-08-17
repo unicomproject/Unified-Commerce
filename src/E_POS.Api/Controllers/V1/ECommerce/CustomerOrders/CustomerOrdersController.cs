@@ -10,7 +10,7 @@ namespace E_POS.Api.Controllers.V1.ECommerce.CustomerOrders;
 [ApiController]
 [Authorize(Policy = "CustomerOnly")]
 [Route("api/v1/ecommerce/storefront/orders")]
-public sealed class CustomerOrdersController : ControllerBase
+public sealed class CustomerOrdersController : CustomerControllerBase
 {
     private readonly ICustomerOrderService _service;
 
@@ -108,28 +108,4 @@ public sealed class CustomerOrdersController : ControllerBase
             _ => BadRequest(error)
         };
     }
-
-    private bool TryGetCustomerContext(out Guid tenantId, out Guid customerId)
-    {
-        tenantId = Guid.Empty;
-        customerId = Guid.Empty;
-        var customerValue = User.FindFirstValue("sub") ??
-                            User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(User.FindFirstValue("tenant_id"), out tenantId) &&
-               Guid.TryParse(customerValue, out customerId);
-    }
-
-    private IActionResult InvalidSession() =>
-        Unauthorized(CreateError(new ApplicationError(
-            "customer_orders.invalid_customer_context",
-            "A valid customer session is required.")));
-
-    private object CreateError(ApplicationError error) => new
-    {
-        success = false,
-        message = error.Message,
-        errorCode = error.Code,
-        errors = Array.Empty<string>(),
-        traceId = HttpContext.TraceIdentifier
-    };
 }

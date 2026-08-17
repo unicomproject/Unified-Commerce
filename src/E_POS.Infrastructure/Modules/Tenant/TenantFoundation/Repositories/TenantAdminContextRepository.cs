@@ -134,8 +134,42 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                   && pd.IsActive
             select pd.PermissionCode;
 
+        var outletRolePermissions =
+            from outletRole in _dbContext.OutletUserRoles.AsNoTracking()
+            join outlet in _dbContext.Outlets.AsNoTracking()
+                on outletRole.OutletId equals outlet.Id
+            join role in _dbContext.TenantRoles.AsNoTracking()
+                on outletRole.TenantRoleId equals role.Id
+            join rp in _dbContext.TenantRolePermissions.AsNoTracking()
+                on role.Id equals rp.TenantRoleId
+            join pd in _dbContext.PermissionDefinitions.AsNoTracking()
+                on rp.PermissionDefinitionId equals pd.Id
+            where outletRole.TenantUserId == tenantUserId
+                  && outlet.TenantId == tenantId
+                  && outlet.Status != "DELETED"
+                  && outlet.Status != "INACTIVE"
+                  && role.TenantId == tenantId
+                  && role.IsActive
+                  && pd.IsActive
+            select pd.PermissionCode;
+
+        var outletDirectPermissions =
+            from outletPermission in _dbContext.OutletUserPermissions.AsNoTracking()
+            join outlet in _dbContext.Outlets.AsNoTracking()
+                on outletPermission.OutletId equals outlet.Id
+            join pd in _dbContext.PermissionDefinitions.AsNoTracking()
+                on outletPermission.PermissionDefinitionId equals pd.Id
+            where outletPermission.TenantUserId == tenantUserId
+                  && outlet.TenantId == tenantId
+                  && outlet.Status != "DELETED"
+                  && outlet.Status != "INACTIVE"
+                  && pd.IsActive
+            select pd.PermissionCode;
+
         var permissions = await directPermissions
             .Union(rolePermissions)
+            .Union(outletRolePermissions)
+            .Union(outletDirectPermissions)
             .Where(x => x != string.Empty)
             .OrderBy(x => x)
             .ToListAsync(cancellationToken);
