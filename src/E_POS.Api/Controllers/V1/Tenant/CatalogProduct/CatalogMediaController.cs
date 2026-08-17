@@ -304,7 +304,9 @@ public sealed class CatalogMediaController : ControllerBase
     {
         return error.Code switch
         {
-            "media.permission_denied" or "brand.permission_denied" =>
+            "media.permission_denied" or
+                "media.initial_brand_logo_not_authorized" or
+                "brand.permission_denied" =>
                 StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "media.invalid_tenant_context" or "brand.invalid_tenant_context" =>
                 Unauthorized(CreateError(error)),
@@ -317,6 +319,10 @@ public sealed class CatalogMediaController : ControllerBase
                 StatusCode(StatusCodes.Status409Conflict, CreateError(error)),
             "media.file_size_exceeded" =>
                 StatusCode(StatusCodes.Status413PayloadTooLarge, CreateError(error)),
+            "media.unsupported_media_type" =>
+                StatusCode(StatusCodes.Status415UnsupportedMediaType, CreateError(error)),
+            "media.save_failed" =>
+                StatusCode(StatusCodes.Status500InternalServerError, CreateError(error)),
             "media.max_images_exceeded" => BadRequest(CreateError(error)),
             "media.storage_not_configured" or "media.storage_unavailable" =>
                 StatusCode(StatusCodes.Status503ServiceUnavailable, CreateError(error)),

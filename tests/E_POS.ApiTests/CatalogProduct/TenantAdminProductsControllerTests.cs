@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using E_POS.Api.Common;
+using E_POS.Api.Controllers;
 using E_POS.Api.Controllers.V1.Tenant.CatalogProduct;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Shared.Media.Dtos;
@@ -17,6 +18,64 @@ namespace E_POS.ApiTests.CatalogProduct;
 
 public sealed class TenantAdminProductsControllerTests
 {
+    [Fact]
+    public async Task UploadBrandLogo_WithCreatePermission_PassesCreationContextAndReturnsBrand()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var brandId = Guid.NewGuid();
+        var brand = new BrandResponse(brandId, "ACME", "Acme", "https://cdn/brand.png", Guid.NewGuid(), "ACTIVE", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var mediaService = new FakeCatalogMediaService
+        {
+            BrandLogoResult = ApplicationResult<MediaAssetUploadResponse>.Success(
+                new MediaAssetUploadResponse(Guid.NewGuid(), null, null, null, null, brandId, "media", "key", brand.LogoUrl!, null, brand.LogoUrl!, "brand.png", "image/png", ".png", 68, 1, 1, "hash")),
+        };
+        var brandService = new FakeBrandService
+        {
+            DetailResult = ApplicationResult<BrandResponse>.Success(brand),
+        };
+        var controller = new CatalogMediaController(mediaService, brandService, new TenantRequestContextFactory())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+        SetTenantClaims(controller, tenantId, userId, BrandConstants.CreatePermission);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+        var file = new FormFile(stream, 0, stream.Length, "file", "brand.png") { Headers = new HeaderDictionary(), ContentType = "image/png" };
+
+        var result = await controller.UploadBrandLogo(brandId, file, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(tenantId, mediaService.BrandLogoContext?.TenantId);
+        Assert.Equal(userId, mediaService.BrandLogoContext?.UserId);
+        Assert.Contains(BrandConstants.CreatePermission, mediaService.BrandLogoContext!.Permissions);
+        Assert.Equal(brandId, mediaService.BrandLogoId);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogo_WhenInitialCompletionUnauthorized_ReturnsForbiddenStableCode()
+    {
+        var mediaService = new FakeCatalogMediaService
+        {
+            BrandLogoResult = ApplicationResult<MediaAssetUploadResponse>.Failure(
+                new ApplicationError("media.initial_brand_logo_not_authorized", "Not authorized.")),
+        };
+        var controller = new CatalogMediaController(mediaService, new FakeBrandService(), new TenantRequestContextFactory())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), BrandConstants.CreatePermission);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+        var file = new FormFile(stream, 0, stream.Length, "file", "brand.png") { Headers = new HeaderDictionary(), ContentType = "image/png" };
+
+        var result = await controller.UploadBrandLogo(Guid.NewGuid(), file, CancellationToken.None);
+
+        var forbidden = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
+        Assert.Contains("media.initial_brand_logo_not_authorized", forbidden.Value!.ToString());
+    }
+
+    private static byte[] CreateOnePixelPng() => Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
     [Fact]
     public async Task GetSummary_WithTenantProductsView_ReturnsOk()
     {
@@ -605,7 +664,7 @@ public sealed class TenantAdminProductsControllerTests
     }
 
     private static void SetTenantClaims(
-        TenantAdminProductsController controller,
+        ControllerBase controller,
         Guid tenantId,
         Guid userId,
         string permission)
@@ -904,6 +963,10 @@ public sealed class TenantAdminProductsControllerTests
 
     private sealed class FakeCatalogMediaService : ICatalogMediaService
     {
+        public TenantRequestContext? BrandLogoContext { get; private set; }
+        public Guid? BrandLogoId { get; private set; }
+        public ApplicationResult<MediaAssetUploadResponse> BrandLogoResult { get; init; } =
+            ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError("media.permission_denied", "Permission denied for media upload."));
         public Task<ApplicationResult<MediaAssetUploadResponse>> UploadProductImageAsync(
             TenantRequestContext context,
             Guid productId,
@@ -960,9 +1023,25 @@ public sealed class TenantAdminProductsControllerTests
             TenantRequestContext context,
             Guid brandId,
             MediaUploadFile file,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<MediaAssetUploadResponse>.Failure(
-                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+            CancellationToken cancellationToken)
+        {
+            BrandLogoContext = context;
+            BrandLogoId = brandId;
+            return Task.FromResult(BrandLogoResult);
+        }
+    }
+
+    private sealed class FakeBrandService : IBrandService
+    {
+        public ApplicationResult<BrandResponse> DetailResult { get; init; } =
+            ApplicationResult<BrandResponse>.Failure(new ApplicationError("brand.not_found", "Brand was not found."));
+
+        public Task<ApplicationResult<BrandResponse>> CreateAsync(TenantRequestContext context, BrandCreateRequest request, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
+        public Task<ApplicationResult<BrandListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<BrandListResponse>.Success(new BrandListResponse([], pageNumber, pageSize, 0)));
+        public Task<ApplicationResult<BrandResponse>> GetByIdAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
+        public Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
+        public Task<ApplicationResult<BrandResponse>> UpdateAsync(TenantRequestContext context, Guid brandId, BrandUpdateRequest request, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
+        public Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory

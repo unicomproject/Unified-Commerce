@@ -81,6 +81,12 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
             .HasColumnName("updated_by_tenant_user_id")
             .IsRequired(false);
 
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .HasDefaultValue(1L)
+            .IsRequired()
+            .IsConcurrencyToken();
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -128,6 +134,7 @@ public sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
         {
             t.HasCheckConstraint("ck_brands_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
             t.HasCheckConstraint("ck_brands_sort_order", "sort_order >= 0");
+            t.HasCheckConstraint("ck_brands_row_version", "row_version >= 1");
         });
     }
 }

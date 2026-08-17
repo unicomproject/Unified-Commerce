@@ -7,4 +7,5 @@ public sealed record BrandUpdateRequest(
     string? Description,
     string? LogoUrl,
     string Status,
-    int SortOrder = 0);
+    int SortOrder = 0,
+    long ExpectedRowVersion = 1);

@@ -157,6 +157,181 @@ public sealed class CatalogMediaServicePhase4ETests
     }
 
     [Fact]
+    public async Task UploadBrandLogoAsync_CreateOnlyCreatorWithoutLogo_AttachesInitialLogo()
+    {
+        var brand = CreateBrand(null);
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = brand };
+        var storage = new FakeMediaObjectStorage();
+        var audit = new FakeBrandAuditLogger();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider(), audit);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.CreatePermission]), BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(brand.LogoMediaAssetId);
+        Assert.Single(repository.MediaAssets);
+        Assert.Single(storage.Uploads);
+        var auditEvent = Assert.Single(audit.Events);
+        Assert.Equal(("InitialBrandLogoAttached", TenantId, UserId, BrandId, 2L), auditEvent);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogoAsync_ManageWithoutLogo_AttachesInitialLogo()
+    {
+        var brand = CreateBrand(null);
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = brand };
+        var storage = new FakeMediaObjectStorage();
+        var audit = new FakeBrandAuditLogger();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider(), audit);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.ManagePermission]), BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(brand.LogoMediaAssetId);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogoAsync_CreateOnlyStorageFailure_CanRetrySameBrandId()
+    {
+        var brand = CreateBrand(null);
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = brand };
+        var storage = new FakeMediaObjectStorage { ThrowOnUpload = true };
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider());
+
+        await using (var firstStream = new MemoryStream(CreateOnePixelPng()))
+        {
+            var failed = await service.UploadBrandLogoAsync(
+                CreateContext([BrandConstants.CreatePermission]), BrandId,
+                new MediaUploadFile(firstStream, "brand.png", "image/png", firstStream.Length), CancellationToken.None);
+
+            Assert.True(failed.IsFailure);
+            Assert.Equal("media.storage_unavailable", failed.Error.Code);
+            Assert.Null(brand.LogoMediaAssetId);
+            Assert.Empty(repository.MediaAssets);
+        }
+
+        storage.ThrowOnUpload = false;
+        await using var retryStream = new MemoryStream(CreateOnePixelPng());
+        var retried = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.CreatePermission]), BrandId,
+            new MediaUploadFile(retryStream, "brand.png", "image/png", retryStream.Length), CancellationToken.None);
+
+        Assert.True(retried.IsSuccess);
+        Assert.Equal(BrandId, retried.Value!.BrandId);
+        Assert.NotNull(brand.LogoMediaAssetId);
+        Assert.Single(repository.MediaAssets);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogoAsync_CreateOnlyCreatorWithExistingLogo_RejectsReplacement()
+    {
+        var brand = CreateBrand(Guid.NewGuid());
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = brand };
+        var storage = new FakeMediaObjectStorage();
+        var audit = new FakeBrandAuditLogger();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider(), audit);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.CreatePermission]), BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("media.initial_brand_logo_not_authorized", result.Error.Code);
+        Assert.Empty(repository.MediaAssets);
+        Assert.Empty(storage.Uploads);
+        Assert.Empty(audit.Events);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogoAsync_CreateOnlyNonCreatorWithoutLogo_RejectsArbitraryBrand()
+    {
+        var brand = CreateBrand(null, Guid.NewGuid());
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = brand };
+        var storage = new FakeMediaObjectStorage();
+        var audit = new FakeBrandAuditLogger();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider(), audit);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.CreatePermission]), BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("media.initial_brand_logo_not_authorized", result.Error.Code);
+        Assert.Empty(repository.MediaAssets);
+        Assert.Empty(storage.Uploads);
+        Assert.Empty(audit.Events);
+    }
+
+    [Theory]
+    [InlineData(BrandConstants.UpdatePermission)]
+    [InlineData(BrandConstants.ManagePermission)]
+    public async Task UploadBrandLogoAsync_UpdateOrManage_ReplacesExistingLogo(string permission)
+    {
+        var previousMediaAssetId = Guid.NewGuid();
+        var brand = CreateBrand(previousMediaAssetId);
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = brand };
+        var storage = new FakeMediaObjectStorage();
+        var audit = new FakeBrandAuditLogger();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider(), audit);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([permission]), BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEqual(previousMediaAssetId, brand.LogoMediaAssetId);
+        Assert.Contains(previousMediaAssetId, repository.InactivatedMediaAssetIds);
+        var auditEvent = Assert.Single(audit.Events);
+        Assert.Equal(("BrandLogoReplaced", TenantId, UserId, BrandId, 2L), auditEvent);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogoAsync_CreateOnlyOtherTenantBrand_ReturnsNotFound()
+    {
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = CreateBrand(null) };
+        var storage = new FakeMediaObjectStorage();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider());
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+        var otherTenantContext = new TenantRequestContext(Guid.NewGuid(), UserId, [BrandConstants.CreatePermission]);
+
+        var result = await service.UploadBrandLogoAsync(
+            otherTenantContext, BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("media.brand_not_found", result.Error.Code);
+        Assert.Empty(storage.Uploads);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogoAsync_CreateOnlyDeletedBrand_ReturnsNotFound()
+    {
+        var brand = CreateBrand(null);
+        brand.SoftDelete(UserId, Now);
+        var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = brand };
+        var storage = new FakeMediaObjectStorage();
+        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider());
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+
+        var result = await service.UploadBrandLogoAsync(
+            CreateContext([BrandConstants.CreatePermission]), BrandId,
+            new MediaUploadFile(stream, "brand.png", "image/png", stream.Length), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("media.brand_not_found", result.Error.Code);
+        Assert.Empty(storage.Uploads);
+    }
+
+    [Fact]
     public async Task UploadBrandLogoAsync_WithJpeg_Succeeds()
     {
         var repository = new FakeCatalogMediaRepository { BrandForLogoUpdate = CreateBrand(null) };
@@ -268,7 +443,7 @@ public sealed class CatalogMediaServicePhase4ETests
         return category;
     }
 
-    private static Brand CreateBrand(Guid? logoMediaAssetId)
+    private static Brand CreateBrand(Guid? logoMediaAssetId, Guid? createdByUserId = null)
     {
         var brand = Brand.Create(
             BrandId,
@@ -279,7 +454,7 @@ public sealed class CatalogMediaServicePhase4ETests
             "Brand",
             logoUrl: null,
             "ACTIVE",
-            UserId,
+            createdByUserId ?? UserId,
             Now);
 
         if (logoMediaAssetId.HasValue)
@@ -299,15 +474,29 @@ public sealed class CatalogMediaServicePhase4ETests
         public DateTimeOffset UtcNow => Now;
     }
 
+    private sealed class FakeBrandAuditLogger : IBrandAuditLogger
+    {
+        public List<(string EventName, Guid TenantId, Guid UserId, Guid BrandId, long RowVersion)> Events { get; } = [];
+
+        public void LogMutation(string eventName, Guid tenantId, Guid userId, Guid brandId, long rowVersion) =>
+            Events.Add((eventName, tenantId, userId, brandId, rowVersion));
+    }
+
     private sealed class FakeMediaObjectStorage : IMediaObjectStorage
     {
         public bool IsConfigured { get; init; } = true;
+        public bool ThrowOnUpload { get; set; }
         public List<MediaObjectUploadResult> Uploads { get; } = [];
 
         public Task<MediaObjectUploadResult> UploadAsync(
             MediaObjectUploadRequest request,
             CancellationToken cancellationToken)
         {
+            if (ThrowOnUpload)
+            {
+                throw new InvalidOperationException("Storage unavailable.");
+            }
+
             var result = new MediaObjectUploadResult(
                 "tenant-media",
                 request.StorageKey,
@@ -360,7 +549,12 @@ public sealed class CatalogMediaServicePhase4ETests
             Guid tenantId,
             Guid brandId,
             CancellationToken cancellationToken) =>
-            Task.FromResult(tenantId == TenantId && brandId == BrandId ? BrandForLogoUpdate : null);
+            Task.FromResult(
+                tenantId == TenantId &&
+                brandId == BrandId &&
+                BrandForLogoUpdate?.Status != BrandConstants.DeletedStatus
+                    ? BrandForLogoUpdate
+                    : null);
 
         public Task AddMediaAssetAsync(
             MediaAsset mediaAsset,

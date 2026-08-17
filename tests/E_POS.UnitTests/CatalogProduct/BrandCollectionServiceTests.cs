@@ -72,7 +72,8 @@ public sealed class BrandCollectionServiceTests
     public async Task BrandCreateAsync_WithCreatePermission_NormalizesCodeAndPersists()
     {
         var repository = new FakeBrandRepository();
-        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider());
+        var audit = new FakeBrandAuditLogger();
+        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider(), audit);
 
         var result = await service.CreateAsync(
             CreateContext([BrandConstants.CreatePermission]),
@@ -82,6 +83,8 @@ public sealed class BrandCollectionServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal("ACME", repository.AddedBrand?.BrandCode);
         Assert.Equal(TenantId, repository.AddedBrand?.TenantId);
+        var auditEvent = Assert.Single(audit.Events);
+        Assert.Equal(("BrandCreated", TenantId, UserId, repository.AddedBrand!.Id, 1L), auditEvent);
     }
 
     [Fact]
@@ -132,7 +135,8 @@ public sealed class BrandCollectionServiceTests
             Now);
         brand.UpdateLogo("https://cdn.example.test/brand-old.png", mediaAssetId, UserId, Now);
         var repository = new FakeBrandRepository { EditableBrand = brand };
-        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider());
+        var audit = new FakeBrandAuditLogger();
+        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider(), audit);
 
         var result = await service.UpdateAsync(
             CreateContext([BrandConstants.UpdatePermission]),
@@ -163,7 +167,8 @@ public sealed class BrandCollectionServiceTests
             Now);
         brand.UpdateLogo("https://cdn.example.test/brand.png", mediaAssetId, UserId, Now);
         var repository = new FakeBrandRepository { EditableBrand = brand };
-        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider());
+        var audit = new FakeBrandAuditLogger();
+        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider(), audit);
 
         var result = await service.DeleteAsync(
             CreateContext([BrandConstants.DeletePermission]),
@@ -173,6 +178,82 @@ public sealed class BrandCollectionServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(BrandConstants.DeletedStatus, brand.Status);
         Assert.Equal([mediaAssetId], repository.InactivatedMediaAssetIds);
+        Assert.Equal(("BrandDeleted", TenantId, UserId, brandId, 2L), Assert.Single(audit.Events));
+    }
+
+    [Fact]
+    public async Task BrandUpdateAsync_WithStaleRowVersion_ReturnsConflictWithoutMutation()
+    {
+        var brand = Brand.Create(Guid.NewGuid(), TenantId, "ACME", "Current", "acme", null, BrandConstants.ActiveStatus, UserId, Now);
+        brand.IncrementRowVersion();
+        var audit = new FakeBrandAuditLogger();
+        var service = new BrandService(new FakeBrandRepository { EditableBrand = brand }, new BrandRequestValidator(), new FakeDateTimeProvider(), audit);
+
+        var result = await service.UpdateAsync(
+            CreateContext([BrandConstants.UpdatePermission]),
+            brand.Id,
+            new BrandUpdateRequest("ACME", "Stale overwrite", null, null, null, BrandConstants.ActiveStatus, ExpectedRowVersion: 1),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("brand.concurrency_conflict", result.Error.Code);
+        Assert.Equal("Current", brand.BrandName);
+        Assert.Equal(2, brand.RowVersion);
+        Assert.Empty(audit.Events);
+    }
+
+    [Fact]
+    public async Task BrandUpdateAsync_WithCurrentRowVersion_IncrementsVersionAndAuditsUpdateAndStatus()
+    {
+        var brand = Brand.Create(Guid.NewGuid(), TenantId, "ACME", "Current", "acme", null, BrandConstants.ActiveStatus, UserId, Now);
+        var audit = new FakeBrandAuditLogger();
+        var service = new BrandService(new FakeBrandRepository { EditableBrand = brand }, new BrandRequestValidator(), new FakeDateTimeProvider(), audit);
+
+        var result = await service.UpdateAsync(
+            CreateContext([BrandConstants.UpdatePermission]),
+            brand.Id,
+            new BrandUpdateRequest("ACME", "Updated", null, null, null, BrandConstants.InactiveStatus, ExpectedRowVersion: 1),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(2, result.Value!.RowVersion);
+        Assert.Contains(audit.Events, item => item.EventName == "BrandUpdated" && item.TenantId == TenantId && item.UserId == UserId && item.BrandId == brand.Id && item.RowVersion == 2);
+        Assert.Contains(audit.Events, item => item.EventName == "BrandStatusChanged" && item.TenantId == TenantId && item.UserId == UserId && item.BrandId == brand.Id && item.RowVersion == 2);
+    }
+
+    [Fact]
+    public async Task BrandCreateAsync_WhenDatabaseCodeRaceOccurs_ReturnsFieldConflict()
+    {
+        var repository = new FakeBrandRepository { AddErrorCode = "brand.code_conflict" };
+        var audit = new FakeBrandAuditLogger();
+        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider(), audit);
+
+        var result = await service.CreateAsync(
+            CreateContext([BrandConstants.CreatePermission]),
+            new BrandCreateRequest("ACME", "Acme", null, null, null, BrandConstants.ActiveStatus),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("brand.code_conflict", result.Error.Code);
+        Assert.Equal("brandCode", Assert.Single(result.Error.FieldErrors!).Field);
+        Assert.Empty(audit.Events);
+    }
+
+    [Fact]
+    public async Task BrandDeleteAsync_WhenActiveProductIsLinked_ReturnsDependencyConflict()
+    {
+        var brand = Brand.Create(Guid.NewGuid(), TenantId, "ACME", "Acme", "acme", null, BrandConstants.ActiveStatus, UserId, Now);
+        var repository = new FakeBrandRepository { EditableBrand = brand, HasProductLinks = true };
+        var audit = new FakeBrandAuditLogger();
+        var service = new BrandService(repository, new BrandRequestValidator(), new FakeDateTimeProvider(), audit);
+
+        var result = await service.DeleteAsync(CreateContext([BrandConstants.DeletePermission]), brand.Id, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("brand.delete_conflict", result.Error.Code);
+        Assert.Equal(BrandConstants.ActiveStatus, brand.Status);
+        Assert.Empty(audit.Events);
     }
     [Fact]
     public async Task CollectionCreateAsync_WithCreatePermission_NormalizesCodeAndPersists()
@@ -217,16 +298,29 @@ public sealed class BrandCollectionServiceTests
         public DateTimeOffset UtcNow => Now;
     }
 
+    private sealed class FakeBrandAuditLogger : IBrandAuditLogger
+    {
+        public List<(string EventName, Guid TenantId, Guid UserId, Guid BrandId, long RowVersion)> Events { get; } = [];
+        public void LogMutation(string eventName, Guid tenantId, Guid userId, Guid brandId, long rowVersion) => Events.Add((eventName, tenantId, userId, brandId, rowVersion));
+    }
+
     private sealed class FakeBrandRepository : IBrandRepository
     {
         public Brand? AddedBrand { get; private set; }
         public Brand? EditableBrand { get; init; }
         public List<MediaAsset> AddedMediaAssets { get; } = [];
         public List<Guid> InactivatedMediaAssetIds { get; } = [];
+        public bool HasProductLinks { get; init; }
+        public string? AddErrorCode { get; init; }
 
         public Task<bool> BrandCodeExistsAsync(Guid tenantId, string brandCode, Guid? excludeBrandId, CancellationToken cancellationToken)
         {
             return Task.FromResult(false);
+        }
+
+        public Task<bool> HasProductLinksAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(HasProductLinks);
         }
 
         public Task<BrandListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken)
@@ -237,7 +331,7 @@ public sealed class BrandCollectionServiceTests
         public Task<BrandResponse?> GetByIdAsync(Guid tenantId, Guid brandId, bool includeDeleted, CancellationToken cancellationToken)
         {
             var brand = AddedBrand ?? EditableBrand;
-            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, brand!.BrandCode, brand.BrandName, null, brand.LogoMediaAssetId, brand.Status, brand.CreatedAt, brand.UpdatedAt, brand.Description, brand.SortOrder));
+            return Task.FromResult<BrandResponse?>(new BrandResponse(brandId, brand!.BrandCode, brand.BrandName, null, brand.LogoMediaAssetId, brand.Status, brand.CreatedAt, brand.UpdatedAt, brand.Description, brand.SortOrder, brand.RowVersion));
         }
 
         public Task<Brand?> GetEditableAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)
@@ -247,6 +341,7 @@ public sealed class BrandCollectionServiceTests
 
         public Task AddAsync(Brand brand, CancellationToken cancellationToken)
         {
+            if (AddErrorCode is not null) throw new BrandPersistenceException(AddErrorCode);
             AddedBrand = brand;
             return Task.CompletedTask;
         }

@@ -15,12 +15,14 @@ public sealed class BrandService : IBrandService
     private readonly IBrandRepository _repository;
     private readonly IBrandRequestValidator _validator;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IBrandAuditLogger? _auditLogger;
 
-    public BrandService(IBrandRepository repository, IBrandRequestValidator validator, IDateTimeProvider dateTimeProvider)
+    public BrandService(IBrandRepository repository, IBrandRequestValidator validator, IDateTimeProvider dateTimeProvider, IBrandAuditLogger? auditLogger = null)
     {
         _repository = repository;
         _validator = validator;
         _dateTimeProvider = dateTimeProvider;
+        _auditLogger = auditLogger;
     }
 
     public async Task<ApplicationResult<BrandResponse>> CreateAsync(TenantRequestContext context, BrandCreateRequest request, CancellationToken cancellationToken)
@@ -34,7 +36,7 @@ public sealed class BrandService : IBrandService
         var normalizedCode = BrandConstants.NormalizeCode(request.BrandCode);
         if (await _repository.BrandCodeExistsAsync(context.TenantId, normalizedCode, null, cancellationToken))
         {
-            return ApplicationResult<BrandResponse>.Failure(new ApplicationError("brand.duplicate_code", "Brand code already exists."));
+            return ApplicationResult<BrandResponse>.Failure(new ApplicationError("brand.code_conflict", "Brand code already exists.", [new ApplicationFieldError("brandCode", "Brand code already exists.")]));
         }
 
         var brandId = Guid.NewGuid();
@@ -71,7 +73,15 @@ public sealed class BrandService : IBrandService
             await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
         }
 
-        await _repository.AddAsync(brand, cancellationToken);
+        try
+        {
+            await _repository.AddAsync(brand, cancellationToken);
+        }
+        catch (BrandPersistenceException ex)
+        {
+            return ApplicationResult<BrandResponse>.Failure(PersistenceConflict(ex.ErrorCode));
+        }
+        _auditLogger?.LogMutation("BrandCreated", context.TenantId, context.UserId, brandId, brand.RowVersion);
         var response = await _repository.GetByIdAsync(context.TenantId, brandId, false, cancellationToken);
         return ApplicationResult<BrandResponse>.Success(response!);
     }
@@ -116,10 +126,15 @@ public sealed class BrandService : IBrandService
         var brand = await _repository.GetEditableAsync(context.TenantId, brandId, cancellationToken);
         if (brand is null) return ApplicationResult<BrandResponse>.Failure(NotFound);
 
+        if (request.ExpectedRowVersion != brand.RowVersion)
+        {
+            return ApplicationResult<BrandResponse>.Failure(PersistenceConflict("brand.concurrency_conflict"));
+        }
+
         var normalizedCode = BrandConstants.NormalizeCode(request.BrandCode);
         if (await _repository.BrandCodeExistsAsync(context.TenantId, normalizedCode, brandId, cancellationToken))
         {
-            return ApplicationResult<BrandResponse>.Failure(new ApplicationError("brand.duplicate_code", "Brand code already exists."));
+            return ApplicationResult<BrandResponse>.Failure(new ApplicationError("brand.code_conflict", "Brand code already exists.", [new ApplicationFieldError("brandCode", "Brand code already exists.")]));
         }
 
         var slug = string.IsNullOrWhiteSpace(request.BrandSlug)
@@ -127,6 +142,7 @@ public sealed class BrandService : IBrandService
             : request.BrandSlug.Trim().ToLowerInvariant();
 
         var now = _dateTimeProvider.UtcNow;
+        var previousStatus = brand.Status;
         var requestedLogoUrl = NormalizeLegacyMediaUrl(request.LogoUrl);
         var previousMediaAssetId = brand.LogoMediaAssetId;
         var shouldClearMedia = request.LogoUrl is not null && string.IsNullOrWhiteSpace(request.LogoUrl);
@@ -184,7 +200,19 @@ public sealed class BrandService : IBrandService
             }
         }
 
-        await _repository.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _repository.SaveChangesAsync(cancellationToken);
+        }
+        catch (BrandPersistenceException ex)
+        {
+            return ApplicationResult<BrandResponse>.Failure(PersistenceConflict(ex.ErrorCode));
+        }
+        _auditLogger?.LogMutation("BrandUpdated", context.TenantId, context.UserId, brandId, brand.RowVersion);
+        if (!string.Equals(previousStatus, brand.Status, StringComparison.Ordinal))
+        {
+            _auditLogger?.LogMutation("BrandStatusChanged", context.TenantId, context.UserId, brandId, brand.RowVersion);
+        }
         var response = await _repository.GetByIdAsync(context.TenantId, brandId, false, cancellationToken);
         return response is null ? ApplicationResult<BrandResponse>.Failure(NotFound) : ApplicationResult<BrandResponse>.Success(response);
     }
@@ -196,6 +224,11 @@ public sealed class BrandService : IBrandService
 
         var brand = await _repository.GetEditableAsync(context.TenantId, brandId, cancellationToken);
         if (brand is null) return ApplicationResult.Failure(NotFound);
+
+        if (await _repository.HasProductLinksAsync(context.TenantId, brandId, cancellationToken))
+        {
+            return ApplicationResult.Failure(new ApplicationError("brand.delete_conflict", "Brand cannot be deleted while active products reference it."));
+        }
 
         var now = _dateTimeProvider.UtcNow;
         var mediaAssetId = brand.LogoMediaAssetId;
@@ -212,13 +245,30 @@ public sealed class BrandService : IBrandService
                 cancellationToken);
         }
 
-        await _repository.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _repository.SaveChangesAsync(cancellationToken);
+        }
+        catch (BrandPersistenceException ex)
+        {
+            return ApplicationResult.Failure(PersistenceConflict(ex.ErrorCode));
+        }
+        _auditLogger?.LogMutation("BrandDeleted", context.TenantId, context.UserId, brandId, brand.RowVersion);
         return ApplicationResult.Success();
     }
 
     private static string? NormalizeLegacyMediaUrl(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+    private static ApplicationError PersistenceConflict(string code)
+    {
+        return code switch
+        {
+            "brand.code_conflict" => new ApplicationError(code, "Brand code already exists.", [new ApplicationFieldError("brandCode", "Brand code already exists.")]),
+            "brand.slug_conflict" => new ApplicationError(code, "The server-managed Brand slug conflicts with another Brand.", [new ApplicationFieldError("brandCode", "Brand code produces a conflicting Brand slug.")]),
+            _ => new ApplicationError("brand.concurrency_conflict", "The Brand was changed by another request. Reload and try again.")
+        };
     }
     private static ApplicationError? ValidateAccess(TenantRequestContext context, string requiredPermission)
     {

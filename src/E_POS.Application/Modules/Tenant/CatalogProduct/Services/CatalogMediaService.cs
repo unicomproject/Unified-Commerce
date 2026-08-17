@@ -27,15 +27,18 @@ public sealed class CatalogMediaService : ICatalogMediaService
     private readonly ICatalogMediaRepository _repository;
     private readonly IMediaObjectStorage _storage;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IBrandAuditLogger? _brandAuditLogger;
 
     public CatalogMediaService(
         ICatalogMediaRepository repository,
         IMediaObjectStorage storage,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IBrandAuditLogger? brandAuditLogger = null)
     {
         _repository = repository;
         _storage = storage;
         _dateTimeProvider = dateTimeProvider;
+        _brandAuditLogger = brandAuditLogger;
     }
 
     public async Task<ApplicationResult<MediaAssetUploadResponse>> UploadProductImageAsync(
@@ -738,7 +741,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
         MediaUploadFile file,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateBrandAccess(context);
+        var accessError = ValidateBrandLogoContext(context);
         if (accessError is not null)
         {
             return ApplicationResult<MediaAssetUploadResponse>.Failure(accessError);
@@ -760,6 +763,12 @@ public sealed class CatalogMediaService : ICatalogMediaService
                 "Brand was not found."));
         }
 
+        accessError = ValidateBrandLogoAccess(context, brand);
+        if (accessError is not null)
+        {
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(accessError);
+        }
+
         var previousMediaAssetId = brand.LogoMediaAssetId;
 
         var preparedResult = await PrepareImageAsync(file, cancellationToken, MaxBrandLogoFileSizeBytes, allowWebP: false);
@@ -779,13 +788,23 @@ public sealed class CatalogMediaService : ICatalogMediaService
             mediaAssetId,
             preparedResult.Image.StorageExtension);
 
-        var uploadResult = await UploadToStorageAsync(
-            context,
-            mediaAssetId,
-            storageKey,
-            purpose,
-            preparedResult.Image,
-            cancellationToken);
+        MediaObjectUploadResult uploadResult;
+        try
+        {
+            uploadResult = await UploadToStorageAsync(
+                context,
+                mediaAssetId,
+                storageKey,
+                purpose,
+                preparedResult.Image,
+                cancellationToken);
+        }
+        catch (Exception)
+        {
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
+                "media.storage_unavailable",
+                "Failed to upload Brand logo to media storage."));
+        }
 
         var now = _dateTimeProvider.UtcNow;
         var mediaAsset = CreateMediaAsset(
@@ -798,6 +817,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             now);
 
         brand.UpdateLogo(mediaAssetId, context.UserId, now);
+        brand.IncrementRowVersion();
 
         try
         {
@@ -814,13 +834,20 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
             await _repository.SaveChangesAsync(cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await TryDeleteUploadedBlobAsync(uploadResult, cancellationToken);
             return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
                 "media.save_failed",
-                "Failed to save brand image record: " + ex.Message));
+                "Failed to save Brand logo metadata."));
         }
+
+        _brandAuditLogger?.LogMutation(
+            previousMediaAssetId.HasValue ? "BrandLogoReplaced" : "InitialBrandLogoAttached",
+            context.TenantId,
+            context.UserId,
+            brandId,
+            brand.RowVersion);
 
         return ApplicationResult<MediaAssetUploadResponse>.Success(new MediaAssetUploadResponse(
             mediaAssetId,
@@ -1051,7 +1078,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             : PermissionDenied;
     }
 
-    private static ApplicationError? ValidateBrandAccess(TenantRequestContext context)
+    private static ApplicationError? ValidateBrandLogoContext(TenantRequestContext context)
     {
         if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
         {
@@ -1059,9 +1086,30 @@ public sealed class CatalogMediaService : ICatalogMediaService
         }
 
         return context.HasPermission(BrandConstants.UpdatePermission) ||
+               context.HasPermission(BrandConstants.CreatePermission) ||
                context.HasPermission(BrandConstants.ManagePermission)
             ? null
             : PermissionDenied;
+    }
+
+    private static ApplicationError? ValidateBrandLogoAccess(TenantRequestContext context, Brand brand)
+    {
+        if (context.HasPermission(BrandConstants.UpdatePermission) ||
+            context.HasPermission(BrandConstants.ManagePermission))
+        {
+            return null;
+        }
+
+        var isCreatorCompletingInitialLogo =
+            context.HasPermission(BrandConstants.CreatePermission) &&
+            !brand.LogoMediaAssetId.HasValue &&
+            brand.CreatedByTenantUserId == context.UserId;
+
+        return isCreatorCompletingInitialLogo
+            ? null
+            : new ApplicationError(
+                "media.initial_brand_logo_not_authorized",
+                "The initial Brand logo can only be attached by the user who created the Brand.");
     }
 
     private static ApplicationError ValidationFailed(IReadOnlyList<ApplicationFieldError> fieldErrors) =>

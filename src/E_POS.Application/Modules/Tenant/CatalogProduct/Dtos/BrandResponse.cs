@@ -10,4 +10,5 @@ public sealed record BrandResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
     string? Description = null,
-    int SortOrder = 0);
+    int SortOrder = 0,
+    long RowVersion = 1);

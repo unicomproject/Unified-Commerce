@@ -14,6 +14,7 @@ public class Brand : AuditableEntity
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+    public long RowVersion { get; protected set; } = 1;
 
     public static Brand Create(
         Guid id,
@@ -62,6 +63,7 @@ public class Brand : AuditableEntity
         Status = status.Trim().ToUpperInvariant();
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
+        RowVersion++;
     }
 
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
@@ -69,6 +71,7 @@ public class Brand : AuditableEntity
         Status = "DELETED";
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
+        RowVersion++;
     }
 
     public void UpdateLogo(
@@ -80,6 +83,8 @@ public class Brand : AuditableEntity
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
+
+    public void IncrementRowVersion() => RowVersion++;
     public static Brand Create(
         Guid id,
         Guid tenantId,
