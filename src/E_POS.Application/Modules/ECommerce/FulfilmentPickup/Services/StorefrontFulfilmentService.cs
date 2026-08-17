@@ -1,25 +1,25 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 
-namespace E_POS.Application.Modules.ECommerce.Storefront.Services;
+namespace E_POS.Application.Modules.ECommerce.FulfilmentPickup.Services;
 
-public sealed class StorefrontFulfillmentService : IStorefrontFulfillmentService
+public sealed class StorefrontFulfilmentService : IStorefrontFulfilmentService
 {
     public const int DefaultCollectionDays = 5;
     public const int MaximumCollectionDays = 14;
 
-    private readonly IStorefrontFulfillmentRepository _repository;
+    private readonly IStorefrontFulfilmentRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
-    public StorefrontFulfillmentService(IStorefrontFulfillmentRepository repository)
+    public StorefrontFulfilmentService(IStorefrontFulfilmentRepository repository)
         : this(repository, new SystemClock())
     {
     }
 
-    public StorefrontFulfillmentService(
-        IStorefrontFulfillmentRepository repository,
+    public StorefrontFulfilmentService(
+        IStorefrontFulfilmentRepository repository,
         IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;

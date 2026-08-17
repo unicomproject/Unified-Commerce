@@ -527,16 +527,15 @@ public abstract class StorefrontProductRepositoryBase
         var normalizedSort = sort?.Trim().ToLowerInvariant();
         return normalizedSort switch
         {
-            "price_asc" => items.OrderBy(x => x.Price ?? decimal.MaxValue).ThenBy(x => x.Product.ProductName),
-            "price_desc" => items.OrderByDescending(x => x.Price ?? decimal.MinValue).ThenBy(x => x.Product.ProductName),
-            "newest" => items.OrderByDescending(x => x.Product.CreatedAt).ThenBy(x => x.Product.ProductName),
-            _ => items.OrderBy(x => x.SortOrder).ThenByDescending(x => x.ReviewCount).ThenByDescending(x => x.Rating).ThenBy(x => x.Product.ProductName)
+            "price_asc" => items.OrderBy(x => x.Model.Price).ThenBy(x => x.Model.Name),
+            "price_desc" => items.OrderByDescending(x => x.Model.Price).ThenBy(x => x.Model.Name),
+            "newest" => items.OrderByDescending(x => x.Model.Id).ThenBy(x => x.Model.Name),
+            _ => items.OrderBy(x => x.SortOrder).ThenByDescending(x => x.ReviewCount).ThenByDescending(x => x.Rating).ThenBy(x => x.Model.Name)
         };
     }
 
     protected sealed record ProductListingSortItem(
-        Product Product,
-        decimal? Price,
+        StorefrontProductListReadModel Model,
         int SortOrder,
         decimal Rating,
         int ReviewCount);

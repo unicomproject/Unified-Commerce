@@ -1,7 +1,7 @@
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.ECommerce.Customer.Dtos;
+using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 
-namespace E_POS.Application.Modules.ECommerce.Customer.Contracts;
+namespace E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 
 public interface IPosCustomerService
 {

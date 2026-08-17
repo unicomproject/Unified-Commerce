@@ -1,11 +1,11 @@
-using E_POS.Application.Modules.ECommerce.Customer.Contracts;
-using E_POS.Application.Modules.ECommerce.Customer.Dtos;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 
-namespace E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
+namespace E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 
 public sealed class PosCustomerRepository : IPosCustomerRepository
 {

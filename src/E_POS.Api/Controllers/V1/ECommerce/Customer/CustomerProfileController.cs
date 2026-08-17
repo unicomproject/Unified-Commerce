@@ -1,18 +1,19 @@
-﻿using System.Security.Claims;
+using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+using System.Security.Claims;
 using E_POS.Api.Extensions;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace E_POS.Api.Controllers.V1.ECommerce.CustomerAuth;
+namespace E_POS.Api.Controllers.V1.ECommerce.Customer;
 
 [ApiController]
 [Authorize(Policy = "CustomerOnly")]
 [Route("api/v1/ecommerce/storefront/customer/profile")]
-public sealed class CustomerProfileController : ControllerBase
+public sealed class CustomerProfileController : CustomerControllerBase
 {
     private readonly ICustomerAuthService _service;
 
@@ -24,8 +25,8 @@ public sealed class CustomerProfileController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetProfile(CancellationToken cancellationToken)
     {
-        if (!TryGetSessionContext(out var tenantId, out var customerId))
-            return Unauthorized(CreateError(new ApplicationError("customer.invalid_session", "Invalid customer session.")));
+        if (!TryGetCustomerContext(out var tenantId, out var customerId))
+            return InvalidSession();
 
         var result = await _service.GetProfileAsync(tenantId, customerId, cancellationToken);
         
@@ -46,8 +47,8 @@ public sealed class CustomerProfileController : ControllerBase
         [FromBody] CustomerProfileUpdateRequest request, 
         CancellationToken cancellationToken)
     {
-        if (!TryGetSessionContext(out var tenantId, out var customerId))
-            return Unauthorized(CreateError(new ApplicationError("customer.invalid_session", "Invalid customer session.")));
+        if (!TryGetCustomerContext(out var tenantId, out var customerId))
+            return InvalidSession();
 
         var result = await _service.UpdateProfileAsync(tenantId, customerId, request, cancellationToken);
         
@@ -62,23 +63,5 @@ public sealed class CustomerProfileController : ControllerBase
 
         return BadRequest(CreateError(result.Error));
     }
-
-    private bool TryGetSessionContext(out Guid tenantId, out Guid customerId)
-    {
-        tenantId = Guid.Empty;
-        customerId = Guid.Empty;
-        var customerValue = User.FindFirstValue("sub") ??
-                            User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(User.FindFirstValue("tenant_id"), out tenantId) &&
-               Guid.TryParse(customerValue, out customerId);
-    }
-
-    private object CreateError(ApplicationError error) => new
-    {
-        success = false,
-        message = error.Message,
-        errorCode = error.Code,
-        errors = Array.Empty<string>(),
-        traceId = HttpContext.TraceIdentifier
-    };
 }
+

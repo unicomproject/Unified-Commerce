@@ -5,7 +5,7 @@ using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace E_POS.Api.Controllers.V1.ECommerce.Storefront;
+namespace E_POS.Api.Controllers.V1.ECommerce.CartCheckout;
 
 [ApiController]
 [Authorize(Policy = "CustomerOnly")]

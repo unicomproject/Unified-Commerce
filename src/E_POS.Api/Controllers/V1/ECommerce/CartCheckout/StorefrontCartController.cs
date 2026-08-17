@@ -3,7 +3,7 @@ using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
-namespace E_POS.Api.Controllers.V1.ECommerce.Storefront;
+namespace E_POS.Api.Controllers.V1.ECommerce.CartCheckout;
 
 [ApiController]
 [Route("api/v1/ecommerce/storefront/cart")]

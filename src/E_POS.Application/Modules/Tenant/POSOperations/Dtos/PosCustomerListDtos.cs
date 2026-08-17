@@ -1,4 +1,4 @@
-namespace E_POS.Application.Modules.ECommerce.Customer.Dtos;
+namespace E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 
 public sealed record PosCustomerCreateRequestDto(
     string FullName,

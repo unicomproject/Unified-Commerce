@@ -1,8 +1,8 @@
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 
-namespace E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+namespace E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 
-public interface IStorefrontFulfillmentRepository
+public interface IStorefrontFulfilmentRepository
 {
     Task<IEnumerable<StorefrontStoreReadModel>> GetAvailableStoresAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task<StorefrontCollectionConfigurationReadModel?> GetCollectionConfigurationAsync(
