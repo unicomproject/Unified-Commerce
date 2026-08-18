@@ -77,7 +77,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                    AND tenant_roles.tenant_id = '55555555-0000-4000-8000-000000000001'
                 JOIN permission_definitions
                     ON permission_definitions.permission_code = mapping.permission_code
-                ON CONFLICT (tenant_id, role_id, permission_id) DO NOTHING;
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM tenant_role_permissions existing_permission
+                    WHERE existing_permission.tenant_id = tenant_roles.tenant_id
+                      AND existing_permission.role_id = tenant_roles.id
+                      AND existing_permission.permission_id = permission_definitions.id
+                );
                 """);
         }
 

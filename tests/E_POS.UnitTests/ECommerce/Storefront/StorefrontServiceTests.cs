@@ -1,8 +1,10 @@
-﻿using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Contracts;
 using System.Reflection;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Services;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Services;
 using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
@@ -34,7 +36,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = (await service.GetActiveBannersAsync(TenantId, "HERO", CancellationToken.None)).ToList();
@@ -68,7 +70,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = (await service.GetFeaturedCategoriesAsync(TenantId, CancellationToken.None)).ToList();
@@ -111,7 +113,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = await service.GetRootCategoriesAsync(TenantId, CancellationToken.None);
@@ -142,7 +144,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = await service.GetChildCategoriesAsync(TenantId, parentCategoryId, CancellationToken.None);
@@ -168,7 +170,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = await service.GetProductsAsync(TenantId, categoryId, "newest", 1, 20, CancellationToken.None);
@@ -197,7 +199,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = await service.GetProductDetailAsync(TenantId, "man-city-home-jersey", CancellationToken.None);
@@ -262,7 +264,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = (await service.GetBestSellersAsync(TenantId, CancellationToken.None)).ToList();
@@ -301,7 +303,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = await service.GetAvailableStoresAsync(TenantId, CancellationToken.None);
@@ -331,13 +333,13 @@ public sealed class StorefrontServiceTests
                 ]
             }
         };
-        var service = new StorefrontFulfillmentService(repository, new FakeClock(Now));
+        var service = new StorefrontFulfilmentService(repository, new FakeClock(Now));
 
         var result = await service.GetCollectionOptionsAsync(TenantId, outletId, 3, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var options = Assert.IsType<StorefrontCollectionOptionsReadModel>(result.Value);
-        Assert.Equal(Now.AddMinutes(90), options.EarliestCollectionAt);
+        Assert.Equal(new DateTimeOffset(2026, 7, 13, 9, 30, 0, TimeSpan.Zero), options.EarliestCollectionAt);
         Assert.Collection(
             options.Dates,
             monday =>
@@ -376,7 +378,7 @@ public sealed class StorefrontServiceTests
                 ]
             }
         };
-        var service = new StorefrontFulfillmentService(repository, new FakeClock(Now));
+        var service = new StorefrontFulfilmentService(repository, new FakeClock(Now));
 
         var result = await service.GetCollectionOptionsAsync(TenantId, outletId, 2, CancellationToken.None);
 
@@ -412,7 +414,7 @@ public sealed class StorefrontServiceTests
                 ]
             }
         };
-        var service = new StorefrontFulfillmentService(repository, new FakeClock(Now));
+        var service = new StorefrontFulfilmentService(repository, new FakeClock(Now));
 
         var result = await service.GetCollectionOptionsAsync(
             TenantId,
@@ -450,7 +452,7 @@ public sealed class StorefrontServiceTests
             }
         };
         var beforeFallback = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
-        var service = new StorefrontFulfillmentService(repository, new FakeClock(beforeFallback));
+        var service = new StorefrontFulfilmentService(repository, new FakeClock(beforeFallback));
 
         var result = await service.GetCollectionOptionsAsync(
             TenantId,
@@ -471,7 +473,7 @@ public sealed class StorefrontServiceTests
             new StorefrontBannerService(repository),
             new StorefrontCategoryService(repository),
             new StorefrontProductService(repository),
-            new StorefrontFulfillmentService(repository),
+            new StorefrontFulfilmentService(repository),
             new StorefrontTenantService(repository));
 
         var result = await service.ResolveTenantAsync("demo-store", CancellationToken.None);
@@ -605,3 +607,5 @@ public sealed class StorefrontServiceTests
         }
     }
 }
+
+

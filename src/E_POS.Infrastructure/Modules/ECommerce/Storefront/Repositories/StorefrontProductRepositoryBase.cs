@@ -348,6 +348,62 @@ public abstract class StorefrontProductRepositoryBase
         return new ProductVariantOptions(options, optionValues, variantOptionLinks);
     }
 
+    protected async Task<Dictionary<Guid, ProductVariantOptions>> GetVariantOptionsByProductAsync(Guid tenantId, IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken)
+    {
+        var options = await DbContext.Set<ProductOption>()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId) && x.Status == ActiveStatus)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.OptionName)
+            .ToListAsync(cancellationToken);
+
+        var optionIds = options.Select(x => x.Id).ToList();
+        var optionValueRows = optionIds.Count == 0 ? [] : await (from optionValue in DbContext.Set<ProductOptionValue>().AsNoTracking()
+                                     join mediaAsset in DbContext.Set<MediaAsset>().AsNoTracking()
+                                         on new { optionValue.TenantId, MediaAssetId = optionValue.ImageMediaAssetId }
+                                         equals new { mediaAsset.TenantId, MediaAssetId = (Guid?)mediaAsset.Id } into mediaAssets
+                                     from mediaAsset in mediaAssets.DefaultIfEmpty()
+                                     where optionValue.TenantId == tenantId &&
+                                           optionIds.Contains(optionValue.ProductOptionId) &&
+                                           optionValue.Status == ActiveStatus
+                                     orderby optionValue.SortOrder, optionValue.ValueName
+                                     select new
+                                     {
+                                         OptionValue = optionValue,
+                                         MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
+                                         MediaContainerName = mediaAsset == null ? null : mediaAsset.ContainerName,
+                                         MediaStorageKey = mediaAsset == null ? null : mediaAsset.StorageKey,
+                                         MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl
+                                     })
+            .ToListAsync(cancellationToken);
+
+        var optionValues = optionValueRows
+            .Select(x => new ProductOptionValueMedia(
+                x.OptionValue,
+                ResolveActiveMediaReadUrl(
+                    x.MediaStatus,
+                    x.MediaContainerName,
+                    x.MediaStorageKey,
+                    x.MediaPublicUrl)))
+            .ToList();
+
+        // For Product Listings, we don't necessarily need the exact variant links, we just need the available option values
+        // to show S, M, L or colors on the card.
+        // If we do need variant links, we could fetch them, but for the basic list we just need the options and values.
+        
+        var result = new Dictionary<Guid, ProductVariantOptions>();
+        foreach (var productId in productIds)
+        {
+            result[productId] = new ProductVariantOptions(
+                options.Where(o => o.ProductId == productId).ToList(),
+                optionValues.Where(v => options.Where(o => o.ProductId == productId).Select(o => o.Id).Contains(v.OptionValue.ProductOptionId)).ToList(),
+                [] // No variant links needed for list view
+            );
+        }
+
+        return result;
+    }
+
     protected static IReadOnlyList<StorefrontProductOptionReadModel> BuildSelectableOptions(
         ProductVariantOptions variantOptions)
     {
@@ -466,22 +522,21 @@ public abstract class StorefrontProductRepositoryBase
                 cancellationToken);
     }
 
-    protected static IEnumerable<ProductListingSortItem> SortProductListings(IReadOnlyList<ProductListingSortItem> productModels, string? sort)
+    protected static IEnumerable<ProductListingSortItem> SortProductListings(IEnumerable<ProductListingSortItem> items, string? sort)
     {
         var normalizedSort = sort?.Trim().ToLowerInvariant();
         return normalizedSort switch
         {
-            "price_asc" => productModels.OrderBy(x => x.Model.Price).ThenBy(x => x.Model.Name),
-            "price_desc" => productModels.OrderByDescending(x => x.Model.Price).ThenBy(x => x.Model.Name),
-            "newest" => productModels.OrderByDescending(x => x.CreatedAt).ThenBy(x => x.Model.Name),
-            _ => productModels.OrderBy(x => x.SortOrder).ThenByDescending(x => x.ReviewCount).ThenByDescending(x => x.Rating).ThenBy(x => x.Model.Name)
+            "price_asc" => items.OrderBy(x => x.Model.Price).ThenBy(x => x.Model.Name),
+            "price_desc" => items.OrderByDescending(x => x.Model.Price).ThenBy(x => x.Model.Name),
+            "newest" => items.OrderByDescending(x => x.Model.Id).ThenBy(x => x.Model.Name),
+            _ => items.OrderBy(x => x.SortOrder).ThenByDescending(x => x.ReviewCount).ThenByDescending(x => x.Rating).ThenBy(x => x.Model.Name)
         };
     }
 
     protected sealed record ProductListingSortItem(
         StorefrontProductListReadModel Model,
         int SortOrder,
-        DateTimeOffset CreatedAt,
         decimal Rating,
         int ReviewCount);
 

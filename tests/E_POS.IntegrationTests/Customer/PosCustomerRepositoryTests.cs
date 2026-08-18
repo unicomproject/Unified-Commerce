@@ -1,6 +1,7 @@
 using System.Reflection;
 using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
@@ -158,3 +159,4 @@ public sealed class PosCustomerRepositoryTests
         return new EPosDbContext(options);
     }
 }
+

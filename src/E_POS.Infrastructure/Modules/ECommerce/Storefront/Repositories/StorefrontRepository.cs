@@ -1,4 +1,5 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Infrastructure.Persistence;
@@ -10,14 +11,14 @@ public sealed class StorefrontRepository : IStorefrontRepository
     private readonly IStorefrontBannerRepository _bannerRepository;
     private readonly IStorefrontCategoryRepository _categoryRepository;
     private readonly IStorefrontProductRepository _productRepository;
-    private readonly IStorefrontFulfillmentRepository _fulfillmentRepository;
+    private readonly IStorefrontFulfilmentRepository _fulfillmentRepository;
     private readonly IStorefrontTenantRepository _tenantRepository;
 
     public StorefrontRepository(
         IStorefrontBannerRepository bannerRepository,
         IStorefrontCategoryRepository categoryRepository,
         IStorefrontProductRepository productRepository,
-        IStorefrontFulfillmentRepository fulfillmentRepository,
+        IStorefrontFulfilmentRepository fulfillmentRepository,
         IStorefrontTenantRepository tenantRepository)
     {
         _bannerRepository = bannerRepository;

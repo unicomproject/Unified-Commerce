@@ -24,7 +24,10 @@ public sealed class PlatformTenantBootstrapServiceTests
                 CanManageTills: true,
                 CanManageRoles: true,
                 CanManageUsers: true,
-                CanManageProducts: true));
+                CanManageProducts: true,
+                OnlineStoreEntitled: false,
+                OnlineStoreStatus: null,
+                CanManageOnlineStore: false));
 
         var outlets = modules.Single(module => module.ModuleKey == "outlets");
         var tills = modules.Single(module => module.ModuleKey == "tills");
@@ -54,7 +57,10 @@ public sealed class PlatformTenantBootstrapServiceTests
                 CanManageTills: true,
                 CanManageRoles: true,
                 CanManageUsers: true,
-                CanManageProducts: true));
+                CanManageProducts: true,
+                OnlineStoreEntitled: true,
+                OnlineStoreStatus: "ACTIVE",
+                CanManageOnlineStore: true));
 
         Assert.All(modules, module => Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusConfigured, module.Status));
     }
@@ -77,7 +83,10 @@ public sealed class PlatformTenantBootstrapServiceTests
                 CanManageTills: true,
                 CanManageRoles: true,
                 CanManageUsers: true,
-                CanManageProducts: true));
+                CanManageProducts: true,
+                OnlineStoreEntitled: false,
+                OnlineStoreStatus: null,
+                CanManageOnlineStore: false));
 
         var roles = modules.Single(module => module.ModuleKey == "roles");
         Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusNotRequired, roles.Status);
@@ -101,7 +110,10 @@ public sealed class PlatformTenantBootstrapServiceTests
                 CanManageTills: true,
                 CanManageRoles: true,
                 CanManageUsers: true,
-                CanManageProducts: true));
+                CanManageProducts: true,
+                OnlineStoreEntitled: false,
+                OnlineStoreStatus: null,
+                CanManageOnlineStore: false));
 
         var products = modules.Single(module => module.ModuleKey == "products");
         Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusNotEntitled, products.Status);
@@ -126,7 +138,10 @@ public sealed class PlatformTenantBootstrapServiceTests
                 CanManageTills: true,
                 CanManageRoles: true,
                 CanManageUsers: true,
-                CanManageProducts: true));
+                CanManageProducts: true,
+                OnlineStoreEntitled: false,
+                OnlineStoreStatus: null,
+                CanManageOnlineStore: false));
 
         var outlets = modules.Single(module => module.ModuleKey == "outlets");
         var tills = modules.Single(module => module.ModuleKey == "tills");
@@ -152,7 +167,10 @@ public sealed class PlatformTenantBootstrapServiceTests
                 CanManageTills: true,
                 CanManageRoles: true,
                 CanManageUsers: true,
-                CanManageProducts: true));
+                CanManageProducts: true,
+                OnlineStoreEntitled: false,
+                OnlineStoreStatus: null,
+                CanManageOnlineStore: false));
 
         var users = modules.Single(module => module.ModuleKey == "users");
         Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusNotStarted, users.Status);
@@ -176,12 +194,104 @@ public sealed class PlatformTenantBootstrapServiceTests
                 CanManageTills: true,
                 CanManageRoles: true,
                 CanManageUsers: true,
-                CanManageProducts: true));
+                CanManageProducts: true,
+                OnlineStoreEntitled: false,
+                OnlineStoreStatus: null,
+                CanManageOnlineStore: false));
 
         var users = modules.Single(module => module.ModuleKey == "users");
         var products = modules.Single(module => module.ModuleKey == "products");
         Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusConfigured, users.Status);
         Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusConfigured, products.Status);
+    }
+
+    [Fact]
+    public void SetupHubEvaluator_WhenOnlineStoreNotEntitled_ReturnsNotEntitled()
+    {
+        var modules = PlatformSelectedTenantSetupHubStatusEvaluator.Evaluate(
+            new PlatformSelectedTenantSetupHubStatusEvaluator.Input(
+                OutletEntitled: true,
+                TillEntitled: true,
+                ProductEntitled: true,
+                ActiveOutletCount: 1,
+                ActiveTillCount: 1,
+                CustomRoleCount: 0,
+                TenantUserCount: 1,
+                ActiveOrDraftProductCount: 0,
+                TenantSuspended: false,
+                CanManageOutlets: true,
+                CanManageTills: true,
+                CanManageRoles: true,
+                CanManageUsers: true,
+                CanManageProducts: true,
+                OnlineStoreEntitled: false,
+                OnlineStoreStatus: null,
+                CanManageOnlineStore: true));
+
+        var onlineStore = modules.Single(module => module.ModuleKey == "online_store");
+        Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusNotEntitled, onlineStore.Status);
+        Assert.False(onlineStore.Entitled);
+        Assert.False(onlineStore.CanConfigure);
+    }
+
+    [Fact]
+    public void SetupHubEvaluator_WhenOnlineStoreDraft_ReturnsNotStarted()
+    {
+        var modules = PlatformSelectedTenantSetupHubStatusEvaluator.Evaluate(
+            new PlatformSelectedTenantSetupHubStatusEvaluator.Input(
+                OutletEntitled: true,
+                TillEntitled: true,
+                ProductEntitled: true,
+                ActiveOutletCount: 1,
+                ActiveTillCount: 1,
+                CustomRoleCount: 0,
+                TenantUserCount: 1,
+                ActiveOrDraftProductCount: 0,
+                TenantSuspended: false,
+                CanManageOutlets: true,
+                CanManageTills: true,
+                CanManageRoles: true,
+                CanManageUsers: true,
+                CanManageProducts: true,
+                OnlineStoreEntitled: true,
+                OnlineStoreStatus: "DRAFT",
+                CanManageOnlineStore: true));
+
+        var onlineStore = modules.Single(module => module.ModuleKey == "online_store");
+        Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusNotStarted, onlineStore.Status);
+        Assert.True(onlineStore.Entitled);
+        Assert.True(onlineStore.CanConfigure);
+        Assert.Equal(0, onlineStore.Count);
+    }
+
+    [Fact]
+    public void SetupHubEvaluator_WhenOnlineStoreActive_ReturnsConfigured()
+    {
+        var modules = PlatformSelectedTenantSetupHubStatusEvaluator.Evaluate(
+            new PlatformSelectedTenantSetupHubStatusEvaluator.Input(
+                OutletEntitled: true,
+                TillEntitled: true,
+                ProductEntitled: true,
+                ActiveOutletCount: 1,
+                ActiveTillCount: 1,
+                CustomRoleCount: 0,
+                TenantUserCount: 1,
+                ActiveOrDraftProductCount: 0,
+                TenantSuspended: false,
+                CanManageOutlets: true,
+                CanManageTills: true,
+                CanManageRoles: true,
+                CanManageUsers: true,
+                CanManageProducts: true,
+                OnlineStoreEntitled: true,
+                OnlineStoreStatus: "ACTIVE",
+                CanManageOnlineStore: true));
+
+        var onlineStore = modules.Single(module => module.ModuleKey == "online_store");
+        Assert.Equal(PlatformSelectedTenantSetupHubStatusEvaluator.StatusConfigured, onlineStore.Status);
+        Assert.True(onlineStore.Entitled);
+        Assert.True(onlineStore.CanConfigure);
+        Assert.Equal(1, onlineStore.Count);
     }
 
     [Fact]

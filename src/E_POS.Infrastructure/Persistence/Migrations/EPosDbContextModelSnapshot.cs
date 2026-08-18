@@ -2676,6 +2676,100 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("storefront_banners", (string)null);
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Storefront.Entities.StorefrontPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_tenant_user_id");
+
+                    b.Property<DateTimeOffset?>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<string>("PolicyType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("policy_type");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid>("SalesChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_channel_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_tenant_user_id");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_storefront_policies");
+
+                    b.HasIndex("CreatedByTenantUserId");
+
+                    b.HasIndex("UpdatedByTenantUserId");
+
+                    b.HasIndex("TenantId", "SalesChannelId", "PolicyType")
+                        .IsUnique()
+                        .HasDatabaseName("uq_storefront_policies_current_published")
+                        .HasFilter("status = 'PUBLISHED'");
+
+                    b.HasIndex("TenantId", "SalesChannelId", "PolicyType", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_storefront_policies_type_version");
+
+                    b.ToTable("storefront_policies", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_storefront_policies_content_non_empty", "length(btrim(content)) > 0");
+
+                            t.HasCheckConstraint("ck_storefront_policies_policy_type", "policy_type IN ('TERMS', 'PRIVACY', 'CANCELLATION', 'COLLECTION', 'RETURN_REFUND')");
+
+                            t.HasCheckConstraint("ck_storefront_policies_status", "status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')");
+                        });
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6406,8 +6500,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("ChangeType")
                         .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
                         .HasColumnName("change_type");
 
                     b.Property<DateTimeOffset>("ChangedAt")
@@ -15730,6 +15824,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("refund_id");
 
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -15770,6 +15868,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "OutletId");
 
                     b.HasIndex("TenantId", "PosDeviceId");
+
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_cash_movements_tenant_id_request_id")
+                        .HasFilter("request_id IS NOT NULL");
 
                     b.HasIndex("TenantId", "TillId");
 
@@ -15837,9 +15940,15 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_cash_movement_types");
 
+                    b.HasIndex("MovementTypeCode")
+                        .IsUnique()
+                        .HasDatabaseName("uq_cash_movement_types_global_code")
+                        .HasFilter("tenant_id IS NULL");
+
                     b.HasIndex("TenantId", "MovementTypeCode")
                         .IsUnique()
-                        .HasDatabaseName("uq_cash_movement_types_tenant_id_movement_type_code");
+                        .HasDatabaseName("uq_cash_movement_types_tenant_code")
+                        .HasFilter("tenant_id IS NOT NULL");
 
                     b.ToTable("cash_movement_types", null, t =>
                         {
@@ -22337,6 +22446,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("performed_by_tenant_user_id");
 
+                    b.Property<Guid?>("PosDeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pos_device_id");
+
                     b.Property<string>("Reason")
                         .HasMaxLength(250)
                         .HasColumnType("varchar(250)")
@@ -22346,6 +22459,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)")
                         .HasColumnName("reference_number");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -22364,13 +22481,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_till_cash_movements_tenant_id_id");
 
-                    b.HasIndex("TenantId", "TillSessionId");
+                    b.HasIndex("TenantId", "PosDeviceId");
+
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_till_cash_movements_tenant_request_id")
+                        .HasFilter("request_id IS NOT NULL");
+
+                    b.HasIndex("TenantId", "TillSessionId", "PerformedAt")
+                        .HasDatabaseName("ix_till_cash_movements_session_performed_at");
 
                     b.ToTable("till_cash_movements", null, t =>
                         {
                             t.HasCheckConstraint("ck_till_cash_movements_amount", "amount > 0");
 
-                            t.HasCheckConstraint("ck_till_cash_movements_movement_type", "movement_type IN ('CASH_IN', 'CASH_OUT', 'OPENING_FLOAT', 'CLOSING_REMOVE')");
+                            t.HasCheckConstraint("ck_till_cash_movements_movement_type", "movement_type IN ('CASH_IN', 'CASH_OUT', 'CASH_DROP', 'OPENING_FLOAT', 'CLOSING_REMOVE')");
                         });
                 });
 
@@ -23148,15 +23273,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("currency_code");
 
                     b.Property<bool>("IsDefaultPriceList")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false)
                         .HasColumnName("is_default_price_list");
 
                     b.Property<bool>("PriceIncludesTax")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false)
                         .HasColumnName("price_includes_tax");
 
                     b.Property<string>("PriceListCode")
@@ -23178,9 +23299,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("price_list_type");
 
                     b.Property<int>("Priority")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(0)
                         .HasColumnName("priority");
 
                     b.Property<string>("Status")
@@ -26058,6 +26177,36 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_storefront_banners_image_media_asset_tenant");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Storefront.Entities.StorefrontPolicy", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_storefront_policies_created_by_tenant_user");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_storefront_policies_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_storefront_policies_updated_by_tenant_user");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SalesChannelId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_storefront_policies_sales_channel_tenant");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", b =>
@@ -31921,6 +32070,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_till_cash_movements_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "PosDeviceId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_till_cash_movements_pos_device_id_pos_devices");
 
                     b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
                         .WithMany()

@@ -10,6 +10,10 @@ public static class PlatformSelectedTenantSetupHubStatusEvaluator
     public const string StatusConfigured = "CONFIGURED";
     public const string StatusBlocked = "BLOCKED";
 
+    public const string OnlineStoreModuleKey = "online_store";
+    public const string StoreStatusDraft = "DRAFT";
+    public const string StoreStatusActive = "ACTIVE";
+
     public sealed record Input(
         bool OutletEntitled,
         bool TillEntitled,
@@ -24,7 +28,10 @@ public static class PlatformSelectedTenantSetupHubStatusEvaluator
         bool CanManageTills,
         bool CanManageRoles,
         bool CanManageUsers,
-        bool CanManageProducts);
+        bool CanManageProducts,
+        bool OnlineStoreEntitled,
+        string? OnlineStoreStatus,
+        bool CanManageOnlineStore);
 
     public static IReadOnlyList<PlatformTenantBootstrapModuleStatusDto> Evaluate(Input input)
     {
@@ -34,7 +41,8 @@ public static class PlatformSelectedTenantSetupHubStatusEvaluator
             EvaluateTills(input),
             EvaluateRoles(input),
             EvaluateUsers(input),
-            EvaluateProducts(input)
+            EvaluateProducts(input),
+            EvaluateOnlineStore(input)
         ];
     }
 
@@ -96,6 +104,19 @@ public static class PlatformSelectedTenantSetupHubStatusEvaluator
 
         var status = input.ActiveOrDraftProductCount >= 1 ? StatusConfigured : StatusNotStarted;
         return Module("products", status, input.ActiveOrDraftProductCount, entitled: true, input.CanManageProducts, null);
+    }
+
+    private static PlatformTenantBootstrapModuleStatusDto EvaluateOnlineStore(Input input)
+    {
+        if (!input.OnlineStoreEntitled)
+        {
+            return Module(OnlineStoreModuleKey, StatusNotEntitled, 0, entitled: false, canConfigure: false, null);
+        }
+
+        var isActive = string.Equals(input.OnlineStoreStatus, StoreStatusActive, StringComparison.Ordinal);
+        var status = isActive ? StatusConfigured : StatusNotStarted;
+        var count = isActive ? 1 : 0;
+        return Module(OnlineStoreModuleKey, status, count, entitled: true, input.CanManageOnlineStore, null);
     }
 
     private static PlatformTenantBootstrapModuleStatusDto Module(

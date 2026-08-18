@@ -215,7 +215,7 @@ public sealed class PosHardwareService : IPosHardwareService
         else if (request.HardwareType.Equals("barcodeScanner", StringComparison.OrdinalIgnoreCase))
         {
             if (request.BarcodeScanner is null ||
-                request.BarcodeScanner.Mode is not ("hid" or "usbHid" or "camera") ||
+                request.BarcodeScanner.Mode is not ("hid" or "usbHid" or "bluetoothHid" or "camera") ||
                 request.BarcodeScanner.InputSuffix is not ("enter" or "newline") ||
                 request.BarcodeScanner.ScanTimeout is < 20 or > 1000 ||
                 request.BarcodeScanner.MinimumBarcodeLength is < 1 or > 128 ||
@@ -288,7 +288,7 @@ public sealed class PosHardwareService : IPosHardwareService
     private static bool ValidScannerEvidence(ScannerTestEvidenceDto? evidence)
     {
         if (evidence is null) return true;
-        return evidence.ScannerMode is "hid" or "usbHid" or "camera" &&
+        return evidence.ScannerMode is "hid" or "usbHid" or "bluetoothHid" or "camera" &&
                evidence.BarcodeLength is >= 0 and <= 512 &&
                (evidence.BarcodeHash is null ||
                 evidence.BarcodeHash.Length is >= 16 and <= 64) &&

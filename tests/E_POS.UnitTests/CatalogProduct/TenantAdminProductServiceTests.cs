@@ -1012,7 +1012,7 @@ public sealed class TenantAdminProductServiceTests
 
         public Task<TenantAdminProductCreateResponse> CreateProductAsync(
             Guid tenantId,
-            Guid userId,
+            Guid? userId,
             TenantAdminProductCreateRequest request,
             Guid unitId,
             DateTimeOffset now,

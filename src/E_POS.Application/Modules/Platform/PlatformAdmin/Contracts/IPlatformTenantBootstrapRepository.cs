@@ -21,6 +21,14 @@ public interface IPlatformTenantBootstrapRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>> ListOutletOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>> ListRoleOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
     Task<bool> OutletBelongsToTenantAsync(
         Guid tenantId,
         Guid outletId,
@@ -108,6 +116,21 @@ public interface IPlatformTenantBootstrapRepository
         DateTimeOffset now,
         string? requestHash,
         CancellationToken cancellationToken);
+
+    Task<string?> GetOnlineStoreDefaultsJsonAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
+    Task UpsertOnlineStoreDefaultsAsync(
+        Guid tenantId,
+        string defaultsJson,
+        Guid? platformUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<bool> HasClickCollectCollectionConfiguredAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
 }
 
 public sealed record PlatformTenantBootstrapIdempotencyRecordLookup(
@@ -124,6 +147,21 @@ public sealed record PlatformTenantBootstrapFootprintCounts(
 public interface IPlatformTenantBootstrapService
 {
     Task<ApplicationResult<PlatformTenantBootstrapSummaryResponse>> GetSummaryAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapOutletOptionDto>>> GetOutletOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapRoleOptionDto>>> GetRoleOptionsAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<IReadOnlyList<PlatformTenantBootstrapPermissionOptionDto>>> GetPermissionOptionsAsync(
         Guid tenantId,
         Guid platformUserId,
         CancellationToken cancellationToken);
@@ -186,5 +224,17 @@ public interface IPlatformTenantBootstrapService
         Guid tenantId,
         Guid platformUserId,
         Guid importId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> GetOnlineStoreAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformTenantBootstrapOnlineStoreResponse>> UpsertOnlineStoreAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        PlatformTenantBootstrapOnlineStoreUpsertRequest request,
+        string idempotencyKey,
         CancellationToken cancellationToken);
 }

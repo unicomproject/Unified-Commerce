@@ -80,6 +80,18 @@ public sealed class PosTillSessionService : IPosTillSessionService
         "till_session.mismatch_reason_required",
         "A mismatch reason is required when counted cash does not match expected cash.");
 
+    private static readonly ApplicationError InvalidMismatchReason = new(
+        "till_session.invalid_mismatch_reason",
+        "The mismatch reason is not supported.");
+
+    private static readonly ApplicationError ClosingNoteTooLong = new(
+        "till_session.closing_note_too_long",
+        "Closing note must not exceed 500 characters.");
+
+    private static readonly ApplicationError AlreadyClosed = new(
+        "till_session.already_closed",
+        "The till session has already been closed.");
+
     private readonly IPosTillSessionRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
@@ -190,11 +202,6 @@ public sealed class PosTillSessionService : IPosTillSessionService
             return ApplicationResult<CloseTillResponseDto>.Failure(InvalidCountedCash);
         }
 
-        if (request.ExpectedCash is < 0)
-        {
-            return ApplicationResult<CloseTillResponseDto>.Failure(InvalidExpectedCash);
-        }
-
         if (!context.HasPermission(PosPermissions.Till.Close))
         {
             return ApplicationResult<CloseTillResponseDto>.Failure(ClosePermissionDenied);
@@ -257,6 +264,9 @@ public sealed class PosTillSessionService : IPosTillSessionService
             "till_session.invalid_counted_cash" => InvalidCountedCash,
             "till_session.invalid_expected_cash" => InvalidExpectedCash,
             "till_session.mismatch_reason_required" => MismatchReasonRequired,
+            "till_session.invalid_mismatch_reason" => InvalidMismatchReason,
+            "till_session.closing_note_too_long" => ClosingNoteTooLong,
+            "till_session.already_closed" => AlreadyClosed,
             _ => new ApplicationError(
                 errorCode ?? "till_session.close_failed",
                 "Till could not be closed."),
@@ -271,7 +281,11 @@ public sealed class PosTillSessionService : IPosTillSessionService
             OpeningFloat: snapshot.OpeningFloat,
             Status: NormalizeStatus(snapshot.Status),
             OpenedAt: snapshot.OpenedAt,
-            OpeningNote: snapshot.OpeningNote));
+            OpeningNote: snapshot.OpeningNote,
+            CurrencyCode: snapshot.CurrencyCode,
+            ExpectedCash: snapshot.ExpectedCash,
+            TillName: snapshot.TillName,
+            OpenedByName: snapshot.OpenedByName));
 
     private static CloseTillResponseDto MapCloseToResponse(ClosedTillSessionDbSnapshot snapshot) =>
         new(new ClosedTillSessionDto(

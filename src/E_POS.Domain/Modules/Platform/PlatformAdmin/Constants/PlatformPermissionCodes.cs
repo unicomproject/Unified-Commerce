@@ -25,6 +25,7 @@ public static class PlatformPermissionCodes
     public const string TenantsBootstrapUsersManage = "platform.tenants.bootstrap.users.manage";
     public const string TenantsBootstrapProductsManage = "platform.tenants.bootstrap.products.manage";
     public const string TenantsBootstrapProductsImport = "platform.tenants.bootstrap.products.import";
+    public const string TenantsBootstrapOnlineStoreManage = "platform.tenants.bootstrap.online_store.manage";
 
     public const string SubscriptionPlansView = "platform.subscription_plans.view";
     public const string SubscriptionPlansCreate = "platform.subscription_plans.create";
@@ -82,6 +83,7 @@ public static class PlatformPermissionCodes
         TenantsBootstrapUsersManage,
         TenantsBootstrapProductsManage,
         TenantsBootstrapProductsImport,
+        TenantsBootstrapOnlineStoreManage,
         SubscriptionPlansView,
         SubscriptionPlansCreate,
         SubscriptionPlansEdit,

@@ -30,17 +30,12 @@ public static class DevelopmentMerchandiseProductVariantsSeedData
             ('0001', 'SIZE',      'Size',      '0001', 'SMALL',  'Small',  NULL,      'S',     '0002', 'MEDIUM', 'Medium', NULL,      'M'),
             ('0002', 'SIZE',      'Size',      '0003', 'SMALL',  'Small',  NULL,      'S',     '0004', 'MEDIUM', 'Medium', NULL,      'M'),
             ('0003', 'SIZE',      'Size',      '0005', 'SMALL',  'Small',  NULL,      'S',     '0006', 'MEDIUM', 'Medium', NULL,      'M'),
-            ('0004', 'SIZE',      'Size',      '0007', 'SMALL',  'Small',  NULL,      'S',     '0008', 'MEDIUM', 'Medium', NULL,      'M'),
-            ('0005', 'SHOE_SIZE', 'Shoe Size', '0009', '8',      'Size 8', NULL,      'SIZE-8','000a', '9',      'Size 9', NULL,      'SIZE-9'),
-            ('0006', 'SHOE_SIZE', 'Shoe Size', '000b', '8',      'Size 8', NULL,      'SIZE-8','000c', '9',      'Size 9', NULL,      'SIZE-9'),
-            ('0007', 'SIZE',      'Size',      '000d', 'SMALL',  'Small',  NULL,      'S',     '000e', 'MEDIUM', 'Medium', NULL,      'M'),
             ('0008', 'COLOR',     'Color',     '000f', 'BLUE',   'Blue',   '#1B5BFF', 'BLUE',  '0010', 'RED',    'Red',    '#DC2626', 'RED'),
             ('0009', 'FINISH',    'Finish',    '0011', 'SILVER', 'Silver', '#C0C0C0', 'SILVER','0012', 'BLACK',  'Black',  '#111827', 'BLACK'),
             ('000a', 'COLOR',     'Color',     '0013', 'BLUE',   'Blue',   '#1B5BFF', 'BLUE',  '0014', 'RED',    'Red',    '#DC2626', 'RED'),
             ('000b', 'BALL_SIZE', 'Ball Size', '0015', '4',      'Size 4', NULL,      'SIZE-4','0016', '5',      'Size 5', NULL,      'SIZE-5'),
             ('000c', 'BALL_SIZE', 'Ball Size', '0017', '6',      'Size 6', NULL,      'SIZE-6','0018', '7',      'Size 7', NULL,      'SIZE-7'),
             ('000d', 'CAPACITY',  'Capacity',  '0019', '500ML',  '500 ml', NULL,      '500ML', '001a', '750ML',  '750 ml', NULL,      '750ML'),
-            ('000e', 'SIZE',      'Size',      '001b', 'MEDIUM', 'Medium', NULL,      'M',     '001c', 'LARGE',  'Large',  NULL,      'L'),
             ('000f', 'COLOR',     'Color',     '001d', 'BLUE',   'Blue',   '#1B5BFF', 'BLUE',  '001e', 'RED',    'Red',    '#DC2626', 'RED');
 
         UPDATE products AS product

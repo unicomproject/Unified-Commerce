@@ -211,7 +211,7 @@ public class TenantAdminProductDraftServiceTests
             Task.FromResult(true);
 
         public Task<TenantAdminProductCreateResponse> CreateProductAsync(
-            Guid tenantId, Guid userId, TenantAdminProductCreateRequest request, Guid unitId, DateTimeOffset now,
+            Guid tenantId, Guid? userId, TenantAdminProductCreateRequest request, Guid unitId, DateTimeOffset now,
             CancellationToken cancellationToken) =>
             Task.FromResult(new TenantAdminProductCreateResponse(Guid.NewGuid(), "x", "SKU", "ACTIVE"));
 

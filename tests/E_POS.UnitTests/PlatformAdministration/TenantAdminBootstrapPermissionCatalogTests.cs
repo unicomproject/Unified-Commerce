@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.ECommerce.Storefront.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using Xunit;
@@ -106,5 +107,36 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
 
         Assert.Equal(1, plan.PermissionCodes.Count(code => code == "fulfillment.orders.view"));
         Assert.Equal(1, plan.PermissionCodes.Count(code => code == "fulfillment.orders.manage"));
+    }
+
+    [Fact]
+    public void Resolve_OnlineStore_IncludesDedicatedOnlineStorePermissions()
+    {
+        var plan = TenantAdminBootstrapPermissionCatalog.Resolve(
+        [
+            PlatformTenantFeatureCodes.OnlineStore
+        ]);
+
+        foreach (var permission in TenantAdminOnlineStorePermissions.All)
+        {
+            Assert.Contains(permission, plan.PermissionCodes);
+        }
+
+        Assert.Equal(
+            TenantAdminOnlineStorePermissions.All.Count,
+            TenantAdminOnlineStorePermissions.All.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
+    public void Resolve_ClickCollect_IncludesOnlyFulfillmentSpecificOnlineStorePermission()
+    {
+        var plan = TenantAdminBootstrapPermissionCatalog.Resolve(
+        [
+            PlatformTenantFeatureCodes.ClickCollect
+        ]);
+
+        Assert.Contains(TenantAdminOnlineStorePermissions.FulfillmentManage, plan.PermissionCodes);
+        Assert.DoesNotContain(TenantAdminOnlineStorePermissions.Publish, plan.PermissionCodes);
+        Assert.DoesNotContain(TenantAdminOnlineStorePermissions.DomainsManage, plan.PermissionCodes);
     }
 }

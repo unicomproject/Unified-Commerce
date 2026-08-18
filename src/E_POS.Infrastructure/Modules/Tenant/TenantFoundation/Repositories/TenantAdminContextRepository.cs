@@ -50,6 +50,24 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             return null;
         }
 
+        var tenantLogoUrl = await (
+                from profile in _dbContext.TenantProfiles.AsNoTracking()
+                join media in _dbContext.MediaAssets.AsNoTracking()
+                    on new
+                    {
+                        profile.TenantId,
+                        MediaAssetId = profile.LogoMediaAssetId
+                    }
+                    equals new
+                    {
+                        media.TenantId,
+                        MediaAssetId = (Guid?)media.Id
+                    }
+                where profile.TenantId == tenantId &&
+                      media.Status == "ACTIVE"
+                select media.PublicUrl)
+            .FirstOrDefaultAsync(cancellationToken);
+
         // Roles assigned to this user
         var roles = await (
             from userRole in _dbContext.TenantUserRoles.AsNoTracking()
@@ -116,8 +134,42 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                   && pd.IsActive
             select pd.PermissionCode;
 
+        var outletRolePermissions =
+            from outletRole in _dbContext.OutletUserRoles.AsNoTracking()
+            join outlet in _dbContext.Outlets.AsNoTracking()
+                on outletRole.OutletId equals outlet.Id
+            join role in _dbContext.TenantRoles.AsNoTracking()
+                on outletRole.TenantRoleId equals role.Id
+            join rp in _dbContext.TenantRolePermissions.AsNoTracking()
+                on role.Id equals rp.TenantRoleId
+            join pd in _dbContext.PermissionDefinitions.AsNoTracking()
+                on rp.PermissionDefinitionId equals pd.Id
+            where outletRole.TenantUserId == tenantUserId
+                  && outlet.TenantId == tenantId
+                  && outlet.Status != "DELETED"
+                  && outlet.Status != "INACTIVE"
+                  && role.TenantId == tenantId
+                  && role.IsActive
+                  && pd.IsActive
+            select pd.PermissionCode;
+
+        var outletDirectPermissions =
+            from outletPermission in _dbContext.OutletUserPermissions.AsNoTracking()
+            join outlet in _dbContext.Outlets.AsNoTracking()
+                on outletPermission.OutletId equals outlet.Id
+            join pd in _dbContext.PermissionDefinitions.AsNoTracking()
+                on outletPermission.PermissionDefinitionId equals pd.Id
+            where outletPermission.TenantUserId == tenantUserId
+                  && outlet.TenantId == tenantId
+                  && outlet.Status != "DELETED"
+                  && outlet.Status != "INACTIVE"
+                  && pd.IsActive
+            select pd.PermissionCode;
+
         var permissions = await directPermissions
             .Union(rolePermissions)
+            .Union(outletRolePermissions)
+            .Union(outletDirectPermissions)
             .Where(x => x != string.Empty)
             .OrderBy(x => x)
             .ToListAsync(cancellationToken);
@@ -182,6 +234,7 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
         return new TenantAdminContextData(
             TenantId: userInfo.TenantId,
             TenantName: userInfo.TenantName,
+            TenantLogoUrl: tenantLogoUrl,
             TenantTimezone: string.IsNullOrWhiteSpace(userInfo.TenantTimezone) ? "UTC" : userInfo.TenantTimezone,
             CurrencyCode: string.IsNullOrWhiteSpace(userInfo.CurrencyCode) ? "LKR" : userInfo.CurrencyCode,
             Locale: string.IsNullOrWhiteSpace(userInfo.Locale) ? "en-LK" : userInfo.Locale,
