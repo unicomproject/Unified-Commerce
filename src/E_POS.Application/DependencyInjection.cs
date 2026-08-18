@@ -104,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<ProductVariantGenerationService>();
         services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
         services.AddScoped<ProductWizardAccessPolicy>();
         services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
@@ -137,6 +138,7 @@ public static class DependencyInjection
         services.AddScoped<ITaxSetupRequestValidator, TaxSetupRequestValidator>();
         services.AddScoped<IProductTaxAssignmentRequestValidator, ProductTaxAssignmentRequestValidator>();
         services.AddScoped<ITaxSetupService, TaxSetupService>();
+        services.AddScoped<ITaxAggregateService, TaxAggregateService>();
         services.AddScoped<IProductTaxAssignmentService, ProductTaxAssignmentService>();
 
         // POS Home (cashier dashboard)

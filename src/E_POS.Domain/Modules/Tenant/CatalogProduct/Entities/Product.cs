@@ -30,6 +30,7 @@ public class Product : AuditableEntity
     public Guid? ArchivedByTenantUserId { get; protected set; }
     public long RowVersion { get; protected set; } = 1;
     public string? DesiredPublishStatus { get; protected set; }
+    public decimal? ReferenceCostPrice { get; protected set; }
 
     public static Product Create(
         Guid id,
@@ -170,6 +171,13 @@ public class Product : AuditableEntity
         UpdatedBy = updatedBy;
         UpdatedByTenantUserId = updatedBy;
         IncrementRowVersion();
+    }
+
+    public void UpdateReferenceCost(decimal? costPrice, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        ReferenceCostPrice = costPrice;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
     }
 
     public void UpdateStatus(string status, Guid? updatedByTenantUserId, DateTimeOffset now)

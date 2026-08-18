@@ -85,7 +85,7 @@ public class ProductVariant : AuditableEntity
 
     public void SetOptionCombinationHash(string hash, DateTimeOffset now)
     {
-        OptionCombinationHash = hash;
+        OptionCombinationHash = string.IsNullOrWhiteSpace(hash) ? null : hash.Trim();
         UpdatedAt = now;
     }
 

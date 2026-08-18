@@ -41,26 +41,47 @@ public sealed class SaveProductDraftRequest
     public BundleConfigurationDto? BundleConfiguration { get; set; }
     
     // Step 5 — Barcode & SKU
-    public string? BaseSku { get; set; }
-    public string? ParentProductBarcode { get; set; }
-    public IReadOnlyList<Step5VariantIdentifierDto>? VariantIdentifiers { get; set; }
-    public IReadOnlyList<Step5AdditionalBarcodeDto>? AdditionalBarcodes { get; set; }
+    public BarcodeSkuConfigurationDto? BarcodeSkuConfiguration { get; set; }
+    
+    // Step 6 — Pricing & Tax
+    public PricingTaxConfigurationDto? PricingTax { get; set; }
 }
 
-public sealed record Step5VariantIdentifierDto(
-    Guid ProductVariantId,
-    string? Sku,
-    string? Barcode);
+public sealed record PricingTaxConfigurationDto(
+    decimal? CostPrice,
+    decimal? StandardSellingPrice,
+    decimal? DiscountPrice,
+    Guid? TaxClassId,
+    bool? TaxExclusive);
 
-public sealed record Step5AdditionalBarcodeDto(
-    Guid? BarcodeId,
-    string Barcode,
-    string BarcodeType,
+public sealed record PricingTaxResponseDto(
+    decimal? CostPrice,
+    decimal? StandardSellingPrice,
+    decimal? DiscountPrice,
+    decimal? EffectiveSellingPrice,
+    decimal? DiscountAmount,
+    decimal? DiscountPercentage,
+    Guid? TaxClassId,
+    string? TaxName,
+    decimal? TaxRatePercentage,
+    bool TaxExclusive = true);
+
+public sealed record BarcodeSkuAssignmentDto(
     Guid? ProductVariantId,
-    Guid? UomId,
-    decimal QuantityPerScan,
-    bool IsPrimary,
-    string Status);
+    string? DisplayName,
+    string? Sku,
+    string? Barcode,
+    string? Status,
+    string? ClientCombinationKey = null);
+
+public sealed record Step5IdentifierTargetDto(
+    Guid? ProductVariantId,
+    string DisplayName,
+    bool IsAssigned);
+
+public sealed record BarcodeSkuConfigurationDto(
+    IReadOnlyList<Step5IdentifierTargetDto>? IdentifierTargets,
+    IReadOnlyList<BarcodeSkuAssignmentDto>? Assignments);
 
 public sealed record BundleComponentDto(
     Guid? ComboComponentId,
@@ -76,7 +97,7 @@ public sealed record BundleConfigurationDto(
 
 public sealed record VariantConfigurationOptionValueDto(
     Guid? ProductOptionValueId,
-    Guid SourceOptionTemplateValueId,
+    Guid? SourceOptionTemplateValueId,
     string ValueCode,
     string ValueName,
     string? DisplayName,
@@ -86,7 +107,7 @@ public sealed record VariantConfigurationOptionValueDto(
 
 public sealed record VariantConfigurationOptionDto(
     Guid? ProductOptionId,
-    Guid SourceOptionTemplateId,
+    Guid? SourceOptionTemplateId,
     string OptionCode,
     string OptionName,
     string OptionType,
@@ -95,8 +116,10 @@ public sealed record VariantConfigurationOptionDto(
     IReadOnlyList<VariantConfigurationOptionValueDto> Values);
 
 public sealed record VariantConfigurationSelectedValueDto(
-    Guid SourceOptionTemplateId,
-    Guid SourceOptionTemplateValueId);
+    Guid? SourceOptionTemplateId,
+    Guid? SourceOptionTemplateValueId,
+    string? OptionName,
+    string? ValueName);
 
 public sealed record VariantConfigurationVariantDto(
     string ClientCombinationKey,
@@ -179,10 +202,8 @@ public sealed record ProductDraftResponse(
     IReadOnlyList<ProductUnitConversionResponse>? UnitConversions = null,
     VariantConfigurationDto? VariantConfiguration = null,
     BundleConfigurationDto? BundleConfiguration = null,
-    string? BaseSku = null,
-    string? ParentProductBarcode = null,
-    IReadOnlyList<Step5VariantIdentifierDto>? VariantIdentifiers = null,
-    IReadOnlyList<Step5AdditionalBarcodeDto>? AdditionalBarcodes = null,
+    BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
+    PricingTaxResponseDto? PricingTax = null,
     int TotalVariantCount = 0,
     int IncludedVariantCount = 0);
 
@@ -234,10 +255,8 @@ public sealed record ProductSetupWizardDto(
     IReadOnlyList<ProductUnitConversionResponse>? UnitConversions = null,
     VariantConfigurationDto? VariantConfiguration = null,
     BundleConfigurationDto? BundleConfiguration = null,
-    string? BaseSku = null,
-    string? ParentProductBarcode = null,
-    IReadOnlyList<Step5VariantIdentifierDto>? VariantIdentifiers = null,
-    IReadOnlyList<Step5AdditionalBarcodeDto>? AdditionalBarcodes = null,
+    BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
+    PricingTaxResponseDto? PricingTax = null,
     int TotalVariantCount = 0,
     int IncludedVariantCount = 0);
 

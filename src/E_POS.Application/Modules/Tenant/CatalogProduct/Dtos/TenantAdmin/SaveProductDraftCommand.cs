@@ -33,8 +33,6 @@ public sealed record SaveProductDraftCommand(
     string? WizardAction = null,
     VariantConfigurationDto? VariantConfiguration = null,
     BundleConfigurationDto? BundleConfiguration = null,
-    string? BaseSku = null,
-    string? ParentProductBarcode = null,
-    IReadOnlyList<Step5VariantIdentifierDto>? VariantIdentifiers = null,
-    IReadOnlyList<Step5AdditionalBarcodeDto>? AdditionalBarcodes = null);
+    BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
+    PricingTaxConfigurationDto? PricingTax = null);
 

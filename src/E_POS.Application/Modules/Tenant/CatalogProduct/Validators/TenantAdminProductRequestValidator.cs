@@ -129,6 +129,7 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             ProductWizardStage.UnitsPackConversion => ValidateUnitsPackConversionDraft(request),
             ProductWizardStage.ProductConfiguration => ValidateProductConfigurationDraft(request),
             ProductWizardStage.BarcodeSku => ValidateBarcodeSkuDraft(request),
+            ProductWizardStage.PricingTax => ValidatePricingTaxDraft(request),
             _ => ValidateStep1Draft(request, requireProductName: false, requireCategory: false)
         };
     }
@@ -141,6 +142,7 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             ProductWizardStage.UnitsPackConversion => ValidateUnitsPackConversionContinue(request),
             ProductWizardStage.ProductConfiguration => ValidateProductConfigurationContinue(request),
             ProductWizardStage.BarcodeSku => ValidateBarcodeSkuContinue(request),
+            ProductWizardStage.PricingTax => ValidatePricingTaxContinue(request),
             _ => ValidateStep1Draft(request, requireProductName: true, requireCategory: true)
         };
     }
@@ -817,11 +819,11 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                                 }
                             }
                             
-                            if (val.SourceOptionTemplateValueId == Guid.Empty && val.ProductOptionValueId == Guid.Empty)
+                            if (!val.SourceOptionTemplateValueId.HasValue && string.IsNullOrWhiteSpace(val.ValueName))
                             {
                                 fieldErrors.Add(new ApplicationFieldError(
                                     $"options[{i}].values[{j}]",
-                                    "Selected value must have a valid identifier."));
+                                    "Selected value must have a valid identifier or name."));
                             }
                         }
                     }
@@ -956,89 +958,43 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
     {
         var fieldErrors = new List<ApplicationFieldError>();
 
-        if (request.BaseSku?.Length > 100)
+        if (request.BarcodeSkuConfiguration?.Assignments != null)
         {
-            fieldErrors.Add(new ApplicationFieldError("baseSku", "Base SKU cannot exceed 100 characters."));
-        }
+            var skuSet = new HashSet<string>(StringComparer.Ordinal);
+            var barcodeSet = new HashSet<string>(StringComparer.Ordinal);
 
-        if (request.ParentProductBarcode?.Length > 100)
-        {
-            fieldErrors.Add(new ApplicationFieldError("parentProductBarcode", "Parent product barcode cannot exceed 100 characters."));
-        }
-
-        var skuSet = new HashSet<string>(StringComparer.Ordinal);
-        var barcodeSet = new HashSet<string>(StringComparer.Ordinal);
-
-        if (!string.IsNullOrWhiteSpace(request.BaseSku))
-        {
-            skuSet.Add(request.BaseSku.Trim());
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.ParentProductBarcode))
-        {
-            barcodeSet.Add(request.ParentProductBarcode.Trim());
-        }
-
-        if (request.VariantIdentifiers != null)
-        {
-            for (int i = 0; i < request.VariantIdentifiers.Count; i++)
+            for (int i = 0; i < request.BarcodeSkuConfiguration.Assignments.Count; i++)
             {
-                var vi = request.VariantIdentifiers[i];
-                if (vi.ProductVariantId == Guid.Empty)
+                var assignment = request.BarcodeSkuConfiguration.Assignments[i];
+                var prefix = $"barcodeSkuConfiguration.assignments[{i}]";
+
+                if (assignment.ProductVariantId == Guid.Empty)
                 {
-                    fieldErrors.Add(new ApplicationFieldError($"variantIdentifiers[{i}].productVariantId", "Variant identifier is required."));
+                    fieldErrors.Add(new ApplicationFieldError($"{prefix}.productVariantId", "Product variant identifier is required."));
                 }
 
-                if (vi.Sku?.Length > 100)
+                if (assignment.Sku?.Length > 100)
                 {
-                    fieldErrors.Add(new ApplicationFieldError($"variantIdentifiers[{i}].sku", "SKU cannot exceed 100 characters."));
+                    fieldErrors.Add(new ApplicationFieldError($"{prefix}.sku", "SKU cannot exceed 100 characters."));
                 }
-                else if (!string.IsNullOrWhiteSpace(vi.Sku))
+                else if (!string.IsNullOrWhiteSpace(assignment.Sku))
                 {
-                    if (!skuSet.Add(vi.Sku.Trim()))
+                    if (!skuSet.Add(assignment.Sku.Trim()))
                     {
-                        fieldErrors.Add(new ApplicationFieldError($"variantIdentifiers[{i}].sku", "Duplicate SKU in request."));
+                        fieldErrors.Add(new ApplicationFieldError($"{prefix}.sku", "Duplicate SKU in request."));
                     }
                 }
 
-                if (vi.Barcode?.Length > 100)
+                if (assignment.Barcode?.Length > 100)
                 {
-                    fieldErrors.Add(new ApplicationFieldError($"variantIdentifiers[{i}].barcode", "Barcode cannot exceed 100 characters."));
+                    fieldErrors.Add(new ApplicationFieldError($"{prefix}.barcode", "Barcode cannot exceed 100 characters."));
                 }
-                else if (!string.IsNullOrWhiteSpace(vi.Barcode))
+                else if (!string.IsNullOrWhiteSpace(assignment.Barcode))
                 {
-                    if (!barcodeSet.Add(vi.Barcode.Trim()))
+                    if (!barcodeSet.Add(assignment.Barcode.Trim()))
                     {
-                        fieldErrors.Add(new ApplicationFieldError($"variantIdentifiers[{i}].barcode", "Duplicate barcode in request."));
+                        fieldErrors.Add(new ApplicationFieldError($"{prefix}.barcode", "Duplicate barcode in request."));
                     }
-                }
-            }
-        }
-
-        if (request.AdditionalBarcodes != null)
-        {
-            for (int i = 0; i < request.AdditionalBarcodes.Count; i++)
-            {
-                var ab = request.AdditionalBarcodes[i];
-                if (string.IsNullOrWhiteSpace(ab.Barcode))
-                {
-                    fieldErrors.Add(new ApplicationFieldError($"additionalBarcodes[{i}].barcode", "Barcode is required."));
-                }
-                else if (ab.Barcode.Length > 100)
-                {
-                    fieldErrors.Add(new ApplicationFieldError($"additionalBarcodes[{i}].barcode", "Barcode cannot exceed 100 characters."));
-                }
-                else
-                {
-                    if (!barcodeSet.Add(ab.Barcode.Trim()))
-                    {
-                        fieldErrors.Add(new ApplicationFieldError($"additionalBarcodes[{i}].barcode", "Duplicate barcode in request."));
-                    }
-                }
-
-                if (string.IsNullOrWhiteSpace(ab.BarcodeType))
-                {
-                    fieldErrors.Add(new ApplicationFieldError($"additionalBarcodes[{i}].barcodeType", "Barcode type is required."));
                 }
             }
         }
@@ -1058,23 +1014,101 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
 
         var fieldErrors = new List<ApplicationFieldError>();
         ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);
-        
+
         bool isVariant = string.Equals(normalizedStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase);
 
-        if (!isVariant && string.IsNullOrWhiteSpace(request.BaseSku))
+        if (request.BarcodeSkuConfiguration?.Assignments == null || request.BarcodeSkuConfiguration.Assignments.Count == 0)
         {
-            fieldErrors.Add(new ApplicationFieldError("baseSku", "Base SKU is required."));
+            fieldErrors.Add(new ApplicationFieldError("barcodeSkuConfiguration.assignments", "At least one SKU assignment is required."));
+        }
+        else
+        {
+            for (int i = 0; i < request.BarcodeSkuConfiguration.Assignments.Count; i++)
+            {
+                var assignment = request.BarcodeSkuConfiguration.Assignments[i];
+                if (string.IsNullOrWhiteSpace(assignment.Sku))
+                {
+                    fieldErrors.Add(new ApplicationFieldError($"barcodeSkuConfiguration.assignments[{i}].sku", "SKU is required."));
+                }
+            }
         }
 
-        if (isVariant && request.VariantIdentifiers != null)
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product validation failed.",
+            fieldErrors);
+    }
+
+    public static ApplicationError? ValidatePricingTaxDraft(SaveProductDraftRequest request)
+    {
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.PricingTax != null)
         {
-            for (int i = 0; i < request.VariantIdentifiers.Count; i++)
+            if (request.PricingTax.CostPrice.HasValue && request.PricingTax.CostPrice.Value < 0)
             {
-                var vi = request.VariantIdentifiers[i];
-                if (string.IsNullOrWhiteSpace(vi.Sku))
-                {
-                    fieldErrors.Add(new ApplicationFieldError($"variantIdentifiers[{i}].sku", "SKU is required for sellable variant."));
-                }
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.costPrice", "Cost price cannot be negative."));
+            }
+
+            if (request.PricingTax.StandardSellingPrice.HasValue && request.PricingTax.StandardSellingPrice.Value < 0)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.standardSellingPrice", "Standard selling price cannot be negative."));
+            }
+
+            if (request.PricingTax.DiscountPrice.HasValue && request.PricingTax.DiscountPrice.Value < 0)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.discountPrice", "Discount price cannot be negative."));
+            }
+
+            if (request.PricingTax.DiscountPrice.HasValue && 
+                request.PricingTax.StandardSellingPrice.HasValue && 
+                request.PricingTax.DiscountPrice.Value >= request.PricingTax.StandardSellingPrice.Value)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.discountPrice", "Discount price must be less than standard selling price."));
+            }
+
+            if (request.PricingTax.TaxExclusive.HasValue && !request.PricingTax.TaxExclusive.Value)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.taxExclusive", "Pricing must be tax exclusive."));
+            }
+        }
+
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product draft validation failed.",
+            fieldErrors);
+    }
+
+    public static ApplicationError? ValidatePricingTaxContinue(SaveProductDraftRequest request)
+    {
+        var draftError = ValidatePricingTaxDraft(request);
+        if (draftError != null) return draftError;
+
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.PricingTax == null)
+        {
+            fieldErrors.Add(new ApplicationFieldError("pricingTax", "Pricing & Tax configuration is required."));
+        }
+        else
+        {
+            if (!request.PricingTax.CostPrice.HasValue)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.costPrice", "Cost price is required."));
+            }
+
+            if (!request.PricingTax.StandardSellingPrice.HasValue)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.standardSellingPrice", "Standard selling price is required."));
+            }
+
+            if (!request.PricingTax.TaxClassId.HasValue || request.PricingTax.TaxClassId.Value == Guid.Empty)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.taxClassId", "Tax class is required."));
             }
         }
 

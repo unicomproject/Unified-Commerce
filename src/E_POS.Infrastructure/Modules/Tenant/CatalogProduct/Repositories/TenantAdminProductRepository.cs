@@ -1923,16 +1923,18 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             ? new Dictionary<Guid, string>()
             : await GetPrimaryImageUrlsAsync(tenantId, productIds, cancellationToken);
 
-        var barcodesByVariant = productIds.Count == 0
-            ? new Dictionary<Guid, string>()
+        var barcodesList = productIds.Count == 0
+            ? new List<ProductBarcode>()
             : await _dbContext.ProductBarcodes
                 .AsNoTracking()
                 .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId))
-                .GroupBy(x => x.ProductId)
-                .ToDictionaryAsync(
-                    g => g.Key,
-                    g => g.OrderByDescending(x => x.IsPrimaryBarcode).ThenBy(x => x.CreatedAt).Select(x => x.Barcode).FirstOrDefault() ?? string.Empty,
-                    cancellationToken);
+                .ToListAsync(cancellationToken);
+
+        var barcodesByVariant = barcodesList
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(x => x.IsPrimaryBarcode).ThenBy(x => x.CreatedAt).Select(x => x.Barcode).FirstOrDefault() ?? string.Empty);
 
         var items = pagedProducts.Select(product =>
         {
@@ -2018,4 +2020,34 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         IReadOnlyCollection<Guid> componentUomIds,
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationUomProjection>>([]);
+
+    public Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductVariantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.ProductVariants
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.Sku == sku &&
+                     x.Status != ProductConstants.ArchivedStatus &&
+                     (!excludeProductVariantId.HasValue || x.Id != excludeProductVariantId.Value),
+                cancellationToken);
+    }
+
+    public Task<bool> BarcodeExistsAsync(Guid tenantId, string barcodeValue, Guid? excludeProductVariantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.ProductBarcodes
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.Barcode == barcodeValue &&
+                     (!excludeProductVariantId.HasValue || x.ProductVariantId != excludeProductVariantId.Value),
+                cancellationToken);
+    }
+
+    public Task<bool> ProductSlugExistsAsync(string slug, CancellationToken cancellationToken)
+    {
+        return _dbContext.Products
+            .AsNoTracking()
+            .AnyAsync(x => x.ProductSlug == slug, cancellationToken);
+    }
 }

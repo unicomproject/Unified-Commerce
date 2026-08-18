@@ -149,6 +149,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasMaxLength(40)
             .IsRequired(false);
 
+        builder.Property(x => x.ReferenceCostPrice)
+            .HasColumnName("reference_cost_price")
+            .HasColumnType("numeric(18,4)")
+            .IsRequired(false);
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
