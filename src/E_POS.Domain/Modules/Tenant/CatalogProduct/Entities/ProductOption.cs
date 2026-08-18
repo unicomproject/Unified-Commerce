@@ -51,5 +51,32 @@ public class ProductOption : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void UpdateProfile(
+        string optionCode,
+        string optionName,
+        string optionType,
+        string inputType,
+        bool isRequired,
+        int sortOrder,
+        Guid? userId,
+        DateTimeOffset now)
+    {
+        OptionCode = optionCode.Trim();
+        OptionName = optionName.Trim();
+        OptionType = optionType.Trim().ToUpperInvariant();
+        InputType = inputType.Trim().ToUpperInvariant();
+        IsRequired = isRequired;
+        SortOrder = sortOrder;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateStatus(string status, Guid? userId, DateTimeOffset now)
+    {
+        Status = status.Trim().ToUpperInvariant();
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
 }
 

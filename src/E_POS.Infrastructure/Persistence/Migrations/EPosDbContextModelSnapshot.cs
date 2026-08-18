@@ -12091,6 +12091,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("published_by_tenant_user_id");
 
+                    b.Property<decimal?>("ReferenceCostPrice")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("reference_cost_price");
+
                     b.Property<Guid?>("ReturnPolicyId")
                         .HasColumnType("uuid")
                         .HasColumnName("return_policy_id");
@@ -12147,7 +12151,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_products_desired_publish_status", "desired_publish_status IS NULL OR desired_publish_status IN ('ACTIVE','INACTIVE')");
 
-                            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 8");
+                            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 7");
 
                             t.HasCheckConstraint("ck_products_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
                         });
@@ -12552,9 +12556,21 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductVariantId");
 
+                    b.HasIndex("UomId");
+
                     b.HasIndex("TenantId", "Barcode")
                         .IsUnique()
                         .HasDatabaseName("uq_product_barcodes_tenant_id_barcode");
+
+                    b.HasIndex("TenantId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_barcodes_tenant_id_product_id_primary")
+                        .HasFilter("product_variant_id IS NULL AND is_primary_barcode = true AND status <> 'DELETED'");
+
+                    b.HasIndex("TenantId", "ProductVariantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_barcodes_tenant_id_product_variant_id_primary")
+                        .HasFilter("product_variant_id IS NOT NULL AND is_primary_barcode = true AND status <> 'DELETED'");
 
                     b.ToTable("product_barcodes", null, t =>
                         {
@@ -23701,9 +23717,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("description");
 
                     b.Property<bool>("IsDefaultTaxClass")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false)
                         .HasColumnName("is_default_tax_class");
 
                     b.Property<string>("Status")
@@ -23723,6 +23737,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
                         .HasColumnName("tax_class_name");
+
+                    b.Property<string>("TaxType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("tax_type");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -23778,9 +23798,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("created_by_tenant_user_id");
 
                     b.Property<int>("SortOrder")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(0)
                         .HasColumnName("sort_order");
 
                     b.Property<string>("Status")
@@ -23951,9 +23969,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("created_by_tenant_user_id");
 
                     b.Property<bool>("IsCompound")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false)
                         .HasColumnName("is_compound");
 
                     b.Property<decimal>("RatePercent")
@@ -28672,6 +28688,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_barcodes_product_variant_id_product_variants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", null)
+                        .WithMany()
+                        .HasForeignKey("UomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_barcodes_uom_id_unit_of_measures");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductCategory", b =>

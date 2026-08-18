@@ -32,8 +32,9 @@ public sealed class TaxClassConfiguration : IEntityTypeConfiguration<TaxClass>
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.TaxClassCode).HasColumnName("tax_class_code").HasColumnType("varchar(80)").HasMaxLength(80).IsRequired();
         builder.Property(x => x.TaxClassName).HasColumnName("tax_class_name").HasColumnType("varchar(150)").HasMaxLength(150).IsRequired();
+        builder.Property(x => x.TaxType).HasColumnName("tax_type").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
         builder.Property(x => x.Description).HasColumnName("description").HasColumnType("text").IsRequired(false);
-        builder.Property(x => x.IsDefaultTaxClass).HasColumnName("is_default_tax_class").HasDefaultValue(false).IsRequired();
+        builder.Property(x => x.IsDefaultTaxClass).HasColumnName("is_default_tax_class").IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(30)").HasMaxLength(30).IsRequired();
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_classes_tenant_id_tenants");

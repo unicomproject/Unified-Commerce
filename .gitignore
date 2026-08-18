@@ -5,3 +5,4 @@ obj/
 *.suo
 TestResults/
 artifacts/
+src/E_POS.Api/appsettings.Development.json

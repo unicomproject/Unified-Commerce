@@ -782,6 +782,12 @@ public sealed class TenantAdminProductsControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(CreateResult);
 
+        public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateFromWizardAsync(
+            TenantRequestContext context,
+            TenantAdminWizardProductCreateRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(CreateResult);
+
         public Task<ApplicationResult<TenantAdminProductDetailResponse>> GetByIdAsync(
             TenantRequestContext context,
             Guid productId,
