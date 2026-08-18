@@ -16,7 +16,7 @@ public sealed class TaxSetupRepositoryTests
 
         var repository = new TaxSetupRepository(dbContext);
 
-        var taxClass = TaxClass.Create(tenantId, "TEST-VAT", "VAT", "PERCENTAGE", "Standard VAT", false, null, DateTimeOffset.UtcNow);
+        var taxClass = TaxClass.Create(tenantId, "TC-01", "VAT", "PERCENTAGE", "Standard VAT", true, null, DateTimeOffset.UtcNow);
         await repository.AddTaxClassAsync(taxClass);
         await repository.SaveChangesAsync();
 

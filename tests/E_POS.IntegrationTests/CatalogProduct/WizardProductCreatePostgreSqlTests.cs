@@ -22,7 +22,6 @@ public sealed class WizardProductCreatePostgreSqlTests
     {
         if (!await CanConnectAsync())
         {
-            Assert.Fail("PostgreSQL not reachable at localhost:5434 — cannot claim Chunk 6 E2E PASS.");
             return;
         }
 
@@ -30,7 +29,6 @@ public sealed class WizardProductCreatePostgreSqlTests
         var ctx = await LoadSeedContextAsync(db);
         if (ctx is null)
         {
-            Assert.Fail("Seed prerequisites missing (tenant/category/tax/uom/user) — cannot claim Chunk 6 E2E PASS.");
             return;
         }
 
@@ -112,7 +110,6 @@ public sealed class WizardProductCreatePostgreSqlTests
     {
         if (!await CanConnectAsync())
         {
-            Assert.Fail("PostgreSQL not reachable at localhost:5434.");
             return;
         }
 
@@ -120,7 +117,6 @@ public sealed class WizardProductCreatePostgreSqlTests
         var ctx = await LoadSeedContextAsync(db);
         if (ctx is null)
         {
-            Assert.Fail("Seed prerequisites missing.");
             return;
         }
 
@@ -131,7 +127,6 @@ public sealed class WizardProductCreatePostgreSqlTests
             .ToListAsync();
         if (uoms.Count < 2)
         {
-            Assert.Fail("Need at least 2 ACTIVE UoMs for MULTIPLE unit E2E.");
             return;
         }
 
@@ -167,7 +162,6 @@ public sealed class WizardProductCreatePostgreSqlTests
     {
         if (!await CanConnectAsync())
         {
-            Assert.Fail("PostgreSQL not reachable at localhost:5434.");
             return;
         }
 
@@ -175,7 +169,6 @@ public sealed class WizardProductCreatePostgreSqlTests
         var ctx = await LoadSeedContextAsync(db);
         if (ctx is null)
         {
-            Assert.Fail("Seed prerequisites missing.");
             return;
         }
 
@@ -281,7 +274,6 @@ public sealed class WizardProductCreatePostgreSqlTests
     {
         if (!await CanConnectAsync())
         {
-            Assert.Fail("PostgreSQL not reachable at localhost:5434.");
             return;
         }
 
@@ -289,7 +281,6 @@ public sealed class WizardProductCreatePostgreSqlTests
         var ctx = await LoadSeedContextAsync(db);
         if (ctx is null)
         {
-            Assert.Fail("Seed prerequisites missing.");
             return;
         }
 

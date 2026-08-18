@@ -513,6 +513,14 @@ public sealed partial class TenantAdminProductRepository
 
                 if (command.VariantConfiguration != null && string.Equals(product.ProductStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
                 {
+                    if (command.VariantConfiguration.Options.Any() && !command.VariantConfiguration.Variants.Any())
+                    {
+                        return SaveProductDraftResult.Failure(new ApplicationError(
+                            "product.validation_failed",
+                            "Variant combinations are required when variant options are defined.",
+                            [new ApplicationFieldError("variants", "At least one variant must be configured.")]));
+                    }
+
                     await SaveVariantsAsync(tenantId, product.Id, command.VariantConfiguration, cancellationToken);
                 }
 
