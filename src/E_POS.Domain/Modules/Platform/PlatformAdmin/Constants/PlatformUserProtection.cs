@@ -4,12 +4,12 @@ public static class PlatformUserProtection
 {
     public static bool IsPendingInvite(Entities.PlatformUser user)
     {
-        return IsPendingInvitePasswordHash(user.PasswordHash);
+        return user.Status == PlatformAuthConstants.InvitedStatus || IsPendingInvitePasswordHash(user.PasswordHash);
     }
 
-    public static bool IsPendingInvitePasswordHash(string passwordHash)
+    public static bool IsPendingInvitePasswordHash(string? passwordHash)
     {
-        return string.Equals(
+        return string.IsNullOrWhiteSpace(passwordHash) || string.Equals(
             passwordHash,
             PlatformUserConstants.PendingInvitePasswordHash,
             StringComparison.Ordinal);

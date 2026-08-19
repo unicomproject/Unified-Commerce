@@ -16,7 +16,7 @@ public static class DevelopmentPosCustomerCreatePermissionSeedData
         PermissionId,
         PermissionCode,
         DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId,
-        DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId,
+        DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId,
         "create",
         "Create customers on POS.");
 
@@ -37,7 +37,7 @@ public static class DevelopmentPosCustomerCreatePermissionSeedData
         UPDATE permission_definitions
         SET
             module_id = '{{DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId}}'::uuid,
-            feature_id = '{{DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId}}'::uuid,
+            feature_id = '{{DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId}}'::uuid,
             action_type = 'create',
             description = 'Create customers on POS.',
             is_system = TRUE,
@@ -61,7 +61,7 @@ public static class DevelopmentPosCustomerCreatePermissionSeedData
             '{{PermissionId}}'::uuid,
             '{{PermissionCode}}',
             '{{DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId}}'::uuid,
-            '{{DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId}}'::uuid,
+            '{{DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId}}'::uuid,
             'create',
             'Create customers on POS.',
             TRUE,

@@ -57,29 +57,44 @@ public sealed partial class PlatformTenantRepository
                 group => group.Key,
                 group => new
                 {
-                    FeatureIds = group.Select(x => x.Id).Distinct().ToList(),
-                    FeatureCodes = group.Select(x => x.FeatureCode).Distinct().ToList()
+                    FeatureIds = group
+                        .Where(x => CommercialSubscriptionFeatureCatalog.IsCommercialSubscriptionSelectable(x.FeatureCode))
+                        .Select(x => x.Id)
+                        .Distinct()
+                        .ToList(),
+                    FeatureCodes = CommercialSubscriptionFeatureCatalog
+                        .NormalizeEntitlementFeatureCodes(group.Select(x => x.FeatureCode))
+                        .ToList()
                 });
 
+        // Tenant create cannot configure entitlements for plans with zero included features.
+        // Exclude those plans so Platform Admins cannot select a permanently blocked path.
         var plans = activePlans
             .Select(plan =>
             {
                 includedFeaturesByPlan.TryGetValue(plan.Id, out var planFeatures);
-                return new PlatformTenantCreatePlanOptionDto(
-                    plan.Id,
-                    plan.PlanCode,
-                    plan.Name,
-                    plan.Description,
-                    plan.Status,
-                    plan.BillingInterval,
-                    plan.BaseCurrency,
-                    plan.PriceAmount,
-                    plan.MaxOutlets,
-                    plan.MaxTills,
-                    plan.MaxUsers,
-                    planFeatures?.FeatureIds ?? [],
-                    planFeatures?.FeatureCodes ?? []);
+                return new
+                {
+                    Plan = plan,
+                    FeatureIds = planFeatures?.FeatureIds ?? [],
+                    FeatureCodes = planFeatures?.FeatureCodes ?? []
+                };
             })
+            .Where(item => item.FeatureIds.Count > 0)
+            .Select(item => new PlatformTenantCreatePlanOptionDto(
+                item.Plan.Id,
+                item.Plan.PlanCode,
+                item.Plan.Name,
+                item.Plan.Description,
+                item.Plan.Status,
+                item.Plan.BillingInterval,
+                item.Plan.BaseCurrency,
+                item.Plan.PriceAmount,
+                item.Plan.MaxOutlets,
+                item.Plan.MaxTills,
+                item.Plan.MaxUsers,
+                item.FeatureIds,
+                item.FeatureCodes))
             .ToList();
 
         var addonRows = await (
@@ -150,6 +165,10 @@ public sealed partial class PlatformTenantRepository
             .OrderBy(addon => addon.Name)
             .ToList();
 
+        var commercialFeatureCodes = CommercialSubscriptionFeatureCatalog
+            .GetCanonicalCommercialFeatureCodes()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var catalogModules = await _dbContext.PlatformModules
             .AsNoTracking()
             .Where(module => module.Status == "ACTIVE")
@@ -162,7 +181,10 @@ public sealed partial class PlatformTenantRepository
                 module.Description,
                 module.SortOrder,
                 _dbContext.PlatformFeatures
-                    .Where(feature => feature.PlatformModuleId == module.Id && feature.Status == "ACTIVE")
+                    .Where(feature =>
+                        feature.PlatformModuleId == module.Id &&
+                        feature.Status == "ACTIVE" &&
+                        commercialFeatureCodes.Contains(feature.FeatureCode))
                     .OrderBy(feature => feature.SortOrder)
                     .ThenBy(feature => feature.Name)
                     .Select(feature => new PlatformTenantCreateCatalogFeatureDto(

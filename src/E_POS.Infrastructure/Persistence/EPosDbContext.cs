@@ -53,6 +53,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<PlatformTenantBootstrapProductImportBatch> PlatformTenantBootstrapProductImportBatches => Set<PlatformTenantBootstrapProductImportBatch>();
     public DbSet<PlatformTenantBootstrapProductImportRow> PlatformTenantBootstrapProductImportRows => Set<PlatformTenantBootstrapProductImportRow>();
     public DbSet<PlatformTenantBootstrapIdempotencyRecord> PlatformTenantBootstrapIdempotencyRecords => Set<PlatformTenantBootstrapIdempotencyRecord>();
+    public DbSet<PlatformUserInvitation> PlatformUserInvitations => Set<PlatformUserInvitation>();
 
     // Tenant Foundation
     public DbSet<BusinessType> BusinessTypes => Set<BusinessType>();

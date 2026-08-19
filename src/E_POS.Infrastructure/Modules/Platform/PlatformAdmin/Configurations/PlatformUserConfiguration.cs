@@ -40,7 +40,7 @@ public sealed class PlatformUserConfiguration : IEntityTypeConfiguration<Platfor
             .HasColumnName("password_hash")
             .HasColumnType("varchar(255)")
             .HasMaxLength(255)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
@@ -130,6 +130,6 @@ public sealed class PlatformUserConfiguration : IEntityTypeConfiguration<Platfor
             .IsUnique()
             .HasDatabaseName("uq_platform_users_normalized_email");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_platform_users_status", "status IN ('ACTIVE', 'INACTIVE', 'LOCKED', 'DELETED')"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_platform_users_status", "status IN ('ACTIVE', 'INACTIVE', 'LOCKED', 'DELETED', 'INVITED')"));
     }
 }

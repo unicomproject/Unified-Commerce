@@ -51,9 +51,7 @@ public static class TenantAdminBootstrapPermissionCatalog
             [
                 "catalog.products.view",
                 "catalog.products.create",
-                "catalog.products.update",
-                "catalog.product_media.manage",
-                "catalog.product_channels.manage"
+                "catalog.products.update"
             ],
             [PlatformTenantFeatureCodes.InventoryTracking] =
             [
@@ -149,21 +147,21 @@ public static class TenantAdminBootstrapPermissionCatalog
             }
 
             var trimmed = raw.Trim();
-            var canonical = PlatformTenantFeatureCodes.NormalizeToCanonicalOrSelf(trimmed);
-            effectiveCanonical.Add(canonical);
-
-            if (!HasExplicitMapping(canonical))
+            if (!CommercialSubscriptionFeatureCatalog.TryNormalizeToCommercialEntitlement(trimmed, out var commercial))
             {
-                // Unknown/unmapped commercial keys must not grant arbitrary permissions.
-                if (!PlatformTenantFeatureCodes.IsKnownFeatureCode(canonical) ||
-                    !PermissionsByEntitlement.ContainsKey(canonical))
-                {
-                    unknownEntitlements.Add(trimmed);
-                }
+                unknownEntitlements.Add(trimmed);
+                continue;
             }
-            else if (GetMappedPermissions(canonical).Count == 0)
+
+            effectiveCanonical.Add(commercial);
+
+            if (!HasExplicitMapping(commercial))
             {
-                intentionallyPermissionless.Add(canonical);
+                unknownEntitlements.Add(trimmed);
+            }
+            else if (GetMappedPermissions(commercial).Count == 0)
+            {
+                intentionallyPermissionless.Add(commercial);
             }
         }
 

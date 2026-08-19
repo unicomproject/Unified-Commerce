@@ -78,8 +78,9 @@ public sealed class PlatformAdminUsersControllerTests
         var result = await controller.CreateUser(
             new CreatePlatformUserRequest
             {
+                FullName = "Duplicate User",
                 Email = "duplicate@example.com",
-                RoleCodes = ["support_operator"]
+                RoleIds = [Guid.NewGuid()]
             },
             CancellationToken.None);
 
@@ -100,8 +101,9 @@ public sealed class PlatformAdminUsersControllerTests
         var result = await controller.CreateUser(
             new CreatePlatformUserRequest
             {
+                FullName = "Support User",
                 Email = "support.user@example.com",
-                RoleCodes = ["unknown_role"]
+                RoleIds = [Guid.NewGuid()]
             },
             CancellationToken.None);
 
