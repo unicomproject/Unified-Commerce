@@ -1,5 +1,6 @@
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Application.Modules.Tenant.Discount.Dtos;
+using E_POS.Domain.Modules.Tenant.Discount.Constants;
 using E_POS.Domain.Modules.Tenant.Discount.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Infrastructure.Persistence;
@@ -46,7 +47,7 @@ public sealed class PosDiscountRepository : IPosDiscountRepository
         var policies = new List<PosDiscountPolicySnapshot>();
         foreach (var policy in candidates)
         {
-            if (IsManualPolicyCode(policy.Code)) continue;
+            if (ManualDiscountPolicyCodes.Contains(policy.Code)) continue;
             var variantIds = query.VariantIds?.Where(x => x != Guid.Empty).Distinct().ToList()
                 ?? (query.VariantId.HasValue && query.VariantId.Value != Guid.Empty
                     ? [query.VariantId.Value]
@@ -108,7 +109,7 @@ public sealed class PosDiscountRepository : IPosDiscountRepository
         if (scope is null)
             return new("pos_discounts.scope_mismatch", context.OutletId, context.TillId,
                 context.TillSessionId, context.Authority, null);
-        var code = ManualPolicyCode(calculationMethod, scope);
+        var code = ManualDiscountPolicyCodes.Resolve(calculationMethod, scope);
         if (code is null)
             return new("pos_discounts.manual_configuration_not_found", context.OutletId, context.TillId,
                 context.TillSessionId, context.Authority, null);
@@ -522,20 +523,6 @@ public sealed class PosDiscountRepository : IPosDiscountRepository
     {
         "ORDER" => "ORDER", "LINE" => "LINE", _ => null
     };
-
-    private static bool IsManualPolicyCode(string code) =>
-        code is "POS_MANUAL_PERCENTAGE" or "POS_MANUAL_FIXED" or
-            "POS_MANUAL_PERCENTAGE_LINE" or "POS_MANUAL_FIXED_LINE";
-
-    private static string? ManualPolicyCode(string calculationMethod, string scope) =>
-        (calculationMethod, scope) switch
-        {
-            ("PERCENTAGE", "ORDER") => "POS_MANUAL_PERCENTAGE",
-            ("FIXED_AMOUNT", "ORDER") => "POS_MANUAL_FIXED",
-            ("PERCENTAGE", "LINE") => "POS_MANUAL_PERCENTAGE_LINE",
-            ("FIXED_AMOUNT", "LINE") => "POS_MANUAL_FIXED_LINE",
-            _ => null
-        };
 
     private static decimal ResolveCashierLimit(PosDiscountAuthorityDto authority, string calculationMethod) =>
         calculationMethod == "PERCENTAGE" ? authority.MaxPercentage : authority.MaxFixedAmount;

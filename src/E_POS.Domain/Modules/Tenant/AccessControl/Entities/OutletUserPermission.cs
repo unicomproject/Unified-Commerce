@@ -42,4 +42,13 @@ public class OutletUserPermission : AuditableEntity
         RevokedAt = now;
         UpdatedAt = now;
     }
+
+    public void Reactivate(Guid? assignedByTenantUserId, DateTimeOffset now)
+    {
+        AssignedByTenantUserId = assignedByTenantUserId;
+        RevokedByTenantUserId = null;
+        AssignedAt = now;
+        RevokedAt = null;
+        UpdatedAt = now;
+    }
 }

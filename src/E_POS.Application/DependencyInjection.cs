@@ -35,16 +35,23 @@ using E_POS.Application.Modules.Tenant.PricingTax.Validators;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Services;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Services;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Application.Modules.Tenant.Discount.Services;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.ECommerce.Customer.Services;
+using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Services;
+using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services.Support;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Services;
@@ -104,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<ProductVariantGenerationService>();
         services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
         services.AddScoped<ProductWizardAccessPolicy>();
         services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
@@ -126,6 +134,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminTillService, TenantAdminTillService>();
         services.AddScoped<ITenantAdminHardwareService, TenantAdminHardwareService>();
         services.AddScoped<ITenantAdminUserService, TenantAdminUserService>();
+        services.AddScoped<ITenantAdminRoleService, TenantAdminRoleService>();
         services.AddScoped<ITillService, TillService>();
         services.AddScoped<IPosDeviceService, PosDeviceService>();
         services.AddScoped<ITillDeviceAssignmentService, TillDeviceAssignmentService>();
@@ -137,6 +146,7 @@ public static class DependencyInjection
         services.AddScoped<ITaxSetupRequestValidator, TaxSetupRequestValidator>();
         services.AddScoped<IProductTaxAssignmentRequestValidator, ProductTaxAssignmentRequestValidator>();
         services.AddScoped<ITaxSetupService, TaxSetupService>();
+        services.AddScoped<ITaxAggregateService, TaxAggregateService>();
         services.AddScoped<IProductTaxAssignmentService, ProductTaxAssignmentService>();
 
         // POS Home (cashier dashboard)
@@ -161,7 +171,7 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
         services.AddScoped<IStorefrontCategoryService, StorefrontCategoryService>();
         services.AddScoped<IStorefrontProductService, StorefrontProductService>();
-        services.AddScoped<IStorefrontFulfillmentService, StorefrontFulfillmentService>();
+        services.AddScoped<IStorefrontFulfilmentService, StorefrontFulfilmentService>();
         services.AddScoped<IStorefrontTenantService, StorefrontTenantService>();
         services.AddScoped<IStorefrontService, StorefrontService>();
         services.AddScoped<IStorefrontCartService, StorefrontCartService>();

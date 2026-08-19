@@ -164,6 +164,16 @@ public sealed class TaxSetupServiceTests
         
         public void UpdateTaxClass(TaxClass taxClass) { }
         
+        public Task<bool> IsTaxClassAssignedAsync(Guid tenantId, Guid taxClassId)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task<TaxJurisdiction> ResolveDefaultJurisdictionAsync(Guid tenantId, Guid? userId, DateTimeOffset now)
+        {
+            return Task.FromResult(TaxJurisdiction.Create(tenantId, "DEFAULT", "DEFAULT", "Default", "US", null, null, null, Guid.Empty, DateTimeOffset.UtcNow));
+        }
+
         public Task ClearDefaultTaxClassAsync(Guid tenantId, Guid? excludeTaxClassId)
         {
             ClearedDefaultClassCalled = true;

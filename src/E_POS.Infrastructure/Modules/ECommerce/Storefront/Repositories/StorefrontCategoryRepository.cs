@@ -138,7 +138,7 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
         }
 
         var categoryIds = categoryRows.Select(c => c.Category.Id).ToList();
-        var productCategoryRows = await (
+        var itemCountsList = await (
                 from productCategory in _dbContext.Set<ProductCategory>().AsNoTracking()
                 join product in _dbContext.Set<Product>().AsNoTracking()
                     on new { productCategory.TenantId, productCategory.ProductId }
@@ -147,13 +147,11 @@ public sealed class StorefrontCategoryRepository : IStorefrontCategoryRepository
                       categoryIds.Contains(productCategory.CategoryId) &&
                       product.Status == ActiveStatus &&
                       product.IsSellable
-                select new { productCategory.CategoryId, product.Id })
-            .Distinct()
+                group product.Id by productCategory.CategoryId into g
+                select new { CategoryId = g.Key, Count = g.Distinct().Count() })
             .ToListAsync(cancellationToken);
 
-        var itemCounts = productCategoryRows
-            .GroupBy(x => x.CategoryId)
-            .ToDictionary(g => g.Key, g => g.Count());
+        var itemCounts = itemCountsList.ToDictionary(g => g.CategoryId, g => g.Count);
 
         return categoryRows.Select(row =>
             row.Category.ToListReadModel(

@@ -52,7 +52,11 @@ using E_POS.Infrastructure.Modules.Shared.Idempotency.Services;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Repositories;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Services;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
+using E_POS.Application.Modules.Tenant.OnlineStoreSetup.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
+using E_POS.Infrastructure.Modules.ECommerce.FulfilmentPickup.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.OnlineStoreSetup.Services;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -64,10 +68,13 @@ using E_POS.Infrastructure.Modules.Tenant.PricingTax.Repositories;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Discount.Repositories;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 using E_POS.Infrastructure.Modules.ECommerce.CustomerAuth.Options;
@@ -225,6 +232,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminHardwareRepository, TenantAdminHardwareRepository>();
         services.AddScoped<ITenantAdminHardwareAuditLogger, TenantAdminHardwareAuditLogger>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
+        services.AddScoped<ITenantAdminRoleRepository, TenantAdminRoleRepository>();
         services.AddScoped<ITenantUserStaffCodeService, TenantUserStaffCodeService>();
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();
@@ -290,9 +298,10 @@ public static class DependencyInjection
             provider.GetRequiredService<IStorefrontProductDetailRepository>(),
             provider.GetRequiredService<IStorefrontProductSearchRepository>(),
             provider.GetRequiredService<IStorefrontProductBestSellerRepository>()));
-        services.AddScoped<IStorefrontFulfillmentRepository, StorefrontFulfillmentRepository>();
+        services.AddScoped<IStorefrontFulfilmentRepository, StorefrontFulfilmentRepository>();
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
+        services.AddScoped<ITenantAdminOnlineStoreService, TenantAdminOnlineStoreService>();
         services.AddScoped<IStorefrontCartRepository, StorefrontCartRepository>();
         services.AddScoped<IStorefrontCheckoutSessionRepository, StorefrontCheckoutSessionRepository>();
         services.AddScoped<IStorefrontCheckoutConfirmationRepository, StorefrontCheckoutConfirmationRepository>();

@@ -9,6 +9,7 @@ public sealed record DrawerOpenRequest(
     string DrawerPort,
     int PulseOnTime,
     int PulseOffTime,
+    DateTimeOffset? RequestedAt = null,
     Guid? ConfigurationId = null,
     int? ConfigurationVersion = null,
     string? PosDeviceId = null);

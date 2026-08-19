@@ -31,4 +31,21 @@ public interface IPosDrawerRepository
 
     Task<IReadOnlyList<CashDrawerOperationDto>> GetHistoryAsync(
         Guid tenantId, Guid posDeviceId, int take, CancellationToken cancellationToken);
+
+    Task<PosCashDrawerSummaryDto?> GetFinancialSummaryAsync(
+        Guid tenantId, Guid tillSessionId, CancellationToken cancellationToken);
+
+    Task<PosCashDrawerMovementPageDto> GetFinancialMovementsAsync(
+        Guid tenantId, Guid tillSessionId, int page, int pageSize, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PosCashMovementTypeDto>> GetMovementTypesAsync(
+        Guid tenantId, string direction, CancellationToken cancellationToken);
+
+    Task<(string? ErrorCode, PosCashDrawerMovementDto? Movement)> CreateFinancialMovementAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid trustedTillId,
+        CreatePosCashMovementRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }

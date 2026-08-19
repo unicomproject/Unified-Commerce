@@ -144,6 +144,50 @@ public sealed class TaxSetupRepository : ITaxSetupRepository
             .AnyAsync(x => x.TenantId == tenantId && x.Id == jurisdictionId && x.Status != "DELETED");
     }
 
+    public async Task<TaxJurisdiction> ResolveDefaultJurisdictionAsync(Guid tenantId, Guid? userId, DateTimeOffset now)
+    {
+        var tenant = await _dbContext.Tenants.FirstOrDefaultAsync(x => x.Id == tenantId);
+        
+        string countryCode = "US";
+        if (tenant != null && !string.IsNullOrWhiteSpace(tenant.DefaultLocale))
+        {
+            var parts = tenant.DefaultLocale.Split('-');
+            if (parts.Length > 1)
+            {
+                countryCode = parts.Last().ToUpperInvariant();
+            }
+        }
+        
+        var jurisdictionCode = $"DEFAULT-{countryCode}";
+
+        var existing = await _dbContext.TaxJurisdictions
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.JurisdictionCode == jurisdictionCode);
+
+        if (existing != null)
+        {
+            if (existing.Status == "DELETED")
+            {
+                // Restore it or handle appropriately
+            }
+            return existing;
+        }
+
+        var newJurisdiction = TaxJurisdiction.Create(
+            tenantId, 
+            jurisdictionCode, 
+            "Default Tax Jurisdiction", 
+            "COUNTRY", 
+            countryCode, 
+            null, 
+            null, 
+            null, 
+            userId, 
+            now);
+
+        await _dbContext.TaxJurisdictions.AddAsync(newJurisdiction);
+        return newJurisdiction;
+    }
+
     public Task SaveChangesAsync()
     {
         return _dbContext.SaveChangesAsync();

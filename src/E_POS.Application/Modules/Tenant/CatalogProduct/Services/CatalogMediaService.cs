@@ -26,15 +26,18 @@ public sealed class CatalogMediaService : ICatalogMediaService
     private readonly ICatalogMediaRepository _repository;
     private readonly IMediaObjectStorage _storage;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IMediaReadUrlResolver? _urlResolver;
 
     public CatalogMediaService(
         ICatalogMediaRepository repository,
         IMediaObjectStorage storage,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IMediaReadUrlResolver? urlResolver = null)
     {
         _repository = repository;
         _storage = storage;
         _dateTimeProvider = dateTimeProvider;
+        _urlResolver = urlResolver;
     }
 
     public async Task<ApplicationResult<MediaAssetUploadResponse>> UploadProductImageAsync(
@@ -168,8 +171,8 @@ public sealed class CatalogMediaService : ICatalogMediaService
             null,
             uploadResult.ContainerName,
             uploadResult.StorageKey,
-            uploadResult.PublicUrl,
-            uploadResult.PublicUrl,
+            _urlResolver?.ResolveReadUrl(uploadResult.PublicUrl) ?? uploadResult.PublicUrl,
+            _urlResolver?.ResolveReadUrl(uploadResult.PublicUrl) ?? uploadResult.PublicUrl,
             null,
             preparedResult.Image.OriginalFileName,
             preparedResult.Image.MimeType,
@@ -253,7 +256,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
         return ApplicationResult<StagedProductImageResponse>.Success(new StagedProductImageResponse(
             mediaAssetId,
-            uploadResult.PublicUrl,
+            _urlResolver?.ResolveReadUrl(uploadResult.PublicUrl) ?? uploadResult.PublicUrl,
             preparedResult.Image.OriginalFileName,
             preparedResult.Image.MimeType,
             preparedResult.Image.FileSizeBytes,
@@ -719,8 +722,8 @@ public sealed class CatalogMediaService : ICatalogMediaService
             null,
             uploadResult.ContainerName,
             uploadResult.StorageKey,
-            uploadResult.PublicUrl,
-            uploadResult.PublicUrl,
+            _urlResolver?.ResolveReadUrl(uploadResult.PublicUrl) ?? uploadResult.PublicUrl,
+            _urlResolver?.ResolveReadUrl(uploadResult.PublicUrl) ?? uploadResult.PublicUrl,
             null,
             preparedResult.Image.OriginalFileName,
             preparedResult.Image.MimeType,
@@ -830,9 +833,9 @@ public sealed class CatalogMediaService : ICatalogMediaService
             brandId,
             uploadResult.ContainerName,
             uploadResult.StorageKey,
-            uploadResult.PublicUrl,
+            _urlResolver?.ResolveReadUrl(uploadResult.PublicUrl) ?? uploadResult.PublicUrl,
             null,
-            uploadResult.PublicUrl,
+            _urlResolver?.ResolveReadUrl(uploadResult.PublicUrl) ?? uploadResult.PublicUrl,
             preparedResult.Image.OriginalFileName,
             preparedResult.Image.MimeType,
             preparedResult.Image.FileExtension,

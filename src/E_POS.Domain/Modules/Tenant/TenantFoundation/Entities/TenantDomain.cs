@@ -57,5 +57,44 @@ public class TenantDomain : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void MarkVerificationStarted(string verificationTokenHash, Guid? updatedByPlatformUserId, DateTimeOffset now)
+    {
+        VerificationTokenHash = verificationTokenHash.Trim();
+        VerificationStatus = "PENDING";
+        VerifiedAt = null;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void MarkVerified(Guid? updatedByPlatformUserId, DateTimeOffset now)
+    {
+        VerificationStatus = "VERIFIED";
+        VerifiedAt = now;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void MarkSslProvisioning(Guid? updatedByPlatformUserId, DateTimeOffset now)
+    {
+        SslStatus = "PENDING";
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void SetPrimary(bool isPrimary, Guid? updatedByPlatformUserId, DateTimeOffset now)
+    {
+        IsPrimary = isPrimary;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void SoftDelete(Guid? updatedByPlatformUserId, DateTimeOffset now)
+    {
+        IsPrimary = false;
+        Status = "DELETED";
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
 }
 

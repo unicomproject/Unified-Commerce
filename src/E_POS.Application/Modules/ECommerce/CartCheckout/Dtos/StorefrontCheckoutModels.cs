@@ -6,6 +6,7 @@ public sealed class CreateStorefrontCheckoutFromCartRequest
     public string? PickupContactName { get; set; }
     public string? PickupContactPhone { get; set; }
     public string? PickupContactEmail { get; set; }
+    public DateTimeOffset? RequestedCollectionAt { get; set; }
 }
 
 public sealed class UpdateStorefrontCheckoutCollectionRequest

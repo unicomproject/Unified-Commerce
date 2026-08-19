@@ -38,7 +38,8 @@ public static class StorefrontProductMapper
         decimal averageRating,
         int reviewCount,
         bool isInStock,
-        string currencyCode)
+        string currencyCode,
+        IReadOnlyList<StorefrontProductOptionReadModel> options)
     {
         return new StorefrontProductListReadModel
         {
@@ -52,7 +53,8 @@ public static class StorefrontProductMapper
             Rating = averageRating,
             ReviewCount = reviewCount,
             IsInStock = isInStock,
-            Badge = reviewCount > 0 && averageRating >= 4.5m ? "Best Seller" : null
+            Badge = reviewCount > 0 && averageRating >= 4.5m ? "Best Seller" : null,
+            Options = options
         };
     }
 

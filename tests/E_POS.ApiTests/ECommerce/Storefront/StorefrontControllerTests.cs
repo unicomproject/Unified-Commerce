@@ -1,6 +1,8 @@
 using E_POS.Api.Controllers.V1.ECommerce.Storefront;
+using E_POS.Api.Controllers.V1.ECommerce.FulfilmentPickup;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
@@ -338,7 +340,7 @@ public sealed class StorefrontControllerTests
     public async Task GetStores_WithMissingTenantHeader_ReturnsBadRequest()
     {
         var service = new FakeStorefrontService();
-        var controller = new StorefrontFulfillmentController(service);
+        var controller = new StorefrontFulfilmentController(service);
 
         var result = await controller.GetStores(Guid.Empty, CancellationToken.None);
 
@@ -354,7 +356,7 @@ public sealed class StorefrontControllerTests
         {
             Stores = [new StorefrontStoreReadModel { Id = Guid.NewGuid(), Name = "Main Store", Address = "Main Road", IsAvailable = true }]
         };
-        var controller = new StorefrontFulfillmentController(service);
+        var controller = new StorefrontFulfilmentController(service);
 
         var result = await controller.GetStores(tenantId, CancellationToken.None);
 
@@ -367,7 +369,7 @@ public sealed class StorefrontControllerTests
     public async Task GetCollectionOptions_WithMissingTenantHeader_ReturnsBadRequest()
     {
         var service = new FakeStorefrontService();
-        var controller = new StorefrontFulfillmentController(service);
+        var controller = new StorefrontFulfilmentController(service);
 
         var result = await controller.GetCollectionOptions(
             Guid.Empty,
@@ -389,7 +391,7 @@ public sealed class StorefrontControllerTests
         {
             CollectionOptionsResult = ApplicationResult<StorefrontCollectionOptionsReadModel>.Success(options)
         };
-        var controller = new StorefrontFulfillmentController(service);
+        var controller = new StorefrontFulfilmentController(service);
 
         var result = await controller.GetCollectionOptions(
             tenantId,
@@ -523,3 +525,6 @@ public sealed class StorefrontControllerTests
         }
     }
 }
+
+
+

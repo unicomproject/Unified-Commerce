@@ -11,7 +11,7 @@ namespace E_POS.Api.Controllers;
 
 [ApiController]
 [Authorize(Policy = "TenantOnly")]
-[Route("api/v1")]
+[Route("api/v1/tenant-admin")]
 public sealed class CatalogMediaController : ControllerBase
 {
     private readonly ICatalogMediaService _catalogMediaService;

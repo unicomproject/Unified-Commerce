@@ -11,4 +11,8 @@ public sealed record CurrentTillSessionDto(
     decimal OpeningFloat,
     string Status,
     DateTimeOffset OpenedAt,
-    string? OpeningNote);
+    string? OpeningNote,
+    string CurrencyCode = "",
+    decimal ExpectedCash = 0,
+    string? TillName = null,
+    string? OpenedByName = null);

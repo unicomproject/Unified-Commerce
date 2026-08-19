@@ -195,7 +195,7 @@ public sealed class PosSaleLinePricingCalculatorTests
         db.TaxJurisdictions.Add(jurisdiction);
         await db.SaveChangesAsync();
 
-        var taxClass = TaxClass.Create(tenantId, "STD", "Standard", null, true, null, Now);
+        var taxClass = TaxClass.Create(tenantId, "STD", "Standard", "OTHER", null, true, null, Now);
         db.TaxClasses.Add(taxClass);
         await db.SaveChangesAsync();
 

@@ -28,7 +28,18 @@ public sealed record PosCalculatedCartLineDto(
     int Tax,
     int LineTotal,
     string StockStatus,
-    string? ConflictCode = null);
+    string? ConflictCode = null,
+    int? BaseUnitPrice = null,
+    int AutomaticDiscount = 0,
+    int? EffectiveUnitPrice = null,
+    PosAppliedPromotionDto? AppliedPromotion = null);
+
+public sealed record PosAppliedPromotionDto(
+    Guid PolicyId,
+    string PolicyCode,
+    string PolicyName,
+    string CalculationMethod,
+    decimal DiscountValue);
 
 public sealed record PosCheckoutSummaryRequestDto(
     Guid DeviceId,
@@ -43,7 +54,9 @@ public sealed record PosCheckoutBillingSummaryDto(
     int Discount,
     int Tax,
     int TotalPayable,
-    string Currency);
+    string Currency,
+    int AutomaticDiscount = 0,
+    int ManualDiscount = 0);
 
 public sealed record PosCheckoutSaleDetailsDto(
     string SaleType,
@@ -159,5 +172,9 @@ public sealed record PosCheckoutStartPaymentResponseDto(
     string? TaxRegistrationNumber = null,
     string? TaxInvoiceLabel = null,
     Guid? DrawerOperationId = null,
+    Guid? DrawerRequestId = null,
     CashDrawerSettingsDto? CashDrawerSettings = null,
-    string? ReceiptDataJson = null);
+    string? ReceiptDataJson = null,
+    Guid? CustomerId = null,
+    string? CustomerName = null,
+    string? CustomerPhone = null);

@@ -27,6 +27,7 @@ public interface ITaxSetupRepository
     
     // Tax Jurisdiction (for existence checks)
     Task<bool> JurisdictionExistsAsync(Guid tenantId, Guid jurisdictionId);
+    Task<TaxJurisdiction> ResolveDefaultJurisdictionAsync(Guid tenantId, Guid? userId, DateTimeOffset now);
 
     Task SaveChangesAsync();
 }

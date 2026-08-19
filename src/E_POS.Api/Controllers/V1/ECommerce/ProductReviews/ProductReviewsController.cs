@@ -9,7 +9,7 @@ namespace E_POS.Api.Controllers.V1.ECommerce.ProductReviews;
 
 [ApiController]
 [Route("api/v1/ecommerce/storefront")]
-public sealed class ProductReviewsController : ControllerBase
+public sealed class ProductReviewsController : CustomerControllerBase
 {
     private readonly IProductReviewService _service;
 
@@ -33,7 +33,15 @@ public sealed class ProductReviewsController : ControllerBase
         [FromQuery] int? rating = null,
         CancellationToken cancellationToken = default)
     {
-        TryGetCustomerContext(out _, out var customerId);
+        if (TryGetCustomerContext(out var jwtTenantId, out var customerId))
+        {
+            if (jwtTenantId != tenantId)
+            {
+                return BadRequest(CreateError(new ApplicationError(
+                    "product_reviews.tenant_mismatch",
+                    "Cross-tenant access is not allowed.")));
+            }
+        }
         
         var result = await _service.GetAsync(
             tenantId, customerId, productId, page, pageSize, sort, rating, cancellationToken);
@@ -176,34 +184,10 @@ public sealed class ProductReviewsController : ControllerBase
         };
     }
 
-    private bool TryGetCustomerContext(out Guid tenantId, out Guid customerId)
-    {
-        tenantId = Guid.Empty;
-        customerId = Guid.Empty;
-        var customerValue = User.FindFirstValue("sub") ??
-                            User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(User.FindFirstValue("tenant_id"), out tenantId) &&
-               Guid.TryParse(customerValue, out customerId);
-    }
-
-    private IActionResult InvalidSession() =>
-        Unauthorized(CreateError(new ApplicationError(
-            "product_reviews.invalid_customer_context",
-            "A valid customer session is required.")));
-
     private static object Success(string message, object data) => new
     {
         success = true,
         message,
         data
-    };
-
-    private object CreateError(ApplicationError error) => new
-    {
-        success = false,
-        message = error.Message,
-        errorCode = error.Code,
-        errors = Array.Empty<string>(),
-        traceId = HttpContext.TraceIdentifier
     };
 }

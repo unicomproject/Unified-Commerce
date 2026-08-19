@@ -72,8 +72,7 @@ public static class SecureManifestTransport
         }
 
         var identity = WindowsIdentity.GetCurrent().User ?? throw new InvalidOperationException("Current Windows identity is unavailable.");
-        var security = new FileSecurity();
-        security.SetOwner(identity);
+        var security = FileSystemAclExtensions.GetAccessControl(new FileInfo(path));
         security.SetAccessRuleProtection(true, false);
         security.AddAccessRule(new FileSystemAccessRule(identity, FileSystemRights.FullControl, AccessControlType.Allow));
         FileSystemAclExtensions.SetAccessControl(new FileInfo(path), security);

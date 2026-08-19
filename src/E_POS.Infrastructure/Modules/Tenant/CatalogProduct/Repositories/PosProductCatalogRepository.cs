@@ -3,6 +3,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Tenant.Discount.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.Discount.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
@@ -201,6 +202,8 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
 
             foreach (var dp in activePols)
             {
+                if (ManualDiscountPolicyCodes.Contains(dp.DiscountPolicyCode)) continue;
+
                 var hasOutletLimits = await _dbContext.DiscountPolicyOutlets.AnyAsync(po => po.DiscountPolicyId == dp.Id && po.Status == "ACTIVE", cancellationToken);
                 if (hasOutletLimits)
                 {
@@ -543,6 +546,8 @@ public sealed class PosProductCatalogRepository : IPosProductCatalogRepository
 
             foreach (var dp in activePols)
             {
+                if (ManualDiscountPolicyCodes.Contains(dp.DiscountPolicyCode)) continue;
+
                 var hasOutletLimits = await _dbContext.DiscountPolicyOutlets.AnyAsync(po => po.DiscountPolicyId == dp.Id && po.Status == "ACTIVE", cancellationToken);
                 if (hasOutletLimits)
                 {
