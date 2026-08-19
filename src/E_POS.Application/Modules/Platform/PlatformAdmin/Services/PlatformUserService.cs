@@ -2,8 +2,11 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
+using E_POS.Domain.Modules.Shared.Integration.Entities;
+using System.Text.Json;
 
 namespace E_POS.Application.Modules.Platform.PlatformAdmin.Services;
 
@@ -38,7 +41,8 @@ public sealed class PlatformUserService : IPlatformUserService
         PlatformAuthConstants.ActiveStatus,
         PlatformAuthConstants.InactiveStatus,
         PlatformAuthConstants.LockedStatus,
-        PlatformAuthConstants.DeletedStatus
+        PlatformAuthConstants.DeletedStatus,
+        PlatformAuthConstants.InvitedStatus
     ];
 
     private static readonly HashSet<string> DeactivatedStatuses =
@@ -51,15 +55,21 @@ public sealed class PlatformUserService : IPlatformUserService
     private readonly IPlatformUserRepository _userRepository;
     private readonly IPlatformPermissionChecker _permissionChecker;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IInvitationTokenService _invitationTokenService;
+    private readonly IInvitationDeliverySecretProtector _deliverySecretProtector;
 
     public PlatformUserService(
         IPlatformUserRepository userRepository,
         IPlatformPermissionChecker permissionChecker,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IInvitationTokenService invitationTokenService,
+        IInvitationDeliverySecretProtector deliverySecretProtector)
     {
         _userRepository = userRepository;
         _permissionChecker = permissionChecker;
         _dateTimeProvider = dateTimeProvider;
+        _invitationTokenService = invitationTokenService;
+        _deliverySecretProtector = deliverySecretProtector;
     }
 
     public async Task<ApplicationResult<PlatformUserListResponse>> GetUsersAsync(
@@ -120,7 +130,7 @@ public sealed class PlatformUserService : IPlatformUserService
                 Conflict with { Message = "A platform user with this email already exists." });
         }
 
-        var roleResolution = await ResolveRequestedRolesAsync(request.RoleIds, request.RoleCodes, cancellationToken);
+        var roleResolution = await ResolveRequestedRolesAsync(request.RoleIds, null, cancellationToken);
         if (roleResolution.IsFailure)
         {
             return ApplicationResult<PlatformUserDetailResponse>.Failure(roleResolution.Error);
@@ -144,24 +154,46 @@ public sealed class PlatformUserService : IPlatformUserService
             return ApplicationResult<PlatformUserDetailResponse>.Failure(protectedRoleCheck);
         }
 
-        var status = NormalizeCreateStatus(request.Status);
-        if (!AllowedStatuses.Contains(status))
-        {
-            return ApplicationResult<PlatformUserDetailResponse>.Failure(
-                ValidationFailed with { Message = "Invalid platform user status." });
-        }
-
         var now = _dateTimeProvider.UtcNow;
         var user = PlatformUser.CreatePendingInvite(Guid.NewGuid(), email, now);
-        if (!string.Equals(status, PlatformAuthConstants.InactiveStatus, StringComparison.Ordinal))
-        {
-            user.SetStatus(status, now);
-        }
+        user.SetDisplayName(request.FullName, now);
+        user.SetPhone(request.Phone, now);
 
-        await _userRepository.AddUserWithRolesAsync(
+        var rawToken = _invitationTokenService.GenerateToken();
+        var protectedToken = _deliverySecretProtector.Protect(rawToken);
+        var inviteTokenHash = _invitationTokenService.HashToken(rawToken);
+
+        var invitation = PlatformUserInvitation.Create(
+            Guid.NewGuid(),
+            user.Id,
+            inviteTokenHash,
+            now.AddHours(72),
+            now);
+
+        var outboxMessage = IntegrationOutboxMessage.Create(
+            Guid.NewGuid(),
+            "platform.user_invited",
+            "PLATFORM_USER",
+            user.Id,
+            1,
+            null,
+            Guid.NewGuid(),
+            null,
+            JsonSerializer.Serialize(new
+            {
+                platformUserId = user.Id,
+                invitationId = invitation.Id,
+                protectedToken = protectedToken.Ciphertext,
+                keyVersion = protectedToken.KeyVersion
+            }),
+            $"platform.user_invited:{invitation.Id:N}",
+            now);
+
+        await _userRepository.AddUserWithRolesAndInvitationAsync(
             user,
             roles.Select(role => role.Id).ToList(),
-            now,
+            invitation,
+            outboxMessage,
             cancellationToken);
 
         var createdUser = await _userRepository.GetUserByIdAsync(user.Id, cancellationToken);

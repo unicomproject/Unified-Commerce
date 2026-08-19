@@ -26,6 +26,13 @@ public interface IPlatformUserRepository
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
+    Task AddUserWithRolesAndInvitationAsync(
+        PlatformUser user,
+        IReadOnlyList<Guid> roleIds,
+        PlatformUserInvitation invitation,
+        E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage outboxMessage,
+        CancellationToken cancellationToken);
+
     Task UpdateUserAsync(PlatformUser user, CancellationToken cancellationToken);
 
     Task ReplaceUserRolesAsync(

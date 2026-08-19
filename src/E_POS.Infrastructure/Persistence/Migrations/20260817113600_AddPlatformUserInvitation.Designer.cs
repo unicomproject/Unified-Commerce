@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260817113600_AddPlatformUserInvitation")]
+    partial class AddPlatformUserInvitation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2674,100 +2677,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_storefront_banners_tenant_id_image_media_asset_id");
 
                     b.ToTable("storefront_banners", (string)null);
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Storefront.Entities.StorefrontPolicy", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("content");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid?>("CreatedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_tenant_user_id");
-
-                    b.Property<DateTimeOffset?>("EffectiveFrom")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("effective_from");
-
-                    b.Property<string>("PolicyType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("policy_type");
-
-                    b.Property<DateTimeOffset?>("PublishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("published_at");
-
-                    b.Property<Guid>("SalesChannelId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("sales_channel_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("title");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid?>("UpdatedByTenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by_tenant_user_id");
-
-                    b.Property<string>("Version")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id")
-                        .HasName("pk_storefront_policies");
-
-                    b.HasIndex("CreatedByTenantUserId");
-
-                    b.HasIndex("UpdatedByTenantUserId");
-
-                    b.HasIndex("TenantId", "SalesChannelId", "PolicyType")
-                        .IsUnique()
-                        .HasDatabaseName("uq_storefront_policies_current_published")
-                        .HasFilter("status = 'PUBLISHED'");
-
-                    b.HasIndex("TenantId", "SalesChannelId", "PolicyType", "Version")
-                        .IsUnique()
-                        .HasDatabaseName("uq_storefront_policies_type_version");
-
-                    b.ToTable("storefront_policies", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_storefront_policies_content_non_empty", "length(btrim(content)) > 0");
-
-                            t.HasCheckConstraint("ck_storefront_policies_policy_type", "policy_type IN ('TERMS', 'PRIVACY', 'CANCELLATION', 'COLLECTION', 'RETURN_REFUND')");
-
-                            t.HasCheckConstraint("ck_storefront_policies_status", "status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')");
-                        });
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", b =>
@@ -12144,10 +12053,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("published_by_tenant_user_id");
 
-                    b.Property<decimal?>("ReferenceCostPrice")
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("reference_cost_price");
-
                     b.Property<Guid?>("ReturnPolicyId")
                         .HasColumnType("uuid")
                         .HasColumnName("return_policy_id");
@@ -12204,7 +12109,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_products_desired_publish_status", "desired_publish_status IS NULL OR desired_publish_status IN ('ACTIVE','INACTIVE')");
 
-                            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 7");
+                            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 8");
 
                             t.HasCheckConstraint("ck_products_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
                         });
@@ -12609,21 +12514,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductVariantId");
 
-                    b.HasIndex("UomId");
-
                     b.HasIndex("TenantId", "Barcode")
                         .IsUnique()
                         .HasDatabaseName("uq_product_barcodes_tenant_id_barcode");
-
-                    b.HasIndex("TenantId", "ProductId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_product_barcodes_tenant_id_product_id_primary")
-                        .HasFilter("product_variant_id IS NULL AND is_primary_barcode = true AND status <> 'DELETED'");
-
-                    b.HasIndex("TenantId", "ProductVariantId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_product_barcodes_tenant_id_product_variant_id_primary")
-                        .HasFilter("product_variant_id IS NOT NULL AND is_primary_barcode = true AND status <> 'DELETED'");
 
                     b.ToTable("product_barcodes", null, t =>
                         {
@@ -15877,10 +15770,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("refund_id");
 
-                    b.Property<Guid?>("RequestId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("request_id");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -15921,11 +15810,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "OutletId");
 
                     b.HasIndex("TenantId", "PosDeviceId");
-
-                    b.HasIndex("TenantId", "RequestId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_cash_movements_tenant_id_request_id")
-                        .HasFilter("request_id IS NOT NULL");
 
                     b.HasIndex("TenantId", "TillId");
 
@@ -15993,15 +15877,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_cash_movement_types");
 
-                    b.HasIndex("MovementTypeCode")
-                        .IsUnique()
-                        .HasDatabaseName("uq_cash_movement_types_global_code")
-                        .HasFilter("tenant_id IS NULL");
-
                     b.HasIndex("TenantId", "MovementTypeCode")
                         .IsUnique()
-                        .HasDatabaseName("uq_cash_movement_types_tenant_code")
-                        .HasFilter("tenant_id IS NOT NULL");
+                        .HasDatabaseName("uq_cash_movement_types_tenant_id_movement_type_code");
 
                     b.ToTable("cash_movement_types", null, t =>
                         {
@@ -22499,10 +22377,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("performed_by_tenant_user_id");
 
-                    b.Property<Guid?>("PosDeviceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("pos_device_id");
-
                     b.Property<string>("Reason")
                         .HasMaxLength(250)
                         .HasColumnType("varchar(250)")
@@ -22512,10 +22386,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)")
                         .HasColumnName("reference_number");
-
-                    b.Property<Guid?>("RequestId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("request_id");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -22534,21 +22404,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_till_cash_movements_tenant_id_id");
 
-                    b.HasIndex("TenantId", "PosDeviceId");
-
-                    b.HasIndex("TenantId", "RequestId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_till_cash_movements_tenant_request_id")
-                        .HasFilter("request_id IS NOT NULL");
-
-                    b.HasIndex("TenantId", "TillSessionId", "PerformedAt")
-                        .HasDatabaseName("ix_till_cash_movements_session_performed_at");
+                    b.HasIndex("TenantId", "TillSessionId");
 
                     b.ToTable("till_cash_movements", null, t =>
                         {
                             t.HasCheckConstraint("ck_till_cash_movements_amount", "amount > 0");
 
-                            t.HasCheckConstraint("ck_till_cash_movements_movement_type", "movement_type IN ('CASH_IN', 'CASH_OUT', 'CASH_DROP', 'OPENING_FLOAT', 'CLOSING_REMOVE')");
+                            t.HasCheckConstraint("ck_till_cash_movements_movement_type", "movement_type IN ('CASH_IN', 'CASH_OUT', 'OPENING_FLOAT', 'CLOSING_REMOVE')");
                         });
                 });
 
@@ -23770,7 +23632,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("description");
 
                     b.Property<bool>("IsDefaultTaxClass")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
+                        .HasDefaultValue(false)
                         .HasColumnName("is_default_tax_class");
 
                     b.Property<string>("Status")
@@ -23790,12 +23654,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
                         .HasColumnName("tax_class_name");
-
-                    b.Property<string>("TaxType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("tax_type");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -23851,7 +23709,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("created_by_tenant_user_id");
 
                     b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
+                        .HasDefaultValue(0)
                         .HasColumnName("sort_order");
 
                     b.Property<string>("Status")
@@ -24022,7 +23882,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnName("created_by_tenant_user_id");
 
                     b.Property<bool>("IsCompound")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
+                        .HasDefaultValue(false)
                         .HasColumnName("is_compound");
 
                     b.Property<decimal>("RatePercent")
@@ -26230,36 +26092,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_storefront_banners_image_media_asset_tenant");
-                });
-
-            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.Storefront.Entities.StorefrontPolicy", b =>
-                {
-                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedByTenantUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_storefront_policies_created_by_tenant_user");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_storefront_policies_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedByTenantUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_storefront_policies_updated_by_tenant_user");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.SalesChannel", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "SalesChannelId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_storefront_policies_sales_channel_tenant");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformAuthSession", b =>
@@ -28751,12 +28583,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_barcodes_product_variant_id_product_variants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.UnitOfMeasure", null)
-                        .WithMany()
-                        .HasForeignKey("UomId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_product_barcodes_uom_id_unit_of_measures");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductCategory", b =>
@@ -32133,13 +31959,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_till_cash_movements_tenant_id_tenants");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.PosDevice", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "PosDeviceId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_till_cash_movements_pos_device_id_pos_devices");
 
                     b.HasOne("E_POS.Domain.Modules.Tenant.HardwareCash.Entities.TillSession", null)
                         .WithMany()

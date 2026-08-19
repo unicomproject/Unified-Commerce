@@ -15,6 +15,8 @@ public static class DevelopmentPosPermissionCatalogSeedConstants
 {
     public static readonly Guid CorePosModuleId = Guid.Parse("71000000-0000-0000-0000-000000000010");
 
+    public static readonly Guid PosCheckoutFeatureId = Guid.Parse("72000000-0000-0000-0000-000000000023");
+
     public static readonly Guid PosHomeFeatureId = Guid.Parse("72000000-0000-0000-0000-000000000010");
     public static readonly Guid PosSalesFeatureId = Guid.Parse("72000000-0000-0000-0000-000000000011");
     public static readonly Guid PosProductsFeatureId = Guid.Parse("72000000-0000-0000-0000-000000000012");

@@ -138,12 +138,7 @@
       "module_code": "product_management",
       "name": "Product Management",
       "features": [
-        { "feature_code": "product_catalog", "name": "Product Catalog" },
-        { "feature_code": "product_categories", "name": "Categories & Departments" },
-        { "feature_code": "product_brands", "name": "Brand Management" },
-        { "feature_code": "product_barcodes", "name": "Product Barcodes" },
-        { "feature_code": "product_images", "name": "Product Images" },
-        { "feature_code": "product_variants", "name": "Product Variants" }
+        { "feature_code": "product_catalog", "name": "Product Catalog" }
       ]
     },
     {

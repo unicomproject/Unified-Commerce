@@ -161,6 +161,31 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task AddUserWithRolesAndInvitationAsync(
+        PlatformUser user,
+        IReadOnlyList<Guid> roleIds,
+        PlatformUserInvitation invitation,
+        E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage outboxMessage,
+        CancellationToken cancellationToken)
+    {
+        _dbContext.PlatformUsers.Add(user);
+
+        foreach (var roleId in roleIds.Distinct())
+        {
+            _dbContext.PlatformUserRoles.Add(PlatformUserRole.Create(
+                Guid.NewGuid(),
+                user.Id,
+                roleId,
+                "Platform user role assignment.",
+                user.CreatedAt));
+        }
+
+        _dbContext.PlatformUserInvitations.Add(invitation);
+        _dbContext.IntegrationOutboxMessages.Add(outboxMessage);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public Task UpdateUserAsync(PlatformUser user, CancellationToken cancellationToken)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);

@@ -229,7 +229,7 @@ public sealed class PosPermissionSeedTests
         Assert.Single(updateDefinitions);
         Assert.Equal(DevelopmentPosCustomerUpdatePermissionSeedData.PermissionId, updateDefinitions[0].Id);
         Assert.Equal(
-            DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId,
+            DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId,
             updateDefinitions[0].FeatureId);
         Assert.Equal("update", updateDefinitions[0].ActionType);
         Assert.Equal(
@@ -252,7 +252,7 @@ public sealed class PosPermissionSeedTests
             DevelopmentPosCustomerCreatePermissionSeedData.PermissionId,
             createDefinitions[0].Id);
         Assert.Equal(
-            DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId,
+            DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId,
             createDefinitions[0].FeatureId);
         Assert.Equal("create", createDefinitions[0].ActionType);
     }
