@@ -165,4 +165,45 @@ public interface ITenantAdminProductRepository
         Guid tenantId,
         Guid productId,
         CancellationToken cancellationToken);
+
+    Task UpdateVariantAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductVariantUpdateRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task AddBarcodeAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductBarcodeAddRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task DeleteBarcodeAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        Guid barcodeId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task RestoreAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<TenantAdminProductCreateResponse> DuplicateAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }

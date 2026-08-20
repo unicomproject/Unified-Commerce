@@ -2075,4 +2075,213 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         string? Barcode,
         decimal SellingPrice,
         decimal? DiscountPrice);
+
+    public async Task UpdateVariantAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductVariantUpdateRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var variant = await _dbContext.ProductVariants
+            .FirstOrDefaultAsync(v => v.TenantId == tenantId && v.ProductId == productId && v.Id == variantId, cancellationToken);
+            
+        if (variant == null)
+            throw new InvalidOperationException("Variant not found.");
+
+        variant.UpdateProfile(
+            variant.VariantCode,
+            variant.VariantName,
+            request.Sku,
+            variant.StockUomId,
+            variant.SalesUomId,
+            variant.IsDefaultVariant,
+            request.IsSellable,
+            request.AllowFractionalQuantity,
+            variant.Status,
+            userId,
+            now);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddBarcodeAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductBarcodeAddRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var barcode = ProductBarcode.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            variantId,
+            request.Barcode,
+            "CUSTOM",
+            null,
+            1,
+            false,
+            ProductConstants.ActiveStatus,
+            userId,
+            now);
+
+        _dbContext.ProductBarcodes.Add(barcode);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteBarcodeAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        Guid barcodeId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var barcode = await _dbContext.ProductBarcodes
+            .FirstOrDefaultAsync(b => b.TenantId == tenantId && b.ProductId == productId && b.ProductVariantId == variantId && b.Id == barcodeId, cancellationToken);
+
+        if (barcode != null)
+        {
+            _dbContext.ProductBarcodes.Remove(barcode);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RestoreAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var product = await _dbContext.Products
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Id == productId, cancellationToken);
+
+        if (product == null)
+            throw new InvalidOperationException("Product not found.");
+
+        product.Restore(userId, now);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<TenantAdminProductCreateResponse> DuplicateAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var product = await _dbContext.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == productId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
+
+        if (product is null)
+        {
+            throw new InvalidOperationException("Product not found.");
+        }
+
+        var newProductId = Guid.NewGuid();
+        var suffix = $"-COPY-{newProductId.ToString().Substring(0, 4).ToUpperInvariant()}";
+        
+        var newCode = product.ProductCode.Length + suffix.Length > ProductConstants.ProductCodeMaxLength 
+            ? product.ProductCode.Substring(0, ProductConstants.ProductCodeMaxLength - suffix.Length) + suffix
+            : product.ProductCode + suffix;
+
+        var newName = product.ProductName.Length + suffix.Length > ProductConstants.ProductNameMaxLength
+            ? product.ProductName.Substring(0, ProductConstants.ProductNameMaxLength - suffix.Length) + suffix
+            : product.ProductName + suffix;
+
+        var newProduct = Product.Create(
+            newProductId,
+            tenantId,
+            newCode,
+            newName,
+            $"{product.ProductSlug}-copy",
+            product.ProductType,
+            product.ProductStructure,
+            product.BusinessTypeId,
+            product.BrandId,
+            product.ReturnPolicyId,
+            product.ShortDescription,
+            product.LongDescription,
+            product.IsSellable,
+            product.IsTaxable,
+            ProductConstants.DraftStatus,
+            userId,
+            now,
+            isExplicitDraftSave: true
+        );
+
+        _dbContext.Products.Add(newProduct);
+
+        var variants = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId && x.Status != ProductConstants.DeletedStatus)
+            .ToListAsync(cancellationToken);
+
+        var variantMap = new Dictionary<Guid, Guid>();
+
+        foreach (var variant in variants)
+        {
+            var newVariantId = Guid.NewGuid();
+            variantMap[variant.Id] = newVariantId;
+
+            var newVariantCode = variant.VariantCode.Length + suffix.Length > 80 // Assuming VariantCode max length is 80
+                ? variant.VariantCode.Substring(0, 80 - suffix.Length) + suffix
+                : variant.VariantCode + suffix;
+
+            var newVariant = ProductVariant.Create(
+                newVariantId,
+                tenantId,
+                newProductId,
+                newVariantCode,
+                variant.VariantName,
+                variant.Sku,
+                variant.StockUomId,
+                variant.SalesUomId,
+                variant.IsDefaultVariant,
+                variant.IsSellable,
+                variant.AllowFractionalQuantity,
+                ProductConstants.DraftStatus,
+                userId,
+                now
+            );
+            _dbContext.ProductVariants.Add(newVariant);
+        }
+        
+        var categories = await _dbContext.ProductCategories
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var category in categories)
+        {
+            var newCategory = ProductCategory.Create(
+                Guid.NewGuid(),
+                tenantId,
+                newProductId,
+                category.CategoryId,
+                category.IsPrimaryCategory,
+                category.SortOrder,
+                userId,
+                now
+            );
+            _dbContext.ProductCategories.Add(newCategory);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new TenantAdminProductCreateResponse(
+            newProductId,
+            newProduct.ProductName,
+            newProduct.ProductCode,
+            newProduct.Status
+        );
+    }
 }

@@ -18,8 +18,15 @@ public sealed class AzureBlobSasTokenProvider : IAzureSasTokenProvider
 
         if (!string.IsNullOrWhiteSpace(configuredOptions.ConnectionString))
         {
-            _blobServiceClient = new BlobServiceClient(configuredOptions.ConnectionString);
-            _storageAccountName = TryParseStorageAccountName(_blobServiceClient.Uri);
+            try
+            {
+                _blobServiceClient = new BlobServiceClient(configuredOptions.ConnectionString);
+                _storageAccountName = TryParseStorageAccountName(_blobServiceClient.Uri);
+            }
+            catch (FormatException)
+            {
+                throw new InvalidOperationException("AzureBlobStorage:ConnectionString is malformed or uses a placeholder. Please configure a valid connection string using .NET User Secrets or an environment variable.");
+            }
         }
     }
 

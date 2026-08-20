@@ -188,6 +188,15 @@ public class Product : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void Restore(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = ProductConstants.DraftStatus;
+        ArchivedAt = null;
+        ArchivedByTenantUserId = null;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
     public void Archive(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
         Status = ProductConstants.ArchivedStatus;
