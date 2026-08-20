@@ -632,7 +632,7 @@ public sealed class OutletServiceTests
             }
 
             var items = query.Skip((pageNumber - 1) * pageSize).Take(pageSize)
-                .Select(x => new OutletSummaryResponse(x.Id, x.OutletCode, x.OutletName, x.Status, x.OutletType, x.Timezone, x.IsDefaultOutlet, x.Phone, x.Email, true, null, null, null, null, 1))
+                .Select(x => new OutletSummaryResponse(x.Id, x.OutletCode, x.OutletName, x.Status, x.OutletType, x.Timezone, x.IsDefaultOutlet, x.Phone, x.Email, true, null, null, null, null, 1, null))
                 .ToList();
             return Task.FromResult(new OutletListResponse(items, pageNumber, pageSize, query.Count()));
         }

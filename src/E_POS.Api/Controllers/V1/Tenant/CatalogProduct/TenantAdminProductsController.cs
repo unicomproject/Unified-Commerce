@@ -375,6 +375,44 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToErrorResult(result.Error);
     }
 
+    [HttpPost("{id:guid}/restore")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Restore(Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError("product.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _tenantAdminProductService.RestoreAsync(context, id, cancellationToken);
+        if (result.IsSuccess)
+        {
+            return Ok();
+        }
+
+        return ToErrorResult(result.Error);
+    }
+
+    [HttpPost("{id:guid}/duplicate")]
+    [ProducesResponseType(typeof(TenantAdminProductCreateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Duplicate(Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError("product.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _tenantAdminProductService.DuplicateAsync(context, id, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Ok(result.Value);
+        }
+
+        return ToErrorResult(result.Error);
+    }
+
     private IActionResult ToErrorResult(ApplicationError error)
     {
         return error.Code switch

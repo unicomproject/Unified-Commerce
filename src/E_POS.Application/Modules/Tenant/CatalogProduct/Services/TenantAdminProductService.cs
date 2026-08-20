@@ -1445,6 +1445,85 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             : PermissionDenied;
     }
 
+    public async Task<ApplicationResult> UpdateVariantAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductVariantUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.VariantsManage))
+            return ApplicationResult.Failure(PermissionDenied);
+
+        await _tenantAdminProductRepository.UpdateVariantAsync(
+            context.TenantId, context.UserId, productId, variantId, request, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult> AddBarcodeAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductBarcodeAddRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.BarcodesManage))
+            return ApplicationResult.Failure(PermissionDenied);
+
+        if (await _tenantAdminProductRepository.BarcodeExistsOnOtherProductAsync(context.TenantId, request.Barcode, productId, cancellationToken))
+            return ApplicationResult.Failure(new ApplicationError("product.duplicate_barcode", "Barcode already exists."));
+
+        await _tenantAdminProductRepository.AddBarcodeAsync(
+            context.TenantId, context.UserId, productId, variantId, request, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult> DeleteBarcodeAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        Guid barcodeId,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.BarcodesManage))
+            return ApplicationResult.Failure(PermissionDenied);
+
+        await _tenantAdminProductRepository.DeleteBarcodeAsync(
+            context.TenantId, context.UserId, productId, variantId, barcodeId, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult> RestoreAsync(
+        TenantRequestContext context,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.ProductsRestore))
+            return ApplicationResult.Failure(PermissionDenied);
+
+        await _tenantAdminProductRepository.RestoreAsync(
+            context.TenantId, context.UserId, productId, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult<TenantAdminProductCreateResponse>> DuplicateAsync(
+        TenantRequestContext context,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.Create))
+            return ApplicationResult<TenantAdminProductCreateResponse>.Failure(PermissionDenied);
+
+        var result = await _tenantAdminProductRepository.DuplicateAsync(
+            context.TenantId, context.UserId, productId, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult<TenantAdminProductCreateResponse>.Success(result);
+    }
+
     private async Task<IReadOnlyList<ApplicationFieldError>> ValidateBundleConfigurationAsync(
         Guid tenantId,
         Guid? currentBundleProductId,
