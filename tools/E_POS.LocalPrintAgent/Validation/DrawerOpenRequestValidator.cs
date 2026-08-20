@@ -33,6 +33,18 @@ public sealed class DrawerOpenRequestValidator(IOptions<PrintAgentOptions> optio
             $"Pulse on time must be between {_options.DrawerMinimumPulseMilliseconds} and {_options.DrawerMaximumPulseMilliseconds} milliseconds.");
         Add(!IsSafe(request.PulseOffTime), "pulseOffTime",
             $"Pulse off time must be between {_options.DrawerMinimumPulseMilliseconds} and {_options.DrawerMaximumPulseMilliseconds} milliseconds.");
+        Add(request.RequestedAt is null, "requestedAt",
+            "Drawer request timestamp (requestedAt) is required.");
+        if (request.RequestedAt is { } requestedAt)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var age = now - requestedAt.ToUniversalTime();
+            Add(age < TimeSpan.FromSeconds(-60), "requestedAt",
+                "Drawer request timestamp is too far in the future.");
+            Add(age > TimeSpan.FromSeconds(_options.DrawerRequestMaxAgeSeconds),
+                "requestedAt",
+                $"Drawer request is stale (older than {_options.DrawerRequestMaxAgeSeconds} seconds) and was not pulsed.");
+        }
         return errors;
 
         bool IsSafe(int value) =>

@@ -125,20 +125,12 @@ public interface ITenantAdminProductRepository
         TenantAdminProductDashboardQuery query,
         CancellationToken cancellationToken);
 
-    Task<bool> ActiveCategoryExistsAsync(
-        Guid tenantId,
-        Guid categoryId,
-        CancellationToken cancellationToken);
-
-    Task<bool> ProductCodeExistsAsync(
-        Guid tenantId,
-        string productCode,
-        Guid? excludeProductId,
-        CancellationToken cancellationToken);
-
-    Task<Guid?> GetDefaultInventoryUomIdAsync(
-        Guid tenantId,
-        CancellationToken cancellationToken);
+    Task<bool> ActiveCategoryExistsAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
+    Task<bool> ProductCodeExistsAsync(Guid tenantId, string productCode, Guid? excludeProductId, CancellationToken cancellationToken);
+    Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductVariantId, CancellationToken cancellationToken);
+    Task<bool> BarcodeExistsAsync(Guid tenantId, string barcodeValue, Guid? excludeProductVariantId, CancellationToken cancellationToken);
+    Task<bool> ProductSlugExistsAsync(string slug, CancellationToken cancellationToken);
+    Task<Guid?> GetDefaultInventoryUomIdAsync(Guid tenantId, CancellationToken cancellationToken);
 
     Task<string?> GetTenantStatusAsync(
         Guid tenantId,
@@ -204,6 +196,36 @@ public interface ITenantAdminProductRepository
         Guid tenantId,
         Guid userId,
         Guid productId,
+    Task<IReadOnlyList<BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<BundleValidationVariantProjection>> GetVariantsForBundleValidationAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> variantIds,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<BundleValidationUomProjection>> GetComponentUomValidationDataAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> componentProductIds,
+        IReadOnlyCollection<Guid> componentVariantIds,
+        IReadOnlyCollection<Guid> componentUomIds,
+        CancellationToken cancellationToken);
+
+    Task SaveVariantsAsync(
+        Guid tenantId,
+        Guid productId,
+        VariantConfigurationDto variantConfiguration,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Atomic final Create from the 7-step wizard (no draft pipeline).
+    /// </summary>
+    Task<SaveProductDraftResult> CreateProductFromWizardAsync(
+        Guid tenantId,
+        Guid userId,
+        TenantAdminWizardProductCreateRequest request,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }

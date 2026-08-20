@@ -80,16 +80,12 @@ public sealed class ProductRepository : IProductRepository
         var defaultPriceListId = await GetDefaultPriceListIdAsync(tenantId, cancellationToken);
 
         var rows = await (from product in products
-                          join variant in _dbContext.ProductVariants.AsNoTracking()
-                              on product.Id equals variant.ProductId into variantJoin
-                          from variant in variantJoin.Where(v => v.Status != ProductConstants.ArchivedStatus).DefaultIfEmpty()
-                          join barcode in _dbContext.ProductBarcodes.AsNoTracking()
-                              on variant.Id equals barcode.ProductVariantId into barcodeJoin
-                          from barcode in barcodeJoin.DefaultIfEmpty()
-                          join price in _dbContext.PriceListItems.AsNoTracking()
-                              on new { VariantId = (Guid?)variant.Id, PriceListId = defaultPriceListId }
-                              equals new { VariantId = (Guid?)price.ProductVariantId, PriceListId = (Guid?)price.PriceListId } into priceJoin
-                          from price in priceJoin.DefaultIfEmpty()
+                          from variant in _dbContext.ProductVariants.AsNoTracking()
+                              .Where(v => v.ProductId == product.Id && v.Status != ProductConstants.ArchivedStatus).DefaultIfEmpty()
+                          from barcode in _dbContext.ProductBarcodes.AsNoTracking()
+                              .Where(b => variant != null && b.ProductVariantId == variant.Id).DefaultIfEmpty()
+                          from price in _dbContext.PriceListItems.AsNoTracking()
+                              .Where(p => variant != null && p.ProductVariantId == variant.Id && p.PriceListId == defaultPriceListId).DefaultIfEmpty()
                           select new
                           {
                               Product = product,

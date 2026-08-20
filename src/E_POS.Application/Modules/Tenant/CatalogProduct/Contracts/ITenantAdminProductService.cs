@@ -35,6 +35,14 @@ public interface ITenantAdminProductService
         TenantAdminProductCreateRequest request,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Final Step 7 Create from the 7-step Product Wizard (atomic, no draft pipeline).
+    /// </summary>
+    Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateFromWizardAsync(
+        TenantRequestContext context,
+        TenantAdminWizardProductCreateRequest request,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<TenantAdminProductDetailResponse>> GetByIdAsync(
         TenantRequestContext context,
         Guid productId,

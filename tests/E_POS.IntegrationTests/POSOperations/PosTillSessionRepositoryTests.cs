@@ -340,6 +340,48 @@ public sealed class PosTillSessionRepositoryTests
         Assert.Contains("\"CashPayments\":250", reconciliation.CalculationDetailsJson);
     }
 
+    [Fact]
+    public async Task CloseTillAsync_WithCanonicalCashInMovement_IncludesCanonicalCashInExpectedCash()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var typeId = Guid.NewGuid();
+        var now = new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
+
+        SeedDeviceContext(dbContext, tenantId, outletId, tillId, deviceId, userId, now, isTrusted: true);
+        dbContext.TillSessions.Add(TillSession.Open(
+            sessionId, tenantId, outletId, tillId, "TS-CANONICAL",
+            DateOnly.FromDateTime(now.UtcDateTime), userId, deviceId, 100m, "LKR", null, now.AddHours(-8)));
+        dbContext.CashMovementTypes.Add(CashMovementType.Create(
+            typeId, null, "FLOAT_ADDED", "Float Added", "IN", true, false, true, "ACTIVE", now));
+        dbContext.CashMovements.Add(CashMovement.Create(
+            Guid.NewGuid(), tenantId, outletId, tillId, sessionId, deviceId, Guid.NewGuid(),
+            typeId, "CM-001", 50m, "LKR", "Morning float", null, null, null, userId, now));
+        await dbContext.SaveChangesAsync();
+
+        var repository = CreateRepository(dbContext);
+        var current = await repository.ResolveCurrentSessionAsync(tenantId, deviceId, CancellationToken.None);
+        Assert.True(current.IsSuccess);
+        Assert.Equal(150m, current.Snapshot!.ExpectedCash);
+
+        var closed = await repository.CloseTillAsync(
+            tenantId, userId,
+            new CloseTillCommand(deviceId, tillId, 150m, 1m, null, "Complete"),
+            now.AddMinutes(1), CancellationToken.None);
+
+        Assert.True(closed.IsSuccess);
+        Assert.Equal(150m, closed.Snapshot!.ExpectedCash);
+        Assert.Equal(0m, closed.Snapshot.CashDifference);
+        var reconciliation = await dbContext.CashReconciliations.SingleAsync();
+        Assert.Equal(150m, reconciliation.ExpectedCashAmount);
+        Assert.Contains("\"CashIn\":50", reconciliation.CalculationDetailsJson);
+    }
+
     [Theory]
     [InlineData("Made up reason", "till_session.invalid_mismatch_reason")]
     [InlineData(null, "till_session.mismatch_reason_required")]

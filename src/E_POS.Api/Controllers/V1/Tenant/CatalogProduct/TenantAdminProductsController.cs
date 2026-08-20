@@ -161,6 +161,36 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToErrorResult(result.Error);
     }
 
+    /// <summary>
+    /// Final Step 7 Create for the 7-step Product Wizard.
+    /// Atomic Product graph create — does not use the draft pipeline.
+    /// </summary>
+    [HttpPost("wizard-create")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateFromWizard(
+        [FromBody] TenantAdminWizardProductCreateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.CreateFromWizardAsync(context, request, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Created(
+                $"/api/v1/tenant-admin/products/{result.Value.ProductId}",
+                new { data = result.Value });
+        }
+
+        return ToErrorResult(result.Error);
+    }
+
     [HttpGet("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -334,6 +364,7 @@ public sealed class TenantAdminProductsController : ControllerBase
             : ToMediaErrorResult(result.Error);
     }
 
+
     private IActionResult ToActionResult<T>(ApplicationResult<T> result)
     {
         if (result.IsSuccess && result.Value is not null)
@@ -439,3 +470,4 @@ public sealed class TenantAdminProductsController : ControllerBase
         };
     }
 }
+

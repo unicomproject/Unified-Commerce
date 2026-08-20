@@ -27,6 +27,7 @@ public sealed class TenantOnboardingOutboxOptions
     public int MaximumAttempts { get; init; } = 8;
     public int InvitationExpiryHours { get; init; } = 24;
     public string? TenantAdminAppBaseUrl { get; init; }
+    public string? PlatformAdminAppBaseUrl { get; init; }
     public string? PaymentAccessBaseUrl { get; init; }
     public string? ManualPaymentInstructions { get; init; }
     public string? PaymentSupportDetails { get; init; }
@@ -86,6 +87,8 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
         {
             if (message.MessageType == "tenant.user_invited")
                 await DispatchTenantUserInvitationAsync(scope.ServiceProvider, db, message, ct);
+            else if (message.MessageType == "platform.user_invited")
+                await DispatchPlatformUserInvitationAsync(scope.ServiceProvider, db, message, ct);
             else if (message.MessageType is "tenant_admin.invitation_requested" or "tenant_admin.invitation_resend_requested")
                 await DispatchInvitationAsync(scope.ServiceProvider, db, message.AggregateId, message.TenantId!.Value, ct);
             else if (message.MessageType.StartsWith("manual_payment.", StringComparison.Ordinal))
@@ -318,6 +321,75 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
             message.CorrelationId.ToString("D")), ct);
         if (send.IsFailure)
             throw new RetryableDeliveryException(send.Error.Code, "Payment notification provider rejected the message.");
+    }
+
+    private async Task DispatchPlatformUserInvitationAsync(IServiceProvider services, EPosDbContext db,
+        E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage message, CancellationToken ct)
+    {
+        var appBaseUrl = _options.PlatformAdminAppBaseUrl;
+        if (string.IsNullOrWhiteSpace(appBaseUrl))
+            throw new RetryableDeliveryException("invitation_base_url_not_configured", "Platform Admin application URL is not configured.");
+        if (!TenantAdminInvitationUrlBuilder.TryValidateBaseUrl(appBaseUrl, false, out var baseUrlError))
+            throw new RetryableDeliveryException("invitation_base_url_invalid", baseUrlError ?? "Platform Admin application URL is invalid.");
+        var sender = services.GetRequiredService<IApplicationEmailSender>();
+        if (!sender.IsConfigured)
+            throw new RetryableDeliveryException("invitation_email_not_configured", "Invitation email provider is not configured.");
+
+        Guid platformUserId; Guid invitationId; string protectedToken; string keyVersion;
+        try
+        {
+            using var payload = JsonDocument.Parse(message.PayloadJson);
+            var root = payload.RootElement;
+            if (!root.TryGetProperty("platformUserId", out var user) || !user.TryGetGuid(out platformUserId) ||
+                !root.TryGetProperty("invitationId", out var inviteElement) || !inviteElement.TryGetGuid(out invitationId) ||
+                !root.TryGetProperty("protectedToken", out var protToken) || protToken.GetString() is not string pt ||
+                !root.TryGetProperty("keyVersion", out var keyVer) || keyVer.GetString() is not string kv)
+            {
+                throw new InvalidOperationException("Platform user invitation outbox payload is invalid.");
+            }
+            protectedToken = pt;
+            keyVersion = kv;
+        }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException("Platform user invitation outbox payload is invalid.");
+        }
+
+        var invitation = await db.PlatformUserInvitations.SingleOrDefaultAsync(x => x.Id == invitationId, ct)
+            ?? throw new InvalidOperationException("Platform user invitation is missing.");
+        if (invitation.PlatformUserId != platformUserId)
+            throw new InvalidOperationException("Platform user invitation target mismatch.");
+        var platformUser = await db.PlatformUsers.SingleOrDefaultAsync(x => x.Id == platformUserId, ct)
+            ?? throw new InvalidOperationException("Platform user is missing.");
+        var now = DateTimeOffset.UtcNow;
+        if (invitation.ExpiresAt <= now)
+            throw new InvalidOperationException("Platform user invitation is no longer deliverable.");
+
+        var protector = services.GetRequiredService<IInvitationDeliverySecretProtector>();
+        var rawToken = protector.Unprotect(protectedToken, keyVersion);
+        var url = $"{appBaseUrl.TrimEnd('/')}/setup-account?token={Uri.EscapeDataString(rawToken)}";
+
+        var emailMessage = E_POS.Application.Modules.Platform.PlatformAdmin.Email.PlatformUserInvitationEmailComposer.Compose(
+            platformUser.Email,
+            platformUser.DisplayName,
+            url,
+            invitation.ExpiresAt,
+            message.CorrelationId.ToString("D"));
+
+        var send = await sender.SendAsync(emailMessage, ct);
+        if (send.IsFailure)
+            throw new RetryableDeliveryException(send.Error.Code, "Invitation provider rejected the message.");
+
+        invitation.MarkSent(now);
+        db.AuditLogs.Add(new AuditLog
+        {
+            TenantId = null,
+            EntityType = "PLATFORM_USER",
+            EntityId = platformUser.Id,
+            ActorType = "SYSTEM",
+            Action = "platform_user.invitation_sent",
+            CreatedAt = now
+        });
     }
 
     private sealed class RetryableDeliveryException(string code, string safeMessage) : Exception(safeMessage)

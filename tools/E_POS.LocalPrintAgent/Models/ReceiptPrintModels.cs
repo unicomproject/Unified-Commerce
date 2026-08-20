@@ -36,7 +36,13 @@ public sealed record ReceiptPrintRequest(
     IReadOnlyList<ReceiptReferenceLineRequest>? ReferenceLines = null,
     IReadOnlyList<ReceiptSettlementLineRequest>? SettlementLines = null,
     string? PrinterConfigurationId = null,
-    int? PrinterConfigurationVersion = null);
+    int? PrinterConfigurationVersion = null,
+    string? BrandSubtitle = null,
+    string? OutletLocation = null,
+    string? CustomerName = null,
+    string? IssuedAtDisplay = null,
+    int? ItemCount = null,
+    string? PresentationLayout = null);
 
 public sealed record ReceiptLineRequest(
     string Name,
@@ -47,7 +53,10 @@ public sealed record ReceiptLineRequest(
     string? ItemGroup = null,
     decimal? DiscountAmount = null,
     decimal? TaxAmount = null,
-    string? Reason = null);
+    string? Reason = null,
+    string? Sku = null,
+    decimal? ValueUnitPrice = null,
+    decimal? RateUnitPrice = null);
 
 public sealed record ReceiptReferenceLineRequest(string Label, string Value);
 

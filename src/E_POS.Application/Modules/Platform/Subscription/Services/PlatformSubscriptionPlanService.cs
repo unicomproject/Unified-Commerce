@@ -366,6 +366,16 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
                 ValidationFailed with { Message = "At least one plan limit must be configured before publishing." });
         }
 
+        var includedFeatureCount = await _repository.GetFeatureCountAsync(planId, cancellationToken);
+        if (includedFeatureCount <= 0)
+        {
+            return ApplicationResult<SubscriptionPlanMutationResponse>.Failure(
+                ValidationFailed with
+                {
+                    Message = "At least one included feature must be configured before publishing."
+                });
+        }
+
         plan.Publish(_dateTimeProvider.UtcNow, platformUserId);
         await _repository.SaveChangesAsync(cancellationToken);
 

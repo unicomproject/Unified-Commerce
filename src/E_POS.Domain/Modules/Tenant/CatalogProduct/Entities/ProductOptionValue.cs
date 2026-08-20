@@ -26,6 +26,7 @@ public class ProductOptionValue : AuditableEntity
         string valueName,
         string? displayName,
         string? colorHex,
+        Guid? imageMediaAssetId,
         int sortOrder,
         string status,
         Guid? createdByTenantUserId,
@@ -41,6 +42,7 @@ public class ProductOptionValue : AuditableEntity
             ValueName = valueName.Trim(),
             DisplayName = displayName?.Trim(),
             ColorHex = colorHex?.Trim(),
+            ImageMediaAssetId = imageMediaAssetId,
             SortOrder = sortOrder,
             Status = status.Trim().ToUpperInvariant(),
             CreatedByTenantUserId = createdByTenantUserId,
@@ -50,32 +52,37 @@ public class ProductOptionValue : AuditableEntity
         };
     }
 
-    public static ProductOptionValue Create(
-        Guid id,
-        Guid tenantId,
-        Guid productOptionId,
-        Guid? sourceOptionTemplateValueId,
+
+
+    public void UpdateProfile(
         string valueCode,
         string valueName,
         string? displayName,
         string? colorHex,
-        string? imageUrl,
         int sortOrder,
-        string status,
-        Guid? createdByTenantUserId,
+        Guid? userId,
         DateTimeOffset now)
     {
-        return Create(
-            id,
-            tenantId,
-            productOptionId,
-            sourceOptionTemplateValueId,
-            valueCode,
-            valueName,
-            displayName,
-            colorHex,
-            sortOrder,
-            status,
-            createdByTenantUserId,
-            now);
-    }}
+        ValueCode = valueCode.Trim();
+        ValueName = valueName.Trim();
+        DisplayName = displayName?.Trim();
+        ColorHex = colorHex?.Trim();
+        SortOrder = sortOrder;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateStatus(string status, Guid? userId, DateTimeOffset now)
+    {
+        Status = status.Trim().ToUpperInvariant();
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
+    public void AssignImage(Guid? imageMediaAssetId, Guid? userId, DateTimeOffset now)
+    {
+        ImageMediaAssetId = imageMediaAssetId;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+}

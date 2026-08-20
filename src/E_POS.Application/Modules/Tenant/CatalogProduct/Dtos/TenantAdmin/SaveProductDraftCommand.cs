@@ -30,5 +30,9 @@ public sealed record SaveProductDraftCommand(
     decimal? PurchaseUnitsPerOuterPack = null,
     bool AllowDecimalQuantity = false,
     bool IsExplicitDraftSave = false,
-    string? WizardAction = null);
+    string? WizardAction = null,
+    VariantConfigurationDto? VariantConfiguration = null,
+    BundleConfigurationDto? BundleConfiguration = null,
+    BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
+    PricingTaxConfigurationDto? PricingTax = null);
 

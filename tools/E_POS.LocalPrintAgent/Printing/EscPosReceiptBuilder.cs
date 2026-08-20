@@ -30,164 +30,155 @@ public sealed class EscPosReceiptBuilder(IOptions<PrintAgentOptions> options) : 
         Write(output, BoldOn);
         Line(output, receipt.MerchantName);
         Write(output, BoldOff);
+        OptionalLine(output, receipt.BrandSubtitle);
         OptionalLine(output, receipt.OutletName);
+        OptionalLine(output, receipt.OutletLocation);
         OptionalLine(output, receipt.TaxInvoiceLabel);
         OptionalLabel(output, "Tax Reg", receipt.TaxRegistrationNumber);
-        Write(output, BoldOn);
-        Line(output, CopyHeading(receipt));
-        Write(output, BoldOff);
+        if (receipt.IsReprint)
+        {
+            Write(output, BoldOn);
+            Line(output, "REPRINT");
+            Write(output, BoldOff);
+        }
         Line(output, new string('-', width));
         Write(output, AlignLeft);
-        Line(output, $"Receipt: {receipt.ReceiptNumber}");
-        OptionalLabel(output, "Original", receipt.OriginalReceiptReference);
-        foreach (var reference in receipt.ReferenceLines ?? [])
-            OptionalLabel(output, reference.Label, reference.Value);
-        Line(output, $"Date: {receipt.PrintedAt:yyyy-MM-dd HH:mm:ss zzz}");
-        OptionalLabel(output, "Till", receipt.TillName);
+
+        LabelValue(output, "Receipt No", receipt.ReceiptNumber, width);
+        LabelValue(
+            output,
+            "Date & Time",
+            string.IsNullOrWhiteSpace(receipt.IssuedAtDisplay)
+                ? receipt.PrintedAt.ToString("MMM d, yyyy | h:mm tt", CultureInfo.InvariantCulture)
+                : receipt.IssuedAtDisplay!,
+            width);
         OptionalLabel(output, "Cashier", receipt.CashierName);
+        LabelValue(
+            output,
+            "Customer",
+            string.IsNullOrWhiteSpace(receipt.CustomerName) ? "Walk-in Customer" : receipt.CustomerName!,
+            width);
+        OptionalLabel(output, "Terminal", receipt.TillName);
+        LabelValue(output, "Payment", receipt.PaymentMethod, width);
         Line(output, new string('-', width));
 
-        string? currentGroup = null;
-        foreach (var item in receipt.Items!)
-        {
-            if (!string.IsNullOrWhiteSpace(item.ItemGroup) &&
-                !string.Equals(currentGroup, item.ItemGroup, StringComparison.OrdinalIgnoreCase))
-            {
-                currentGroup = item.ItemGroup;
-                Write(output, BoldOn);
-                Line(output, currentGroup.Trim().ToUpperInvariant());
-                Write(output, BoldOff);
-            }
-            WrappedLine(output, item.Name, width);
-            Columns(
-                output,
-                $"{FormatQuantity(item.Quantity)} x {Money(receipt.Currency, item.UnitPrice)}",
-                Money(receipt.Currency, item.LineTotal),
-                width);
-            if (item.DiscountAmount is > 0)
-                Columns(output, "  Item discount",
-                    $"-{Money(receipt.Currency, item.DiscountAmount.Value)}", width);
-            if (item.TaxAmount is > 0)
-                Columns(output, "  Item tax",
-                    Money(receipt.Currency, item.TaxAmount.Value), width);
-            OptionalLabel(output, "  Reason", item.Reason);
-            foreach (var discount in receipt.DiscountLines?.Where(x =>
-                         string.Equals(x.Scope, "ITEM", StringComparison.OrdinalIgnoreCase) &&
-                         !string.IsNullOrWhiteSpace(item.SaleLineId) &&
-                         string.Equals(x.SaleLineId, item.SaleLineId,
-                             StringComparison.OrdinalIgnoreCase)) ??
-                     Enumerable.Empty<ReceiptDiscountLineRequest>())
-                Columns(output, $"  {DiscountLabel(discount)}",
-                    $"-{Money(receipt.Currency, discount.Amount)}", width);
-        }
+        if (width >= 48)
+            WriteItems80(output, receipt, width);
+        else
+            WriteItems58(output, receipt, width);
 
         Line(output, new string('-', width));
+        var itemCount = receipt.ItemCount ??
+                        (int)Math.Round(receipt.Items?.Sum(x => x.Quantity) ?? 0);
+        Columns(output, "No. of Items", itemCount.ToString(CultureInfo.InvariantCulture), width);
         Columns(output, "Subtotal", Money(receipt.Currency, receipt.Subtotal), width);
-        if (receipt.DiscountTotal > 0 &&
-            !(receipt.DiscountLines?.Any(x =>
-                string.Equals(x.Scope, "TRANSACTION", StringComparison.OrdinalIgnoreCase)) ?? false))
+        if (receipt.DiscountTotal > 0)
             Columns(output, "Discount", $"-{Money(receipt.Currency, receipt.DiscountTotal)}", width);
-        foreach (var discount in receipt.DiscountLines?.Where(x =>
-                     string.Equals(x.Scope, "TRANSACTION", StringComparison.OrdinalIgnoreCase)) ??
-                 Enumerable.Empty<ReceiptDiscountLineRequest>())
-            Columns(output, DiscountLabel(discount), $"-{Money(receipt.Currency, discount.Amount)}", width);
-        if (receipt.TaxLines is { Count: > 0 })
-        {
-            Line(output, "TAX BREAKDOWN");
-            foreach (var tax in receipt.TaxLines)
-            {
-                var label = tax.Rate is null
-                    ? tax.TaxName
-                    : $"{tax.TaxName} ({tax.Rate:0.##}%)";
-                Columns(output, label, Money(receipt.Currency, tax.TaxAmount), width);
-            }
-        }
         if (receipt.TaxTotal > 0)
             Columns(output, "Tax", Money(receipt.Currency, receipt.TaxTotal), width);
         Write(output, BoldOn);
         Columns(output, "TOTAL", Money(receipt.Currency, receipt.Total), width);
         Write(output, BoldOff);
-        if (receipt.Tenders is { Count: > 0 })
+        Columns(
+            output,
+            $"Paid by {receipt.PaymentMethod}",
+            Money(receipt.Currency, receipt.AmountTendered ?? receipt.Total),
+            width);
+        Columns(output, "Change Due", Money(receipt.Currency, receipt.Change ?? 0m), width);
+        Line(output, new string('-', width));
+
+        Write(output, AlignCenter);
+        var footers = receipt.FooterLines?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList() ?? [];
+        if (footers.Count == 0)
         {
-            Line(output, "PAYMENT BREAKDOWN");
-            foreach (var tender in receipt.Tenders)
-            {
-                Columns(output, tender.MethodName, Money(tender.Currency, tender.Amount), width);
-                OptionalLabel(output, "Card", SafeCard(tender));
-                OptionalLabel(output, "Auth", tender.AuthorizationReference);
-                OptionalLabel(output, "Terminal", tender.TerminalReference);
-                if (tender.AmountTendered is not null)
-                    Columns(output, "Tendered", Money(tender.Currency, tender.AmountTendered.Value), width);
-                if (tender.ChangeAmount is not null)
-                    Columns(output, "Change", Money(tender.Currency, tender.ChangeAmount.Value), width);
-            }
+            WrappedLine(output, "Thank you for your purchase", width);
+            WrappedLine(output, "Goods once sold can be exchanged with the original receipt.", width);
         }
         else
         {
-            Line(output, $"Payment: {receipt.PaymentMethod}");
-            if (receipt.AmountTendered is not null)
-                Columns(output, "Tendered", Money(receipt.Currency, receipt.AmountTendered.Value), width);
-            if (receipt.Change is not null)
-                Columns(output, "Change", Money(receipt.Currency, receipt.Change.Value), width);
-        }
-
-        if (receipt.SettlementLines is { Count: > 0 })
-        {
-            Line(output, "SETTLEMENT");
-            foreach (var settlement in receipt.SettlementLines)
-            {
-                Columns(output, settlement.Label,
-                    Money(settlement.Currency, settlement.Amount), width);
-                OptionalLabel(output, "Method", settlement.Method);
-                OptionalLabel(output, "Reference", settlement.SafeReference);
-            }
-        }
-
-        Barcode(output, receipt.BarcodeValue);
-
-        if (receipt.FooterLines is not null)
-        {
-            Write(output, AlignCenter);
-            foreach (var footer in receipt.FooterLines.Where(x => !string.IsNullOrWhiteSpace(x)))
+            foreach (var footer in footers)
                 WrappedLine(output, footer, width);
         }
+        Write(output, AlignLeft);
+
+        Barcode(output, receipt.BarcodeValue);
 
         FeedLines(output, _options.FeedLinesBeforeCut);
         if (_options.AutoCut) Write(output, FullCut);
         return output.ToArray();
     }
 
-    private static string CopyHeading(ReceiptPrintRequest receipt)
+    private static void WriteItems80(Stream output, ReceiptPrintRequest receipt, int width)
     {
-        var type = string.Equals(receipt.CopyType, "MERCHANT", StringComparison.OrdinalIgnoreCase)
-            ? "MERCHANT COPY"
-            : "CUSTOMER COPY";
-        var purposeCode = (receipt.ReceiptPurpose ??
-                           (receipt.IsReprint ? "saleReprint" : "saleOriginal"))
-            .Trim().ToLowerInvariant();
-        var purpose = purposeCode switch
+        Line(output, PadColumns80("ITEM", "QTY", "VALUE", "RATE"));
+        foreach (var item in receipt.Items ?? [])
         {
-            "salereprint" => "SALE REPRINT",
-            "return" => receipt.IsReprint ? "RETURN REPRINT" : "RETURN RECEIPT",
-            "exchange" => receipt.IsReprint ? "EXCHANGE REPRINT" : "EXCHANGE RECEIPT",
-            "refund" => receipt.IsReprint ? "REFUND REPRINT" : "REFUND RECEIPT",
-            "test" => "PRINTER TEST - NOT A SALE",
-            "report" => "REPORT",
-            _ => "SALE RECEIPT"
-        };
-        return $"{purpose} - {type}";
+            WrappedLine(output, item.Name, width);
+            if (!string.IsNullOrWhiteSpace(item.Sku))
+                WrappedLine(output, item.Sku!, width);
+            var value = item.ValueUnitPrice ?? item.UnitPrice;
+            var rate = item.RateUnitPrice ??
+                       (item.Quantity == 0 ? item.UnitPrice : Math.Round(item.LineTotal / item.Quantity, MidpointRounding.AwayFromZero));
+            Line(output, PadColumns80(
+                "",
+                FormatQuantity(item.Quantity),
+                FormatAmountOnly(value),
+                FormatAmountOnly(rate)));
+        }
     }
 
-    private static string DiscountLabel(ReceiptDiscountLineRequest discount) =>
-        string.IsNullOrWhiteSpace(discount.Name) ? "Discount" : discount.Name.Trim();
-
-    private static string? SafeCard(PaymentTenderLineRequest tender)
+    private static void WriteItems58(Stream output, ReceiptPrintRequest receipt, int width)
     {
-        var brand = tender.CardBrand?.Trim();
-        var last4 = tender.MaskedCardLast4?.Trim();
-        if (string.IsNullOrWhiteSpace(brand) && string.IsNullOrWhiteSpace(last4)) return null;
-        return $"{brand} {last4}".Trim();
+        foreach (var item in receipt.Items ?? [])
+        {
+            WrappedLine(output, "ITEM", width);
+            WrappedLine(output, item.Name, width);
+            if (!string.IsNullOrWhiteSpace(item.Sku))
+                WrappedLine(output, item.Sku!, width);
+            var value = item.ValueUnitPrice ?? item.UnitPrice;
+            var rate = item.RateUnitPrice ??
+                       (item.Quantity == 0 ? item.UnitPrice : Math.Round(item.LineTotal / item.Quantity, MidpointRounding.AwayFromZero));
+            Line(output, $"QTY {FormatQuantity(item.Quantity)}  VALUE {FormatAmountOnly(value)}");
+            Line(output, $"RATE {FormatAmountOnly(rate)}");
+        }
     }
+
+    private static string PadColumns80(string item, string qty, string value, string rate)
+    {
+        static string Fit(string text, int size, bool right = false)
+        {
+            if (text.Length > size) return text[..size];
+            return right ? text.PadLeft(size) : text.PadRight(size);
+        }
+
+        return $"{Fit(item, 18)}{Fit(qty, 4, true)} {Fit(value, 12, true)} {Fit(rate, 12, true)}";
+    }
+
+    private static void LabelValue(Stream output, string label, string value, int width)
+    {
+        var left = $"{label}:";
+        if (left.Length + 1 + value.Length <= width)
+            Columns(output, left, value, width);
+        else
+        {
+            Line(output, left);
+            WrappedLine(output, value, width);
+        }
+    }
+
+    private static string FormatQuantity(decimal qty) =>
+        qty == decimal.Truncate(qty)
+            ? ((int)qty).ToString(CultureInfo.InvariantCulture)
+            : qty.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static string Money(string currency, decimal value)
+    {
+        var code = string.IsNullOrWhiteSpace(currency) ? "" : $"{currency.Trim()} ";
+        return $"{code}{FormatAmountOnly(value)}";
+    }
+
+    private static string FormatAmountOnly(decimal value) =>
+        value.ToString("#,0.00", CultureInfo.InvariantCulture);
 
     private static void Barcode(Stream output, string? value)
     {
@@ -200,23 +191,25 @@ public sealed class EscPosReceiptBuilder(IOptions<PrintAgentOptions> options) : 
         Write(output, BarcodeWidth);
         Write(output, BarcodeCode39);
         Write(output, Encoding.ASCII.GetBytes(normalized));
-        output.WriteByte(0x00);
-        output.WriteByte(0x0A);
+        Write(output, [0x00]);
+        Write(output, [0x0A]);
         Write(output, AlignLeft);
     }
 
     private static string NormalizeCode39(string? value)
     {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
         const string supported = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%";
-        return string.Concat((value ?? string.Empty)
-            .Trim()
-            .ToUpperInvariant()
-            .Where(supported.Contains));
+        var chars = value.Trim().ToUpperInvariant()
+            .Where(c => supported.Contains(c))
+            .ToArray();
+        return new string(chars);
     }
 
-    private static void OptionalLabel(Stream output, string label, string? value)
+    private static void FeedLines(Stream output, int feedLines)
     {
-        if (!string.IsNullOrWhiteSpace(value)) Line(output, $"{label}: {value.Trim()}");
+        var count = Math.Clamp(feedLines, 0, 20);
+        if (count > 0) Write(output, [0x1B, 0x64, (byte)count]);
     }
 
     private static void OptionalLine(Stream output, string? value)
@@ -224,49 +217,50 @@ public sealed class EscPosReceiptBuilder(IOptions<PrintAgentOptions> options) : 
         if (!string.IsNullOrWhiteSpace(value)) Line(output, value.Trim());
     }
 
+    private static void OptionalLabel(Stream output, string label, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value)) Line(output, $"{label}: {value.Trim()}");
+    }
+
     private static void Columns(Stream output, string left, string right, int width)
     {
-        if (left.Length + right.Length + 1 > width)
+        var gap = width - left.Length - right.Length;
+        if (gap <= 0)
         {
             Line(output, left);
             Line(output, right.PadLeft(width));
             return;
         }
-        Line(output, left + new string(' ', width - left.Length - right.Length) + right);
+        Line(output, left + new string(' ', gap) + right);
     }
 
-    private static void WrappedLine(Stream output, string value, int width)
+    private static void WrappedLine(Stream output, string text, int width)
     {
-        var remaining = value.Trim();
-        while (remaining.Length > width)
+        var cleaned = text.Trim();
+        if (cleaned.Length == 0) return;
+        for (var i = 0; i < cleaned.Length; i += width)
         {
-            var breakAt = remaining.LastIndexOf(' ', width);
-            if (breakAt < 1) breakAt = width;
-            Line(output, remaining[..breakAt]);
-            remaining = remaining[breakAt..].TrimStart();
+            var len = Math.Min(width, cleaned.Length - i);
+            Line(output, cleaned.Substring(i, len));
         }
-        if (remaining.Length > 0) Line(output, remaining);
     }
 
-    private static void Line(Stream output, string value)
+    private static void Line(Stream output, string text)
     {
-        Write(output, Encode(value));
-        output.WriteByte(0x0A);
+        Write(output, Encoding.Latin1.GetBytes(Sanitize(text)));
+        Write(output, [0x0A]);
     }
 
-    private static byte[] Encode(string value) =>
-        Encoding.Latin1.GetBytes(string.Concat(value.Select(c => c <= 0xFF ? c : '?')));
-
-    private static void Write(Stream output, ReadOnlySpan<byte> value) => output.Write(value);
-    private static void FeedLines(Stream output, int lineCount)
+    private static string Sanitize(string text)
     {
-        if (lineCount > 0)
-            Write(output, [0x1B, 0x64, checked((byte)lineCount)]);
+        var buffer = new StringBuilder(text.Length);
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (rune.Value <= 0xFF) buffer.Append(rune.ToString());
+            else buffer.Append('?');
+        }
+        return buffer.ToString();
     }
-    private static string Money(string currency, decimal value) =>
-        $"{currency.Trim()} {value.ToString("0.00", CultureInfo.InvariantCulture)}";
-    private static string FormatQuantity(decimal value) =>
-        value == decimal.Truncate(value)
-            ? value.ToString("0", CultureInfo.InvariantCulture)
-            : value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static void Write(Stream output, ReadOnlySpan<byte> bytes) => output.Write(bytes);
 }

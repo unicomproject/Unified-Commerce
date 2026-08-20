@@ -36,6 +36,33 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
     }
 
     [Fact]
+    public void Resolve_OutletManagement_GrantsExactLockedBootstrapPack()
+    {
+        var plan = TenantAdminBootstrapPermissionCatalog.Resolve(
+        [
+            PlatformTenantFeatureCodes.OutletManagement
+        ]);
+
+        var outletPermissions = plan.PermissionCodes
+            .Where(code => code.StartsWith("tenant.outlets.", StringComparison.Ordinal))
+            .OrderBy(code => code, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            new[]
+            {
+                "tenant.outlets.details.view",
+                "tenant.outlets.manage",
+                "tenant.outlets.update",
+                "tenant.outlets.view"
+            },
+            outletPermissions);
+        Assert.DoesNotContain("tenant.outlets.revenue.view", plan.PermissionCodes);
+        Assert.DoesNotContain("pos.till.open", plan.PermissionCodes);
+        Assert.DoesNotContain("platform.tenants.create", plan.PermissionCodes);
+    }
+
+    [Fact]
     public void Resolve_LegacyOutletAlias_MapsToOutletPermissions()
     {
         var plan = TenantAdminBootstrapPermissionCatalog.Resolve(
@@ -107,6 +134,45 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
 
         Assert.Equal(1, plan.PermissionCodes.Count(code => code == "fulfillment.orders.view"));
         Assert.Equal(1, plan.PermissionCodes.Count(code => code == "fulfillment.orders.manage"));
+    }
+
+    [Fact]
+    public void Resolve_TechnicalPosEntitlement_NormalizesToPosCheckoutWithoutCashierPermissions()
+    {
+        var plan = TenantAdminBootstrapPermissionCatalog.Resolve(["pos.sales"]);
+
+        Assert.Contains(PlatformTenantFeatureCodes.PosCheckout, plan.EffectiveEntitlementCodes);
+        Assert.Contains(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
+        Assert.Empty(plan.UnknownOrUnmappedEntitlements);
+        Assert.DoesNotContain("pos.till.open", plan.PermissionCodes);
+    }
+
+    [Fact]
+    public void Resolve_ProductCatalog_GrantsExactLockedBootstrapPack()
+    {
+        var plan = TenantAdminBootstrapPermissionCatalog.Resolve(
+        [
+            PlatformTenantFeatureCodes.ProductCatalog
+        ]);
+
+        var catalogProductPermissions = plan.PermissionCodes
+            .Where(code => code.StartsWith("catalog.products.", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Equal(3, catalogProductPermissions.Count);
+        Assert.Contains("catalog.products.view", catalogProductPermissions);
+        Assert.Contains("catalog.products.create", catalogProductPermissions);
+        Assert.Contains("catalog.products.update", catalogProductPermissions);
+        Assert.DoesNotContain("catalog.product_media.manage", plan.PermissionCodes);
+        Assert.DoesNotContain("catalog.product_channels.manage", plan.PermissionCodes);
+    }
+
+    [Fact]
+    public void Resolve_InvalidTenantTillOps_IsUnknownAndFailsClosed()
+    {
+        var plan = TenantAdminBootstrapPermissionCatalog.Resolve(["tenant.till_ops"]);
+
+        Assert.Contains("tenant.till_ops", plan.UnknownOrUnmappedEntitlements);
     }
 
     [Fact]

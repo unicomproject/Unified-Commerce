@@ -318,6 +318,19 @@ public sealed class DevelopmentPlatformAdminTestAccountSeederUnitTests
             return Task.CompletedTask;
         }
 
+        public Task AddUserWithRolesAndInvitationAsync(
+            PlatformUser user,
+            IReadOnlyList<Guid> roleIds,
+            PlatformUserInvitation invitation,
+            E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage outboxMessage,
+            CancellationToken cancellationToken)
+        {
+            AddCalled = true;
+            LastAddedRoleIds = roleIds.ToList();
+            UsersByNormalizedEmail[user.NormalizedEmail] = user;
+            return Task.CompletedTask;
+        }
+
         public Task UpdateUserAsync(PlatformUser user, CancellationToken cancellationToken)
         {
             UpdateCalled = true;

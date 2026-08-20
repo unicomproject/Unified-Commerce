@@ -7,7 +7,7 @@ public class PlatformUser : AuditableEntity
 {
     public string Email { get; protected set; } = string.Empty;
     public string NormalizedEmail { get; protected set; } = string.Empty;
-    public string PasswordHash { get; protected set; } = string.Empty;
+    public string? PasswordHash { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public string? FirstName { get; protected set; }
     public string? LastName { get; protected set; }
@@ -22,7 +22,7 @@ public class PlatformUser : AuditableEntity
     public Guid? CreatedByPlatformUserId { get; protected set; }
     public Guid? UpdatedByPlatformUserId { get; protected set; }
 
-    public static PlatformUser Create(Guid id, string email, string passwordHash, string status, DateTimeOffset now)
+    public static PlatformUser Create(Guid id, string email, string? passwordHash, string status, DateTimeOffset now)
     {
         return new PlatformUser
         {
@@ -42,8 +42,8 @@ public class PlatformUser : AuditableEntity
         return Create(
             id,
             email,
-            PlatformUserConstants.PendingInvitePasswordHash,
-            PlatformAuthConstants.InactiveStatus,
+            null,
+            PlatformAuthConstants.InvitedStatus,
             now);
     }
 
@@ -68,6 +68,12 @@ public class PlatformUser : AuditableEntity
     public void SetDisplayName(string? displayName, DateTimeOffset now)
     {
         DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+        UpdatedAt = now;
+    }
+
+    public void SetPhone(string? phone, DateTimeOffset now)
+    {
+        Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
         UpdatedAt = now;
     }
 

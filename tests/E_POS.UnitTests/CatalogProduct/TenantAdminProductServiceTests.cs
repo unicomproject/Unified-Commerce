@@ -858,7 +858,8 @@ public sealed class TenantAdminProductServiceTests
             new TenantAdminProductRequestValidator(),
             clock,
             auditLogger ?? new FakeTenantAdminProductAuditLogger(),
-            accessPolicy);
+            accessPolicy,
+            new ProductVariantGenerationService());
     }
 
     private static TenantRequestContext CreateContext(string[] permissions) =>
@@ -870,7 +871,7 @@ public sealed class TenantAdminProductServiceTests
             new(0, 0, 0, 0);
 
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
-            new([], [], [], [], [], [], [], []);
+            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []);
 
         public IReadOnlyDictionary<Guid, string> PrimaryImageUrls { get; init; } =
             new Dictionary<Guid, string>();
@@ -1128,6 +1129,26 @@ public sealed class TenantAdminProductServiceTests
 
         public ProductSetupWizardDto? SetupDto { get; init; }
 
+        public Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductId = null, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> BarcodeExistsAsync(Guid tenantId, string barcode, Guid? excludeProductId = null, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> ProductSlugExistsAsync(string slug, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> IsValidBrandAsync(Guid brandId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(true);
+        }
+
         public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult<string?>("ACTIVE");
 
@@ -1158,6 +1179,26 @@ public sealed class TenantAdminProductServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
+        public Task SaveVariantsAsync(
+            Guid tenantId,
+            Guid productId,
+            VariantConfigurationDto variantConfiguration,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<SaveProductDraftResult> CreateProductFromWizardAsync(
+            Guid tenantId,
+            Guid userId,
+            TenantAdminWizardProductCreateRequest request,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(SaveProductDraftResult.Failure(
+                new ApplicationError("not_implemented", "Fake repository")));
+        }
+
         public Task<SaveProductDraftResult> SaveProductDraftAsync(
             Guid tenantId,
             Guid userId,
@@ -1176,6 +1217,26 @@ public sealed class TenantAdminProductServiceTests
         public Task DeleteBarcodeAsync(Guid tenantId, Guid userId, Guid productId, Guid variantId, Guid barcodeId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task RestoreAsync(Guid tenantId, Guid userId, Guid productId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<TenantAdminProductCreateResponse> DuplicateAsync(Guid tenantId, Guid userId, Guid productId, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(new TenantAdminProductCreateResponse(Guid.NewGuid(), "Duplicate", "DUP-001", "DRAFT"));
+
+        public Task<IReadOnlyList<BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> productIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationProductProjection>>([]);
+
+        public Task<IReadOnlyList<BundleValidationVariantProjection>> GetVariantsForBundleValidationAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> variantIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationVariantProjection>>([]);
+
+        public Task<IReadOnlyList<BundleValidationUomProjection>> GetComponentUomValidationDataAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> componentProductIds,
+            IReadOnlyCollection<Guid> componentVariantIds,
+            IReadOnlyCollection<Guid> componentUomIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<BundleValidationUomProjection>>([]);
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider

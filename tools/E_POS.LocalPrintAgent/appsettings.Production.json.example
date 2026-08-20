@@ -1,0 +1,31 @@
+{
+  "PrintAgent": {
+    "_comment": "EXAMPLE ONLY — copy to appsettings.json on the store machine or use service environment variables. Never commit real LocalApiKey values.",
+    "ListenUrl": "http://127.0.0.1:9101",
+    "PrinterName": "POSPrinter POS80",
+    "PaperWidth": "80mm",
+    "AutoCut": true,
+    "FeedLinesBeforeCut": 5,
+    "SpoolerTimeoutSeconds": 5,
+    "LocalApiKey": "",
+    "DrawerRequestMaxAgeSeconds": 120,
+    "IdempotencyDirectory": "C:/ProgramData/E_POS/LocalPrintAgent/operations",
+    "OperationRetentionDays": 30,
+    "AllowedNetworkRanges": [ "127.0.0.1/32", "::1/128" ],
+    "RequestBodyLimit": 262144,
+    "LoggingDirectory": "C:/ProgramData/E_POS/LocalPrintAgent/logs",
+    "LogRetentionDays": 14,
+    "MaxLogFileBytes": 10485760,
+    "MinimumFreeDiskBytes": 104857600,
+    "FailedAuthenticationLimit": 10,
+    "FailedAuthenticationWindowMinutes": 5,
+    "DrawerMinimumPulseMilliseconds": 2,
+    "DrawerMaximumPulseMilliseconds": 510
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}

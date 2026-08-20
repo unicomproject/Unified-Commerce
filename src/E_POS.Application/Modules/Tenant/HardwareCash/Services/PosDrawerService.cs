@@ -62,6 +62,17 @@ public sealed class PosDrawerService : IPosDrawerService
         if (operationId == Guid.Empty)
             return ApplicationResult<CashDrawerOperationDto>.Failure(new ApplicationError("pos_drawer.invalid_operation_id", "Operation ID is required."));
 
+        if (string.IsNullOrWhiteSpace(request.Status) ||
+            request.Status.Trim() is not (
+                "AGENT_ACCEPTED" or "OPENED" or "FAILED" or "UNKNOWN" or
+                "PENDING" or "SUBMITTED" or "CANCELLED"))
+        {
+            return ApplicationResult<CashDrawerOperationDto>.Failure(
+                new ApplicationError(
+                    "pos_drawer.invalid_status",
+                    "Drawer finalize status must be AGENT_ACCEPTED, OPENED, FAILED, UNKNOWN, PENDING, SUBMITTED, or CANCELLED."));
+        }
+
         var result = await _repository.FinalizeOperationAsync(
             context.TenantId,
             context.UserId,
@@ -227,29 +238,37 @@ public sealed class PosDrawerService : IPosDrawerService
             await _repository.GetFinancialMovementsAsync(context.TenantId, session.Snapshot.SessionId, page, pageSize, cancellationToken));
     }
 
+    public async Task<ApplicationResult<IReadOnlyList<PosCashMovementTypeDto>>> GetMovementTypesAsync(
+        TenantRequestContext context, string direction, CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(CashDrawerPermissions.View))
+            return Failure<IReadOnlyList<PosCashMovementTypeDto>>("cash_drawer.permission_denied", "You do not have permission to view cash movement types.");
+
+        var normalizedDirection = direction?.Trim().ToUpperInvariant();
+        if (normalizedDirection is not ("IN" or "OUT"))
+            return Failure<IReadOnlyList<PosCashMovementTypeDto>>(
+                "cash_drawer.invalid_direction",
+                "Direction must be IN or OUT.");
+
+        var types = await _repository.GetMovementTypesAsync(context.TenantId, normalizedDirection, cancellationToken);
+        return ApplicationResult<IReadOnlyList<PosCashMovementTypeDto>>.Success(types);
+    }
+
     public async Task<ApplicationResult<PosCashDrawerMovementDto>> CreateFinancialMovementAsync(
         TenantRequestContext context, CreatePosCashMovementRequest request, CancellationToken cancellationToken)
     {
         if (!context.HasPermission(CashDrawerPermissions.CreateMovement))
             return Failure<PosCashDrawerMovementDto>("cash_drawer.permission_denied", "You do not have permission to create cash movements.");
-        if (request.RequestId == Guid.Empty || request.DeviceId == Guid.Empty || request.TillSessionId == Guid.Empty)
-            return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_request", "Request, device and till session ids are required.");
-        var type = request.MovementType.Trim().ToUpperInvariant();
-        if (type is not ("CASH_IN" or "CASH_OUT" or "CASH_DROP"))
-            return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_movement_type", "Movement type is not supported.");
+        if (request.RequestId == Guid.Empty || request.DeviceId == Guid.Empty || request.MovementTypeId == Guid.Empty)
+            return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_request", "Request, device and movement type ids are required.");
         if (request.Amount <= 0)
             return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_amount", "Amount must be greater than zero.");
-        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length > 250)
-            return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_reason", "A reason of at most 250 characters is required.");
-        if (request.ReferenceNumber?.Trim().Length > 100)
-            return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_reference", "Reference number must not exceed 100 characters.");
+        if (request.Note?.Trim().Length > 500)
+            return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_note", "Note must not exceed 500 characters.");
 
         var session = await ResolveSession(context.TenantId, request.DeviceId, cancellationToken);
         if (!session.IsSuccess || session.Snapshot is null)
             return Failure<PosCashDrawerMovementDto>(session.ErrorCode!, SessionMessage(session.ErrorCode));
-        if (session.Snapshot.SessionId != request.TillSessionId)
-            return Failure<PosCashDrawerMovementDto>("cash_drawer.till_session_mismatch", "The requested till session does not match this device.");
-
         var result = await _repository.CreateFinancialMovementAsync(
             context.TenantId, context.UserId, session.Snapshot.TillId, request, _clock.UtcNow, cancellationToken);
         return result.ErrorCode is null && result.Movement is not null
@@ -272,7 +291,11 @@ public sealed class PosDrawerService : IPosDrawerService
         "till_session.till_not_assigned" => "No till is assigned to this POS device.",
         "till_session.not_found" or "cash_drawer.till_session_not_open" => "No open till session was found for this device.",
         "cash_drawer.idempotency_conflict" => "The request id was already used for a different movement.",
-        "cash_drawer.insufficient_expected_cash" => "The movement amount exceeds current expected cash.",
+        "cash_drawer.movement_type_not_found" => "The selected cash movement type is not available.",
+        "cash_drawer.movement_type_not_in" => "The selected movement type is not a Cash In type.",
+        "cash_drawer.movement_type_invalid_direction" => "The selected movement type direction is not supported.",
+        "cash_drawer.reason_required" => "A note is required for the selected cash movement type.",
+        "cash_drawer.insufficient_expected_cash" => "The movement amount exceeds available cash in the drawer.",
         _ => "Cash drawer request could not be completed."
     };
 }

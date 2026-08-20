@@ -9,15 +9,18 @@ using Microsoft.Extensions.Options;
 
 namespace E_POS.Infrastructure.Integrations.Email;
 
-/// <summary>
-/// Thin transport over <see cref="EmailClient"/> so unit tests can assert send parameters
-/// without calling Azure.
-/// </summary>
+internal record AcsSendResult(
+    string OperationId,
+    string Status,
+    bool IsSuccess,
+    string? ErrorCode = null,
+    string? ErrorMessage = null);
+
 internal interface IAcsEmailSendGateway
 {
     string AuthMode { get; }
 
-    Task<(string OperationId, string Status)> SendStartedAsync(
+    Task<AcsSendResult> SendAsync(
         string senderAddress,
         string recipientAddress,
         string subject,
@@ -38,7 +41,7 @@ internal sealed class EmailClientAcsEmailSendGateway : IAcsEmailSendGateway
 
     public string AuthMode { get; }
 
-    public async Task<(string OperationId, string Status)> SendStartedAsync(
+    public async Task<AcsSendResult> SendAsync(
         string senderAddress,
         string recipientAddress,
         string subject,
@@ -57,11 +60,44 @@ internal sealed class EmailClientAcsEmailSendGateway : IAcsEmailSendGateway
             cancellationToken);
 
         var operationId = operation.Id ?? string.Empty;
-        var status = operation.HasValue
-            ? operation.Value.Status.ToString()
-            : "Started";
 
-        return (operationId, status);
+        try
+        {
+            Response<EmailSendResult> response = await operation.WaitForCompletionAsync(cancellationToken);
+            var status = response.Value.Status;
+
+            if (status == EmailSendStatus.Succeeded)
+            {
+                return new AcsSendResult(operationId, status.ToString(), true);
+            }
+            else
+            {
+                return new AcsSendResult(
+                    operationId,
+                    status.ToString(),
+                    false,
+                    "EmailSendFailed",
+                    $"Send operation completed with non-success status: {status}");
+            }
+        }
+        catch (RequestFailedException ex)
+        {
+            return new AcsSendResult(
+                operationId,
+                EmailSendStatus.Failed.ToString(),
+                false,
+                ex.ErrorCode,
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return new AcsSendResult(
+                operationId,
+                EmailSendStatus.Failed.ToString(),
+                false,
+                "UnexpectedError",
+                ex.Message);
+        }
     }
 }
 
@@ -150,7 +186,7 @@ public sealed class AzureCommunicationEmailSender : IApplicationEmailSender
 
         try
         {
-            var (operationId, status) = await _gateway.SendStartedAsync(
+            var result = await _gateway.SendAsync(
                 senderAddress,
                 recipientAddress,
                 subject,
@@ -158,14 +194,31 @@ public sealed class AzureCommunicationEmailSender : IApplicationEmailSender
                 plainTextContent,
                 cancellationToken);
 
-            _logger.LogInformation(
-                "ACS email send accepted. OperationId={OperationId}, Status={Status}, CorrelationId={CorrelationId}",
-                operationId,
-                status,
-                message.CorrelationId);
+            if (result.IsSuccess)
+            {
+                _logger.LogInformation(
+                    "ACS email send completed successfully. OperationId={OperationId}, Status={Status}, CorrelationId={CorrelationId}",
+                    result.OperationId,
+                    result.Status,
+                    message.CorrelationId);
 
-            return ApplicationResult<ApplicationEmailSendResult>.Success(
-                new ApplicationEmailSendResult(operationId, status, operationId));
+                return ApplicationResult<ApplicationEmailSendResult>.Success(
+                    new ApplicationEmailSendResult(result.OperationId, result.Status, result.OperationId));
+            }
+            else
+            {
+                _logger.LogError(
+                    "ACS email send failed. OperationId={OperationId}, Status={Status}, ErrorCode={ErrorCode}, ErrorMessage={ErrorMessage}, CorrelationId={CorrelationId}",
+                    result.OperationId,
+                    result.Status,
+                    result.ErrorCode ?? "Unknown",
+                    result.ErrorMessage ?? "Unknown",
+                    message.CorrelationId);
+
+                return ApplicationResult<ApplicationEmailSendResult>.Failure(new ApplicationError(
+                    "email.provider_failed",
+                    $"Email provider rejected the send request. Status: {result.Status}, ErrorCode: {result.ErrorCode ?? "None"}, Message: {result.ErrorMessage ?? "None"}"));
+            }
         }
         catch (RequestFailedException ex)
         {

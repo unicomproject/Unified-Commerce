@@ -131,6 +131,78 @@ public sealed class AzureCommunicationEmailSenderTests
     }
 
     [Fact]
+    public async Task SendAsync_OnStatusSucceeded_ReturnsSuccess_AndPreservesOperationId()
+    {
+        var gateway = new RecordingGateway
+        {
+            StatusToReturn = "Succeeded",
+            IsSuccessToReturn = true
+        };
+        var sut = CreateSut(gateway, senderAddress: "DoNotReply@contoso.azurecomm.net");
+
+        var result = await sut.SendAsync(ValidMessage(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("op-1", result.Value.OperationId);
+        Assert.Equal("Succeeded", result.Value.Status);
+    }
+
+    [Fact]
+    public async Task SendAsync_OnStatusStarted_ReturnsFailure_BecauseStartedIsProgressNotSuccess()
+    {
+        var gateway = new RecordingGateway
+        {
+            StatusToReturn = "Started",
+            IsSuccessToReturn = false
+        };
+        var sut = CreateSut(gateway, senderAddress: "DoNotReply@contoso.azurecomm.net");
+
+        var result = await sut.SendAsync(ValidMessage(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("email.provider_failed", result.Error.Code);
+        Assert.Contains("Status: Started", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task SendAsync_OnStatusFailed_ReturnsFailure_AndLogsOperationDetails()
+    {
+        var gateway = new RecordingGateway
+        {
+            StatusToReturn = "Failed",
+            IsSuccessToReturn = false,
+            ErrorCodeToReturn = "InvalidAddress",
+            ErrorMessageToReturn = "The recipient address is invalid."
+        };
+        var sut = CreateSut(gateway, senderAddress: "DoNotReply@contoso.azurecomm.net");
+
+        var result = await sut.SendAsync(ValidMessage(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("email.provider_failed", result.Error.Code);
+        Assert.Contains("Status: Failed", result.Error.Message);
+        Assert.Contains("ErrorCode: InvalidAddress", result.Error.Message);
+        Assert.Contains("Message: The recipient address is invalid.", result.Error.Message);
+    }
+
+    [Fact]
+    public async Task SendAsync_OnStatusCanceled_ReturnsFailure_AndLogsCancellation()
+    {
+        var gateway = new RecordingGateway
+        {
+            StatusToReturn = "Canceled",
+            IsSuccessToReturn = false
+        };
+        var sut = CreateSut(gateway, senderAddress: "DoNotReply@contoso.azurecomm.net");
+
+        var result = await sut.SendAsync(ValidMessage(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("email.provider_failed", result.Error.Code);
+        Assert.Contains("Status: Canceled", result.Error.Message);
+    }
+
+    [Fact]
     public void NormalizeAndValidate_Helpers_TrimAndRejectAngleBrackets()
     {
         Assert.Equal(
@@ -166,9 +238,14 @@ public sealed class AzureCommunicationEmailSenderTests
 
         public RequestFailedException? ExceptionToThrow { get; init; }
 
+        public string StatusToReturn { get; set; } = "Succeeded";
+        public bool IsSuccessToReturn { get; set; } = true;
+        public string? ErrorCodeToReturn { get; set; }
+        public string? ErrorMessageToReturn { get; set; }
+
         public SendCall? LastCall { get; private set; }
 
-        public Task<(string OperationId, string Status)> SendStartedAsync(
+        public Task<AcsSendResult> SendAsync(
             string senderAddress,
             string recipientAddress,
             string subject,
@@ -182,7 +259,12 @@ public sealed class AzureCommunicationEmailSenderTests
                 throw ExceptionToThrow;
             }
 
-            return Task.FromResult(("op-1", "Started"));
+            return Task.FromResult(new AcsSendResult(
+                "op-1",
+                StatusToReturn,
+                IsSuccessToReturn,
+                ErrorCodeToReturn,
+                ErrorMessageToReturn));
         }
     }
 
