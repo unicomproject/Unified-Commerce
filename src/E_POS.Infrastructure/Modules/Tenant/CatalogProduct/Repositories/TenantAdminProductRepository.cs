@@ -2285,6 +2285,8 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             newProduct.ProductCode,
             newProduct.Status
         );
+    }
+
     public Task<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
         Guid tenantId,
         IReadOnlyCollection<Guid> productIds,
