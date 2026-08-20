@@ -1522,6 +1522,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             context.TenantId, context.UserId, productId, DateTimeOffset.UtcNow, cancellationToken);
 
         return ApplicationResult<TenantAdminProductCreateResponse>.Success(result);
+    }
+
     private async Task<IReadOnlyList<ApplicationFieldError>> ValidateBundleConfigurationAsync(
         Guid tenantId,
         Guid? currentBundleProductId,

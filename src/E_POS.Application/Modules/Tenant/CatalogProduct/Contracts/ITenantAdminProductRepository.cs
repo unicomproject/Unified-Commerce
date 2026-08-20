@@ -196,6 +196,8 @@ public interface ITenantAdminProductRepository
         Guid tenantId,
         Guid userId,
         Guid productId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
     Task<IReadOnlyList<BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
         Guid tenantId,
         IReadOnlyCollection<Guid> productIds,
