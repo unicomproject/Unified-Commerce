@@ -3,6 +3,7 @@ using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Shared.Media.Contracts;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -49,6 +50,12 @@ public sealed class StorefrontProductDetailRepository : StorefrontProductReposit
         var variantModels = BuildVariantModels(variants, productPrice, variantPricesByVariant, inventoryByVariant, variantOptions, currencyCode);
         var highlights = await GetHighlightsAsync(tenantId, productId, cancellationToken);
         var returnInfo = StorefrontProductMapper.BuildReturnInfo(await GetReturnPolicyAsync(tenantId, product.ReturnPolicyId, cancellationToken));
+        var fulfillmentMethodNames = await DbContext.Set<FulfillmentMethod>()
+            .AsNoTracking()
+            .Where(m => m.TenantId == tenantId && m.Status == "ACTIVE")
+            .Select(m => m.MethodName)
+            .ToListAsync(cancellationToken);
+        var deliveryInfo = StorefrontProductMapper.BuildDeliveryInfo(fulfillmentMethodNames);
         var isInStock = variantModels.Count > 0
             ? variantModels.Any(x => x.IsInStock)
             : !inventoryRows.Any() || inventoryRows.Sum(x => x.AvailableQuantity) > 0m;
@@ -93,6 +100,7 @@ public sealed class StorefrontProductDetailRepository : StorefrontProductReposit
             variantModels,
             highlights,
             returnInfo,
+            deliveryInfo,
             primaryCategory,
             parentCategory,
             brand);

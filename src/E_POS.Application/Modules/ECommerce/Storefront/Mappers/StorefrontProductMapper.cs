@@ -126,6 +126,7 @@ public static class StorefrontProductMapper
         IReadOnlyList<StorefrontProductVariantReadModel> variants,
         IReadOnlyList<string> highlights,
         string returnInfo,
+        string deliveryInfo,
         Category? primaryCategory,
         Category? parentCategory,
         Brand? brand)
@@ -157,7 +158,7 @@ public static class StorefrontProductMapper
             Options = options,
             Variants = variants,
             Highlights = highlights,
-            DeliveryInfo = null,
+            DeliveryInfo = deliveryInfo,
             ReturnInfo = returnInfo
         };
     }
@@ -250,6 +251,16 @@ public static class StorefrontProductMapper
         return returnPolicy.ReturnWindowDays > 0
             ? $"Easy returns within {returnPolicy.ReturnWindowDays} days."
             : "Returns available under the store policy.";
+    }
+
+    public static string BuildDeliveryInfo(IReadOnlyList<string> fulfillmentMethodNames)
+    {
+        if (fulfillmentMethodNames.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(", ", fulfillmentMethodNames);
     }
 
     private static bool ContainsInvariant(string value, string expected)
