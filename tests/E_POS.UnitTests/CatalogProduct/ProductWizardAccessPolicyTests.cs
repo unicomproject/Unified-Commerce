@@ -12,15 +12,16 @@ public class ProductWizardAccessPolicyTests
     private class FakeEntitlementEvaluator : ITenantFeatureEntitlementEvaluator
     {
         public bool IsEntitled { get; set; } = true;
+        public HashSet<string> DeniedFeatureCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public Task<TenantFeatureEntitlementEvaluation> EvaluateAsync(Guid tenantId, string featureCode, DateTimeOffset evaluationTime, CancellationToken cancellationToken = default)
         {
-            if (IsEntitled)
+            if (DeniedFeatureCodes.Contains(featureCode) || !IsEntitled)
             {
-                return Task.FromResult(TenantFeatureEntitlementEvaluation.Allowed(featureCode, featureCode, false, true, false));
+                return Task.FromResult(TenantFeatureEntitlementEvaluation.Denied(TenantFeatureEntitlementDecision.Disabled, featureCode, featureCode, false, true, false, "Feature disabled"));
             }
 
-            return Task.FromResult(TenantFeatureEntitlementEvaluation.Denied(TenantFeatureEntitlementDecision.Disabled, featureCode, featureCode, false, true, false, "Feature disabled"));
+            return Task.FromResult(TenantFeatureEntitlementEvaluation.Allowed(featureCode, featureCode, false, true, false));
         }
 
         public Task<bool> IsEnabledAsync(Guid tenantId, string featureCode, DateTimeOffset evaluationTime, CancellationToken cancellationToken = default)
@@ -106,7 +107,8 @@ public class ProductWizardAccessPolicyTests
 
         var request = new E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.SaveProductDraftRequest 
         { 
-            CurrentSetupStep = E_POS.Application.Modules.Tenant.CatalogProduct.Constants.ProductWizardStage.ProductConfiguration
+            CurrentSetupStep = E_POS.Application.Modules.Tenant.CatalogProduct.Constants.ProductWizardStage.ProductConfiguration,
+            ProductStructure = "VARIANT"
         };
 
         var error = await policy.ValidateWizardAccessAsync(context, productId: null, isCreateAction: true, request, CancellationToken.None);
@@ -129,7 +131,8 @@ public class ProductWizardAccessPolicyTests
 
         var request = new E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.SaveProductDraftRequest 
         { 
-            CurrentSetupStep = E_POS.Application.Modules.Tenant.CatalogProduct.Constants.ProductWizardStage.ProductConfiguration
+            CurrentSetupStep = E_POS.Application.Modules.Tenant.CatalogProduct.Constants.ProductWizardStage.ProductConfiguration,
+            ProductStructure = "VARIANT"
         };
 
         var error = await policy.ValidateWizardAccessAsync(context, productId: null, isCreateAction: true, request, CancellationToken.None);
@@ -177,5 +180,55 @@ public class ProductWizardAccessPolicyTests
 
         Assert.NotNull(error);
         Assert.Equal("product.permission_denied", error.Code);
+    }
+
+    [Fact]
+    public async Task ValidateWizardAccessAsync_Blocks_PricingPayload_OnStep1_WithoutPricingManage()
+    {
+        var repo = new FakeRepo { TenantStatus = "ACTIVE" };
+        var evaluator = new FakeEntitlementEvaluator { IsEntitled = true };
+        var policy = new ProductWizardAccessPolicy(evaluator, repo, new FakeClock());
+
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [TenantAdminProductPermissions.Create]);
+
+        var request = new E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.SaveProductDraftRequest
+        {
+            CurrentSetupStep = 1,
+            PricingTax = new E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.PricingTaxConfigurationDto(
+                1m, 10m, null, null, true)
+        };
+
+        var error = await policy.ValidateWizardAccessAsync(context, productId: null, isCreateAction: true, request, CancellationToken.None);
+
+        Assert.NotNull(error);
+        Assert.Equal("product.permission_denied", error.Code);
+    }
+
+    [Fact]
+    public async Task ValidateWizardAccessAsync_Blocks_NonEmptyInitialTracking_WithoutInventoryTrackingEntitlement()
+    {
+        var repo = new FakeRepo { TenantStatus = "ACTIVE" };
+        var evaluator = new FakeEntitlementEvaluator { IsEntitled = true };
+        evaluator.DeniedFeatureCodes.Add("inventory_tracking");
+        var policy = new ProductWizardAccessPolicy(evaluator, repo, new FakeClock());
+
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            [TenantAdminProductPermissions.Create]);
+
+        var request = new E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.SaveProductDraftRequest
+        {
+            CurrentSetupStep = 1,
+            InitialBatchNumber = "BAT-1"
+        };
+
+        var error = await policy.ValidateWizardAccessAsync(context, productId: null, isCreateAction: true, request, CancellationToken.None);
+
+        Assert.NotNull(error);
+        Assert.Equal("product.entitlement_denied", error.Code);
     }
 }

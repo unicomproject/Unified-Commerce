@@ -3,6 +3,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.Inventory.Services;
 
@@ -59,10 +60,10 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             fieldErrors.Add(new ApplicationFieldError("pageNumber", "Page number must be 1 or greater."));
         }
 
-        var allowedPageSizes = new[] { 6, 8, 10, 25, 50 };
+        var allowedPageSizes = new[] { 4, 5, 6, 8, 10, 25, 50 };
         if (!allowedPageSizes.Contains(pageSize))
         {
-            fieldErrors.Add(new ApplicationFieldError("pageSize", "Page size must be 6, 8, 10, 25, or 50."));
+            fieldErrors.Add(new ApplicationFieldError("pageSize", "Page size must be 4, 5, 6, 8, 10, 25, or 50."));
         }
 
         if (productStatus != null)
@@ -286,6 +287,14 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             fieldErrors.Add(new ApplicationFieldError(
                 "currentSetupStep",
                 "Current setup step must be between 1 and 7."));
+        }
+
+        var trackingLengthError = ProductSetupInitialTrackingRules.ValidateLengths(
+            request.InitialBatchNumber,
+            request.InitialSerialNumber);
+        if (trackingLengthError?.FieldErrors is { Count: > 0 } trackingErrors)
+        {
+            fieldErrors.AddRange(trackingErrors);
         }
 
         if (fieldErrors.Count == 0)

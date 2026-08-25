@@ -86,6 +86,12 @@ public interface ITenantAdminProductService
         Guid productId,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<ProductDraftResponse>> PublishAsync(
+        TenantRequestContext context,
+        Guid productId,
+        PublishProductRequest request,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult> UpdateVariantAsync(
         TenantRequestContext context,
         Guid productId,
