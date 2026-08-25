@@ -46,6 +46,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
     {
         var rows = await BuildUserRowsQuery(tenantId).ToListAsync(cancellationToken);
         await AttachOutletAssignmentsAsync(tenantId, rows, cancellationToken);
+        await AttachProfileImageUrlsAsync(tenantId, rows, cancellationToken);
 
         var filtered = rows;
         if (!string.IsNullOrWhiteSpace(status))
@@ -72,6 +73,8 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                 .Where(x =>
                     x.FullName.ToUpperInvariant().Contains(term) ||
                     x.Email.ToUpperInvariant().Contains(term) ||
+                    (!string.IsNullOrWhiteSpace(x.StaffCode) &&
+                     x.StaffCode.ToUpperInvariant().Contains(term)) ||
                     (!string.IsNullOrWhiteSpace(x.Phone) &&
                      x.Phone.ToUpperInvariant().Contains(term)))
                 .ToList();
@@ -1173,6 +1176,8 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                    FullName = user.FullName,
                    Email = user.Email,
                    Phone = user.UnmaskedPhone ?? user.Phone,
+                   StaffCode = user.StaffCode,
+                   ProfileImageMediaAssetId = user.ProfileImageUrl,
                    RoleId = tenantRole != null ? tenantRole.Id : (outletRole != null ? outletRole.Id : (Guid?)null),
                    RoleName = tenantRole != null ? tenantRole.RoleName : (outletRole != null ? outletRole.RoleName : "-"),
                    RoleDescription = tenantRole != null
@@ -1298,6 +1303,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             row.FullName,
             row.Email,
             row.Phone,
+            row.StaffCode,
             row.RoleId,
             row.RoleName,
             row.Outlets.Count == 0 ? "All Outlets" : string.Join(", ", row.Outlets.Select(x => x.OutletName)),
@@ -1305,7 +1311,49 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             row.LastActiveAt,
             row.RoleDescription,
             row.Outlets,
-            row.OutletCount);
+            row.OutletCount,
+            row.ProfileImageUrl);
+    }
+
+    private async Task AttachProfileImageUrlsAsync(
+        Guid tenantId,
+        List<UserRow> rows,
+        CancellationToken cancellationToken)
+    {
+        var mediaAssetIds = rows
+            .Where(row => row.ProfileImageMediaAssetId.HasValue)
+            .Select(row => row.ProfileImageMediaAssetId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (mediaAssetIds.Count == 0)
+        {
+            return;
+        }
+
+        var mediaUrls = await _dbContext.MediaAssets
+            .AsNoTracking()
+            .Where(asset =>
+                asset.TenantId == tenantId &&
+                mediaAssetIds.Contains(asset.Id) &&
+                asset.Status == ActiveMediaStatus)
+            .Select(asset => new { asset.Id, asset.PublicUrl, asset.StorageKey })
+            .ToDictionaryAsync(
+                asset => asset.Id,
+                asset => MediaUrlResolver.PreferMediaAsset(
+                    asset.PublicUrl,
+                    null,
+                    asset.StorageKey),
+                cancellationToken);
+
+        foreach (var row in rows)
+        {
+            if (row.ProfileImageMediaAssetId is { } mediaAssetId &&
+                mediaUrls.TryGetValue(mediaAssetId, out var profileImageUrl))
+            {
+                row.ProfileImageUrl = profileImageUrl;
+            }
+        }
     }
 
     private static string FormatStatus(string status)
@@ -1466,6 +1514,9 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         public string FullName { get; init; } = string.Empty;
         public string Email { get; init; } = string.Empty;
         public string? Phone { get; init; }
+        public string? StaffCode { get; init; }
+        public Guid? ProfileImageMediaAssetId { get; init; }
+        public string? ProfileImageUrl { get; set; }
         public Guid? RoleId { get; init; }
         public string RoleName { get; init; } = string.Empty;
         public string? RoleDescription { get; init; }

@@ -1,5 +1,6 @@
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.ECommerce.Storefront.Constants;
+using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
@@ -112,9 +113,11 @@ public static class TenantAdminBootstrapPermissionCatalog
                 "tenant.devices.view",
                 "tenant.devices.manage"
             ],
-            // POS checkout is a commercial entitlement. Bootstrap Tenant Admin is not a cashier —
-            // cashier POS operational permissions are intentionally not auto-granted.
-            [PlatformTenantFeatureCodes.PosCheckout] = [],
+            // POS checkout lets a Tenant Admin configure the supported Cashier template
+            // without bypassing the delegation ceiling; it grants no platform permissions.
+            [PlatformTenantFeatureCodes.PosCheckout] = TenantRoleSetupCatalog.CashierAllowedPermissionCodes
+                .OrderBy(permissionCode => permissionCode, StringComparer.Ordinal)
+                .ToArray(),
             [PlatformTenantFeatureCodes.OfflineOperationSync] = []
         };
 

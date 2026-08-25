@@ -1,7 +1,7 @@
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
-using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Constants;
 using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
+using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Queries;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,70 +41,9 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
         Guid tenantId,
         CancellationToken cancellationToken)
     {
-        // Combine direct, role-based, outlet-role, and outlet-direct active permissions within the resolved tenant.
-        var directPermissions =
-            from userPermission in _dbContext.TenantUserPermissions.AsNoTracking()
-            join user in _dbContext.TenantUsers.AsNoTracking()
-                on userPermission.TenantUserId equals user.Id
-            join permission in _dbContext.PermissionDefinitions.AsNoTracking()
-                on userPermission.PermissionDefinitionId equals permission.Id
-            where user.Id == tenantUserId &&
-                  user.TenantId == tenantId &&
-                  permission.IsActive
-            select permission.PermissionCode;
-
-        var rolePermissions =
-            from userRole in _dbContext.TenantUserRoles.AsNoTracking()
-            join role in _dbContext.TenantRoles.AsNoTracking()
-                on userRole.TenantRoleId equals role.Id
-            join rolePermission in _dbContext.TenantRolePermissions.AsNoTracking()
-                on role.Id equals rolePermission.TenantRoleId
-            join permission in _dbContext.PermissionDefinitions.AsNoTracking()
-                on rolePermission.PermissionDefinitionId equals permission.Id
-            where userRole.TenantUserId == tenantUserId &&
-                  role.TenantId == tenantId &&
-                  role.IsActive &&
-                  permission.IsActive
-            select permission.PermissionCode;
-
-        var outletRolePermissions =
-            from outletRole in _dbContext.OutletUserRoles.AsNoTracking()
-            join outlet in _dbContext.Outlets.AsNoTracking()
-                on outletRole.OutletId equals outlet.Id
-            join role in _dbContext.TenantRoles.AsNoTracking()
-                on outletRole.TenantRoleId equals role.Id
-            join rolePermission in _dbContext.TenantRolePermissions.AsNoTracking()
-                on role.Id equals rolePermission.TenantRoleId
-            join permission in _dbContext.PermissionDefinitions.AsNoTracking()
-                on rolePermission.PermissionDefinitionId equals permission.Id
-            where outletRole.TenantUserId == tenantUserId &&
-                  outlet.TenantId == tenantId &&
-                  outlet.Status.ToUpper() != OutletConstants.DeletedStatus &&
-                  outlet.Status.ToUpper() != OutletConstants.InactiveStatus &&
-                  role.TenantId == tenantId &&
-                  role.IsActive &&
-                  permission.IsActive
-            select permission.PermissionCode;
-
-        var outletDirectPermissions =
-            from outletPermission in _dbContext.OutletUserPermissions.AsNoTracking()
-            join outlet in _dbContext.Outlets.AsNoTracking()
-                on outletPermission.OutletId equals outlet.Id
-            join permission in _dbContext.PermissionDefinitions.AsNoTracking()
-                on outletPermission.PermissionDefinitionId equals permission.Id
-            where outletPermission.TenantUserId == tenantUserId &&
-                  outlet.TenantId == tenantId &&
-                  outlet.Status.ToUpper() != OutletConstants.DeletedStatus &&
-                  outlet.Status.ToUpper() != OutletConstants.InactiveStatus &&
-                  permission.IsActive
-            select permission.PermissionCode;
-
-        return await directPermissions
-            .Union(rolePermissions)
-            .Union(outletRolePermissions)
-            .Union(outletDirectPermissions)
-            .Where(x => x != string.Empty)
-            .OrderBy(x => x)
+        return await TenantEffectivePermissionCodesQuery
+            .Build(_dbContext, tenantUserId, tenantId)
+            .OrderBy(code => code)
             .ToListAsync(cancellationToken);
     }
 

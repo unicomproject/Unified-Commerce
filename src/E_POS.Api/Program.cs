@@ -20,6 +20,14 @@ const string CustomerIdentityType = "customer";
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (builder.Environment.IsDevelopment() && OperatingSystem.IsWindows())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
+    builder.Logging.AddConsole();
+    builder.Logging.AddDebug();
+}
+
 builder.Services.AddControllers();
 builder.Services.AddCors(options =>
 {
@@ -214,6 +222,7 @@ app.MapGet("/api/v1/health", () =>
 
 
 await DevelopmentPlatformAdminTestAccountSeedHost.RunIfDevelopmentAsync(app);
+await DevelopmentTenantRoleAccessTestAccountSeedHost.RunIfDevelopmentAsync(app);
 
 app.Run();
 

@@ -15,8 +15,8 @@ namespace E_POS.Infrastructure.Modules.Tenant.AccessControl.Repositories;
 
 public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
 {
-    private const string TenantWideScope = "TENANT_WIDE";
-    private const string SelectedOutletsScope = "SELECTED_OUTLETS";
+    private const string TenantWideScope = TenantRoleSetupCatalog.TenantWideScope;
+    private const string SelectedOutletsScope = TenantRoleSetupCatalog.SelectedOutletsScope;
 
     private static readonly string[] AdministrativePermissionCodes =
     [
@@ -139,6 +139,47 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
             NormalizeUpdatedAt(role.UpdatedAt, role.CreatedAt));
     }
 
+    public async Task<IReadOnlyList<TenantRoleSetupOptionResponse>> GetSetupRoleOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var roles = await _dbContext.TenantRoles
+            .AsNoTracking()
+            .Where(role =>
+                role.TenantId == tenantId &&
+                TenantRoleSetupCatalog.SupportedRoleCodes.Contains(role.RoleCode))
+            .OrderBy(role => role.RoleName)
+            .Select(role => new
+            {
+                role.Id,
+                role.RoleCode,
+                role.RoleName,
+                role.RoleDescription,
+                role.IsActive,
+                role.IsCustom,
+                role.CreatedAt,
+                role.UpdatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        var roleIds = roles.Select(role => role.Id).ToArray();
+        var permissionCounts = await ActivePermissionCountsAsync(tenantId, roleIds, cancellationToken);
+        var userCounts = await ActiveAssignmentCountsAsync(tenantId, roleIds, cancellationToken);
+
+        return roles
+            .Select(role => new TenantRoleSetupOptionResponse(
+                role.Id,
+                role.RoleCode,
+                role.RoleName,
+                role.RoleDescription,
+                role.IsActive,
+                role.IsCustom != true,
+                permissionCounts.GetValueOrDefault(role.Id),
+                userCounts.GetValueOrDefault(role.Id),
+                NormalizeUpdatedAt(role.UpdatedAt, role.CreatedAt)))
+            .ToArray();
+    }
+
     public Task<TenantRole?> GetEditableAsync(Guid tenantId, Guid roleId, CancellationToken cancellationToken)
     {
         return _dbContext.TenantRoles
@@ -189,14 +230,18 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
         var normalizedCodes = permissionCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var rows = await (
             from permission in _dbContext.PermissionDefinitions
+            join module in _dbContext.PlatformModules.AsNoTracking()
+                on permission.ModuleId equals module.Id
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on permission.FeatureId equals feature.Id
             where normalizedCodes.Contains(permission.PermissionCode)
             select new
             {
                 Permission = permission,
+                ModuleStatus = module.Status,
                 feature.Id,
                 feature.FeatureCode,
+                FeatureStatus = feature.Status,
                 feature.IsCoreFeature
             }).ToListAsync(cancellationToken);
 
@@ -206,7 +251,8 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
         return rows
             .Where(row =>
                 row.Permission.IsActive &&
-                !row.Permission.IsSystem &&
+                row.ModuleStatus == "ACTIVE" &&
+                row.FeatureStatus == "ACTIVE" &&
                 !TenantAdminBootstrapPermissionCatalog.IsPlatformOnlyPermission(row.Permission.PermissionCode) &&
                 ActorHasPermission(actorPermissionCodes, row.Permission.PermissionCode) &&
                 HasRequiredEntitlement(
@@ -232,7 +278,8 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on permission.FeatureId equals feature.Id
             where permission.IsActive &&
-                  !permission.IsSystem &&
+                  module.Status == "ACTIVE" &&
+                  feature.Status == "ACTIVE" &&
                   !permission.PermissionCode.StartsWith("platform.")
             orderby module.SortOrder, module.Name, feature.SortOrder, feature.Name, permission.PermissionCode
             select new CatalogRow(
@@ -308,7 +355,9 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
                             "TENANT",
                             0,
                             row.PermissionIsActive,
-                            "TENANT")).ToArray()))
+                            "TENANT",
+                            true,
+                            null)).ToArray()))
                     .ToArray()))
             .ToArray();
 
@@ -580,7 +629,7 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
     {
         var criticalPermissionIds = await _dbContext.PermissionDefinitions
             .AsNoTracking()
-            .Where(permission => AdministrativePermissionCodes.Contains(permission.PermissionCode))
+            .Where(permission => permission.IsActive && AdministrativePermissionCodes.Contains(permission.PermissionCode))
             .Select(permission => permission.Id)
             .ToArrayAsync(cancellationToken);
 
@@ -656,7 +705,7 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
     {
         var criticalPermissionIds = await _dbContext.PermissionDefinitions
             .AsNoTracking()
-            .Where(permission => AdministrativePermissionCodes.Contains(permission.PermissionCode))
+            .Where(permission => permission.IsActive && AdministrativePermissionCodes.Contains(permission.PermissionCode))
             .Select(permission => permission.Id)
             .ToArrayAsync(cancellationToken);
 

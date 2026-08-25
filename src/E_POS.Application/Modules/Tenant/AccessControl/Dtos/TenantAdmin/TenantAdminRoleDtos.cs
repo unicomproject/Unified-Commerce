@@ -31,6 +31,25 @@ public sealed record TenantAdminRoleDetailResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+public sealed record TenantRoleSetupOptionsResponse(
+    IReadOnlyList<TenantRoleSetupOptionResponse> Roles);
+
+public sealed record TenantRoleSetupOptionResponse(
+    Guid RoleId,
+    string RoleCode,
+    string RoleName,
+    string? RoleDescription,
+    bool IsActive,
+    bool IsSystem,
+    int PermissionCount,
+    int UserCount,
+    DateTimeOffset UpdatedAt);
+
+public sealed record TenantRoleSetupSaveRequest(
+    IReadOnlyList<string>? PermissionCodes,
+    IReadOnlyList<TenantAdminRoleAssignmentRequest>? Assignments,
+    DateTimeOffset? ExpectedUpdatedAt = null);
+
 public sealed record TenantAdminRoleCreateRequest(
     string RoleName,
     string RoleCode,
@@ -80,7 +99,9 @@ public sealed record TenantPermissionCatalogPermissionResponse(
     string Scope,
     int SortOrder,
     bool IsActive,
-    string Source);
+    string Source,
+    bool Assignable = true,
+    string? BlockedReason = null);
 
 public sealed record TenantRolePermissionsResponse(
     Guid RoleId,

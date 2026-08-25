@@ -26,7 +26,11 @@ public sealed class TenantAdminRoleServiceTests
 
         var result = await service.CreateAsync(
             context,
-            new TenantAdminRoleCreateRequest("Floor Manager", "platform.super_admin", "Manages floor"),
+            new TenantAdminRoleCreateRequest(
+                "Floor Manager",
+                "platform.super_admin",
+                "Manages floor",
+                [TenantAdminUserPermissions.RolesCreate]),
             CancellationToken.None,
             "role-create-1");
 
@@ -34,6 +38,24 @@ public sealed class TenantAdminRoleServiceTests
         Assert.Equal("FLOOR_MANAGER", repository.CreatedRole?.RoleCode);
         Assert.False((repository.CreatedRole?.RoleCode ?? string.Empty).StartsWith("platform.", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(1, idempotency.ExecuteCallCount);
+    }
+
+    [Fact]
+    public async Task Create_WithoutPermissions_RejectsBrokenRole()
+    {
+        var repository = new FakeTenantAdminRoleRepository();
+        var idempotency = new FakeIdempotencyService();
+        var service = CreateService(repository, idempotency);
+
+        var result = await service.CreateAsync(
+            Context(TenantAdminUserPermissions.RolesCreate),
+            new TenantAdminRoleCreateRequest("Custom Cashier", "CASHIER", null),
+            CancellationToken.None,
+            "role-create-no-permissions");
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_roles.validation_failed", result.Error.Code);
+        Assert.Null(repository.CreatedRole);
     }
 
     [Fact]
@@ -70,6 +92,24 @@ public sealed class TenantAdminRoleServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("tenant_roles.delegation_ceiling_exceeded", result.Error.Code);
+        Assert.Equal(0, repository.ReplacePermissionsCallCount);
+    }
+
+    [Fact]
+    public async Task ReplacePermissions_WithoutPermissions_RejectsBrokenRole()
+    {
+        var role = ExistingRole(updatedAt: Now);
+        var repository = new FakeTenantAdminRoleRepository { EditableRole = role };
+        var service = CreateService(repository);
+
+        var result = await service.ReplacePermissionsAsync(
+            Context(TenantAdminUserPermissions.RolesPermissionsUpdate),
+            role.Id,
+            new TenantRolePermissionsUpdateRequest([], Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_roles.validation_failed", result.Error.Code);
         Assert.Equal(0, repository.ReplacePermissionsCallCount);
     }
 
@@ -112,6 +152,68 @@ public sealed class TenantAdminRoleServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("tenant_roles.concurrency_conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetSetupOptions_ReturnsOnlyCanonicalTenantAdminAndCashierRoles()
+    {
+        var repository = new FakeTenantAdminRoleRepository
+        {
+            SetupRoleOptions =
+            [
+                new TenantRoleSetupOptionResponse(Guid.NewGuid(), "SUPER_ADMIN", "Super Admin", null, true, true, 10, 1, Now),
+                new TenantRoleSetupOptionResponse(Guid.NewGuid(), TenantUserConstants.DefaultCashierRoleCode, "Cashier", null, true, true, 8, 2, Now),
+                new TenantRoleSetupOptionResponse(Guid.NewGuid(), TenantUserConstants.DefaultTenantAdminRoleCode, "Tenant Administrator", null, true, true, 15, 1, Now)
+            ]
+        };
+        var service = CreateService(repository);
+
+        var result = await service.GetSetupOptionsAsync(
+            Context(TenantAdminUserPermissions.RolesView),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Collection(
+            result.Value!.Roles,
+            role => Assert.Equal(TenantUserConstants.DefaultTenantAdminRoleCode, role.RoleCode),
+            role => Assert.Equal(TenantUserConstants.DefaultCashierRoleCode, role.RoleCode));
+    }
+
+    [Fact]
+    public async Task SaveSetup_ForCashierRejectsAdministrativePermissions()
+    {
+        var role = TenantRole.Create(
+            Guid.NewGuid(),
+            TenantId,
+            null,
+            null,
+            TenantUserConstants.DefaultCashierRoleCode,
+            "Cashier",
+            null,
+            false,
+            true,
+            ActorUserId,
+            Now);
+        var repository = new FakeTenantAdminRoleRepository { EditableRole = role };
+        var service = CreateService(repository);
+
+        var result = await service.SaveSetupAsync(
+            Context(
+                TenantAdminUserPermissions.RolesManage,
+                TenantAdminUserPermissions.RolesPermissionsUpdate,
+                TenantAdminUserPermissions.RolesAssignmentsUpdate,
+                TenantAdminUserPermissions.RolesManage),
+            role.Id,
+            new TenantRoleSetupSaveRequest(
+                [TenantAdminUserPermissions.RolesManage],
+                [new TenantAdminRoleAssignmentRequest(Guid.NewGuid(), TenantRoleSetupCatalog.TenantWideScope)],
+                Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_roles.delegation_ceiling_exceeded", result.Error.Code);
+        Assert.Equal(0, repository.ReplacePermissionsCallCount);
+        Assert.Equal(0, repository.ReplaceAssignmentsCallCount);
     }
 
     private static TenantAdminRoleService CreateService(
@@ -168,6 +270,7 @@ public sealed class TenantAdminRoleServiceTests
         public bool AssignmentReplacementRemovesLastAdmin { get; init; }
         public int ReplacePermissionsCallCount { get; private set; }
         public int ReplaceAssignmentsCallCount { get; private set; }
+        public IReadOnlyList<TenantRoleSetupOptionResponse> SetupRoleOptions { get; init; } = [];
 
         public Task<TenantAdminRoleListResponse> ListAsync(Guid tenantId, string? search, string? status, int page, int pageSize, CancellationToken cancellationToken) =>
             Task.FromResult(new TenantAdminRoleListResponse([], page, pageSize, 0, 0));
@@ -177,6 +280,9 @@ public sealed class TenantAdminRoleServiceTests
             var role = CreatedRole?.Id == roleId ? CreatedRole : EditableRole;
             return Task.FromResult(role is null ? null : ToDetail(role));
         }
+
+        public Task<IReadOnlyList<TenantRoleSetupOptionResponse>> GetSetupRoleOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult(SetupRoleOptions);
 
         public Task<TenantRole?> GetEditableAsync(Guid tenantId, Guid roleId, CancellationToken cancellationToken) =>
             Task.FromResult(EditableRole?.Id == roleId ? EditableRole : null);
