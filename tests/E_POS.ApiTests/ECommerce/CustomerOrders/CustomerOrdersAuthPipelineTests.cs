@@ -237,6 +237,7 @@ public sealed class CustomerOrdersAuthPipelineTests : IClassFixture<CustomerOrde
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Port=5432;Database=ApiAuthPipelineTests;Username=postgres;Password=postgres",
+                    ["AzureBlobStorage:ConnectionString"] = "UseDevelopmentStorage=true",
                     ["DevelopmentSeed:PlatformAdmin:Disabled"] = "true",
                     ["PlatformJwt:Issuer"] = Issuer,
                     ["PlatformJwt:Audience"] = "TM-EPOS-Platform",
