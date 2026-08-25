@@ -167,7 +167,7 @@ public sealed class TenantAdminProductServiceTests
     }
 
     [Fact]
-    public async Task GetCreateOptionsAsync_WithLegacyTenantProductsCreateAlone_ReturnsPermissionDenied()
+    public async Task GetCreateOptionsAsync_WithLegacyTenantProductsCreate_MapsToCatalogCreate_AndReturnsOptions()
     {
         var createOptions = new TenantAdminProductCreateOptionsResponse(
             [],
@@ -188,8 +188,8 @@ public sealed class TenantAdminProductServiceTests
             CreateContext([TenantAdminProductPermissions.Create]),
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("product.permission_denied", result.Error.Code);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
     }
 
     [Fact]

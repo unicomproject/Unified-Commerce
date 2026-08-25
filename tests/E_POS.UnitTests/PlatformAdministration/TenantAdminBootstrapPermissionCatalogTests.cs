@@ -159,10 +159,16 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
             .Where(code => code.StartsWith("catalog.products.", StringComparison.Ordinal))
             .ToList();
 
-        Assert.Equal(3, catalogProductPermissions.Count);
+        Assert.Equal(4, catalogProductPermissions.Count);
         Assert.Contains("catalog.products.view", catalogProductPermissions);
         Assert.Contains("catalog.products.create", catalogProductPermissions);
         Assert.Contains("catalog.products.update", catalogProductPermissions);
+        Assert.Contains("catalog.products.publish", catalogProductPermissions);
+        Assert.Contains("catalog.barcodes.manage", plan.PermissionCodes);
+        Assert.Contains("catalog.product_pricing.manage", plan.PermissionCodes);
+        Assert.Contains("catalog.variants.manage", plan.PermissionCodes);
+        Assert.Contains("catalog.combo_components.manage", plan.PermissionCodes);
+        Assert.Contains("pricing.tax_classes.view", plan.PermissionCodes);
         Assert.DoesNotContain("catalog.product_media.manage", plan.PermissionCodes);
         Assert.DoesNotContain("catalog.product_channels.manage", plan.PermissionCodes);
     }

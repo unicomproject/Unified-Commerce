@@ -665,8 +665,40 @@ public sealed partial class TenantAdminProductRepository
                 }
             }
 
+            var trackingUpsert = await UpsertInitialTrackingAsync(
+                tenantId,
+                product.Id,
+                userId,
+                command.InitialBatchNumber,
+                command.InitialExpiryDate,
+                command.InitialSerialNumber,
+                command.InitialTrackingAssignedVariantId,
+                command.ConfirmClearIncompatibleInitialTracking,
+                now,
+                cancellationToken);
+
             if (command.CurrentStage == 7 && !command.IsExplicitDraftSave)
             {
+                var identityError = await PublishInitialTrackingIdentityAsync(
+                    tenantId,
+                    product.Id,
+                    userId,
+                    normalizedStructure,
+                    command.TrackInventory,
+                    command.BatchTracking,
+                    command.ExpiryTracking,
+                    command.SerialTracking,
+                    trackingUpsert.InitialBatchNumber,
+                    trackingUpsert.InitialExpiryDate,
+                    trackingUpsert.InitialSerialNumber,
+                    trackingUpsert.AssignedProductVariantId,
+                    now,
+                    cancellationToken);
+                if (identityError is not null)
+                {
+                    return SaveProductDraftResult.Failure(identityError);
+                }
+
                 product.SetPublished(userId, now, command.DesiredPublishStatus);
             }
 
@@ -758,6 +790,7 @@ public sealed partial class TenantAdminProductRepository
 
             var componentsConfigured = componentCount >= 2;
             var unitProjection = await ProjectProductUnitSettingsAsync(tenantId, product.Id, cancellationToken);
+            var trackingValues = await LoadInitialTrackingValuesAsync(tenantId, product.Id, cancellationToken);
 
             return SaveProductDraftResult.Success(new ProductDraftResponse(
                 product.Id,
@@ -806,7 +839,11 @@ public sealed partial class TenantAdminProductRepository
                 AllowDecimalQuantity: unitProjection.AllowDecimalQuantity,
                 UnitConversions: unitProjection.UnitConversions,
                 PricingTax: await ProjectPricingTaxAsync(tenantId, product.Id, cancellationToken),
-                VariantConfiguration: command.VariantConfiguration));
+                VariantConfiguration: command.VariantConfiguration,
+                InitialBatchNumber: trackingValues.Batch,
+                InitialExpiryDate: trackingValues.Expiry,
+                InitialSerialNumber: trackingValues.Serial,
+                InitialTrackingAssignedVariantId: trackingValues.AssignedVariantId));
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -901,6 +938,7 @@ public sealed partial class TenantAdminProductRepository
         var componentsConfigured = componentCount >= 2;
         var unitProjection = await ProjectProductUnitSettingsAsync(tenantId, product.Id, cancellationToken);
         var barcodeSkuProjection = await ProjectBarcodeSkuConfigurationAsync(tenantId, product.Id, cancellationToken);
+        var trackingValues = await LoadInitialTrackingValuesAsync(tenantId, productId, cancellationToken);
 
         return new ProductSetupWizardDto(
             product.Id,
@@ -949,7 +987,11 @@ public sealed partial class TenantAdminProductRepository
             AllowDecimalQuantity: unitProjection.AllowDecimalQuantity,
             UnitConversions: unitProjection.UnitConversions,
             PricingTax: await ProjectPricingTaxAsync(tenantId, productId, cancellationToken),
-            BarcodeSkuConfiguration: barcodeSkuProjection);
+            BarcodeSkuConfiguration: barcodeSkuProjection,
+            InitialBatchNumber: trackingValues.Batch,
+            InitialExpiryDate: trackingValues.Expiry,
+            InitialSerialNumber: trackingValues.Serial,
+            InitialTrackingAssignedVariantId: trackingValues.AssignedVariantId);
     }
 
     private async Task<(Guid? PosSalesChannelId, Guid? OnlineSalesChannelId, ApplicationError? Error)>

@@ -324,6 +324,27 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpPost("{id:guid}/publish")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Publish(
+        Guid id,
+        [FromBody] PublishProductRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.PublishAsync(context, id, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpPost("images/stage")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -432,9 +453,19 @@ public sealed class TenantAdminProductsController : ControllerBase
             "product.unsafe_product_structure_transition" or
             "product.unsafe_tracking_change" or
             "product.validation_failed" or
-            "product.delete_blocked" => BadRequest(CreateError(error)),
+            "product.delete_blocked" or
+            "product.initial_tracking.incompatible_values_require_confirmation" or
+            "product.initial_tracking.batch_required_for_expiry" or
+            "product.initial_tracking.invalid_expiry_date" or
+            "product.initial_tracking.variant_assignment_required" or
+            "product.initial_tracking.invalid_variant_assignment" or
+            "product.initial_tracking.bundle_parent_not_supported" => BadRequest(CreateError(error)),
             "product.not_found" => NotFound(CreateError(error)),
-            "product.concurrency_conflict" or "product.duplicate_sku" or "product.duplicate_barcode" => StatusCode(
+            "product.concurrency_conflict" or
+            "product.duplicate_sku" or
+            "product.duplicate_barcode" or
+            "product.initial_tracking.duplicate_batch" or
+            "product.initial_tracking.duplicate_serial" => StatusCode(
                 StatusCodes.Status409Conflict,
                 CreateError(error)),
             _ => BadRequest(CreateError(error)),

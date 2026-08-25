@@ -52,7 +52,13 @@ public static class TenantAdminBootstrapPermissionCatalog
             [
                 "catalog.products.view",
                 "catalog.products.create",
-                "catalog.products.update"
+                "catalog.products.update",
+                "catalog.products.publish",
+                "catalog.barcodes.manage",
+                "catalog.product_pricing.manage",
+                "catalog.variants.manage",
+                "catalog.combo_components.manage",
+                "pricing.tax_classes.view"
             ],
             [PlatformTenantFeatureCodes.InventoryTracking] =
             [

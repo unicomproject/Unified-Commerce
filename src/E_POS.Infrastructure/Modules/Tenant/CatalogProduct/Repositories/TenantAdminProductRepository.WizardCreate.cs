@@ -331,6 +331,38 @@ public sealed partial class TenantAdminProductRepository
                 }
             }
 
+            var trackingRow = await UpsertInitialTrackingAsync(
+                tenantId,
+                productId,
+                userId,
+                request.InitialBatchNumber,
+                request.InitialExpiryDate,
+                request.InitialSerialNumber,
+                request.InitialTrackingAssignedVariantId,
+                request.ConfirmClearIncompatibleInitialTracking,
+                now,
+                cancellationToken);
+
+            var identityError = await PublishInitialTrackingIdentityAsync(
+                tenantId,
+                productId,
+                userId,
+                structure,
+                request.TrackInventory,
+                request.BatchTracking,
+                request.ExpiryTracking,
+                request.SerialTracking,
+                trackingRow.InitialBatchNumber,
+                trackingRow.InitialExpiryDate,
+                trackingRow.InitialSerialNumber,
+                trackingRow.AssignedProductVariantId,
+                now,
+                cancellationToken);
+            if (identityError is not null)
+            {
+                return SaveProductDraftResult.Failure(identityError);
+            }
+
             await _dbContext.AuditLogs.AddAsync(new AuditLog
             {
                 TenantId = tenantId,
@@ -557,6 +589,10 @@ public sealed partial class TenantAdminProductRepository
             setup.BarcodeSkuConfiguration,
             setup.PricingTax,
             setup.TotalVariantCount,
-            setup.IncludedVariantCount);
+            setup.IncludedVariantCount,
+            setup.InitialBatchNumber,
+            setup.InitialExpiryDate,
+            setup.InitialSerialNumber,
+            setup.InitialTrackingAssignedVariantId);
     }
 }

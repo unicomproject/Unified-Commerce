@@ -34,5 +34,11 @@ public sealed record SaveProductDraftCommand(
     VariantConfigurationDto? VariantConfiguration = null,
     BundleConfigurationDto? BundleConfiguration = null,
     BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
-    PricingTaxConfigurationDto? PricingTax = null);
+    PricingTaxConfigurationDto? PricingTax = null,
+    string? InitialBatchNumber = null,
+    DateOnly? InitialExpiryDate = null,
+    string? InitialSerialNumber = null,
+    bool ConfirmClearIncompatibleInitialTracking = false,
+    Guid? InitialTrackingAssignedVariantId = null,
+    bool ApplyChannelMutation = true);
 
