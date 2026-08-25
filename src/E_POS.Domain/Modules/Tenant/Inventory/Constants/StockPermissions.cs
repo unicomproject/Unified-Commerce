@@ -10,7 +10,9 @@ public static class StockPermissions
     public const string MovementsView = "tenant.stock.movements.view";
     public const string ExpiryView = "tenant.stock.expiry.view";
     public const string AdjustmentsView = "tenant.stock.adjustments.view";
+    public const string AdjustmentsCreate = "tenant.stock.adjustments.create";
     public const string TransfersView = "tenant.stock.transfers.view";
+    public const string TransfersCreate = "tenant.stock.transfers.create";
     
     public const string OpeningStock = "tenant.stock.opening";
 

@@ -113,9 +113,6 @@ public sealed class PosPermissionSeedTests
             SalesPermissions.Park.Recall,
             SalesPermissions.Sale.Checkout,
             PaymentPermissions.AcceptCash,
-            PaymentPermissions.AcceptCard,
-            PaymentPermissions.AcceptQr,
-            PaymentPermissions.AcceptSplit,
             PosPermissions.Notifications.View,
             PosPermissions.Till.ViewSession,
             PosPermissions.Till.Close
@@ -152,9 +149,6 @@ public sealed class PosPermissionSeedTests
             SalesPermissions.Park.Recall,
             SalesPermissions.Sale.Checkout,
             PaymentPermissions.AcceptCash,
-            PaymentPermissions.AcceptCard,
-            PaymentPermissions.AcceptQr,
-            PaymentPermissions.AcceptSplit,
             PosPermissions.Notifications.View,
             PosPermissions.Till.ViewSession,
             PosPermissions.Till.Close
@@ -164,6 +158,10 @@ public sealed class PosPermissionSeedTests
         {
             Assert.Contains(code, assignments);
         }
+
+        Assert.DoesNotContain(PaymentPermissions.AcceptCard, assignments);
+        Assert.DoesNotContain(PaymentPermissions.AcceptQr, assignments);
+        Assert.DoesNotContain(PaymentPermissions.AcceptSplit, assignments);
     }
 
     [Fact]
@@ -229,7 +227,7 @@ public sealed class PosPermissionSeedTests
         Assert.Single(updateDefinitions);
         Assert.Equal(DevelopmentPosCustomerUpdatePermissionSeedData.PermissionId, updateDefinitions[0].Id);
         Assert.Equal(
-            DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId,
+            DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId,
             updateDefinitions[0].FeatureId);
         Assert.Equal("update", updateDefinitions[0].ActionType);
         Assert.Equal(
@@ -252,7 +250,7 @@ public sealed class PosPermissionSeedTests
             DevelopmentPosCustomerCreatePermissionSeedData.PermissionId,
             createDefinitions[0].Id);
         Assert.Equal(
-            DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId,
+            DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId,
             createDefinitions[0].FeatureId);
         Assert.Equal("create", createDefinitions[0].ActionType);
     }

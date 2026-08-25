@@ -30,7 +30,12 @@ public sealed class CashMovementTypeConfiguration : IEntityTypeConfiguration<Cas
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_cash_movement_types_tenant_id_tenants");
 
-        builder.HasIndex(x => new { x.TenantId, x.MovementTypeCode }).IsUnique().HasDatabaseName("uq_cash_movement_types_tenant_id_movement_type_code");
+        builder.HasIndex(x => x.MovementTypeCode).IsUnique()
+            .HasFilter("tenant_id IS NULL")
+            .HasDatabaseName("uq_cash_movement_types_global_code");
+        builder.HasIndex(x => new { x.TenantId, x.MovementTypeCode }).IsUnique()
+            .HasFilter("tenant_id IS NOT NULL")
+            .HasDatabaseName("uq_cash_movement_types_tenant_code");
 
         builder.ToTable(t =>
         {

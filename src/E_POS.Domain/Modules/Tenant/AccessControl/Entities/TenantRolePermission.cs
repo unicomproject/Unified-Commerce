@@ -40,4 +40,13 @@ public class TenantRolePermission : AuditableEntity
         RevokedAt = now;
         UpdatedAt = now;
     }
+
+    public void Reactivate(Guid grantedByTenantUserId, DateTimeOffset now)
+    {
+        GrantedByTenantUserId = grantedByTenantUserId;
+        RevokedByTenantUserId = null;
+        GrantedAt = now;
+        RevokedAt = null;
+        UpdatedAt = now;
+    }
 }

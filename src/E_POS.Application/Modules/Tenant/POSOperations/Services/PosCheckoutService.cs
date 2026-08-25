@@ -2,6 +2,7 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Application.Modules.Tenant.HardwareCash;
 using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
 using System.Text.Json;
@@ -298,19 +299,23 @@ public sealed class PosCheckoutService : IPosCheckoutService
         }
 
         var payment = result.Payment;
-        var isCash = string.Equals(request.PaymentMethod, "CASH", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(request.PaymentMethod, "SPLIT_CASH", StringComparison.OrdinalIgnoreCase);
+        var isCashOnly = string.Equals(request.PaymentMethod, "CASH", StringComparison.OrdinalIgnoreCase);
+        var isSplitCash = string.Equals(request.PaymentMethod, "SPLIT_CASH", StringComparison.OrdinalIgnoreCase);
 
-        if (isCash)
+        if (isCashOnly || isSplitCash)
         {
+            var drawerPurpose = isSplitCash ? "splitPaymentCash" : "cashSale";
+            var drawerRequestId = CashDrawerStableRequestId.ForBusinessReference(
+                payment.SaleId,
+                drawerPurpose);
             var registerResult = await _drawerService.RegisterOperationAsync(
                 context,
                 new RegisterDrawerOperationRequest(
-                    Guid.NewGuid(),
+                    drawerRequestId,
                     request.DeviceId,
                     null,
-                    "cashSale",
-                    "Cash Sale Open",
+                    drawerPurpose,
+                    isSplitCash ? "Split Payment Cash Open" : "Cash Sale Open",
                     "SALE",
                     payment.SaleId),
                 cancellationToken);
@@ -324,6 +329,7 @@ public sealed class PosCheckoutService : IPosCheckoutService
 
                 payment = payment with {
                     DrawerOperationId = drawerOperationId,
+                    DrawerRequestId = drawerRequestId,
                     CashDrawerSettings = cashDrawerSettings
                 };
             }

@@ -9,19 +9,21 @@ public class TaxClass : AuditableEntity
     public Guid TenantId { get; protected set; }
     public string TaxClassCode { get; protected set; } = string.Empty;
     public string TaxClassName { get; protected set; } = string.Empty;
+    public string TaxType { get; protected set; } = string.Empty;
     public string? Description { get; protected set; }
     public bool IsDefaultTaxClass { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
-    public static TaxClass Create(Guid tenantId, string taxClassCode, string taxClassName, string? description, bool isDefaultTaxClass, Guid? createdByTenantUserId, DateTimeOffset now)
+    public static TaxClass Create(Guid tenantId, string taxClassCode, string taxClassName, string taxType, string? description, bool isDefaultTaxClass, Guid? createdByTenantUserId, DateTimeOffset now)
     {
         return new TaxClass
         {
             TenantId = tenantId,
             TaxClassCode = taxClassCode.Trim().ToUpperInvariant(),
             TaxClassName = taxClassName.Trim(),
+            TaxType = taxType.Trim().ToUpperInvariant(),
             Description = description?.Trim(),
             IsDefaultTaxClass = isDefaultTaxClass,
             Status = "ACTIVE",
@@ -31,10 +33,12 @@ public class TaxClass : AuditableEntity
         };
     }
 
-    public void UpdateProfile(string taxClassName, string? description, Guid? updatedByTenantUserId)
+    public void UpdateProfile(string taxClassName, string taxType, string? description, string status, Guid? updatedByTenantUserId)
     {
         TaxClassName = taxClassName.Trim();
+        TaxType = taxType.Trim().ToUpperInvariant();
         Description = description?.Trim();
+        Status = status.Trim().ToUpperInvariant();
         UpdatedByTenantUserId = updatedByTenantUserId;
     }
 

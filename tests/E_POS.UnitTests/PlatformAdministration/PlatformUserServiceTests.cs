@@ -3,6 +3,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Infrastructure.Persistence.Seed;
@@ -69,8 +70,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "Support User",
                 Email = "support.user@example.com",
-                RoleCodes = ["support_operator"]
+                RoleIds = [SupportRoleId]
             },
             SuperAdminUserId,
             CancellationToken.None);
@@ -78,7 +80,7 @@ public sealed class PlatformUserServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal("support.user@example.com", result.Value!.Email);
         Assert.True(result.Value.InvitePending);
-        Assert.True(repository.AddCalled);
+        Assert.True(repository.AddWithInvitationCalled);
     }
 
     [Fact]
@@ -98,8 +100,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "Duplicate User",
                 Email = "duplicate@example.com",
-                RoleCodes = ["support_operator"]
+                RoleIds = [SupportRoleId]
             },
             SuperAdminUserId,
             CancellationToken.None);
@@ -118,8 +121,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "Support User",
                 Email = "support.user@example.com",
-                RoleCodes = ["unknown_role"]
+                RoleIds = [Guid.NewGuid()]
             },
             SuperAdminUserId,
             CancellationToken.None);
@@ -136,8 +140,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "Support User",
                 Email = "support.user@example.com",
-                RoleCodes = ["support_operator"]
+                RoleIds = [SupportRoleId]
             },
             Guid.NewGuid(),
             CancellationToken.None);
@@ -166,8 +171,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "New Admin",
                 Email = "new.admin@example.com",
-                RoleCodes = [PlatformRoleCodes.SuperAdministrator]
+                RoleIds = [PlatformAdminSeedConstants.SuperAdministratorRoleId]
             },
             Guid.NewGuid(),
             CancellationToken.None);
@@ -353,7 +359,23 @@ public sealed class PlatformUserServiceTests
                 hasUsersCreate,
                 hasUsersUpdate,
                 hasUsersRolesAssign),
-            new FakeDateTimeProvider());
+            new FakeDateTimeProvider(),
+            new FakeInvitationTokenService(),
+            new FakeInvitationDeliverySecretProtector());
+    }
+
+    private sealed class FakeInvitationTokenService : IInvitationTokenService
+    {
+        public string GenerateToken() => "fake_raw_token";
+        public string HashToken(string token) => "fake_token_hash";
+    }
+
+    private sealed class FakeInvitationDeliverySecretProtector : IInvitationDeliverySecretProtector
+    {
+        public ProtectedInvitationDeliverySecret Protect(string rawToken) =>
+            new ProtectedInvitationDeliverySecret("fake_protected_token", "v1");
+
+        public string Unprotect(string ciphertext, string keyVersion) => "fake_raw_token";
     }
 
     private static PlatformUserListResponse CreateListResponse()
@@ -498,6 +520,10 @@ public sealed class PlatformUserServiceTests
             return Task.FromResult(EmailExists);
         }
 
+        public bool AddWithInvitationCalled { get; private set; }
+        public PlatformUserInvitation? InvitationEntity { get; private set; }
+        public E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage? OutboxMessageEntity { get; private set; }
+
         public Task AddUserWithRolesAsync(
             PlatformUser user,
             IReadOnlyList<Guid> roleIds,
@@ -506,6 +532,20 @@ public sealed class PlatformUserServiceTests
         {
             AddCalled = true;
             UserEntity = user;
+            return Task.CompletedTask;
+        }
+
+        public Task AddUserWithRolesAndInvitationAsync(
+            PlatformUser user,
+            IReadOnlyList<Guid> roleIds,
+            PlatformUserInvitation invitation,
+            E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage outboxMessage,
+            CancellationToken cancellationToken)
+        {
+            AddWithInvitationCalled = true;
+            UserEntity = user;
+            InvitationEntity = invitation;
+            OutboxMessageEntity = outboxMessage;
             return Task.CompletedTask;
         }
 

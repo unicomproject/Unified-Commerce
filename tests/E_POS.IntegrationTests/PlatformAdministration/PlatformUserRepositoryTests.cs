@@ -91,7 +91,7 @@ public sealed class PlatformUserRepositoryTests
         var detail = await repository.GetUserByIdAsync(userId, CancellationToken.None);
 
         Assert.NotNull(detail);
-        Assert.Equal(PlatformAuthConstants.InactiveStatus, detail!.Status);
+        Assert.Equal(PlatformAuthConstants.InvitedStatus, detail!.Status);
         Assert.True(detail.InvitePending);
         Assert.Equal(["integration_support_role"], detail.RoleCodes);
     }

@@ -5,6 +5,7 @@ public class TaxClassResponse
     public Guid Id { get; set; }
     public string TaxClassCode { get; set; } = string.Empty;
     public string TaxClassName { get; set; } = string.Empty;
+    public string TaxType { get; set; } = string.Empty;
     public string? Description { get; set; }
     public bool IsDefaultTaxClass { get; set; }
     public string Status { get; set; } = string.Empty;

@@ -414,12 +414,24 @@ public sealed class OutletService : IOutletService
     }
 
     private static ApplicationError? ValidateReadPermission(TenantRequestContext context) =>
-        context.HasPermission(OutletConstants.ViewPermission) || context.HasPermission(OutletConstants.ManagePermission)
+        context.HasPermission(OutletConstants.ViewPermission) || 
+        context.HasPermission(OutletConstants.ManagePermission) ||
+        context.HasPermission("outlet.view") ||
+        context.HasPermission("outlets.view") ||
+        context.HasPermission("tenant.outlets.view") ||
+        context.HasPermission("tenant.outlets.details.view") ||
+        context.HasPermission("tenant.outlets.manage") ||
+        context.HasPermission("tenant.outlets.update")
             ? null
             : PermissionDenied;
 
     private static ApplicationError? ValidateManagePermission(TenantRequestContext context) =>
-        context.HasPermission(OutletConstants.ManagePermission) ? null : PermissionDenied;
+        context.HasPermission(OutletConstants.ManagePermission) ||
+        context.HasPermission("tenant.outlets.update") ||
+        context.HasPermission("outlet.create") ||
+        context.HasPermission("outlet.update") ||
+        context.HasPermission("outlet.delete")
+            ? null : PermissionDenied;
 
     private static ApplicationError? ValidateTenantContext(TenantRequestContext context)
     {

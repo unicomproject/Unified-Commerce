@@ -42,6 +42,16 @@ public interface ICurrentStockService
         StockInRequest request,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<StockAdjustmentResponse>> AdjustStockAsync(
+        TenantRequestContext context,
+        StockAdjustmentRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<StockTransferResponse>> TransferStockAsync(
+        TenantRequestContext context,
+        StockTransferRequest request,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<ProductStockDetailResponse>> GetProductStockDetailAsync(
         TenantRequestContext context,
         Guid productVariantId,

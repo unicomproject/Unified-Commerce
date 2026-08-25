@@ -21,9 +21,10 @@ public sealed class OutletImageService : IOutletImageService
     private readonly IMediaObjectStorage _storage;
     private readonly IDateTimeProvider _clock;
     private readonly IOutletAuditLogger _audit;
+    private readonly IMediaReadUrlResolver _mediaReadUrlResolver;
 
-    public OutletImageService(IOutletImageRepository repository, IOutletRepository outletRepository, IMediaObjectStorage storage, IDateTimeProvider clock, IOutletAuditLogger audit)
-    { _repository = repository; _outletRepository = outletRepository; _storage = storage; _clock = clock; _audit = audit; }
+    public OutletImageService(IOutletImageRepository repository, IOutletRepository outletRepository, IMediaObjectStorage storage, IDateTimeProvider clock, IOutletAuditLogger audit, IMediaReadUrlResolver mediaReadUrlResolver)
+    { _repository = repository; _outletRepository = outletRepository; _storage = storage; _clock = clock; _audit = audit; _mediaReadUrlResolver = mediaReadUrlResolver; }
 
     public async Task<ApplicationResult<OutletImageUploadResponse>> UploadAsync(TenantRequestContext context, MediaUploadFile file, CancellationToken cancellationToken)
     {
@@ -54,7 +55,8 @@ public sealed class OutletImageService : IOutletImageService
             try { await _repository.AddAsync(asset, cancellationToken); await _repository.SaveChangesAsync(cancellationToken); }
             catch { await _storage.DeleteIfExistsAsync(uploaded.ContainerName, uploaded.StorageKey, cancellationToken); throw; }
             _audit.LogImageUploaded(context.TenantId, context.UserId, id);
-            return ApplicationResult<OutletImageUploadResponse>.Success(new OutletImageUploadResponse(id, uploaded.PublicUrl, safeName, mime, bytes.Length, image.Width, image.Height));
+            var resolvedImageUrl = _mediaReadUrlResolver.ResolveReadUrl(uploaded.ContainerName, uploaded.StorageKey, uploaded.PublicUrl);
+            return ApplicationResult<OutletImageUploadResponse>.Success(new OutletImageUploadResponse(id, resolvedImageUrl, safeName, mime, bytes.Length, image.Width, image.Height));
         }
         catch (UnknownImageFormatException) { return ApplicationResult<OutletImageUploadResponse>.Failure(Invalid("file", "Image data is corrupted or cannot be decoded.")); }
         catch (InvalidImageContentException) { return ApplicationResult<OutletImageUploadResponse>.Failure(Invalid("file", "Image data is corrupted or cannot be decoded.")); }
@@ -77,7 +79,15 @@ public sealed class OutletImageService : IOutletImageService
 
     private async Task<ApplicationError?> ValidateAccessAsync(TenantRequestContext context, CancellationToken ct)
     {
-        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty || !context.HasPermission(OutletConstants.ManagePermission)) return new ApplicationError("outlet.permission_denied", "Permission denied for outlet management.");
+        var hasPermission = context.HasPermission(OutletConstants.ManagePermission) ||
+                            context.HasPermission("tenant.outlets.update") ||
+                            context.HasPermission("outlet.create") ||
+                            context.HasPermission("outlet.update") ||
+                            context.HasPermission("outlet.delete");
+
+        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty || !hasPermission) 
+            return new ApplicationError("outlet.permission_denied", "Permission denied for outlet management.");
+            
         if (!await _outletRepository.IsOutletManagementFeatureEnabledAsync(context.TenantId, ct)) return new ApplicationError("outlet.feature_disabled", "Outlet management is not enabled for this tenant.");
         return null;
     }

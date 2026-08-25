@@ -9,6 +9,7 @@ public class CashMovement : AuditableEntity
     public Guid TillId { get; protected set; }
     public Guid TillSessionId { get; protected set; }
     public Guid? PosDeviceId { get; protected set; }
+    public Guid? RequestId { get; protected set; }
     public Guid MovementTypeId { get; protected set; }
     public string MovementNumber { get; protected set; } = string.Empty;
     public decimal Amount { get; protected set; }
@@ -27,6 +28,7 @@ public class CashMovement : AuditableEntity
         Guid tillId,
         Guid tillSessionId,
         Guid? posDeviceId,
+        Guid? requestId,
         Guid movementTypeId,
         string movementNumber,
         decimal amount,
@@ -46,6 +48,7 @@ public class CashMovement : AuditableEntity
             TillId = tillId,
             TillSessionId = tillSessionId,
             PosDeviceId = posDeviceId,
+            RequestId = requestId,
             MovementTypeId = movementTypeId,
             MovementNumber = movementNumber.Trim().ToUpperInvariant(),
             Amount = amount,

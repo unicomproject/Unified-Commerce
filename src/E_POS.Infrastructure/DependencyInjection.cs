@@ -16,6 +16,7 @@ using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.AccessControl.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.AccessControl.Options;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
@@ -109,13 +110,28 @@ public static class DependencyInjection
         services.Configure<InvitationDeliverySecretOptions>(configuration.GetSection(InvitationDeliverySecretOptions.SectionName));
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
-        services.Configure<E_POS.Infrastructure.Modules.Shared.Media.Options.AzureBlobStorageOptions>(configuration.GetSection(E_POS.Infrastructure.Modules.Shared.Media.Options.AzureBlobStorageOptions.SectionName));
+        services.AddOptions<AzureBlobStorageOptions>()
+            .Bind(configuration.GetSection(AzureBlobStorageOptions.SectionName))
+            .Validate(options =>
+            {
+                if (string.IsNullOrWhiteSpace(options.ConnectionString))
+                    return false;
+                if (!options.ConnectionString.Contains("AccountKey=") &&
+                    !options.ConnectionString.Contains("SharedAccessSignature=") &&
+                    !options.ConnectionString.Contains("UseDevelopmentStorage=true"))
+                    return false;
+                return true;
+            }, "AzureBlobStorage:ConnectionString is not configured or malformed. Configure it using .NET User Secrets or an environment variable.")
+            .ValidateOnStart();
         services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
+        services.Configure<DevelopmentTenantRoleAccessSeedOptions>(
+            configuration.GetSection(DevelopmentTenantRoleAccessSeedOptions.SectionName));
         services.Configure<E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions>(
             configuration.GetSection(E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions.SectionName));
         services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
+        services.AddScoped<IDevelopmentTenantRoleAccessTestAccountSeeder, DevelopmentTenantRoleAccessTestAccountSeeder>();
 
         var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(connectionString);
         dataSourceBuilder.EnableDynamicJson();
@@ -230,6 +246,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminHardwareRepository, TenantAdminHardwareRepository>();
         services.AddScoped<ITenantAdminHardwareAuditLogger, TenantAdminHardwareAuditLogger>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
+        services.AddScoped<ITenantAdminRoleRepository, TenantAdminRoleRepository>();
         services.AddScoped<ITenantUserStaffCodeService, TenantUserStaffCodeService>();
         services.AddScoped<ITillRepository, TillRepository>();
         services.AddScoped<IPosDeviceRepository, PosDeviceRepository>();

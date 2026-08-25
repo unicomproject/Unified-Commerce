@@ -43,7 +43,7 @@ public sealed class TaxSetupService : ITaxSetupService
         if (existing != null)
             return ApplicationResult<Guid>.Failure(new ApplicationError("pricing.tax_class.code_exists", $"Tax Class with code '{request.TaxClassCode}' already exists."));
 
-        var taxClass = TaxClass.Create(context.TenantId, request.TaxClassCode, request.TaxClassName, request.Description, request.IsDefaultTaxClass, context.UserId, _dateTimeProvider.UtcNow);
+        var taxClass = TaxClass.Create(context.TenantId, request.TaxClassCode, request.TaxClassName, request.TaxType, request.Description, request.IsDefaultTaxClass, context.UserId, _dateTimeProvider.UtcNow);
 
         if (request.IsDefaultTaxClass)
         {
@@ -83,7 +83,7 @@ public sealed class TaxSetupService : ITaxSetupService
         if (taxClass == null)
             return ApplicationResult<bool>.Failure(NotFound);
 
-        taxClass.UpdateProfile(request.TaxClassName, request.Description, context.UserId);
+        taxClass.UpdateProfile(request.TaxClassName, request.TaxType, request.Description, request.Status, context.UserId);
 
         if (request.IsDefaultTaxClass && !taxClass.IsDefaultTaxClass)
         {
@@ -133,6 +133,7 @@ public sealed class TaxSetupService : ITaxSetupService
             Id = taxClass.Id,
             TaxClassCode = taxClass.TaxClassCode,
             TaxClassName = taxClass.TaxClassName,
+            TaxType = taxClass.TaxType,
             Description = taxClass.Description,
             IsDefaultTaxClass = taxClass.IsDefaultTaxClass,
             Status = taxClass.Status
@@ -174,6 +175,7 @@ public sealed class TaxSetupService : ITaxSetupService
             Id = x.Id,
             TaxClassCode = x.TaxClassCode,
             TaxClassName = x.TaxClassName,
+            TaxType = x.TaxType,
             Description = x.Description,
             IsDefaultTaxClass = x.IsDefaultTaxClass,
             Status = x.Status

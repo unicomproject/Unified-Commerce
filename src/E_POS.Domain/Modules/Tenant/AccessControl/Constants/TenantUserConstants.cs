@@ -7,5 +7,6 @@ public static class TenantUserConstants
     public const string StatusInactive = "INACTIVE";
     public const string PendingInvitePasswordHash = "PENDING_INVITE:UNSET";
     public const string DefaultTenantAdminRoleCode = "TENANT_ADMIN";
+    public const string DefaultCashierRoleCode = "CASHIER";
 }
 

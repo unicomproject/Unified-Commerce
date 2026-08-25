@@ -9,6 +9,7 @@ using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
@@ -150,6 +151,7 @@ public sealed class PosDrawerRepository : IPosDrawerRepository
         if (op.Status is "OPENED" or "FAILED" or "CANCELLED")
             return ("pos_drawer.already_finalized", Map(op));
 
+        // AGENT_ACCEPTED / UNKNOWN remain updatable for physical confirmation.
         op.FinalizeOperation(
             request.Status,
             request.ResultCategory,
@@ -202,27 +204,18 @@ public sealed class PosDrawerRepository : IPosDrawerRepository
             select new { Sales = grouped.Sum(x => x.PaidAmount), Refunds = grouped.Sum(x => x.RefundedAmount) })
             .SingleOrDefaultAsync(cancellationToken);
 
-        var cashPaymentReferences = await (
-            from payment in _db.SalesPayments.AsNoTracking()
-            join method in _db.PaymentMethods.AsNoTracking() on payment.PaymentMethodId equals method.Id
-            where payment.TenantId == tenantId && method.TenantId == tenantId &&
-                  payment.TillSessionId == tillSessionId && method.MethodCode == "CASH" &&
-                  (payment.PaymentStatus == "PAID" || payment.PaymentStatus == "PARTIALLY_REFUNDED" || payment.PaymentStatus == "REFUNDED")
-            select payment.PaymentNumber).ToListAsync(cancellationToken);
-
-        var manual = await _db.TillCashMovements.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.TillSessionId == tillSessionId &&
-                        x.CurrencyCode == session.CurrencyCode &&
-                        !(x.MovementType == "CASH_IN" && x.ReferenceNumber != null &&
-                          cashPaymentReferences.Contains(x.ReferenceNumber)))
+        var manual = await (
+            from movement in _db.CashMovements.AsNoTracking()
+            join type in _db.CashMovementTypes.AsNoTracking() on movement.MovementTypeId equals type.Id
+            where movement.TenantId == tenantId && movement.TillSessionId == tillSessionId &&
+                  movement.CurrencyCode == session.CurrencyCode && type.AffectsExpectedCash
+            select new { movement.Amount, type.Direction, type.MovementTypeCode })
             .GroupBy(_ => 1)
             .Select(grouped => new
             {
-                CashIn = grouped.Where(x => x.MovementType == "CASH_IN").Sum(x => x.Amount),
-                CashOut = grouped.Where(x => x.MovementType == "CASH_OUT").Sum(x => x.Amount),
-                CashDrops = grouped.Where(x => x.MovementType == "CASH_DROP").Sum(x => x.Amount),
-                OpeningAdjustments = grouped.Where(x => x.MovementType == "OPENING_FLOAT").Sum(x => x.Amount),
-                ClosingRemovals = grouped.Where(x => x.MovementType == "CLOSING_REMOVE").Sum(x => x.Amount)
+                CashIn = grouped.Where(x => x.Direction == "IN").Sum(x => x.Amount),
+                CashOut = grouped.Where(x => x.Direction == "OUT" && x.MovementTypeCode != "CASH_DROP").Sum(x => x.Amount),
+                CashDrops = grouped.Where(x => x.Direction == "OUT" && x.MovementTypeCode == "CASH_DROP").Sum(x => x.Amount)
             }).SingleOrDefaultAsync(cancellationToken);
 
         var cashSales = payments?.Sales ?? 0;
@@ -230,8 +223,7 @@ public sealed class PosDrawerRepository : IPosDrawerRepository
         var cashIn = manual?.CashIn ?? 0;
         var cashOut = manual?.CashOut ?? 0;
         var cashDrops = manual?.CashDrops ?? 0;
-        var expected = session.OpeningFloatAmount + cashSales - cashRefunds + cashIn +
-                       (manual?.OpeningAdjustments ?? 0) - cashOut - cashDrops - (manual?.ClosingRemovals ?? 0);
+        var expected = session.OpeningFloatAmount + cashSales - cashRefunds + cashIn - cashOut - cashDrops;
         return new PosCashDrawerSummaryDto(
             session.Id, session.TillId, session.TillName, session.Status, session.CurrencyCode,
             session.OpeningFloatAmount, cashSales, cashRefunds, cashIn, cashOut, cashDrops,
@@ -268,25 +260,17 @@ public sealed class PosDrawerRepository : IPosDrawerRepository
                 payment.CurrencyCode, "Cash refund", payment.PaymentNumber,
                 user == null ? "System" : user.DisplayName ?? user.FullName, payment.UpdatedAt ?? payment.InitiatedAt)).Take(take).ToListAsync(cancellationToken);
 
-        var paymentReferences = await (
-            from payment in _db.SalesPayments.AsNoTracking()
-            join method in _db.PaymentMethods.AsNoTracking() on payment.PaymentMethodId equals method.Id
-            where payment.TenantId == tenantId && method.TenantId == tenantId &&
-                  payment.TillSessionId == tillSessionId && method.MethodCode == "CASH" &&
-                  (payment.PaymentStatus == "PAID" || payment.PaymentStatus == "PARTIALLY_REFUNDED" || payment.PaymentStatus == "REFUNDED")
-            select payment.PaymentNumber).ToListAsync(cancellationToken);
         var manual = await (
-            from movement in _db.TillCashMovements.AsNoTracking()
+            from movement in _db.CashMovements.AsNoTracking()
+            join type in _db.CashMovementTypes.AsNoTracking() on movement.MovementTypeId equals type.Id
             join user in _db.TenantUsers.AsNoTracking() on movement.PerformedByTenantUserId equals user.Id
             where movement.TenantId == tenantId && movement.TillSessionId == tillSessionId &&
-                  (movement.MovementType == "CASH_IN" || movement.MovementType == "CASH_OUT" || movement.MovementType == "CASH_DROP") &&
-                  !(movement.MovementType == "CASH_IN" && movement.ReferenceNumber != null &&
-                    paymentReferences.Contains(movement.ReferenceNumber))
+                  (type.TenantId == null || type.TenantId == tenantId)
             orderby movement.PerformedAt descending
-            select new PosCashDrawerMovementDto(movement.Id, movement.MovementType,
-                movement.MovementType == "CASH_IN" ? "IN" : "OUT", movement.Amount,
-                movement.CurrencyCode, movement.Reason, movement.ReferenceNumber,
-                user.DisplayName ?? user.FullName, movement.PerformedAt)).Take(take).ToListAsync(cancellationToken);
+            select new PosCashDrawerMovementDto(movement.Id, type.MovementTypeCode,
+                type.Direction, movement.Amount, movement.CurrencyCode, movement.Reason, movement.MovementNumber,
+                user.DisplayName ?? user.FullName, movement.PerformedAt, movement.MovementNumber,
+                type.Id, type.MovementTypeName)).Take(take).ToListAsync(cancellationToken);
 
         var paymentCount = await _db.SalesPayments.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.TillSessionId == tillSessionId &&
@@ -299,87 +283,179 @@ public sealed class PosDrawerRepository : IPosDrawerRepository
             .Join(_db.PaymentMethods.AsNoTracking().Where(x => x.TenantId == tenantId && x.MethodCode == "CASH"),
                 payment => payment.PaymentMethodId, method => method.Id, (payment, _) => payment)
             .CountAsync(cancellationToken);
-        var manualCount = await _db.TillCashMovements.AsNoTracking()
-            .CountAsync(x => x.TenantId == tenantId && x.TillSessionId == tillSessionId &&
-                (x.MovementType == "CASH_IN" || x.MovementType == "CASH_OUT" || x.MovementType == "CASH_DROP") &&
-                !(x.MovementType == "CASH_IN" && x.ReferenceNumber != null &&
-                  paymentReferences.Contains(x.ReferenceNumber)), cancellationToken);
+        var manualCount = await _db.CashMovements.AsNoTracking()
+            .CountAsync(x => x.TenantId == tenantId && x.TillSessionId == tillSessionId, cancellationToken);
         var total = paymentCount + refundCount + manualCount;
         var items = payments.Concat(refunds).Concat(manual)
             .OrderByDescending(x => x.PerformedAt).Skip((page - 1) * pageSize).Take(pageSize).ToList();
         return new PosCashDrawerMovementPageDto(items, page, pageSize, total, (int)Math.Ceiling(total / (double)pageSize));
     }
 
-    public async Task<(string? ErrorCode, PosCashDrawerMovementDto? Movement)> CreateFinancialMovementAsync(
-        Guid tenantId, Guid userId, Guid trustedTillId, CreatePosCashMovementRequest request,
-        DateTimeOffset now, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<PosCashMovementTypeDto>> GetMovementTypesAsync(
+        Guid tenantId, string direction, CancellationToken cancellationToken)
     {
-        var transaction = _db.Database.IsRelational()
-            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
-            : null;
+        var normalizedDirection = direction.Trim().ToUpperInvariant();
+        return await _db.CashMovementTypes.AsNoTracking()
+            .Where(x => (x.TenantId == null || x.TenantId == tenantId) &&
+                        x.Direction == normalizedDirection && x.Status == "ACTIVE")
+            .OrderBy(x => x.TenantId == null ? 0 : 1)
+            .ThenBy(x => x.MovementTypeName)
+            .Select(x => new PosCashMovementTypeDto(
+                x.Id, x.MovementTypeCode, x.MovementTypeName, x.Direction,
+                x.RequiresReason, x.AffectsExpectedCash))
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<(string? ErrorCode, PosCashDrawerMovementDto? Movement)> CreateFinancialMovementAsync(
+        Guid tenantId, Guid userId, Guid trustedTillId, CreatePosCashMovementRequest request,
+        DateTimeOffset now, CancellationToken cancellationToken) =>
+        CreateFinancialMovementCoreAsync(
+            tenantId, userId, trustedTillId, request, now, allowSerializationRetry: true, cancellationToken);
+
+    private async Task<(string? ErrorCode, PosCashDrawerMovementDto? Movement)> CreateFinancialMovementCoreAsync(
+        Guid tenantId, Guid userId, Guid trustedTillId, CreatePosCashMovementRequest request,
+        DateTimeOffset now, bool allowSerializationRetry, CancellationToken cancellationToken)
+    {
+        IDbContextTransaction? transaction = null;
+        var committed = false;
         try
         {
-            var existing = await _db.TillCashMovements.AsNoTracking()
+            if (_db.Database.IsRelational())
+            {
+                transaction = await _db.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable, cancellationToken);
+            }
+
+            var existing = await _db.CashMovements.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.TenantId == tenantId && x.RequestId == request.RequestId, cancellationToken);
             if (existing is not null)
             {
-                var same = existing.TillSessionId == request.TillSessionId &&
-                           existing.PosDeviceId == request.DeviceId &&
-                           existing.MovementType == request.MovementType.Trim().ToUpperInvariant() &&
+                var same = existing.PosDeviceId == request.DeviceId &&
+                           existing.MovementTypeId == request.MovementTypeId &&
                            existing.Amount == request.Amount &&
-                           existing.Reason == request.Reason.Trim() &&
-                           existing.ReferenceNumber == NormalizeReference(request.ReferenceNumber);
-                return same ? (null, await MapManualAsync(existing, cancellationToken)) : ("cash_drawer.idempotency_conflict", null);
+                           existing.Reason == NormalizeNote(request.Note);
+                return same ? (null, await MapCanonicalAsync(existing, cancellationToken)) : ("cash_drawer.idempotency_conflict", null);
             }
 
             var session = await _db.TillSessions.SingleOrDefaultAsync(x => x.TenantId == tenantId &&
-                x.Id == request.TillSessionId && x.TillId == trustedTillId && x.Status == "OPEN", cancellationToken);
+                x.TillId == trustedTillId && x.OpenedFromPosDeviceId == request.DeviceId && x.Status == "OPEN", cancellationToken);
             if (session is null) return ("cash_drawer.till_session_not_open", null);
-            if (request.MovementType.Trim().ToUpperInvariant() is "CASH_OUT" or "CASH_DROP")
+
+            var movementType = await _db.CashMovementTypes.AsNoTracking().SingleOrDefaultAsync(x =>
+                x.Id == request.MovementTypeId && (x.TenantId == null || x.TenantId == tenantId) &&
+                x.Status == "ACTIVE", cancellationToken);
+            if (movementType is null) return ("cash_drawer.movement_type_not_found", null);
+            if (movementType.Direction is not ("IN" or "OUT"))
+                return ("cash_drawer.movement_type_invalid_direction", null);
+
+            var note = NormalizeNote(request.Note);
+            if (movementType.RequiresReason && note is null) return ("cash_drawer.reason_required", null);
+
+            if (movementType.Direction == "OUT" && movementType.AffectsExpectedCash)
             {
-                var summary = await GetFinancialSummaryAsync(tenantId, session.Id, cancellationToken);
-                if (summary is null || request.Amount > summary.CurrentExpectedCash)
+                var available = await GetFinancialSummaryAsync(tenantId, session.Id, cancellationToken);
+                if (available is null) return ("cash_drawer.till_session_not_open", null);
+                if (request.Amount > available.CurrentExpectedCash)
                     return ("cash_drawer.insufficient_expected_cash", null);
             }
 
-            var movement = TillCashMovement.CreateManual(Guid.NewGuid(), tenantId, session.Id, request.DeviceId,
-                request.RequestId, request.MovementType, request.Amount, session.CurrencyCode, request.Reason,
-                request.ReferenceNumber, userId, now);
-            _db.TillCashMovements.Add(movement);
+            var movement = CashMovement.Create(
+                Guid.NewGuid(), tenantId, session.OutletId, session.TillId, session.Id, request.DeviceId,
+                request.RequestId, movementType.Id, $"CM-{request.RequestId:N}", request.Amount,
+                session.CurrencyCode, note, null, null, null, userId, now);
+            _db.CashMovements.Add(movement);
             await _db.SaveChangesAsync(cancellationToken);
-            if (transaction is not null) await transaction.CommitAsync(cancellationToken);
-            return (null, await MapManualAsync(movement, cancellationToken));
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                committed = true;
+            }
+
+            var summary = await GetFinancialSummaryAsync(tenantId, session.Id, cancellationToken);
+            return (null, await MapCanonicalAsync(movement, cancellationToken, summary?.CurrentExpectedCash));
         }
         catch (Exception exception) when (IsIdempotencyRace(exception))
         {
-            if (transaction is not null) await transaction.RollbackAsync(cancellationToken);
-            _db.ChangeTracker.Clear();
-            var raced = await _db.TillCashMovements.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.TenantId == tenantId && x.RequestId == request.RequestId, cancellationToken);
-            if (raced is null) throw;
+            if (transaction is not null && !committed)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
 
-            var same = raced.TillSessionId == request.TillSessionId &&
-                       raced.PosDeviceId == request.DeviceId &&
-                       raced.MovementType == request.MovementType.Trim().ToUpperInvariant() &&
-                       raced.Amount == request.Amount &&
-                       raced.Reason == request.Reason.Trim() &&
-                       raced.ReferenceNumber == NormalizeReference(request.ReferenceNumber);
-            return same ? (null, await MapManualAsync(raced, cancellationToken)) : ("cash_drawer.idempotency_conflict", null);
+            _db.ChangeTracker.Clear();
+            var raced = await _db.CashMovements.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.TenantId == tenantId && x.RequestId == request.RequestId, cancellationToken);
+            if (raced is not null)
+            {
+                var same = raced.PosDeviceId == request.DeviceId &&
+                           raced.MovementTypeId == request.MovementTypeId &&
+                           raced.Amount == request.Amount &&
+                           raced.Reason == NormalizeNote(request.Note);
+                return same ? (null, await MapCanonicalAsync(raced, cancellationToken)) : ("cash_drawer.idempotency_conflict", null);
+            }
+
+            if (allowSerializationRetry && IsSerializationOrDeadlock(exception))
+            {
+                return await CreateFinancialMovementCoreAsync(
+                    tenantId, userId, trustedTillId, request, now,
+                    allowSerializationRetry: false, cancellationToken);
+            }
+
+            throw;
         }
         catch
         {
-            if (transaction is not null) await transaction.RollbackAsync(cancellationToken);
+            if (transaction is not null && !committed)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
             throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
         }
     }
 
-    private async Task<PosCashDrawerMovementDto> MapManualAsync(TillCashMovement movement, CancellationToken cancellationToken)
+    private static bool IsSerializationOrDeadlock(Exception exception)
     {
-        var name = await _db.TenantUsers.AsNoTracking().Where(x => x.Id == movement.PerformedByTenantUserId)
-            .Select(x => x.DisplayName ?? x.FullName).SingleAsync(cancellationToken);
-        return new PosCashDrawerMovementDto(movement.Id, movement.MovementType,
-            movement.MovementType == "CASH_IN" ? "IN" : "OUT", movement.Amount, movement.CurrencyCode,
-            movement.Reason, movement.ReferenceNumber, name, movement.PerformedAt);
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is PostgresException postgres &&
+                postgres.SqlState is PostgresErrorCodes.SerializationFailure
+                    or PostgresErrorCodes.DeadlockDetected)
+            {
+                return true;
+            }
+
+            if (current is DbUpdateException dbUpdate &&
+                dbUpdate.InnerException is PostgresException innerPostgres &&
+                innerPostgres.SqlState is PostgresErrorCodes.SerializationFailure
+                    or PostgresErrorCodes.DeadlockDetected)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task<PosCashDrawerMovementDto> MapCanonicalAsync(
+        CashMovement movement, CancellationToken cancellationToken, decimal? currentExpectedCash = null)
+    {
+        var details = await (
+            from type in _db.CashMovementTypes.AsNoTracking()
+            join user in _db.TenantUsers.AsNoTracking() on movement.PerformedByTenantUserId equals user.Id
+            where type.Id == movement.MovementTypeId
+            select new { type.MovementTypeCode, type.MovementTypeName, type.Direction, Name = user.DisplayName ?? user.FullName })
+            .SingleAsync(cancellationToken);
+        return new PosCashDrawerMovementDto(
+            movement.Id, details.MovementTypeCode, details.Direction, movement.Amount, movement.CurrencyCode,
+            movement.Reason, movement.MovementNumber, details.Name, movement.PerformedAt,
+            movement.MovementNumber, movement.MovementTypeId, details.MovementTypeName, currentExpectedCash);
     }
 
     private static bool IsIdempotencyRace(Exception exception)
@@ -407,8 +483,8 @@ public sealed class PosDrawerRepository : IPosDrawerRepository
         return false;
     }
 
-    private static string? NormalizeReference(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+    private static string? NormalizeNote(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private async Task<Guid> ResolveActiveTillIdAsync(Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken)
     {

@@ -15,7 +15,7 @@ public static class DevelopmentPosCustomerUpdatePermissionSeedData
         PermissionId,
         PermissionCode,
         DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId,
-        DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId,
+        DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId,
         "update",
         "Update customers on POS.");
 
@@ -36,7 +36,7 @@ public static class DevelopmentPosCustomerUpdatePermissionSeedData
         UPDATE permission_definitions
         SET
             module_id = '{{DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId}}'::uuid,
-            feature_id = '{{DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId}}'::uuid,
+            feature_id = '{{DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId}}'::uuid,
             action_type = 'update',
             description = 'Update customers on POS.',
             is_system = TRUE,
@@ -60,7 +60,7 @@ public static class DevelopmentPosCustomerUpdatePermissionSeedData
             '{{PermissionId}}'::uuid,
             '{{PermissionCode}}',
             '{{DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId}}'::uuid,
-            '{{DevelopmentPosPermissionCatalogSeedConstants.PosCustomersFeatureId}}'::uuid,
+            '{{DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId}}'::uuid,
             'update',
             'Update customers on POS.',
             TRUE,

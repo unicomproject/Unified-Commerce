@@ -22,9 +22,17 @@ if (Test-Path -LiteralPath $output) {
 dotnet publish $project --configuration $Configuration --runtime $Runtime `
     --self-contained:$($SelfContained.ToString().ToLowerInvariant()) `
     --no-restore --output $output `
-    -p:DebugType=None -p:DebugSymbols=false
+    -p:DebugType=None -p:DebugSymbols=false `
+    -p:PublishSingleFile=false
 
 Get-ChildItem -LiteralPath $output -Recurse -Force |
-    Where-Object { $_.Name -in @(".git", "data", "appsettings.Development.json") } |
+    Where-Object {
+        $_.Name -in @(
+            ".git", "data", "appsettings.Development.json",
+            "launchSettings.json"
+        ) -or $_.FullName -match '\\Properties\\'
+    } |
     ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
 Write-Host "Published Local Print Agent to $output"
+Write-Host "Self-contained=$SelfContained Runtime=$Runtime"
+Write-Host "Install with scripts/local-print-agent/install-print-agent.ps1 (not dotnet run)."

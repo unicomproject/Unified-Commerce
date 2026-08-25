@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 
 public sealed record PlatformUserListItemDto(
@@ -30,13 +32,21 @@ public sealed record PlatformUserDetailResponse(
 
 public sealed record CreatePlatformUserRequest
 {
-    public string? Email { get; init; }
+    [Required]
+    [StringLength(100)]
+    public string FullName { get; init; } = string.Empty;
 
-    public string? Status { get; init; }
+    [Required]
+    [EmailAddress]
+    [StringLength(255)]
+    public string Email { get; init; } = string.Empty;
 
-    public IReadOnlyList<Guid>? RoleIds { get; init; }
+    [StringLength(20)]
+    public string? Phone { get; init; }
 
-    public IReadOnlyList<string>? RoleCodes { get; init; }
+    [Required]
+    [MinLength(1, ErrorMessage = "At least one role is required.")]
+    public IReadOnlyList<Guid> RoleIds { get; init; } = [];
 }
 
 public sealed record UpdatePlatformUserRequest

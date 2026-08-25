@@ -27,6 +27,10 @@ public sealed class PlatformTenantCreateWriteModel
 
     public IReadOnlyList<TenantRolePermission> TenantAdminRolePermissions { get; init; } = [];
 
+    public TenantRole? CashierRole { get; init; }
+
+    public IReadOnlyList<TenantRolePermission> CashierRolePermissions { get; init; } = [];
+
     public TenantUser? TenantAdminUser { get; init; }
 
     public TenantUserRole? TenantAdminUserRole { get; init; }
