@@ -36,7 +36,26 @@ public static class DevelopmentPosPaymentReceiptPermissionsSeedData
     ];
 
     public static IReadOnlyList<string> CashierPermissionCodes { get; } =
-        Definitions.Select(static definition => definition.PermissionCode).ToList();
+    [
+        SalesPermissions.Sale.Checkout,
+        PaymentPermissions.AcceptCash,
+        SalesPermissions.Sale.View,
+        ReceiptPermissions.View,
+        ReceiptPermissions.Print,
+        ReceiptPermissions.Reprint,
+        SalesPermissions.Orders.View,
+        ReturnsPermissions.ViewReturns,
+        ReturnsPermissions.ViewRefunds,
+        ReturnsPermissions.CreateRefund,
+        CashDrawerPermissions.View,
+        CashDrawerPermissions.Manage,
+        PosPermissions.Notifications.View,
+        PosPermissions.Till.ViewSession,
+        PosPermissions.Till.Open,
+        PosPermissions.Till.Close,
+        TillConstants.ManagePermission,
+        "tenant.till.manage"
+    ];
 
     public static string UpSql => TenantPermissionSeedSqlBuilder.BuildPermissionUpsertSql(Definitions);
 

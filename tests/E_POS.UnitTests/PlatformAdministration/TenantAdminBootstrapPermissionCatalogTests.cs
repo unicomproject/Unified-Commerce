@@ -76,16 +76,19 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
     }
 
     [Fact]
-    public void Resolve_PosCheckout_DoesNotGrantCashierPermissions()
+    public void Resolve_PosCheckout_GrantsOnlyTheCashierTemplateCeiling()
     {
         var plan = TenantAdminBootstrapPermissionCatalog.Resolve(
         [
             PlatformTenantFeatureCodes.PosCheckout
         ]);
 
-        Assert.Contains(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
-        Assert.DoesNotContain("pos.sale.create", plan.PermissionCodes);
-        Assert.DoesNotContain("pos.till.open", plan.PermissionCodes);
+        Assert.DoesNotContain(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
+        Assert.Contains("sales.create", plan.PermissionCodes);
+        Assert.Contains("pos.till.open", plan.PermissionCodes);
+        Assert.Contains("payments.cash.accept", plan.PermissionCodes);
+        Assert.DoesNotContain("payments.card.accept", plan.PermissionCodes);
+        Assert.DoesNotContain("tenant.roles.manage", plan.PermissionCodes);
     }
 
     [Fact]
@@ -137,14 +140,14 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
     }
 
     [Fact]
-    public void Resolve_TechnicalPosEntitlement_NormalizesToPosCheckoutWithoutCashierPermissions()
+    public void Resolve_TechnicalPosEntitlement_NormalizesToPosCheckoutWithCashierPermissions()
     {
         var plan = TenantAdminBootstrapPermissionCatalog.Resolve(["pos.sales"]);
 
         Assert.Contains(PlatformTenantFeatureCodes.PosCheckout, plan.EffectiveEntitlementCodes);
-        Assert.Contains(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
+        Assert.DoesNotContain(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
         Assert.Empty(plan.UnknownOrUnmappedEntitlements);
-        Assert.DoesNotContain("pos.till.open", plan.PermissionCodes);
+        Assert.Contains("pos.till.open", plan.PermissionCodes);
     }
 
     [Fact]

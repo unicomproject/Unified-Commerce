@@ -18,6 +18,10 @@ public interface ITenantAdminRoleRepository
         Guid roleId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<TenantRoleSetupOptionResponse>> GetSetupRoleOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
     Task<TenantRole?> GetEditableAsync(
         Guid tenantId,
         Guid roleId,

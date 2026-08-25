@@ -53,7 +53,7 @@ public sealed class TenantAdminBootstrapPermissionProjectionTests
     }
 
     [Fact]
-    public void Resolve_PosProductOutletTill_ExcludesOnlineStoreAndInventory()
+    public void Resolve_PosProductOutletTill_GrantsCashierTemplateWithoutOnlineStoreOrInventory()
     {
         var plan = TenantAdminBootstrapPermissionCatalog.Resolve(
         [
@@ -68,7 +68,9 @@ public sealed class TenantAdminBootstrapPermissionProjectionTests
         Assert.Contains("catalog.products.create", plan.PermissionCodes);
         Assert.DoesNotContain("inventory.stock.view", plan.PermissionCodes);
         Assert.DoesNotContain("fulfillment.orders.manage", plan.PermissionCodes);
-        Assert.DoesNotContain("pos.sale.create", plan.PermissionCodes);
+        Assert.Contains("sales.create", plan.PermissionCodes);
+        Assert.Contains("payments.cash.accept", plan.PermissionCodes);
+        Assert.DoesNotContain("payments.card.accept", plan.PermissionCodes);
     }
 
     [Fact]

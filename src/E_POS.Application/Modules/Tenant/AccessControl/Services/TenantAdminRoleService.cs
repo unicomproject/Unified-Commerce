@@ -89,6 +89,29 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
             : ApplicationResult<TenantAdminRoleDetailResponse>.Success(response);
     }
 
+    public async Task<ApplicationResult<TenantRoleSetupOptionsResponse>> GetSetupOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccessAny(
+            context,
+            TenantAdminUserPermissions.RolesView,
+            TenantAdminUserPermissions.RolesManage,
+            TenantAdminUserPermissions.RolesPermissionsView,
+            TenantAdminUserPermissions.RolesAssignmentsView);
+        if (accessError is not null) return ApplicationResult<TenantRoleSetupOptionsResponse>.Failure(accessError);
+
+        var roles = await _repository.GetSetupRoleOptionsAsync(context.TenantId, cancellationToken);
+        var filtered = roles
+            .Where(role => TenantRoleSetupCatalog.IsSupportedSetupRoleCode(role.RoleCode))
+            .OrderBy(role => TenantRoleSetupCatalog.IsTenantAdminRoleCode(role.RoleCode) ? 0 : 1)
+            .ThenBy(role => role.RoleName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return ApplicationResult<TenantRoleSetupOptionsResponse>.Success(
+            new TenantRoleSetupOptionsResponse(filtered));
+    }
+
     public async Task<ApplicationResult<TenantAdminRoleDetailResponse>> CreateAsync(
         TenantRequestContext context,
         TenantAdminRoleCreateRequest request,
@@ -135,6 +158,12 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
 
         var now = _dateTimeProvider.UtcNow;
         var permissionCodes = NormalizePermissionCodes(request.PermissionCodes);
+        if (permissionCodes.Count == 0)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(
+                ValidationFailed("Select at least one permission before creating a role."));
+        }
+
         var permissions = await _repository.GetAssignablePermissionsByCodeAsync(
             context.TenantId,
             permissionCodes,
@@ -145,6 +174,14 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         if (permissions.Count != permissionCodes.Count)
         {
             return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(DelegationCeilingExceeded);
+        }
+
+        var ceilingError = ValidateRolePermissionCeiling(
+            normalized.RoleCode!,
+            permissions.Select(permission => permission.PermissionCode));
+        if (ceilingError is not null)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(ceilingError);
         }
 
         var assignments = NormalizeAssignments(request.Assignments);
@@ -335,6 +372,12 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         if (HasConcurrencyConflict(role.UpdatedAt, request.ExpectedUpdatedAt)) return ApplicationResult<TenantRolePermissionsResponse>.Failure(ConcurrencyConflict);
 
         var permissionCodes = NormalizePermissionCodes(request.PermissionCodes);
+        if (permissionCodes.Count == 0)
+        {
+            return ApplicationResult<TenantRolePermissionsResponse>.Failure(
+                ValidationFailed("A role must retain at least one permission."));
+        }
+
         var now = _dateTimeProvider.UtcNow;
         var permissions = await _repository.GetAssignablePermissionsByCodeAsync(
             context.TenantId,
@@ -346,6 +389,14 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         if (permissions.Count != permissionCodes.Count)
         {
             return ApplicationResult<TenantRolePermissionsResponse>.Failure(DelegationCeilingExceeded);
+        }
+
+        var ceilingError = ValidateRolePermissionCeiling(
+            role.RoleCode,
+            permissions.Select(permission => permission.PermissionCode));
+        if (ceilingError is not null)
+        {
+            return ApplicationResult<TenantRolePermissionsResponse>.Failure(ceilingError);
         }
 
         var replacementIds = permissions.Select(permission => permission.Id).ToArray();
@@ -430,6 +481,88 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         return response is null
             ? ApplicationResult<TenantRoleAssignmentsResponse>.Failure(NotFound)
             : ApplicationResult<TenantRoleAssignmentsResponse>.Success(response);
+    }
+
+    public async Task<ApplicationResult<TenantAdminRoleDetailResponse>> SaveSetupAsync(
+        TenantRequestContext context,
+        Guid roleId,
+        TenantRoleSetupSaveRequest request,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateAccessAny(
+            context,
+            TenantAdminUserPermissions.RolesManage,
+            TenantAdminUserPermissions.RolesPermissionsUpdate,
+            TenantAdminUserPermissions.RolesAssignmentsUpdate);
+        if (accessError is not null) return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(accessError);
+
+        var role = await _repository.GetEditableAsync(context.TenantId, roleId, cancellationToken);
+        if (role is null) return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(NotFound);
+        if (!TenantRoleSetupCatalog.IsSupportedSetupRoleCode(role.RoleCode))
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(ValidationFailed(
+                "Only canonical Tenant Admin and Cashier roles can be configured through role setup."));
+        }
+
+        if (HasConcurrencyConflict(role.UpdatedAt, request.ExpectedUpdatedAt))
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(ConcurrencyConflict);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        var permissionCodes = NormalizePermissionCodes(request.PermissionCodes);
+        if (permissionCodes.Count == 0)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(
+                ValidationFailed("A role must retain at least one permission."));
+        }
+
+        var permissions = await _repository.GetAssignablePermissionsByCodeAsync(
+            context.TenantId,
+            permissionCodes,
+            context.Permissions,
+            now,
+            cancellationToken);
+
+        if (permissions.Count != permissionCodes.Count)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(DelegationCeilingExceeded);
+        }
+
+        var ceilingError = ValidateRolePermissionCeiling(
+            role.RoleCode,
+            permissions.Select(permission => permission.PermissionCode));
+        if (ceilingError is not null)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(ceilingError);
+        }
+
+        var assignments = NormalizeAssignments(request.Assignments);
+        var assignmentValidation = await _repository.ValidateAssignmentsAsync(context.TenantId, assignments, cancellationToken);
+        if (!assignmentValidation.IsValid)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(ToAssignmentError(assignmentValidation.Failure));
+        }
+
+        var replacementIds = permissions.Select(permission => permission.Id).ToArray();
+        if (await _repository.WouldRemoveLastAdminAsync(context.TenantId, roleId, replacementIds, null, cancellationToken) ||
+            await _repository.WouldReplaceAssignmentsRemoveLastAdminAsync(context.TenantId, roleId, assignments, cancellationToken))
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(LastAdminProtected);
+        }
+
+        await _repository.ReplacePermissionsAsync(context.TenantId, roleId, replacementIds, context.UserId, now, cancellationToken);
+        await _repository.ReplaceAssignmentsAsync(context.TenantId, roleId, assignments, context.UserId, now, cancellationToken);
+        role.UpdateAudit(context.UserId, now);
+        await _repository.AddAuditAsync(context.TenantId, context.UserId, roleId, "tenant.role.setup_saved", new
+        {
+            role.RoleCode,
+            permissionCodes,
+            assignments
+        }, now, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+
+        return await GetUpdatedDetailAsync(context.TenantId, roleId, cancellationToken);
     }
 
     private async Task<ApplicationResult<TenantAdminRoleDetailResponse>> GetUpdatedDetailAsync(
@@ -530,6 +663,30 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
 
     private static ApplicationError ValidationFailed(string message) =>
         new("tenant_roles.validation_failed", message);
+
+    private static ApplicationError? ValidateRolePermissionCeiling(
+        string roleCode,
+        IEnumerable<string> permissionCodes)
+    {
+        var normalizedCodes = permissionCodes
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (!TenantRoleSetupCatalog.IsCashierRoleCode(roleCode))
+        {
+            return null;
+        }
+
+        if (normalizedCodes.Any(code => !TenantRoleSetupCatalog.IsAllowedForRole(roleCode, code)) ||
+            normalizedCodes.Any(code => TenantRoleSetupCatalog.AdministrativePermissionCodes.Contains(code)))
+        {
+            return DelegationCeilingExceeded;
+        }
+
+        return null;
+    }
 
     private static ApplicationError? ValidateAccessAny(TenantRequestContext context, params string[] permissions)
     {
