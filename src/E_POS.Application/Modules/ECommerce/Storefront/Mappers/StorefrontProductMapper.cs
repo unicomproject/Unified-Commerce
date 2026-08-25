@@ -157,7 +157,7 @@ public static class StorefrontProductMapper
             Options = options,
             Variants = variants,
             Highlights = highlights,
-            DeliveryInfo = "Free delivery on eligible orders. Click & Collect ready in as little as 30 minutes.",
+            DeliveryInfo = null,
             ReturnInfo = returnInfo
         };
     }

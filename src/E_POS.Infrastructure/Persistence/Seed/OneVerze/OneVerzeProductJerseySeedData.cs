@@ -20,10 +20,45 @@ public static class OneVerzeProductJerseySeedData
             public_url = EXCLUDED.public_url,
             status = 'ACTIVE';
 
+        -- 1.5 Insert Brand, Return Policy, and Highlights
+        INSERT INTO brands (id, tenant_id, brand_code, brand_name, brand_slug, description, status, created_at, updated_at)
+        VALUES ('88888888-0006-4000-8000-000000000001', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'AURA', 'Aura', 'aura', 'Aura Sports', 'ACTIVE', now(), now())
+        ON CONFLICT (id) DO NOTHING;
+
+        INSERT INTO return_policies (
+            id, tenant_id, return_policy_code, return_policy_name, description, 
+            return_window_days, exchange_window_days, requires_receipt, allow_defective_return, 
+            requires_manager_approval, is_default_policy, status, created_at, updated_at
+        )
+        VALUES (
+            '88888888-0007-4000-8000-000000000001', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '7D-EXC-ONLY', '7 Days Exchange Only', '7 day return, only exchange. You can exchange it at the store you bought it.', 
+            7, 7, true, true, false, false, 'ACTIVE', now(), now()
+        )
+        ON CONFLICT (id) DO UPDATE 
+        SET description = EXCLUDED.description;
+
+        INSERT INTO product_attribute_definitions (
+            id, tenant_id, attribute_key, attribute_name, attribute_type, is_filterable, is_searchable, is_required, applies_to, sort_order, status, created_at, updated_at
+        ) VALUES 
+            ('88888888-0008-4000-8000-000000000001', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'fabric', 'Fabric', 'TEXT', false, false, false, 'PRODUCT', 0, 'ACTIVE', now(), now()),
+            ('88888888-0008-4000-8000-000000000002', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'fit', 'Fit', 'TEXT', false, false, false, 'PRODUCT', 1, 'ACTIVE', now(), now()),
+            ('88888888-0008-4000-8000-000000000003', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'technology', 'Technology', 'TEXT', false, false, false, 'PRODUCT', 2, 'ACTIVE', now(), now()),
+            ('88888888-0008-4000-8000-000000000004', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'care', 'Care Instructions', 'TEXT', false, false, false, 'PRODUCT', 3, 'ACTIVE', now(), now())
+        ON CONFLICT (id) DO NOTHING;
+
+        INSERT INTO product_attribute_values (
+            id, tenant_id, product_id, attribute_definition_id, attribute_value_text, status, created_at, updated_at
+        ) VALUES 
+            ('88888888-0009-4000-8000-000000000001', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '88888888-0008-4000-8000-000000000001', '100% Recycled Polyester', 'ACTIVE', now(), now()),
+            ('88888888-0009-4000-8000-000000000002', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '88888888-0008-4000-8000-000000000002', 'Athletic Fit', 'ACTIVE', now(), now()),
+            ('88888888-0009-4000-8000-000000000003', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '88888888-0008-4000-8000-000000000003', 'AeroReady Moisture Wicking', 'ACTIVE', now(), now()),
+            ('88888888-0009-4000-8000-000000000004', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '88888888-0008-4000-8000-000000000004', 'Machine wash cold', 'ACTIVE', now(), now())
+        ON CONFLICT (id) DO NOTHING;
+
         -- 2. Insert Product
         INSERT INTO products (
             id, tenant_id, product_code, product_name, product_slug, product_type, product_structure,
-            short_description, is_sellable, is_taxable, status, created_at, updated_at
+            short_description, long_description, brand_id, return_policy_id, is_sellable, is_taxable, status, created_at, updated_at
         )
         VALUES (
             '99999999-0010-4000-8000-000000000001',
@@ -34,6 +69,9 @@ public static class OneVerzeProductJerseySeedData
             'STANDARD',
             'VARIABLE',
             'Official match jersey with breathable fabric. Available in multiple colors and sizes.',
+            'Experience the ultimate performance with the OneVerze Premium Match Jersey. Engineered with cutting-edge breathable technology, this jersey keeps you cool and dry even during the most intense matches.<br/><br/>The lightweight fabric moves with your body, providing an athletic fit that never restricts your range of motion. Designed for both professional athletes and passionate fans, it features a sleek, modern aesthetic with the iconic Aura branding.<br/><br/>Whether you are on the pitch or cheering from the stands, this jersey delivers unmatched comfort and durability. Available in a wide range of colors to represent your true team spirit.',
+            '88888888-0006-4000-8000-000000000001',
+            '88888888-0007-4000-8000-000000000001',
             true,
             true,
             'ACTIVE',
@@ -42,6 +80,9 @@ public static class OneVerzeProductJerseySeedData
         )
         ON CONFLICT (id) DO UPDATE
         SET product_name = EXCLUDED.product_name,
+            long_description = EXCLUDED.long_description,
+            brand_id = EXCLUDED.brand_id,
+            return_policy_id = EXCLUDED.return_policy_id,
             product_structure = 'VARIABLE',
             is_sellable = true,
             status = 'ACTIVE',
@@ -76,7 +117,7 @@ public static class OneVerzeProductJerseySeedData
         -- 5. Product Option Values
         INSERT INTO product_option_values (
             id, tenant_id, product_option_id, value_code, value_name,
-            display_name, color_hex, image_url, sort_order, status, created_at, updated_at
+            display_name, color_hex, image_media_asset_id, sort_order, status, created_at, updated_at
         )
         VALUES
             -- Colors
@@ -244,7 +285,7 @@ public static class OneVerzeProductJerseySeedData
         -- 10. Channel Allocation (Product Channel Visibility)
         -- Link to channel '11111111-0002-4000-8000-000000000001' (B2C ECommerce) and '11111111-0003-4000-8000-000000000001' (Main POS)
         INSERT INTO product_channel_visibility (
-            id, tenant_id, product_id, channel_id, is_visible, status, created_at, updated_at
+            id, tenant_id, product_id, sales_channel_id, is_visible, status, created_at, updated_at
         )
         VALUES
             ('99999999-0018-4000-8000-000000000001', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '11111111-0002-4000-8000-000000000001', true, 'ACTIVE', now(), now()),
@@ -276,5 +317,29 @@ public static class OneVerzeProductJerseySeedData
             ('99999999-0019-4000-8000-000000000015', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '33333333-0002-4000-8000-000000000001', '99999999-0010-4000-8000-000000000001', '99999999-0014-4000-8000-000000000015', 50.0, 0.0, 0.0, 0.0, 0, now(), now())
         ON CONFLICT (id) DO UPDATE
         SET on_hand_quantity = EXCLUDED.on_hand_quantity;
+
+        -- 11.5 Insert Customers for Reviews
+        INSERT INTO customers (
+            id, tenant_id, customer_code, display_name, first_name, last_name, email, normalized_email, phone, normalized_phone, source_type, status, created_at, updated_at
+        )
+        VALUES
+            ('55555555-0001-4000-8000-000000000001', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'CUST-OV-001', 'John Doe', 'John', 'Doe', 'john@example.com', 'JOHN@EXAMPLE.COM', '+15550000001', '+15550000001', 'ECOMMERCE', 'ACTIVE', now(), now()),
+            ('55555555-0001-4000-8000-000000000002', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'CUST-OV-002', 'Jane Smith', 'Jane', 'Smith', 'jane@example.com', 'JANE@EXAMPLE.COM', '+15550000002', '+15550000002', 'ECOMMERCE', 'ACTIVE', now(), now()),
+            ('55555555-0001-4000-8000-000000000003', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'CUST-OV-003', 'Mike Johnson', 'Mike', 'Johnson', 'mike@example.com', 'MIKE@EXAMPLE.COM', '+15550000003', '+15550000003', 'ECOMMERCE', 'ACTIVE', now(), now()),
+            ('55555555-0001-4000-8000-000000000004', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'CUST-OV-004', 'Emily Davis', 'Emily', 'Davis', 'emily@example.com', 'EMILY@EXAMPLE.COM', '+15550000004', '+15550000004', 'ECOMMERCE', 'ACTIVE', now(), now()),
+            ('55555555-0001-4000-8000-000000000005', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'CUST-OV-005', 'Chris Wilson', 'Chris', 'Wilson', 'chris@example.com', 'CHRIS@EXAMPLE.COM', '+15550000005', '+15550000005', 'ECOMMERCE', 'ACTIVE', now(), now())
+        ON CONFLICT (id) DO NOTHING;
+
+        -- 12. Product Reviews
+        INSERT INTO product_reviews (
+            id, tenant_id, product_id, customer_id, rating_value, review_title, review_text, "IsRecommended", status, created_by, updated_by, created_at, updated_at
+        )
+        VALUES
+            ('99999999-0020-4000-8000-000000000001', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '55555555-0001-4000-8000-000000000001', 5, 'Great Jersey!', 'The fabric is amazing and fits perfectly. Highly recommend.', true, 'APPROVED', '55555555-0001-4000-8000-000000000001', '55555555-0001-4000-8000-000000000001', now(), now()),
+            ('99999999-0020-4000-8000-000000000002', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '55555555-0001-4000-8000-000000000002', 4, 'Good quality', 'Comfortable to wear during matches. A bit tight on the shoulders.', true, 'APPROVED', '55555555-0001-4000-8000-000000000002', '55555555-0001-4000-8000-000000000002', now(), now()),
+            ('99999999-0020-4000-8000-000000000003', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '55555555-0001-4000-8000-000000000003', 5, 'Awesome design', 'Love the colors and the aura brand logo. Very stylish.', true, 'APPROVED', '55555555-0001-4000-8000-000000000003', '55555555-0001-4000-8000-000000000003', now(), now()),
+            ('99999999-0020-4000-8000-000000000004', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '55555555-0001-4000-8000-000000000004', 5, 'Perfect', 'Exactly as described. Arrived quickly and fits true to size.', true, 'APPROVED', '55555555-0001-4000-8000-000000000004', '55555555-0001-4000-8000-000000000004', now(), now()),
+            ('99999999-0020-4000-8000-000000000005', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '99999999-0010-4000-8000-000000000001', '55555555-0001-4000-8000-000000000005', 4, 'Nice jersey', 'Good material, but wish they had more colors.', true, 'APPROVED', '55555555-0001-4000-8000-000000000005', '55555555-0001-4000-8000-000000000005', now(), now())
+        ON CONFLICT (id) DO NOTHING;
         """;
 }

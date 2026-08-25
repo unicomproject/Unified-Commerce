@@ -43,7 +43,11 @@ public static class DevelopmentClickCollectOrderStatusSeedData
                     (7, 'e0000101-0007-4000-8000-000000000001'::uuid, 'ECOMM-SEED-READY-001',     'ACCEPTED',  'READY_FOR_COLLECTION', 'UNPAID', 0.0000, 2200.0000, 2200.0000, 1.0000, 'cccc0004-000d-4000-8000-000000000001'::uuid, 'cccc0005-000d-4000-8000-000000000001'::uuid, 'Water Bottle',      'MER-013-SKU', 0.0000, 'ACTIVE',    interval '38 hours'),
                     (8, 'e0000101-0008-4000-8000-000000000001'::uuid, 'ECOMM-SEED-READY-002',     'ACCEPTED',  'READY_FOR_COLLECTION', 'UNPAID', 0.0000, 4500.0000, 4500.0000, 1.0000, 'cccc0004-000f-4000-8000-000000000001'::uuid, 'cccc0005-000f-4000-8000-000000000001'::uuid, 'Silicone Wristband','MER-015-SKU', 0.0000, 'ACTIVE',    interval '36 hours'),
                     (9, 'e0000101-0009-4000-8000-000000000001'::uuid, 'ECOMM-SEED-COMPLETED-001', 'COMPLETED', 'COLLECTED',            'PAID',   5500.0000, 5500.0000, 0.0000, 1.0000, 'cccc0010-0001-4000-8000-000000000001'::uuid, 'cccc0013-0001-4000-8000-000000000001'::uuid, 'Development Sneaker','DEV-SNEAKER-01', 1.0000, 'FULFILLED', interval '34 hours'),
-                    (10,'e0000101-0010-4000-8000-000000000001'::uuid, 'ECOMM-SEED-COMPLETED-002', 'COMPLETED', 'COLLECTED',            'PAID',   6200.0000, 6200.0000, 0.0000, 1.0000, 'cccc0010-0001-4000-8000-000000000001'::uuid, 'cccc0013-0002-4000-8000-000000000001'::uuid, 'Development Sneaker','DEV-SNEAKER-02', 1.0000, 'FULFILLED', interval '32 hours')
+                    (10,'e0000101-0010-4000-8000-000000000001'::uuid, 'ECOMM-SEED-COMPLETED-002', 'COMPLETED', 'COLLECTED',            'PAID',   6200.0000, 6200.0000, 0.0000, 1.0000, 'cccc0010-0001-4000-8000-000000000001'::uuid, 'cccc0013-0002-4000-8000-000000000001'::uuid, 'Development Sneaker','DEV-SNEAKER-02', 1.0000, 'FULFILLED', interval '32 hours'),
+                    (11, 'e0000101-0011-4000-8000-000000000001'::uuid, 'ECOMM-SEED-PENDING-003',   'CONFIRMED', 'PENDING',              'UNPAID', 0.0000, 1500.0000, 1500.0000, 1.0000, 'cccc0004-0001-4000-8000-000000000001'::uuid, 'cccc0005-0001-4000-8000-000000000001'::uuid, 'Team Jersey',       'MER-001-SKU', 0.0000, 'ACTIVE',    interval '20 hours'),
+                    (12, 'e0000101-0012-4000-8000-000000000001'::uuid, 'ECOMM-SEED-ACCEPTED-003',  'ACCEPTED',  'ACCEPTED',             'UNPAID', 0.0000, 2000.0000, 2000.0000, 1.0000, 'cccc0004-0003-4000-8000-000000000001'::uuid, 'cccc0005-0003-4000-8000-000000000001'::uuid, 'Match Shorts',      'MER-003-SKU', 0.0000, 'ACTIVE',    interval '18 hours'),
+                    (13, 'e0000101-0013-4000-8000-000000000001'::uuid, 'ECOMM-SEED-PREPARING-003', 'ACCEPTED',  'PREPARING',            'UNPAID', 0.0000, 3000.0000, 3000.0000, 1.0000, 'cccc0004-0008-4000-8000-000000000001'::uuid, 'cccc0005-0008-4000-8000-000000000001'::uuid, 'Fan Scarf',         'MER-008-SKU', 0.0000, 'ACTIVE',    interval '16 hours'),
+                    (14, 'e0000101-0014-4000-8000-000000000001'::uuid, 'ECOMM-SEED-READY-003',     'ACCEPTED',  'READY_FOR_COLLECTION', 'UNPAID', 0.0000, 2500.0000, 2500.0000, 1.0000, 'cccc0004-000d-4000-8000-000000000001'::uuid, 'cccc0005-000d-4000-8000-000000000001'::uuid, 'Water Bottle',      'MER-013-SKU', 0.0000, 'ACTIVE',    interval '14 hours')
             ) AS value(
                 ordinal, id, order_number, order_status, fulfillment_status, payment_status,
                 paid_amount, total_amount, balance_due, quantity, product_id, product_variant_id,
@@ -139,7 +143,11 @@ public static class DevelopmentClickCollectOrderStatusSeedData
                     (7, 'e0000101-0007-4000-8000-000000000001'::uuid, 1.0000, 2200.0000, 0.0000, 'cccc0004-000d-4000-8000-000000000001'::uuid, 'cccc0005-000d-4000-8000-000000000001'::uuid, 'Water Bottle',       'MER-013-SKU',     0.0000, 'ACTIVE'),
                     (8, 'e0000101-0008-4000-8000-000000000001'::uuid, 1.0000, 4500.0000, 0.0000, 'cccc0004-000f-4000-8000-000000000001'::uuid, 'cccc0005-000f-4000-8000-000000000001'::uuid, 'Silicone Wristband', 'MER-015-SKU',     0.0000, 'ACTIVE'),
                     (9, 'e0000101-0009-4000-8000-000000000001'::uuid, 1.0000, 5500.0000, 1.0000, 'cccc0010-0001-4000-8000-000000000001'::uuid, 'cccc0013-0001-4000-8000-000000000001'::uuid, 'Development Sneaker', 'DEV-SNEAKER-01',  1.0000, 'FULFILLED'),
-                    (10,'e0000101-0010-4000-8000-000000000001'::uuid, 1.0000, 6200.0000, 1.0000, 'cccc0010-0001-4000-8000-000000000001'::uuid, 'cccc0013-0002-4000-8000-000000000001'::uuid, 'Development Sneaker', 'DEV-SNEAKER-02',  1.0000, 'FULFILLED')
+                    (10,'e0000101-0010-4000-8000-000000000001'::uuid, 1.0000, 6200.0000, 1.0000, 'cccc0010-0001-4000-8000-000000000001'::uuid, 'cccc0013-0002-4000-8000-000000000001'::uuid, 'Development Sneaker', 'DEV-SNEAKER-02',  1.0000, 'FULFILLED'),
+                    (11, 'e0000101-0011-4000-8000-000000000001'::uuid, 1.0000, 1500.0000, 0.0000, 'cccc0004-0001-4000-8000-000000000001'::uuid, 'cccc0005-0001-4000-8000-000000000001'::uuid, 'Team Jersey',       'MER-001-SKU',     0.0000, 'ACTIVE'),
+                    (12, 'e0000101-0012-4000-8000-000000000001'::uuid, 1.0000, 2000.0000, 0.0000, 'cccc0004-0003-4000-8000-000000000001'::uuid, 'cccc0005-0003-4000-8000-000000000001'::uuid, 'Match Shorts',      'MER-003-SKU',     0.0000, 'ACTIVE'),
+                    (13, 'e0000101-0013-4000-8000-000000000001'::uuid, 1.0000, 3000.0000, 0.0000, 'cccc0004-0008-4000-8000-000000000001'::uuid, 'cccc0005-0008-4000-8000-000000000001'::uuid, 'Fan Scarf',         'MER-008-SKU',     0.0000, 'ACTIVE'),
+                    (14, 'e0000101-0014-4000-8000-000000000001'::uuid, 1.0000, 2500.0000, 0.0000, 'cccc0004-000d-4000-8000-000000000001'::uuid, 'cccc0005-000d-4000-8000-000000000001'::uuid, 'Water Bottle',      'MER-013-SKU',     0.0000, 'ACTIVE')
             ) AS value(ordinal, order_id, quantity, unit_price, tax_amount, product_id, product_variant_id, product_name, sku, fulfilled_quantity, line_status)
         )
         INSERT INTO sales_order_lines (
@@ -225,7 +233,16 @@ public static class DevelopmentClickCollectOrderStatusSeedData
                     ('ECOMM-SEED-COMPLETED-002', 3, 'FULFILLMENT_STATUS', 'ACCEPTED',             'PREPARING',            interval '30 minutes'),
                     ('ECOMM-SEED-COMPLETED-002', 4, 'FULFILLMENT_STATUS', 'PREPARING',            'READY_FOR_COLLECTION', interval '70 minutes'),
                     ('ECOMM-SEED-COMPLETED-002', 5, 'ORDER_STATUS',       'ACCEPTED',             'COMPLETED',            interval '90 minutes'),
-                    ('ECOMM-SEED-COMPLETED-002', 6, 'FULFILLMENT_STATUS', 'READY_FOR_COLLECTION', 'COLLECTED',            interval '90 minutes')
+                    ('ECOMM-SEED-COMPLETED-002', 6, 'FULFILLMENT_STATUS', 'READY_FOR_COLLECTION', 'COLLECTED',            interval '90 minutes'),
+                    ('ECOMM-SEED-ACCEPTED-003',  1, 'ORDER_STATUS',       'CONFIRMED',            'ACCEPTED',             interval '10 minutes'),
+                    ('ECOMM-SEED-ACCEPTED-003',  2, 'FULFILLMENT_STATUS', 'PENDING',              'ACCEPTED',             interval '10 minutes'),
+                    ('ECOMM-SEED-PREPARING-003', 1, 'ORDER_STATUS',       'CONFIRMED',            'ACCEPTED',             interval '10 minutes'),
+                    ('ECOMM-SEED-PREPARING-003', 2, 'FULFILLMENT_STATUS', 'PENDING',              'ACCEPTED',             interval '10 minutes'),
+                    ('ECOMM-SEED-PREPARING-003', 3, 'FULFILLMENT_STATUS', 'ACCEPTED',             'PREPARING',            interval '30 minutes'),
+                    ('ECOMM-SEED-READY-003',     1, 'ORDER_STATUS',       'CONFIRMED',            'ACCEPTED',             interval '10 minutes'),
+                    ('ECOMM-SEED-READY-003',     2, 'FULFILLMENT_STATUS', 'PENDING',              'ACCEPTED',             interval '10 minutes'),
+                    ('ECOMM-SEED-READY-003',     3, 'FULFILLMENT_STATUS', 'ACCEPTED',             'PREPARING',            interval '30 minutes'),
+                    ('ECOMM-SEED-READY-003',     4, 'FULFILLMENT_STATUS', 'PREPARING',            'READY_FOR_COLLECTION', interval '70 minutes')
             ) AS value(order_number, sequence_number, status_type, old_status, new_status, changed_after)
         ),
         numbered_history AS (
@@ -251,7 +268,7 @@ public static class DevelopmentClickCollectOrderStatusSeedData
         JOIN sales_orders sales_order
             ON sales_order.tenant_id = '55555555-0000-4000-8000-000000000001'::uuid
            AND sales_order.order_number = numbered_history.order_number
-        ON CONFLICT (tenant_id, sales_order_id, sequence_number) DO UPDATE
+        ON CONFLICT (id) DO UPDATE
         SET status_type = EXCLUDED.status_type,
             old_status = EXCLUDED.old_status,
             new_status = EXCLUDED.new_status,
