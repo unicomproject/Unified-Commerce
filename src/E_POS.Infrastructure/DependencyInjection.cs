@@ -112,17 +112,8 @@ public static class DependencyInjection
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.AddOptions<AzureBlobStorageOptions>()
             .Bind(configuration.GetSection(AzureBlobStorageOptions.SectionName))
-            .Validate(options =>
-            {
-                if (string.IsNullOrWhiteSpace(options.ConnectionString))
-                    return false;
-                if (!options.ConnectionString.Contains("AccountKey=") &&
-                    !options.ConnectionString.Contains("SharedAccessSignature=") &&
-                    !options.ConnectionString.Contains("UseDevelopmentStorage=true"))
-                    return false;
-                return true;
-            }, "AzureBlobStorage:ConnectionString is not configured or malformed. Configure it using .NET User Secrets or an environment variable.")
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AzureBlobStorageOptions>, AzureBlobStorageOptionsValidator>();
         services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
