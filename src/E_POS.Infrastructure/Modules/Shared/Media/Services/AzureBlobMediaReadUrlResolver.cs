@@ -28,7 +28,9 @@ public sealed class AzureBlobMediaReadUrlResolver : IMediaReadUrlResolver
         string? storageKey,
         string? mediaPublicUrl)
     {
-        var candidateUrl = FirstNonEmpty(mediaPublicUrl, BuildBlobUrl(containerName, storageKey));
+        var candidateUrl = FirstAbsoluteHttpUrl(mediaPublicUrl)
+            ?? BuildBlobUrl(containerName, storageKey)
+            ?? FirstNonEmpty(mediaPublicUrl, null);
         return string.IsNullOrWhiteSpace(candidateUrl)
             ? null
             : _sasTokenProvider.AppendReadSasToken(candidateUrl);
@@ -78,6 +80,20 @@ public sealed class AzureBlobMediaReadUrlResolver : IMediaReadUrlResolver
         return !string.IsNullOrWhiteSpace(first)
             ? first.Trim()
             : string.IsNullOrWhiteSpace(second) ? null : second.Trim();
+    }
+
+    private static string? FirstAbsoluteHttpUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var candidate = value.Trim();
+        return Uri.TryCreate(candidate, UriKind.Absolute, out var uri) &&
+               (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            ? candidate
+            : null;
     }
 
     private static string NormalizePath(string? value)

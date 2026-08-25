@@ -451,6 +451,16 @@ public sealed partial class PlatformTenantRepository
                 _dbContext.TenantRolePermissions.AddRange(model.TenantAdminRolePermissions);
             }
 
+            if (model.CashierRole is not null)
+            {
+                _dbContext.TenantRoles.Add(model.CashierRole);
+            }
+
+            if (model.CashierRolePermissions.Count > 0)
+            {
+                _dbContext.TenantRolePermissions.AddRange(model.CashierRolePermissions);
+            }
+
             if (model.TenantAdminUser is not null)
             {
                 if (string.IsNullOrWhiteSpace(model.TenantAdminUser.StaffCode))

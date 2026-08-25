@@ -189,6 +189,7 @@ public sealed class PlatformTenantBootstrapHttpPipelineTests
                 {
                     ["ConnectionStrings:DefaultConnection"] =
                         "Host=localhost;Port=5432;Database=BootstrapHttpPipelineTests;Username=postgres;Password=postgres",
+                    ["AzureBlobStorage:ConnectionString"] = "UseDevelopmentStorage=true",
                     ["PlatformJwt:Issuer"] = Issuer,
                     ["PlatformJwt:Audience"] = PlatformAudience,
                     ["PlatformJwt:SigningKey"] = PlatformKey,

@@ -48,6 +48,16 @@ public sealed class TenantAdminRolesController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpGet("roles/setup-options")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSetupOptions(CancellationToken cancellationToken)
+    {
+        if (!TryCreateContext(out var context, out var unauthorized)) return unauthorized!;
+
+        var result = await _tenantAdminRoleService.GetSetupOptionsAsync(context, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpPost("roles")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     public async Task<IActionResult> Create([FromBody] TenantAdminRoleCreateRequest request, CancellationToken cancellationToken)
@@ -166,6 +176,19 @@ public sealed class TenantAdminRolesController : ControllerBase
         if (!TryCreateContext(out var context, out var unauthorized)) return unauthorized!;
 
         var result = await _tenantAdminRoleService.ReplaceAssignmentsAsync(context, roleId, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpPut("roles/{roleId:guid}/setup")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> SaveSetup(
+        Guid roleId,
+        [FromBody] TenantRoleSetupSaveRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryCreateContext(out var context, out var unauthorized)) return unauthorized!;
+
+        var result = await _tenantAdminRoleService.SaveSetupAsync(context, roleId, request, cancellationToken);
         return ToActionResult(result);
     }
 
