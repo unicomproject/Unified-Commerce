@@ -5,7 +5,7 @@ namespace E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 
 public interface IPlatformUserRepository
 {
-    Task<PlatformUserListResponse> GetUsersAsync(CancellationToken cancellationToken);
+    Task<PlatformUserListResponse> GetUsersAsync(PlatformUserListQuery query, CancellationToken cancellationToken);
 
     Task<PlatformUserDetailResponse?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken);
 

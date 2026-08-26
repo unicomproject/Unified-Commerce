@@ -24,10 +24,35 @@ public sealed class PlatformUserServiceTests
             new FakePlatformUserRepository { ListResponse = CreateListResponse() },
             hasUsersView: true);
 
-        var result = await service.GetUsersAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await service.GetUsersAsync(new PlatformUserListQuery(), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value!.Users);
+    }
+
+    [Fact]
+    public async Task GetUsersAsync_WithQueryParameters_PassesQueryToRepository()
+    {
+        var repository = new FakePlatformUserRepository { ListResponse = CreateListResponse() };
+        var service = CreateService(repository, hasUsersView: true);
+        var query = new PlatformUserListQuery
+        {
+            PageNumber = 2,
+            PageSize = 5,
+            Search = "admin",
+            Status = "ACTIVE",
+            Role = "SUPER_ADMIN"
+        };
+
+        var result = await service.GetUsersAsync(query, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastReceivedQuery);
+        Assert.Equal(2, repository.LastReceivedQuery.PageNumber);
+        Assert.Equal(5, repository.LastReceivedQuery.PageSize);
+        Assert.Equal("admin", repository.LastReceivedQuery.Search);
+        Assert.Equal("ACTIVE", repository.LastReceivedQuery.Status);
+        Assert.Equal("SUPER_ADMIN", repository.LastReceivedQuery.Role);
     }
 
     [Fact]
@@ -37,7 +62,7 @@ public sealed class PlatformUserServiceTests
             new FakePlatformUserRepository { ListResponse = CreateListResponse() },
             hasUsersView: false);
 
-        var result = await service.GetUsersAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await service.GetUsersAsync(new PlatformUserListQuery(), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("platform_users.access_denied", result.Error.Code);
@@ -471,8 +496,11 @@ public sealed class PlatformUserServiceTests
         public bool AddCalled { get; private set; }
         public bool ReplaceRolesCalled { get; private set; }
 
-        public Task<PlatformUserListResponse> GetUsersAsync(CancellationToken cancellationToken)
+        public PlatformUserListQuery? LastReceivedQuery { get; private set; }
+
+        public Task<PlatformUserListResponse> GetUsersAsync(PlatformUserListQuery query, CancellationToken cancellationToken)
         {
+            LastReceivedQuery = query;
             return Task.FromResult(ListResponse);
         }
 

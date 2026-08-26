@@ -26,7 +26,7 @@ public sealed class PlatformAdminUsersControllerTests
                 ApplicationResult<PlatformUserListResponse>.Success(CreateListResponse())),
             Guid.NewGuid());
 
-        var result = await controller.GetUsers(CancellationToken.None);
+        var result = await controller.GetUsers(new PlatformUserListQuery(), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<LegacyApiResponse<PlatformUserListResponse>>(ok.Value);
@@ -44,7 +44,7 @@ public sealed class PlatformAdminUsersControllerTests
                     "Platform user access denied."))),
             Guid.NewGuid());
 
-        var result = await controller.GetUsers(CancellationToken.None);
+        var result = await controller.GetUsers(new PlatformUserListQuery(), CancellationToken.None);
 
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
@@ -156,7 +156,7 @@ public sealed class PlatformAdminUsersControllerTests
                 ApplicationResult<PlatformUserListResponse>.Success(CreateListResponse())),
             platformUserId: null);
 
-        var result = await controller.GetUsers(CancellationToken.None);
+        var result = await controller.GetUsers(new PlatformUserListQuery(), CancellationToken.None);
 
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
@@ -230,6 +230,7 @@ public sealed class PlatformAdminUsersControllerTests
         }
 
         public Task<ApplicationResult<PlatformUserListResponse>> GetUsersAsync(
+            PlatformUserListQuery query,
             Guid platformUserId,
             CancellationToken cancellationToken)
         {
