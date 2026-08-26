@@ -49,6 +49,14 @@ jobs:
       - name: Run API Contract Tests
         run: dotnet test tests/E_POS.ApiTests --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --no-restore --logger "trx;LogFilePrefix=api-tests" --results-directory TestResults
 
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: ignore
+
   ef-model-gate:
     name: Tier 2 - EF Pending Model Changes Check
     runs-on: ubuntu-latest
@@ -61,8 +69,11 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Restore packages
+        run: dotnet restore ${{ env.SOLUTION_FILE }}
+
       - name: Install EF Tool
         run: dotnet tool install --global dotnet-ef
 
       - name: Check EF Pending Model Changes
-        run: dotnet ef migrations has-pending-model-changes --project src/E_POS.Infrastructure --startup-project src/E_POS.Api
+        run: dotnet ef migrations has-pending-model-changes --project src/E_POS.Infrastructure --startup-project src/E_POS.Api
