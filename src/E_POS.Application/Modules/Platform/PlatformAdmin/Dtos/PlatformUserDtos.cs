@@ -15,7 +15,14 @@ public sealed record PlatformUserListItemDto(
     DateTimeOffset UpdatedAt);
 
 public sealed record PlatformUserListResponse(
-    IReadOnlyList<PlatformUserListItemDto> Users);
+    IReadOnlyList<PlatformUserListItemDto> Users,
+    int PageNumber = 1,
+    int PageSize = 10,
+    int TotalCount = 0,
+    int TotalPages = 0)
+{
+    public IReadOnlyList<PlatformUserListItemDto> Items => Users;
+}
 
 public sealed record PlatformUserDetailResponse(
     Guid Id,

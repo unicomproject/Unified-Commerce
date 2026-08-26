@@ -73,6 +73,7 @@ public sealed class PlatformUserService : IPlatformUserService
     }
 
     public async Task<ApplicationResult<PlatformUserListResponse>> GetUsersAsync(
+        PlatformUserListQuery query,
         Guid platformUserId,
         CancellationToken cancellationToken)
     {
@@ -81,7 +82,7 @@ public sealed class PlatformUserService : IPlatformUserService
             return ApplicationResult<PlatformUserListResponse>.Failure(AccessDenied);
         }
 
-        var users = await _userRepository.GetUsersAsync(cancellationToken);
+        var users = await _userRepository.GetUsersAsync(query, cancellationToken);
         return ApplicationResult<PlatformUserListResponse>.Success(users);
     }
 
