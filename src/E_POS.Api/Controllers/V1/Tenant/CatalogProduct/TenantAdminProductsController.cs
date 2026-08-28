@@ -324,6 +324,27 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpPost("{id:guid}/publish")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Publish(
+        Guid id,
+        [FromBody] PublishProductRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.PublishAsync(context, id, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpPost("images/stage")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -375,6 +396,44 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToErrorResult(result.Error);
     }
 
+    [HttpPost("{id:guid}/restore")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Restore(Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError("product.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _tenantAdminProductService.RestoreAsync(context, id, cancellationToken);
+        if (result.IsSuccess)
+        {
+            return Ok();
+        }
+
+        return ToErrorResult(result.Error);
+    }
+
+    [HttpPost("{id:guid}/duplicate")]
+    [ProducesResponseType(typeof(TenantAdminProductCreateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Duplicate(Guid id, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError("product.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _tenantAdminProductService.DuplicateAsync(context, id, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Ok(result.Value);
+        }
+
+        return ToErrorResult(result.Error);
+    }
+
     private IActionResult ToErrorResult(ApplicationError error)
     {
         return error.Code switch
@@ -394,9 +453,19 @@ public sealed class TenantAdminProductsController : ControllerBase
             "product.unsafe_product_structure_transition" or
             "product.unsafe_tracking_change" or
             "product.validation_failed" or
-            "product.delete_blocked" => BadRequest(CreateError(error)),
+            "product.delete_blocked" or
+            "product.initial_tracking.incompatible_values_require_confirmation" or
+            "product.initial_tracking.batch_required_for_expiry" or
+            "product.initial_tracking.invalid_expiry_date" or
+            "product.initial_tracking.variant_assignment_required" or
+            "product.initial_tracking.invalid_variant_assignment" or
+            "product.initial_tracking.bundle_parent_not_supported" => BadRequest(CreateError(error)),
             "product.not_found" => NotFound(CreateError(error)),
-            "product.concurrency_conflict" or "product.duplicate_sku" or "product.duplicate_barcode" => StatusCode(
+            "product.concurrency_conflict" or
+            "product.duplicate_sku" or
+            "product.duplicate_barcode" or
+            "product.initial_tracking.duplicate_batch" or
+            "product.initial_tracking.duplicate_serial" => StatusCode(
                 StatusCodes.Status409Conflict,
                 CreateError(error)),
             _ => BadRequest(CreateError(error)),

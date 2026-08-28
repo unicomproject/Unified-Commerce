@@ -13767,6 +13767,96 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductSetupInitialTracking", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AssignedProductVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_product_variant_id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_tenant_user_id");
+
+                    b.Property<DateTimeOffset?>("IncompatibleClearConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("incompatible_clear_confirmed_at");
+
+                    b.Property<string>("InitialBatchNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("initial_batch_number");
+
+                    b.Property<DateOnly?>("InitialExpiryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("initial_expiry_date");
+
+                    b.Property<string>("InitialSerialNumber")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("initial_serial_number");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<long>("RowVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("row_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_tenant_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_setup_initial_tracking");
+
+                    b.HasIndex("CreatedByTenantUserId");
+
+                    b.HasIndex("UpdatedByTenantUserId");
+
+                    b.HasIndex("TenantId", "AssignedProductVariantId");
+
+                    b.HasIndex("TenantId", "ConsumedAt")
+                        .HasDatabaseName("ix_product_setup_initial_tracking_tenant_id_consumed_at")
+                        .HasFilter("consumed_at IS NULL");
+
+                    b.HasIndex("TenantId", "Id")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_setup_initial_tracking_tenant_id_id");
+
+                    b.HasIndex("TenantId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_setup_initial_tracking_tenant_id_product_id");
+
+                    b.ToTable("product_setup_initial_tracking", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_setup_initial_tracking_row_version", "row_version >= 1");
+                        });
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductUnitConversion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -29042,6 +29132,43 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_product_reviews_tenant_id_tenants");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductSetupInitialTracking", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_setup_initial_tracking_created_by");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_setup_initial_tracking_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_setup_initial_tracking_updated_by");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "AssignedProductVariantId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_setup_initial_tracking_assigned_variant");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ProductId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_setup_initial_tracking_product_id_products");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductUnitConversion", b =>

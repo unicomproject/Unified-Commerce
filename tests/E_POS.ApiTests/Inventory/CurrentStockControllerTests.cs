@@ -113,6 +113,8 @@ public sealed class CurrentStockControllerTests
         {
             throw new NotImplementedException();
         }
+        public Task<ApplicationResult<StockAdjustmentResponse>> AdjustStockAsync(TenantRequestContext context, StockAdjustmentRequest request, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<StockAdjustmentResponse>.Success(new StockAdjustmentResponse { StockMovementId = Guid.NewGuid(), OutletId = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow }));
+        public Task<ApplicationResult<StockTransferResponse>> TransferStockAsync(TenantRequestContext context, StockTransferRequest request, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<StockTransferResponse>.Success(new StockTransferResponse { StockMovementId = Guid.NewGuid(), SourceOutletId = Guid.NewGuid(), DestinationOutletId = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow }));
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory

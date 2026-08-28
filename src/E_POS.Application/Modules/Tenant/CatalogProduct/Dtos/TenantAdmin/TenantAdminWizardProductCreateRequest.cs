@@ -46,6 +46,12 @@ public sealed class TenantAdminWizardProductCreateRequest
 
     public IReadOnlyList<Guid>? StagedMediaAssetIds { get; set; }
 
+    public string? InitialBatchNumber { get; set; }
+    public DateOnly? InitialExpiryDate { get; set; }
+    public string? InitialSerialNumber { get; set; }
+    public bool ConfirmClearIncompatibleInitialTracking { get; set; }
+    public Guid? InitialTrackingAssignedVariantId { get; set; }
+
     /// <summary>Optional client idempotency key to prevent double-create.</summary>
     public string? IdempotencyKey { get; set; }
 }

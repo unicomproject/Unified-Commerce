@@ -87,6 +87,50 @@ public sealed class TenantAdminRolesControllerTests
     }
 
     [Fact]
+    public async Task GetSetupOptions_ReturnsOk()
+    {
+        var service = new FakeTenantAdminRoleService(CreateRoleDetail(Guid.NewGuid()));
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), TenantAdminUserPermissions.RolesView);
+
+        var result = await controller.GetSetupOptions(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var dataProperty = ok.Value?.GetType().GetProperty("data", BindingFlags.Instance | BindingFlags.Public);
+        var payload = Assert.IsType<TenantRoleSetupOptionsResponse>(dataProperty?.GetValue(ok.Value));
+        Assert.Single(payload.Roles);
+        Assert.Equal(TenantUserConstants.DefaultTenantAdminRoleCode, payload.Roles[0].RoleCode);
+    }
+
+    [Fact]
+    public async Task SaveSetup_WithValidTenantClaims_ForwardsRequest()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        var service = new FakeTenantAdminRoleService(CreateRoleDetail(roleId));
+        var controller = CreateController(service);
+        SetTenantClaims(
+            controller,
+            tenantId,
+            userId,
+            TenantAdminUserPermissions.RolesManage);
+
+        var request = new TenantRoleSetupSaveRequest(
+            [TenantAdminUserPermissions.View],
+            [new TenantAdminRoleAssignmentRequest(Guid.NewGuid(), TenantRoleSetupCatalog.TenantWideScope)],
+            DateTimeOffset.UtcNow);
+
+        var result = await controller.SaveSetup(roleId, request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(tenantId, service.SaveSetupContext?.TenantId);
+        Assert.Equal(userId, service.SaveSetupContext?.UserId);
+        Assert.Equal(roleId, service.SaveSetupRoleId);
+        Assert.Same(request, service.SaveSetupRequest);
+    }
+
+    [Fact]
     public void Controller_RequiresTenantOnlyPolicy()
     {
         var authorize = Assert.Single(
@@ -145,6 +189,9 @@ public sealed class TenantAdminRolesControllerTests
 
         public TenantRequestContext? CreateContext { get; private set; }
         public string? CreateIdempotencyKey { get; private set; }
+        public TenantRequestContext? SaveSetupContext { get; private set; }
+        public Guid? SaveSetupRoleId { get; private set; }
+        public TenantRoleSetupSaveRequest? SaveSetupRequest { get; private set; }
         public ApplicationResult<TenantRolePermissionsResponse> ReplacePermissionsResult { get; set; } =
             ApplicationResult<TenantRolePermissionsResponse>.Success(new TenantRolePermissionsResponse(
                 Guid.NewGuid(), "MANAGER", "Manager", "TENANT", false, [], [], DateTimeOffset.UtcNow));
@@ -204,6 +251,24 @@ public sealed class TenantAdminRolesControllerTests
             Task.FromResult(ApplicationResult<TenantPermissionCatalogResponse>.Success(
                 new TenantPermissionCatalogResponse([])));
 
+        public Task<ApplicationResult<TenantRoleSetupOptionsResponse>> GetSetupOptionsAsync(
+            TenantRequestContext context,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<TenantRoleSetupOptionsResponse>.Success(
+                new TenantRoleSetupOptionsResponse(
+                [
+                    new TenantRoleSetupOptionResponse(
+                        Guid.NewGuid(),
+                        TenantUserConstants.DefaultTenantAdminRoleCode,
+                        "Tenant Administrator",
+                        null,
+                        true,
+                        true,
+                        10,
+                        1,
+                        DateTimeOffset.UtcNow)
+                ])));
+
         public Task<ApplicationResult<TenantRolePermissionsResponse>> GetPermissionsAsync(
             TenantRequestContext context,
             Guid roleId,
@@ -231,6 +296,18 @@ public sealed class TenantAdminRolesControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<TenantRoleAssignmentsResponse>.Success(
                 new TenantRoleAssignmentsResponse(roleId, "MANAGER", "Manager", false, [], DateTimeOffset.UtcNow)));
+
+        public Task<ApplicationResult<TenantAdminRoleDetailResponse>> SaveSetupAsync(
+            TenantRequestContext context,
+            Guid roleId,
+            TenantRoleSetupSaveRequest request,
+            CancellationToken cancellationToken)
+        {
+            SaveSetupContext = context;
+            SaveSetupRoleId = roleId;
+            SaveSetupRequest = request;
+            return Task.FromResult(ApplicationResult<TenantAdminRoleDetailResponse>.Success(_detail));
+        }
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory

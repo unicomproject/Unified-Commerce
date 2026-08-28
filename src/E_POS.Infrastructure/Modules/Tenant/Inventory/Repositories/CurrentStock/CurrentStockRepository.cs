@@ -166,6 +166,26 @@ internal sealed class CurrentStockRepository : ICurrentStockRepository
         return Task.FromResult(new StockInResponse(Guid.NewGuid(), request.OutletId, "StockIn", request.ReferenceNumber, [], now));
     }
 
+    public Task<StockAdjustmentResponse> AdjustStockAsync(
+        Guid tenantId,
+        Guid userId,
+        StockAdjustmentRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(new StockAdjustmentResponse { StockMovementId = Guid.NewGuid(), OutletId = request.OutletId, CreatedAt = now });
+    }
+
+    public Task<StockTransferResponse> TransferStockAsync(
+        Guid tenantId,
+        Guid userId,
+        StockTransferRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(new StockTransferResponse { StockMovementId = Guid.NewGuid(), SourceOutletId = request.SourceOutletId, DestinationOutletId = request.DestinationOutletId, CreatedAt = now });
+    }
+
     public Task<OpeningStockResponse> AddOpeningStockAsync(
         Guid tenantId,
         Guid userId,

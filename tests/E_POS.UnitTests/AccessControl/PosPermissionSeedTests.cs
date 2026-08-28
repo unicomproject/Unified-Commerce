@@ -113,9 +113,6 @@ public sealed class PosPermissionSeedTests
             SalesPermissions.Park.Recall,
             SalesPermissions.Sale.Checkout,
             PaymentPermissions.AcceptCash,
-            PaymentPermissions.AcceptCard,
-            PaymentPermissions.AcceptQr,
-            PaymentPermissions.AcceptSplit,
             PosPermissions.Notifications.View,
             PosPermissions.Till.ViewSession,
             PosPermissions.Till.Close
@@ -152,9 +149,6 @@ public sealed class PosPermissionSeedTests
             SalesPermissions.Park.Recall,
             SalesPermissions.Sale.Checkout,
             PaymentPermissions.AcceptCash,
-            PaymentPermissions.AcceptCard,
-            PaymentPermissions.AcceptQr,
-            PaymentPermissions.AcceptSplit,
             PosPermissions.Notifications.View,
             PosPermissions.Till.ViewSession,
             PosPermissions.Till.Close
@@ -164,6 +158,10 @@ public sealed class PosPermissionSeedTests
         {
             Assert.Contains(code, assignments);
         }
+
+        Assert.DoesNotContain(PaymentPermissions.AcceptCard, assignments);
+        Assert.DoesNotContain(PaymentPermissions.AcceptQr, assignments);
+        Assert.DoesNotContain(PaymentPermissions.AcceptSplit, assignments);
     }
 
     [Fact]

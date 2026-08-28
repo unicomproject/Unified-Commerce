@@ -105,6 +105,16 @@ public class TenantUser : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void ResetPasswordAndActivate(string encryptedPassword, string passwordSalt, DateTimeOffset now)
+    {
+        EncryptedPassword = encryptedPassword;
+        PasswordSalt = passwordSalt;
+        AccountStatus = TenantUserConstants.StatusActive;
+        FailedLoginAttempts = 0;
+        LockedUntil = null;
+        UpdatedAt = now;
+    }
+
     /// <summary>
     /// Completes first-time invitation activation: sets a real password hash and ACTIVE status together.
     /// </summary>

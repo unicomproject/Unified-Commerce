@@ -76,16 +76,19 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
     }
 
     [Fact]
-    public void Resolve_PosCheckout_DoesNotGrantCashierPermissions()
+    public void Resolve_PosCheckout_GrantsOnlyTheCashierTemplateCeiling()
     {
         var plan = TenantAdminBootstrapPermissionCatalog.Resolve(
         [
             PlatformTenantFeatureCodes.PosCheckout
         ]);
 
-        Assert.Contains(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
-        Assert.DoesNotContain("pos.sale.create", plan.PermissionCodes);
-        Assert.DoesNotContain("pos.till.open", plan.PermissionCodes);
+        Assert.DoesNotContain(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
+        Assert.Contains("sales.create", plan.PermissionCodes);
+        Assert.Contains("pos.till.open", plan.PermissionCodes);
+        Assert.Contains("payments.cash.accept", plan.PermissionCodes);
+        Assert.DoesNotContain("payments.card.accept", plan.PermissionCodes);
+        Assert.DoesNotContain("tenant.roles.manage", plan.PermissionCodes);
     }
 
     [Fact]
@@ -137,14 +140,14 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
     }
 
     [Fact]
-    public void Resolve_TechnicalPosEntitlement_NormalizesToPosCheckoutWithoutCashierPermissions()
+    public void Resolve_TechnicalPosEntitlement_NormalizesToPosCheckoutWithCashierPermissions()
     {
         var plan = TenantAdminBootstrapPermissionCatalog.Resolve(["pos.sales"]);
 
         Assert.Contains(PlatformTenantFeatureCodes.PosCheckout, plan.EffectiveEntitlementCodes);
-        Assert.Contains(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
+        Assert.DoesNotContain(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
         Assert.Empty(plan.UnknownOrUnmappedEntitlements);
-        Assert.DoesNotContain("pos.till.open", plan.PermissionCodes);
+        Assert.Contains("pos.till.open", plan.PermissionCodes);
     }
 
     [Fact]
@@ -159,10 +162,16 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
             .Where(code => code.StartsWith("catalog.products.", StringComparison.Ordinal))
             .ToList();
 
-        Assert.Equal(3, catalogProductPermissions.Count);
+        Assert.Equal(4, catalogProductPermissions.Count);
         Assert.Contains("catalog.products.view", catalogProductPermissions);
         Assert.Contains("catalog.products.create", catalogProductPermissions);
         Assert.Contains("catalog.products.update", catalogProductPermissions);
+        Assert.Contains("catalog.products.publish", catalogProductPermissions);
+        Assert.Contains("catalog.barcodes.manage", plan.PermissionCodes);
+        Assert.Contains("catalog.product_pricing.manage", plan.PermissionCodes);
+        Assert.Contains("catalog.variants.manage", plan.PermissionCodes);
+        Assert.Contains("catalog.combo_components.manage", plan.PermissionCodes);
+        Assert.Contains("pricing.tax_classes.view", plan.PermissionCodes);
         Assert.DoesNotContain("catalog.product_media.manage", plan.PermissionCodes);
         Assert.DoesNotContain("catalog.product_channels.manage", plan.PermissionCodes);
     }

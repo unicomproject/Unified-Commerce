@@ -15,4 +15,5 @@ public sealed record OutletSummaryResponse(
     int? PickupWindowMinutes,
     TimeOnly? CollectionCutoffTime,
     string? City,
-    int TillCount);
+    int TillCount,
+    OutletImageResponse? PrimaryImage);

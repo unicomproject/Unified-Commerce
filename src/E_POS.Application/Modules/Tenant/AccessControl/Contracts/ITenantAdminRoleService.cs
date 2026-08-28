@@ -18,6 +18,10 @@ public interface ITenantAdminRoleService
         Guid roleId,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<TenantRoleSetupOptionsResponse>> GetSetupOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<TenantAdminRoleDetailResponse>> CreateAsync(
         TenantRequestContext context,
         TenantAdminRoleCreateRequest request,
@@ -66,5 +70,11 @@ public interface ITenantAdminRoleService
         TenantRequestContext context,
         Guid roleId,
         TenantRoleAssignmentsUpdateRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<TenantAdminRoleDetailResponse>> SaveSetupAsync(
+        TenantRequestContext context,
+        Guid roleId,
+        TenantRoleSetupSaveRequest request,
         CancellationToken cancellationToken);
 }

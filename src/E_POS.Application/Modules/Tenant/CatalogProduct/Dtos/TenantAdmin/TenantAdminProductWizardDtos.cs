@@ -1,5 +1,9 @@
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 
+public sealed record PublishProductRequest(
+    long ExpectedRowVersion,
+    Guid? InitialTrackingAssignedVariantId = null);
+
 public sealed class SaveProductDraftRequest
 {
     public string? ProductName { get; set; }
@@ -22,6 +26,12 @@ public sealed class SaveProductDraftRequest
     public string? WizardAction { get; set; }
     public long? ExpectedRowVersion { get; set; }
     public IReadOnlyList<Guid>? StagedMediaAssetIds { get; set; }
+
+    public string? InitialBatchNumber { get; set; }
+    public DateOnly? InitialExpiryDate { get; set; }
+    public string? InitialSerialNumber { get; set; }
+    public bool ConfirmClearIncompatibleInitialTracking { get; set; }
+    public Guid? InitialTrackingAssignedVariantId { get; set; }
 
     // Step 3 — Units & Pack Conversion Properties
     public string? UnitModel { get; set; }
@@ -205,7 +215,11 @@ public sealed record ProductDraftResponse(
     BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
     PricingTaxResponseDto? PricingTax = null,
     int TotalVariantCount = 0,
-    int IncludedVariantCount = 0);
+    int IncludedVariantCount = 0,
+    string? InitialBatchNumber = null,
+    DateOnly? InitialExpiryDate = null,
+    string? InitialSerialNumber = null,
+    Guid? InitialTrackingAssignedVariantId = null);
 
 public sealed record ProductSetupWizardDto(
     Guid ProductId,
@@ -258,7 +272,11 @@ public sealed record ProductSetupWizardDto(
     BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
     PricingTaxResponseDto? PricingTax = null,
     int TotalVariantCount = 0,
-    int IncludedVariantCount = 0);
+    int IncludedVariantCount = 0,
+    string? InitialBatchNumber = null,
+    DateOnly? InitialExpiryDate = null,
+    string? InitialSerialNumber = null,
+    Guid? InitialTrackingAssignedVariantId = null);
 
 public sealed record TenantAdminProductSalesChannelOptionResponse(
     Guid SalesChannelId,

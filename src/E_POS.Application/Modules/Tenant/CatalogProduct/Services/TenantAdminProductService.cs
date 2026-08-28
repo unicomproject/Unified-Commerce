@@ -125,6 +125,16 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             return ApplicationResult<TenantAdminProductCreateResponse>.Failure(accessError);
         }
 
+        var wizardAccessError = await _accessPolicy.ValidatePublishAccessAsync(
+            context,
+            MapWizardCreateToDraftRequest(request),
+            existing: null,
+            cancellationToken);
+        if (wizardAccessError is not null)
+        {
+            return ApplicationResult<TenantAdminProductCreateResponse>.Failure(wizardAccessError);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
         {
             if (_wizardCreateIdempotency.TryGetValue(request.IdempotencyKey.Trim(), out var cached) &&
@@ -140,6 +150,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         {
             return ApplicationResult<TenantAdminProductCreateResponse>.Failure(validationError);
         }
+
+        ApplyConfirmedInitialTrackingClear(request);
 
         if (!await _tenantAdminProductRepository.ActiveCategoryExistsAsync(
                 context.TenantId, request.CategoryId, cancellationToken))
@@ -326,6 +338,31 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             return new ApplicationError(
                 "product.validation_failed",
                 "Product structure must be SIMPLE or VARIANT.");
+        }
+
+        var trackingLengthError = ProductSetupInitialTrackingRules.ValidateLengths(
+            request.InitialBatchNumber,
+            request.InitialSerialNumber);
+        if (trackingLengthError is not null)
+        {
+            return trackingLengthError;
+        }
+
+        var createPlan = ProductSetupInitialTrackingRules.EvaluateClear(
+            structure,
+            request.TrackInventory,
+            request.BatchTracking,
+            request.ExpiryTracking,
+            request.SerialTracking,
+            request.InitialBatchNumber,
+            request.InitialExpiryDate,
+            request.InitialSerialNumber);
+
+        if (createPlan.RequiresConfirmation && !request.ConfirmClearIncompatibleInitialTracking)
+        {
+            return new ApplicationError(
+                ProductSetupInitialTrackingRules.IncompatibleConfirmationRequired,
+                "Tracking is disabled for the entered Batch/Expiry/Serial values. These values will be cleared if you continue.");
         }
 
         return null;
@@ -759,9 +796,78 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             productId,
             cancellationToken);
 
-        return response is null
-            ? ApplicationResult<ProductSetupWizardDto>.Failure(NotFound)
-            : ApplicationResult<ProductSetupWizardDto>.Success(response);
+        if (response is null)
+        {
+            return ApplicationResult<ProductSetupWizardDto>.Failure(NotFound);
+        }
+
+        return ApplicationResult<ProductSetupWizardDto>.Success(RedactSetup(context, response));
+    }
+
+    public async Task<ApplicationResult<ProductDraftResponse>> PublishAsync(
+        TenantRequestContext context,
+        Guid productId,
+        PublishProductRequest request,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _tenantAdminProductRepository.GetSetupAsync(
+            context.TenantId,
+            productId,
+            cancellationToken);
+
+        if (existing is null)
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(NotFound);
+        }
+
+        var draftRequest = new SaveProductDraftRequest
+        {
+            CurrentSetupStep = ProductWizardStage.ReviewCreate,
+            AdvanceStep = true,
+            WizardAction = "PUBLISH",
+            ExpectedRowVersion = request.ExpectedRowVersion,
+            ProductName = existing.ProductName,
+            ProductCode = existing.ProductCode,
+            CategoryId = existing.CategoryId,
+            BrandId = existing.BrandId,
+            ShortDescription = existing.ShortDescription,
+            LongDescription = existing.LongDescription,
+            PosSellable = existing.PosSellable,
+            AllowOnlineSale = existing.AllowOnlineSale,
+            TrackInventory = existing.TrackInventory,
+            BatchTracking = existing.BatchTracking,
+            ExpiryTracking = existing.ExpiryTracking,
+            SerialTracking = existing.SerialTracking,
+            ProductStructure = existing.ProductStructure,
+            DesiredPublishActive = string.Equals(existing.DesiredPublishStatus, ProductConstants.DesiredPublishActive, StringComparison.OrdinalIgnoreCase),
+            InitialBatchNumber = existing.InitialBatchNumber,
+            InitialExpiryDate = existing.InitialExpiryDate,
+            InitialSerialNumber = existing.InitialSerialNumber,
+            InitialTrackingAssignedVariantId = request.InitialTrackingAssignedVariantId ?? existing.InitialTrackingAssignedVariantId,
+            VariantConfiguration = existing.VariantConfiguration,
+            BundleConfiguration = existing.BundleConfiguration,
+            BarcodeSkuConfiguration = existing.BarcodeSkuConfiguration,
+            PricingTax = existing.PricingTax is null
+                ? null
+                : new PricingTaxConfigurationDto(
+                    existing.PricingTax.CostPrice,
+                    existing.PricingTax.StandardSellingPrice,
+                    existing.PricingTax.DiscountPrice,
+                    existing.PricingTax.TaxClassId,
+                    existing.PricingTax.TaxExclusive)
+        };
+
+        var accessError = await _accessPolicy.ValidatePublishAccessAsync(
+            context,
+            draftRequest,
+            existing,
+            cancellationToken);
+        if (accessError is not null)
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(accessError);
+        }
+
+        return await SaveOrUpdateDraftAsync(context, productId, draftRequest, cancellationToken);
     }
 
     private async Task<ApplicationResult<ProductDraftResponse>> SaveOrUpdateDraftAsync(
@@ -770,7 +876,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         SaveProductDraftRequest request,
         CancellationToken cancellationToken)
     {
-        var currentStage = Math.Clamp(request.CurrentSetupStep, 1, 8);
+        var currentStage = Math.Clamp(request.CurrentSetupStep, 1, 7);
         var isSaveAndContinue = string.Equals(request.WizardAction, "SAVE_AND_CONTINUE", StringComparison.OrdinalIgnoreCase) || request.AdvanceStep;
         var isSkip = string.Equals(request.WizardAction, "SKIP", StringComparison.OrdinalIgnoreCase);
 
@@ -796,6 +902,43 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         if (productId.HasValue && existingSetup == null)
         {
             return ApplicationResult<ProductDraftResponse>.Failure(NotFound);
+        }
+
+        SanitizeUnauthorizedDraftFields(context, request, existingSetup);
+
+        if (currentStage == ProductWizardStage.ProductTypeTracking)
+        {
+            var plan = ProductSetupInitialTrackingRules.EvaluateClear(
+                request.ProductStructure ?? existingSetup?.ProductStructure ?? "SIMPLE",
+                request.TrackInventory,
+                request.BatchTracking,
+                request.ExpiryTracking,
+                request.SerialTracking,
+                existingSetup?.InitialBatchNumber ?? request.InitialBatchNumber,
+                existingSetup?.InitialExpiryDate ?? request.InitialExpiryDate,
+                existingSetup?.InitialSerialNumber ?? request.InitialSerialNumber);
+
+            if (plan.RequiresConfirmation && !request.ConfirmClearIncompatibleInitialTracking)
+            {
+                return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                    ProductSetupInitialTrackingRules.IncompatibleConfirmationRequired,
+                    "Tracking is disabled for the entered Batch/Expiry/Serial values. These values will be cleared if you continue."));
+            }
+
+            if (plan.RequiresConfirmation)
+            {
+                request.InitialBatchNumber = plan.BatchNumber;
+                request.InitialExpiryDate = plan.ExpiryDate;
+                request.InitialSerialNumber = plan.SerialNumber;
+            }
+
+            var remainingBatch = ProductSetupInitialTrackingRules.NormalizeBatch(request.InitialBatchNumber);
+            if (request.ExpiryTracking && request.InitialExpiryDate.HasValue && remainingBatch is null)
+            {
+                return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                    ProductSetupInitialTrackingRules.BatchRequiredForExpiry,
+                    "Expiry date requires an Initial Batch Number."));
+            }
         }
 
         if (currentStage == ProductWizardStage.BasicDetails)
@@ -950,6 +1093,9 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             variantConfiguration = request.VariantConfiguration;
         }
 
+        var (initialBatch, initialExpiry, initialSerial, assignedVariantId) =
+            ResolveDraftTrackingValues(currentStage, request, existingSetup);
+
         var command = new SaveProductDraftCommand(
             productId,
             resolvedProductName,
@@ -984,7 +1130,13 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             variantConfiguration,
             request.BundleConfiguration,
             request.BarcodeSkuConfiguration,
-            request.PricingTax);
+            request.PricingTax,
+            initialBatch,
+            initialExpiry,
+            initialSerial,
+            request.ConfirmClearIncompatibleInitialTracking,
+            assignedVariantId,
+            context.HasPermission(ProductConstants.ChannelManagePermission));
 
         var result = await _tenantAdminProductRepository.SaveProductDraftAsync(
             context.TenantId,
@@ -1326,6 +1478,117 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             fieldErrors);
     }
 
+    private static void SanitizeUnauthorizedDraftFields(
+        TenantRequestContext context,
+        SaveProductDraftRequest request,
+        ProductSetupWizardDto? existingSetup)
+    {
+        if (!context.HasPermission(ProductConstants.ChannelManagePermission))
+        {
+            request.PosSellable = existingSetup?.PosSellable ?? true;
+            request.AllowOnlineSale = existingSetup?.AllowOnlineSale ?? false;
+        }
+
+        if (!context.HasPermission(ProductConstants.MediaManagePermission))
+        {
+            request.StagedMediaAssetIds = null;
+        }
+    }
+
+    private static (string? Batch, DateOnly? Expiry, string? Serial, Guid? AssignedVariantId)
+        ResolveDraftTrackingValues(
+            int currentStage,
+            SaveProductDraftRequest request,
+            ProductSetupWizardDto? existingSetup)
+    {
+        var preserveExisting = existingSetup is not null &&
+            currentStage is not ProductWizardStage.BasicDetails
+                and not ProductWizardStage.ProductTypeTracking;
+
+        var batch = preserveExisting
+            ? existingSetup!.InitialBatchNumber
+            : ProductSetupInitialTrackingRules.NormalizeBatch(request.InitialBatchNumber);
+        var expiry = preserveExisting
+            ? existingSetup!.InitialExpiryDate
+            : request.InitialExpiryDate;
+        var serial = preserveExisting
+            ? existingSetup!.InitialSerialNumber
+            : ProductSetupInitialTrackingRules.NormalizeSerial(request.InitialSerialNumber);
+
+        var assigned = currentStage == ProductWizardStage.ReviewCreate
+            ? request.InitialTrackingAssignedVariantId ?? existingSetup?.InitialTrackingAssignedVariantId
+            : existingSetup?.InitialTrackingAssignedVariantId;
+
+        return (batch, expiry, serial, assigned);
+    }
+
+    private static SaveProductDraftRequest MapWizardCreateToDraftRequest(
+        TenantAdminWizardProductCreateRequest request)
+    {
+        return new SaveProductDraftRequest
+        {
+            CurrentSetupStep = ProductWizardStage.ReviewCreate,
+            AdvanceStep = true,
+            WizardAction = "PUBLISH",
+            ProductName = request.ProductName,
+            ProductCode = request.ProductCode,
+            CategoryId = request.CategoryId,
+            BrandId = request.BrandId,
+            ShortDescription = request.ShortDescription,
+            LongDescription = request.LongDescription,
+            PosSellable = request.PosSellable,
+            AllowOnlineSale = request.AllowOnlineSale,
+            TrackInventory = request.TrackInventory,
+            BatchTracking = request.BatchTracking,
+            ExpiryTracking = request.ExpiryTracking,
+            SerialTracking = request.SerialTracking,
+            ProductStructure = request.ProductStructure,
+            DesiredPublishActive = request.DesiredPublishActive,
+            StagedMediaAssetIds = request.StagedMediaAssetIds,
+            VariantConfiguration = request.VariantConfiguration,
+            BarcodeSkuConfiguration = request.BarcodeSkuConfiguration,
+            PricingTax = request.PricingTax,
+            InitialBatchNumber = request.InitialBatchNumber,
+            InitialExpiryDate = request.InitialExpiryDate,
+            InitialSerialNumber = request.InitialSerialNumber,
+            ConfirmClearIncompatibleInitialTracking = request.ConfirmClearIncompatibleInitialTracking,
+            InitialTrackingAssignedVariantId = request.InitialTrackingAssignedVariantId
+        };
+    }
+
+    private static void ApplyConfirmedInitialTrackingClear(TenantAdminWizardProductCreateRequest request)
+    {
+        var plan = ProductSetupInitialTrackingRules.EvaluateClear(
+            request.ProductStructure ?? "SIMPLE",
+            request.TrackInventory,
+            request.BatchTracking,
+            request.ExpiryTracking,
+            request.SerialTracking,
+            request.InitialBatchNumber,
+            request.InitialExpiryDate,
+            request.InitialSerialNumber);
+
+        if (!plan.RequiresConfirmation)
+        {
+            return;
+        }
+
+        request.InitialBatchNumber = plan.BatchNumber;
+        request.InitialExpiryDate = plan.ExpiryDate;
+        request.InitialSerialNumber = plan.SerialNumber;
+    }
+
+    private static ProductSetupWizardDto RedactSetup(TenantRequestContext context, ProductSetupWizardDto setup)
+    {
+        if (context.HasPermission(ProductConstants.ProductCostViewPermission) || setup.PricingTax is null)
+        {
+            return setup;
+        }
+
+        var pricing = setup.PricingTax with { CostPrice = null };
+        return setup with { PricingTax = pricing };
+    }
+
     private static ApplicationError? ValidateAccess(TenantRequestContext context)
     {
         if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
@@ -1347,8 +1610,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             return new ApplicationError("product.invalid_tenant_context", "Invalid tenant context.");
         }
 
-        return context.HasPermission(TenantAdminProductPermissions.Create) ||
-               context.HasPermission(ProductConstants.CreatePermission) ||
+        return context.HasPermission(ProductConstants.CreatePermission) ||
                context.HasPermission(ProductConstants.ManagePermission)
             ? null
             : PermissionDenied;
@@ -1443,6 +1705,85 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                context.HasPermission(ProductConstants.ManagePermission)
             ? null
             : PermissionDenied;
+    }
+
+    public async Task<ApplicationResult> UpdateVariantAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductVariantUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.VariantsManage))
+            return ApplicationResult.Failure(PermissionDenied);
+
+        await _tenantAdminProductRepository.UpdateVariantAsync(
+            context.TenantId, context.UserId, productId, variantId, request, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult> AddBarcodeAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductBarcodeAddRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.BarcodesManage))
+            return ApplicationResult.Failure(PermissionDenied);
+
+        if (await _tenantAdminProductRepository.BarcodeExistsOnOtherProductAsync(context.TenantId, request.Barcode, productId, cancellationToken))
+            return ApplicationResult.Failure(new ApplicationError("product.duplicate_barcode", "Barcode already exists."));
+
+        await _tenantAdminProductRepository.AddBarcodeAsync(
+            context.TenantId, context.UserId, productId, variantId, request, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult> DeleteBarcodeAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        Guid barcodeId,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.BarcodesManage))
+            return ApplicationResult.Failure(PermissionDenied);
+
+        await _tenantAdminProductRepository.DeleteBarcodeAsync(
+            context.TenantId, context.UserId, productId, variantId, barcodeId, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult> RestoreAsync(
+        TenantRequestContext context,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.ProductsRestore))
+            return ApplicationResult.Failure(PermissionDenied);
+
+        await _tenantAdminProductRepository.RestoreAsync(
+            context.TenantId, context.UserId, productId, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult.Success();
+    }
+
+    public async Task<ApplicationResult<TenantAdminProductCreateResponse>> DuplicateAsync(
+        TenantRequestContext context,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(TenantAdminProductPermissions.Create))
+            return ApplicationResult<TenantAdminProductCreateResponse>.Failure(PermissionDenied);
+
+        var result = await _tenantAdminProductRepository.DuplicateAsync(
+            context.TenantId, context.UserId, productId, DateTimeOffset.UtcNow, cancellationToken);
+
+        return ApplicationResult<TenantAdminProductCreateResponse>.Success(result);
     }
 
     private async Task<IReadOnlyList<ApplicationFieldError>> ValidateBundleConfigurationAsync(
