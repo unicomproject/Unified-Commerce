@@ -1224,7 +1224,6 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                        : (outletRole != null ? outletRole.RoleDescription : null),
                    Status = user.AccountStatus,
                    LastActiveAt = lastActiveAt,
-                   ProfileImageMediaAssetId = user.ProfileImageUrl,
                };
     }
 
@@ -1353,47 +1352,6 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             row.Outlets,
             row.OutletCount,
             row.ProfileImageUrl);
-    }
-
-    private async Task AttachProfileImageUrlsAsync(
-        Guid tenantId,
-        List<UserRow> rows,
-        CancellationToken cancellationToken)
-    {
-        var mediaAssetIds = rows
-            .Where(row => row.ProfileImageMediaAssetId.HasValue)
-            .Select(row => row.ProfileImageMediaAssetId!.Value)
-            .Distinct()
-            .ToList();
-
-        if (mediaAssetIds.Count == 0)
-        {
-            return;
-        }
-
-        var mediaUrls = await _dbContext.MediaAssets
-            .AsNoTracking()
-            .Where(asset =>
-                asset.TenantId == tenantId &&
-                mediaAssetIds.Contains(asset.Id) &&
-                asset.Status == ActiveMediaStatus)
-            .Select(asset => new { asset.Id, asset.PublicUrl, asset.StorageKey })
-            .ToDictionaryAsync(
-                asset => asset.Id,
-                asset => MediaUrlResolver.PreferMediaAsset(
-                    asset.PublicUrl,
-                    null,
-                    asset.StorageKey),
-                cancellationToken);
-
-        foreach (var row in rows)
-        {
-            if (row.ProfileImageMediaAssetId is { } mediaAssetId &&
-                mediaUrls.TryGetValue(mediaAssetId, out var profileImageUrl))
-            {
-                row.ProfileImageUrl = profileImageUrl;
-            }
-        }
     }
 
     private static string FormatStatus(string status)
@@ -1565,7 +1523,5 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         public int OutletCount { get; set; }
         public string Status { get; init; } = string.Empty;
         public DateTimeOffset? LastActiveAt { get; init; }
-        public Guid? ProfileImageMediaAssetId { get; init; }
-        public string? ProfileImageUrl { get; set; }
     }
 }
