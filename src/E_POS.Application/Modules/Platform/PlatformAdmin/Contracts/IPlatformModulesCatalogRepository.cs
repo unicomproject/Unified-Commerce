@@ -5,6 +5,8 @@ namespace E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 public interface IPlatformModulesCatalogRepository
 {
     Task<IReadOnlyList<PlatformModulesCatalogModuleDto>> GetActiveModulesAsync(
+        string? scopeFilter,
         CancellationToken cancellationToken);
+
 }
 

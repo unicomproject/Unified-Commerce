@@ -11,6 +11,7 @@ public class PermissionDefinition : AuditableEntity
     public string? Description { get; protected set; }
     public bool IsSystem { get; protected set; }
     public bool IsActive { get; protected set; }
+    public string Scope { get; protected set; } = "TENANT";
 
     public static PermissionDefinition Create(
         Guid id,
@@ -21,7 +22,8 @@ public class PermissionDefinition : AuditableEntity
         string? description,
         bool isSystem,
         bool isActive,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string scope = "TENANT")
     {
         return new PermissionDefinition
         {
@@ -33,8 +35,10 @@ public class PermissionDefinition : AuditableEntity
             Description = description?.Trim(),
             IsSystem = isSystem,
             IsActive = isActive,
+            Scope = scope,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
 }
+

@@ -72,6 +72,14 @@ public sealed class PlatformModuleConfiguration : IEntityTypeConfiguration<Platf
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(x => x.Scope)
+            .HasColumnName("scope")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired()
+            .HasDefaultValue("TENANT");
+
+
         builder.HasIndex(x => x.ModuleCode)
             .IsUnique()
             .HasDatabaseName("uq_platform_modules_module_code");

@@ -22,9 +22,12 @@ public sealed class PlatformAdminCatalogController : ControllerBase
 
     [HttpGet("modules")]
     [ProducesResponseType(typeof(LegacyApiResponse<PlatformModulesCatalogResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetModules(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetModules(
+        [FromQuery] string? scope,
+        CancellationToken cancellationToken)
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
@@ -33,9 +36,29 @@ public sealed class PlatformAdminCatalogController : ControllerBase
                 "Invalid platform session."));
         }
 
-        var result = await _modulesCatalogService.GetModulesAsync(platformUserId, cancellationToken);
+        if (!IsValidScope(scope))
+        {
+            return BadRequest(CreateLegacyError(
+                "platform_modules_catalog.invalid_scope",
+                "Invalid scope parameter. Allowed values are 'all', 'platform', or 'tenant'."));
+        }
+
+        var result = await _modulesCatalogService.GetModulesAsync(platformUserId, scope, cancellationToken);
         return ToActionResult(result, "Platform modules catalog loaded successfully.");
     }
+
+    private static bool IsValidScope(string? scope)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+        {
+            return true;
+        }
+
+        var normalized = scope.Trim().ToLowerInvariant();
+        return normalized is "all" or "platform" or "tenant";
+    }
+
+
 
     private IActionResult ToActionResult<T>(ApplicationResult<T> result, string successMessage)
     {

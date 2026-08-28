@@ -1,4 +1,5 @@
 using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.Platform.Subscription.Entities;
 
 namespace E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 
@@ -7,6 +8,10 @@ public class PlatformPermission : AuditableEntity
     public string PermissionCode { get; protected set; } = string.Empty;
     public string Name { get; protected set; } = string.Empty;
     public string ModuleKey { get; protected set; } = string.Empty;
+    public Guid PlatformModuleId { get; protected set; }
+    public Guid PlatformFeatureId { get; protected set; }
+    public PlatformModule? PlatformModule { get; protected set; }
+    public PlatformFeature? PlatformFeature { get; protected set; }
     public string? Description { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByPlatformUserId { get; protected set; }
@@ -19,7 +24,9 @@ public class PlatformPermission : AuditableEntity
         string? description,
         string status,
         DateTimeOffset now,
-        string? moduleKey = null)
+        string? moduleKey = null,
+        Guid? platformModuleId = null,
+        Guid? platformFeatureId = null)
     {
         return new PlatformPermission
         {
@@ -27,11 +34,20 @@ public class PlatformPermission : AuditableEntity
             PermissionCode = permissionCode,
             Name = name,
             ModuleKey = moduleKey ?? DeriveModuleKey(permissionCode),
+            PlatformModuleId = platformModuleId ?? Guid.Empty,
+            PlatformFeatureId = platformFeatureId ?? Guid.Empty,
             Description = description,
             Status = status,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public void SetModuleAndFeature(Guid platformModuleId, Guid platformFeatureId, DateTimeOffset now)
+    {
+        PlatformModuleId = platformModuleId;
+        PlatformFeatureId = platformFeatureId;
+        UpdatedAt = now;
     }
 
     public void Activate(DateTimeOffset now)
@@ -52,3 +68,4 @@ public class PlatformPermission : AuditableEntity
         return "unknown";
     }
 }
+
