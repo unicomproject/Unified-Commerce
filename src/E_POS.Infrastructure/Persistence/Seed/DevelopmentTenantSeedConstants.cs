@@ -28,4 +28,5 @@ public static class DevelopmentPosPermissionCatalogSeedConstants
     public static readonly Guid PosNotificationsFeatureId = Guid.Parse("72000000-0000-0000-0000-000000000020");
     public static readonly Guid TenantTillOpsFeatureId = Guid.Parse("72000000-0000-0000-0000-000000000021");
     public static readonly Guid PosExchangesFeatureId = Guid.Parse("72000000-0000-0000-0000-000000000022");
+    public static readonly Guid PosOnlineOrdersFeatureId = Guid.Parse("72000000-0000-0000-0000-000000000023");
 }

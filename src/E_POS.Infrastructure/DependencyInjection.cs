@@ -19,7 +19,6 @@ using E_POS.Infrastructure.Modules.Tenant.AccessControl.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
-using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.Payment.Contracts;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
@@ -36,7 +35,6 @@ using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services;
-using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Application.Common.Email;
 using E_POS.Infrastructure.Integrations.Email;
@@ -299,6 +297,7 @@ public static class DependencyInjection
             provider.GetRequiredService<IStorefrontProductSearchRepository>(),
             provider.GetRequiredService<IStorefrontProductBestSellerRepository>()));
         services.AddScoped<IStorefrontFulfilmentRepository, StorefrontFulfilmentRepository>();
+        services.AddScoped<IPosOnlineOrderRepository, PosOnlineOrderRepository>();
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
         services.AddScoped<ITenantAdminOnlineStoreService, TenantAdminOnlineStoreService>();

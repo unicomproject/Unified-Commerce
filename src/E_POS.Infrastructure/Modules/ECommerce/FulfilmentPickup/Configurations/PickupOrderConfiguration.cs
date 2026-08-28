@@ -114,6 +114,11 @@ public sealed class PickupOrderConfiguration : IEntityTypeConfiguration<PickupOr
             .HasColumnType("timestamp with time zone")
             .IsRequired(false);
 
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .IsConcurrencyToken()
+            .IsRequired();
+
         // <second-brain-constraints>
         builder.HasIndex(x => new { x.TenantId, x.PickupNumber })
             .IsUnique()

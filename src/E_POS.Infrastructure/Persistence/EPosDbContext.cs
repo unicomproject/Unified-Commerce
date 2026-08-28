@@ -296,6 +296,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<FulfillmentOrder> FulfillmentOrders => Set<FulfillmentOrder>();
     public DbSet<FulfillmentOrderEvent> FulfillmentOrderEvents => Set<FulfillmentOrderEvent>();
     public DbSet<FulfillmentOrderLine> FulfillmentOrderLines => Set<FulfillmentOrderLine>();
+    public DbSet<FulfillmentPackage> FulfillmentPackages => Set<FulfillmentPackage>();
+    public DbSet<FulfillmentPackageLine> FulfillmentPackageLines => Set<FulfillmentPackageLine>();
     public DbSet<PickupOrder> PickupOrders => Set<PickupOrder>();
     public DbSet<PickupOrderEvent> PickupOrderEvents => Set<PickupOrderEvent>();
     public DbSet<PickupSlot> PickupSlots => Set<PickupSlot>();

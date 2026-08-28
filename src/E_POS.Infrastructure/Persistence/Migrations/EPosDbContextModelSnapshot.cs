@@ -2025,6 +2025,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("requested_fulfillment_date");
 
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
                     b.Property<Guid>("SalesOrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("sales_order_id");
@@ -2168,6 +2173,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("fulfillment_order_id");
 
+                    b.Property<Guid?>("InventoryReservationLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inventory_reservation_line_id");
+
                     b.Property<string>("LineStatus")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2217,6 +2226,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FulfillmentOrderId");
 
+                    b.HasIndex("InventoryReservationLineId");
+
                     b.HasIndex("PackedByTenantUserId");
 
                     b.HasIndex("PickedByTenantUserId");
@@ -2240,6 +2251,127 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_fulfillment_order_lines_requested_quantity", "requested_quantity > 0");
 
                             t.HasCheckConstraint("ck_fulfillment_order_lines_status", "line_status IN ('PENDING', 'PICKING', 'PICKED', 'PACKED', 'FULFILLED', 'CANCELLED')");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentPackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FulfillmentOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fulfillment_order_id");
+
+                    b.Property<string>("PackageNumber")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("package_number");
+
+                    b.Property<string>("PackageStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("package_status");
+
+                    b.Property<DateTimeOffset>("PackedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("packed_at");
+
+                    b.Property<Guid>("PackedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("packed_by_tenant_user_id");
+
+                    b.Property<string>("PackingNote")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("packing_note");
+
+                    b.Property<DateTimeOffset?>("ReadyAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ready_at");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<Guid?>("StagingInventoryLocationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("staging_inventory_location_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FulfillmentOrderId");
+
+                    b.HasIndex("TenantId", "FulfillmentOrderId", "PackageNumber")
+                        .IsUnique();
+
+                    b.ToTable("fulfillment_packages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fulfillment_packages_status", "package_status IN ('OPEN','PACKED','READY','HANDED_OVER','CANCELLED')");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentPackageLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FulfillmentOrderLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fulfillment_order_line_id");
+
+                    b.Property<Guid>("FulfillmentPackageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fulfillment_package_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FulfillmentOrderLineId");
+
+                    b.HasIndex("FulfillmentPackageId");
+
+                    b.HasIndex("TenantId", "FulfillmentPackageId", "FulfillmentOrderLineId")
+                        .IsUnique();
+
+                    b.ToTable("fulfillment_package_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fulfillment_package_lines_quantity", "quantity > 0");
                         });
                 });
 
@@ -2317,6 +2449,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("pickup_status");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -26003,6 +26140,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_fulfillment_order_lines_5ac519a0");
 
+                    b.HasOne("E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservationLine", null)
+                        .WithMany()
+                        .HasForeignKey("InventoryReservationLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_fulfillment_order_lines_reservation_line");
+
                     b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("PackedByTenantUserId")
@@ -26034,6 +26177,30 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_fulfillment_order_lines_aff467be");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentPackage", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrder", null)
+                        .WithMany()
+                        .HasForeignKey("FulfillmentOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentPackageLine", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentOrderLine", null)
+                        .WithMany()
+                        .HasForeignKey("FulfillmentOrderLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.FulfillmentPackage", null)
+                        .WithMany()
+                        .HasForeignKey("FulfillmentPackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities.PickupOrder", b =>

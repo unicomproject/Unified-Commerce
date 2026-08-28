@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Infrastructure.Modules.Shared.Media.Options;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace E_POS.Infrastructure.Modules.Shared.Media.Services;
@@ -9,10 +10,12 @@ namespace E_POS.Infrastructure.Modules.Shared.Media.Services;
 public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
 {
     private readonly AzureBlobStorageOptions _options;
+    private readonly IHostEnvironment _environment;
 
-    public AzureBlobMediaObjectStorage(IOptions<AzureBlobStorageOptions> options)
+    public AzureBlobMediaObjectStorage(IOptions<AzureBlobStorageOptions> options, IHostEnvironment environment)
     {
         _options = options.Value;
+        _environment = environment;
     }
 
     public bool IsConfigured =>
@@ -97,13 +100,13 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
         DeleteFromLocalStorage(containerName, storageKey);
     }
 
-    private static async Task<MediaObjectUploadResult> SaveToLocalStorageAsync(
+    private async Task<MediaObjectUploadResult> SaveToLocalStorageAsync(
         string containerName,
         string storageKey,
         Stream content,
         CancellationToken cancellationToken)
     {
-        var localStorageRoot = Path.Combine(AppContext.BaseDirectory, "App_Data", "media-storage", containerName);
+        var localStorageRoot = Path.Combine(GetLocalMediaStorageRoot(), containerName);
         var localPath = Path.Combine(localStorageRoot, storageKey.Replace('/', Path.DirectorySeparatorChar));
         var dir = Path.GetDirectoryName(localPath);
         if (!string.IsNullOrWhiteSpace(dir))
@@ -123,11 +126,11 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
         return new MediaObjectUploadResult(containerName, storageKey, publicUrl);
     }
 
-    private static void DeleteFromLocalStorage(string containerName, string storageKey)
+    private void DeleteFromLocalStorage(string containerName, string storageKey)
     {
         try
         {
-            var localStorageRoot = Path.Combine(AppContext.BaseDirectory, "App_Data", "media-storage", containerName);
+            var localStorageRoot = Path.Combine(GetLocalMediaStorageRoot(), containerName);
             var localPath = Path.Combine(localStorageRoot, storageKey.Replace('/', Path.DirectorySeparatorChar));
             if (File.Exists(localPath))
             {
@@ -138,6 +141,14 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
         {
             // Best effort
         }
+    }
+
+    private string GetLocalMediaStorageRoot()
+    {
+        var contentRoot = string.IsNullOrWhiteSpace(_environment.ContentRootPath)
+            ? AppContext.BaseDirectory
+            : _environment.ContentRootPath;
+        return Path.Combine(contentRoot, "App_Data", "media-storage");
     }
 
     private string ResolvePublicUrl(Uri blobUri, string containerName, string storageKey)

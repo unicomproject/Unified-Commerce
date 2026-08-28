@@ -115,6 +115,11 @@ public sealed class FulfillmentOrderConfiguration : IEntityTypeConfiguration<Ful
             .HasColumnName("updated_by_tenant_user_id")
             .IsRequired(false);
 
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .IsConcurrencyToken()
+            .IsRequired();
+
         // <second-brain-constraints>
         builder.HasIndex(x => new { x.TenantId, x.FulfillmentNumber })
             .IsUnique()

@@ -106,6 +106,7 @@ public sealed class PosLoginBrandingServiceTests
         public Task<PosLoginBrandingTenantSnapshot?> FindActiveTenantBySlugAsync(string tenantSlug, CancellationToken cancellationToken) => Task.FromResult(Tenant);
         public Task<PosLoginBrandingTenantSnapshot?> FindTenantAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult(Tenant);
         public Task<IReadOnlyDictionary<string, string>> GetSettingValuesAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyDictionary<string, string>>(Settings);
+        public Task<IReadOnlyDictionary<string, string>> GetResolvedSettingValuesAsync(Guid tenantId, IReadOnlyCollection<string> settingKeys, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyDictionary<string, string>>(Settings);
         public Task<PosLoginBrandingMediaSnapshot?> FindMediaAsync(Guid mediaAssetId, CancellationToken cancellationToken) =>
             Task.FromResult(MediaById.GetValueOrDefault(mediaAssetId) ?? Media);
 

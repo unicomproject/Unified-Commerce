@@ -12,7 +12,8 @@ public sealed record TenantAdminUserListItemResponse(
     DateTimeOffset? LastActiveAt,
     string? RoleDescription = null,
     IReadOnlyList<OutletOptionResponse>? Outlets = null,
-    int OutletCount = 0);
+    int OutletCount = 0,
+    string? ProfileImageUrl = null);
 
 public sealed record TenantAdminUserListResponse(
     IReadOnlyList<TenantAdminUserListItemResponse> Items,

@@ -68,6 +68,23 @@ public sealed class TenantAdminUserProfileMediaPostgreSqlTests
             Assert.True(createResult.IsSuccess);
             createResponse = createResult.Value!;
             Assert.Equal("https://cdn.example.test/profile-1.jpg", createResponse.ProfileImageUrl);
+
+            var listResult = await service.ListAsync(
+                CreateContext(fixture, [TenantAdminUserPermissions.View]),
+                "profile.media@example.com",
+                null,
+                null,
+                null,
+                1,
+                10,
+                "name",
+                "asc",
+                CancellationToken.None);
+
+            Assert.True(listResult.IsSuccess);
+            var listItem = Assert.Single(listResult.Value!.Items);
+            Assert.Equal(createResponse.UserId, listItem.UserId);
+            Assert.Equal("https://cdn.example.test/profile-1.jpg", listItem.ProfileImageUrl);
         }
 
         await using (var db = CreateDb(harness.ConnectionString))

@@ -22,5 +22,33 @@ public class PickupOrder : AuditableEntity
     public Guid? VerifiedByTenantUserId { get; protected set; }
     public DateTimeOffset? VerifiedAt { get; protected set; }
     public DateTimeOffset? CollectedAt { get; protected set; }
+    public long RowVersion { get; protected set; }
+
+    protected PickupOrder() { }
+
+    public static PickupOrder CreateReady(
+        Guid id, Guid tenantId, Guid fulfillmentOrderId, string pickupNumber,
+        string contactName, string? phone, string? email, DateTimeOffset now) => new()
+    {
+        Id = id,
+        TenantId = tenantId,
+        FulfillmentOrderId = fulfillmentOrderId,
+        PickupNumber = pickupNumber,
+        PickupContactName = contactName,
+        PickupContactPhone = phone,
+        PickupContactEmail = email,
+        PickupStatus = "READY",
+        CreatedAt = now,
+        UpdatedAt = now
+    };
+
+    public void MarkReady(DateTimeOffset now)
+    {
+        if (PickupStatus is not ("PENDING" or "READY"))
+            throw new InvalidOperationException("Pickup is not eligible to become ready.");
+        PickupStatus = "READY";
+        UpdatedAt = now;
+        RowVersion++;
+    }
 }
 

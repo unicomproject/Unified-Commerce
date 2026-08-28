@@ -43,6 +43,25 @@ public sealed class PosLoginBrandingRepository : IPosLoginBrandingRepository
             select new { definition.SettingKey, setting.SettingValue })
             .ToDictionaryAsync(x => x.SettingKey, x => x.SettingValue, StringComparer.Ordinal, cancellationToken);
 
+    public async Task<IReadOnlyDictionary<string, string>> GetResolvedSettingValuesAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> settingKeys,
+        CancellationToken cancellationToken) =>
+        await (
+            from definition in _dbContext.SettingDefinitions.AsNoTracking()
+            join setting in _dbContext.TenantSettings.AsNoTracking().Where(x => x.TenantId == tenantId)
+                on definition.Id equals setting.SettingDefinitionId into tenantValues
+            from setting in tenantValues.DefaultIfEmpty()
+            where settingKeys.Contains(definition.SettingKey)
+                && definition.Status == "ACTIVE"
+                && (setting != null || definition.DefaultValue != null)
+            select new
+            {
+                definition.SettingKey,
+                Value = setting != null ? setting.SettingValue : definition.DefaultValue!
+            })
+            .ToDictionaryAsync(x => x.SettingKey, x => x.Value, StringComparer.Ordinal, cancellationToken);
+
     public Task<PosLoginBrandingMediaSnapshot?> FindMediaAsync(
         Guid mediaAssetId,
         CancellationToken cancellationToken) =>

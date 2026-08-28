@@ -25,6 +25,8 @@ using E_POS.Infrastructure.Modules.Shared.Media.Services;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Xunit;
@@ -94,7 +96,7 @@ public sealed class ManualPaymentProofLifecycleIntegrationTests
             CreateContainerIfNotExists = true
         });
 
-        IMediaObjectStorage mediaStorage = new AzureBlobMediaObjectStorage(blobOptions);
+        IMediaObjectStorage mediaStorage = new AzureBlobMediaObjectStorage(blobOptions, new TestHostEnvironment());
         var evidenceStorage = new AzureManualPaymentEvidenceStorage(mediaStorage, blobOptions);
 
         var tenantId = Guid.NewGuid();
@@ -415,7 +417,9 @@ public sealed class ManualPaymentProofLifecycleIntegrationTests
             ContainerName = AzuriteContainer,
             CreateContainerIfNotExists = true
         });
-        return new AzureManualPaymentEvidenceStorage(new AzureBlobMediaObjectStorage(blobOptions), blobOptions);
+        return new AzureManualPaymentEvidenceStorage(
+            new AzureBlobMediaObjectStorage(blobOptions, new TestHostEnvironment()),
+            blobOptions);
     }
 
     private static IManualPaymentEvidenceScanner CreateScanner()
@@ -547,5 +551,14 @@ public sealed class ManualPaymentProofLifecycleIntegrationTests
     private sealed class StaticClock(DateTimeOffset now) : IDateTimeProvider
     {
         public DateTimeOffset UtcNow => now;
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "IntegrationTest";
+        public string ApplicationName { get; set; } = "E_POS.IntegrationTests";
+        public string ContentRootPath { get; set; } = Path.Combine(Path.GetTempPath(), "epos-media-tests");
+        public IFileProvider ContentRootFileProvider { get; set; } =
+            new NullFileProvider();
     }
 }

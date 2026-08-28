@@ -65,6 +65,7 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     Branding: null,
                     Time: null,
                     Notifications: null,
+                    Summary: null,
                     Metrics: null,
                     QuickActions: null));
         }
@@ -135,7 +136,8 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                 Cashier: new PosHomeCashierDto(
                     snapshot.CashierTenantUserId,
                     snapshot.CashierDisplayName,
-                    snapshot.CashierProfileImageUrl),
+                    snapshot.CashierProfileImageUrl,
+                    snapshot.CashierRoleLabel),
                 Device: new PosHomeDeviceDto(
                     snapshot.DeviceId,
                     snapshot.DeviceCode,
@@ -161,6 +163,15 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     snapshot.OutletTimezone,
                     snapshot.BusinessDate),
                 Notifications: new PosHomeNotificationsDto(snapshot.UnreadNotificationCount),
+                Summary: new PosHomeSessionSummaryDto(
+                    Scope: "CURRENT_TILL_SESSION",
+                    CurrencyCode: snapshot.CurrencyCode,
+                    GrossSalesAmount: snapshot.GrossSalesAmount,
+                    TransactionCount: snapshot.TransactionCount,
+                    RefundAmount: snapshot.RefundAmount,
+                    RefundCount: snapshot.RefundCount,
+                    DiscountAmount: snapshot.DiscountAmount,
+                    NetSalesAmount: snapshot.NetSalesAmount),
                 Metrics: new PosHomeMetricsDto(snapshot.ParkedSalesCount),
                 QuickActions: new PosHomeQuickActionsDto(
                     CanStartSale: startSaleEnabled,

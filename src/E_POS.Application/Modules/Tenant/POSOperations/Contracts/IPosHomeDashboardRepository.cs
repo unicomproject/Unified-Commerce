@@ -24,6 +24,7 @@ public sealed record PosHomeDashboardDbSnapshot(
     Guid CashierTenantUserId,
     string CashierDisplayName,
     string? CashierProfileImageUrl,
+    string CashierRoleLabel,
     Guid DeviceId,
     string DeviceCode,
     string DeviceName,
@@ -47,4 +48,10 @@ public sealed record PosHomeDashboardDbSnapshot(
     int ReturnsRefundsCount,
     int CustomersCount,
     int ParkedSalesCount,
-    double CashDrawerBalance);
+    double CashDrawerBalance,
+    double GrossSalesAmount,
+    int TransactionCount,
+    double RefundAmount,
+    int RefundCount,
+    double DiscountAmount,
+    double NetSalesAmount);

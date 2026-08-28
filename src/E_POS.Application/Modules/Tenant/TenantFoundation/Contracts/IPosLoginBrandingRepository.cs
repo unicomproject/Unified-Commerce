@@ -7,6 +7,10 @@ public interface IPosLoginBrandingRepository
     Task<PosLoginBrandingTenantSnapshot?> FindActiveTenantBySlugAsync(string tenantSlug, CancellationToken cancellationToken);
     Task<PosLoginBrandingTenantSnapshot?> FindTenantAsync(Guid tenantId, CancellationToken cancellationToken);
     Task<IReadOnlyDictionary<string, string>> GetSettingValuesAsync(Guid tenantId, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<string, string>> GetResolvedSettingValuesAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> settingKeys,
+        CancellationToken cancellationToken);
     Task<PosLoginBrandingMediaSnapshot?> FindMediaAsync(Guid mediaAssetId, CancellationToken cancellationToken);
     Task SaveSettingsAsync(Guid tenantId, IReadOnlyDictionary<string, string?> values, DateTimeOffset now, CancellationToken cancellationToken);
 }
