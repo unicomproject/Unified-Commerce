@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
@@ -12,13 +13,16 @@ namespace E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver _mediaReadUrlResolver;
     private readonly ILogger<PosHomeDashboardRepository> _logger;
 
     public PosHomeDashboardRepository(
         EPosDbContext dbContext,
+        IMediaReadUrlResolver mediaReadUrlResolver,
         ILogger<PosHomeDashboardRepository> logger)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
         _logger = logger;
     }
 
@@ -53,16 +57,50 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             "POS home context: tenant user resolved {UserId}.",
             context.UserId);
 
-        var cashierProfileImageUrl = cashier.ProfileImageUrl is { } profileImageAssetId
+        var cashierProfileImage = cashier.ProfileImageUrl is { } profileImageAssetId
             ? await _dbContext.MediaAssets
                 .AsNoTracking()
                 .Where(x =>
                     x.TenantId == context.TenantId &&
                     x.Id == profileImageAssetId &&
                     x.Status == "ACTIVE")
-                .Select(x => x.PublicUrl)
+                .Select(x => new
+                {
+                    x.ContainerName,
+                    x.StorageKey,
+                    x.PublicUrl
+                })
                 .FirstOrDefaultAsync(cancellationToken)
             : null;
+        var cashierProfileImageUrl = cashierProfileImage is null
+            ? null
+            : _mediaReadUrlResolver.ResolveReadUrl(
+                cashierProfileImage.ContainerName,
+                cashierProfileImage.StorageKey,
+                cashierProfileImage.PublicUrl);
+        var cashierRoleLabel = await (
+                from userRole in _dbContext.TenantUserRoles.AsNoTracking()
+                join role in _dbContext.TenantRoles.AsNoTracking()
+                    on new
+                    {
+                        userRole.TenantId,
+                        RoleId = userRole.TenantRoleId
+                    }
+                    equals new
+                    {
+                        role.TenantId,
+                        RoleId = role.Id
+                    }
+                where userRole.TenantId == context.TenantId &&
+                      userRole.TenantUserId == context.UserId &&
+                      userRole.RevokedAt == null &&
+                      role.IsActive
+                orderby userRole.AssignedAt descending
+                select role.RoleName)
+            .FirstOrDefaultAsync(cancellationToken);
+        cashierRoleLabel = string.IsNullOrWhiteSpace(cashierRoleLabel)
+            ? "Cashier"
+            : cashierRoleLabel.Trim();
 
         var requestedFingerprint = deviceFingerprint?.Trim() ?? string.Empty;
         if (requestedFingerprint.Length == 0)
@@ -395,6 +433,10 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             tillSession.Id,
             tillSession.OpeningFloatAmount,
             cancellationToken);
+        var sessionSummary = await CalculateCurrentSessionSummaryAsync(
+            context.TenantId,
+            tillSession.Id,
+            cancellationToken);
 
         _logger.LogDebug(
             "POS home context resolved for user {UserId}, device {DeviceId}, till {TillId}, session {SessionId}.",
@@ -412,6 +454,7 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 CashierTenantUserId: context.UserId,
                 CashierDisplayName: cashier.DisplayName ?? cashier.FullName,
                 CashierProfileImageUrl: cashierProfileImageUrl,
+                CashierRoleLabel: cashierRoleLabel,
                 DeviceId: device.Id,
                 DeviceCode: deviceCode,
                 DeviceName: deviceName,
@@ -437,7 +480,13 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 ReturnsRefundsCount: returnsRefundsCount,
                 CustomersCount: customersCount,
                 ParkedSalesCount: parkedSalesCount,
-                CashDrawerBalance: cashDrawerBalance));
+                CashDrawerBalance: cashDrawerBalance,
+                GrossSalesAmount: (double)sessionSummary.GrossSalesAmount,
+                TransactionCount: sessionSummary.TransactionCount,
+                RefundAmount: (double)sessionSummary.RefundAmount,
+                RefundCount: sessionSummary.RefundCount,
+                DiscountAmount: (double)sessionSummary.DiscountAmount,
+                NetSalesAmount: (double)sessionSummary.NetSalesAmount));
     }
 
     private async Task<Guid?> ResolveTrustedDeviceIdByFingerprintAsync(
@@ -538,6 +587,55 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
         return (double)(openingFloat + cashIn - cashOut - closingRemove);
     }
 
+    private async Task<CurrentSessionSummary> CalculateCurrentSessionSummaryAsync(
+        Guid tenantId,
+        Guid tillSessionId,
+        CancellationToken cancellationToken)
+    {
+        var sales = await _dbContext.SalesOrders
+            .AsNoTracking()
+            .Where(order =>
+                order.TenantId == tenantId &&
+                order.TillSessionId == tillSessionId &&
+                order.CompletedAt != null &&
+                order.CancelledAt == null)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                GrossSalesAmount = group.Sum(order => order.SubtotalAmount),
+                TransactionCount = group.Count(),
+                DiscountAmount = group.Sum(order => order.DiscountAmount),
+                SalesTotalAmount = group.Sum(order => order.TotalAmount)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var refunds = await (
+                from salesReturn in _dbContext.SalesReturns.AsNoTracking()
+                join order in _dbContext.SalesOrders.AsNoTracking()
+                    on salesReturn.SalesOrderId equals order.Id
+                where salesReturn.TenantId == tenantId &&
+                      salesReturn.CompletedAt != null &&
+                      salesReturn.CancelledAt == null &&
+                      order.TenantId == tenantId &&
+                      order.TillSessionId == tillSessionId
+                group salesReturn by 1
+                into groupRows
+                select new
+                {
+                    RefundAmount = groupRows.Sum(row => row.TotalRefundAmount),
+                    RefundCount = groupRows.Count()
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new CurrentSessionSummary(
+            sales?.GrossSalesAmount ?? 0,
+            sales?.TransactionCount ?? 0,
+            refunds?.RefundAmount ?? 0,
+            refunds?.RefundCount ?? 0,
+            sales?.DiscountAmount ?? 0,
+            (sales?.SalesTotalAmount ?? 0) - (refunds?.RefundAmount ?? 0));
+    }
+
     private static PosHomeContextResolutionResult Unresolved(
         string reasonCode,
         string message,
@@ -548,4 +646,12 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             Message: message,
             RequiredAction: requiredAction,
             Snapshot: null);
+
+    private sealed record CurrentSessionSummary(
+        decimal GrossSalesAmount,
+        int TransactionCount,
+        decimal RefundAmount,
+        int RefundCount,
+        decimal DiscountAmount,
+        decimal NetSalesAmount);
 }

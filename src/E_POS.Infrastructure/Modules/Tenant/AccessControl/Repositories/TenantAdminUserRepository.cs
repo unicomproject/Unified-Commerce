@@ -86,10 +86,10 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         var pageItems = filtered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(MapListItem)
             .ToList();
+        await AttachProfileImageUrlsAsync(tenantId, pageItems, cancellationToken);
 
-        return new TenantAdminUserListResponse(pageItems, page, pageSize, totalCount);
+        return new TenantAdminUserListResponse(pageItems.Select(MapListItem).ToList(), page, pageSize, totalCount);
     }
 
     public async Task<IReadOnlyList<RoleOptionResponse>> GetRoleOptionsAsync(
@@ -1147,6 +1147,45 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             : MediaUrlResolver.PreferMediaAsset(mediaAsset.PublicUrl, null, mediaAsset.StorageKey);
     }
 
+    private async Task AttachProfileImageUrlsAsync(
+        Guid tenantId,
+        List<UserRow> rows,
+        CancellationToken cancellationToken)
+    {
+        var mediaAssetIds = rows
+            .Select(x => x.ProfileImageMediaAssetId)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .Distinct()
+            .ToList();
+
+        if (mediaAssetIds.Count == 0)
+        {
+            return;
+        }
+
+        var mediaUrls = await _dbContext.MediaAssets
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                mediaAssetIds.Contains(x.Id) &&
+                x.Status == ActiveMediaStatus)
+            .Select(x => new { x.Id, x.PublicUrl, x.StorageKey })
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => MediaUrlResolver.PreferMediaAsset(x.PublicUrl, null, x.StorageKey),
+                cancellationToken);
+
+        foreach (var row in rows)
+        {
+            if (row.ProfileImageMediaAssetId.HasValue &&
+                mediaUrls.TryGetValue(row.ProfileImageMediaAssetId.Value, out var profileImageUrl))
+            {
+                row.ProfileImageUrl = profileImageUrl;
+            }
+        }
+    }
+
     private IQueryable<UserRow> BuildUserRowsQuery(Guid tenantId)
     {
         return from user in _dbContext.TenantUsers.AsNoTracking()
@@ -1313,47 +1352,6 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             row.Outlets,
             row.OutletCount,
             row.ProfileImageUrl);
-    }
-
-    private async Task AttachProfileImageUrlsAsync(
-        Guid tenantId,
-        List<UserRow> rows,
-        CancellationToken cancellationToken)
-    {
-        var mediaAssetIds = rows
-            .Where(row => row.ProfileImageMediaAssetId.HasValue)
-            .Select(row => row.ProfileImageMediaAssetId!.Value)
-            .Distinct()
-            .ToList();
-
-        if (mediaAssetIds.Count == 0)
-        {
-            return;
-        }
-
-        var mediaUrls = await _dbContext.MediaAssets
-            .AsNoTracking()
-            .Where(asset =>
-                asset.TenantId == tenantId &&
-                mediaAssetIds.Contains(asset.Id) &&
-                asset.Status == ActiveMediaStatus)
-            .Select(asset => new { asset.Id, asset.PublicUrl, asset.StorageKey })
-            .ToDictionaryAsync(
-                asset => asset.Id,
-                asset => MediaUrlResolver.PreferMediaAsset(
-                    asset.PublicUrl,
-                    null,
-                    asset.StorageKey),
-                cancellationToken);
-
-        foreach (var row in rows)
-        {
-            if (row.ProfileImageMediaAssetId is { } mediaAssetId &&
-                mediaUrls.TryGetValue(mediaAssetId, out var profileImageUrl))
-            {
-                row.ProfileImageUrl = profileImageUrl;
-            }
-        }
     }
 
     private static string FormatStatus(string status)

@@ -183,17 +183,24 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseCors("AllowAll");
 app.UseStaticFiles();
 
-var mediaStoragePath = Path.Combine(AppContext.BaseDirectory, "App_Data", "media-storage");
-if (!Directory.Exists(mediaStoragePath))
+var mediaStoragePaths = new[]
 {
-    Directory.CreateDirectory(mediaStoragePath);
-}
+    Path.Combine(app.Environment.ContentRootPath, "App_Data", "media-storage"),
+    Path.Combine(AppContext.BaseDirectory, "App_Data", "media-storage")
+}.Distinct(StringComparer.OrdinalIgnoreCase);
+foreach (var mediaStoragePath in mediaStoragePaths)
+{
+    if (!Directory.Exists(mediaStoragePath))
+    {
+        Directory.CreateDirectory(mediaStoragePath);
+    }
 
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(mediaStoragePath),
-    RequestPath = "/uploads"
-});
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(mediaStoragePath),
+        RequestPath = "/uploads"
+    });
+}
 
 if (app.Environment.IsDevelopment())
 {

@@ -293,6 +293,7 @@ public sealed class PosPermissionSeedTests
             .Select(definition => definition.Id)
             .Concat(DevelopmentPosPaymentReceiptPermissionsSeedData.Definitions.Select(definition => definition.Id))
             .Concat(DevelopmentPosReturnsExchangePermissionsSeedData.Definitions.Select(definition => definition.Id))
+            .Concat(DevelopmentPosOnlineOrderPermissionsSeedData.Definitions.Select(definition => definition.Id))
             .Concat(DevelopmentPosDiscountWorkflowSeedData.PermissionDefinitions.Select(definition => definition.Id))
             .ToList();
 

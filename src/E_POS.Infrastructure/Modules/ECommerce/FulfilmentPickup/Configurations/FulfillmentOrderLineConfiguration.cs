@@ -81,6 +81,10 @@ public sealed class FulfillmentOrderLineConfiguration : IEntityTypeConfiguration
             .HasColumnName("packed_by_tenant_user_id")
             .IsRequired(false);
 
+        builder.Property(x => x.InventoryReservationLineId)
+            .HasColumnName("inventory_reservation_line_id")
+            .IsRequired(false);
+
         // <second-brain-constraints>
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
@@ -117,6 +121,12 @@ public sealed class FulfillmentOrderLineConfiguration : IEntityTypeConfiguration
             .HasForeignKey(x => x.PackedByTenantUserId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_fulfillment_order_lines_bcaca9ef");
+
+        builder.HasOne<E_POS.Domain.Modules.Tenant.Inventory.Entities.InventoryReservationLine>()
+            .WithMany()
+            .HasForeignKey(x => x.InventoryReservationLineId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_fulfillment_order_lines_reservation_line");
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_fulfillment_order_lines_requested_quantity", "requested_quantity > 0");

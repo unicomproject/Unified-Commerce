@@ -20,6 +20,7 @@ public sealed record PosHomeDashboardResponseDto(
     PosHomeBrandingDto? Branding,
     PosHomeTimeDto? Time,
     PosHomeNotificationsDto? Notifications,
+    PosHomeSessionSummaryDto? Summary,
     PosHomeMetricsDto? Metrics,
     PosHomeQuickActionsDto? QuickActions);
 
@@ -49,7 +50,8 @@ public sealed record PosHomeCardDto(
 public sealed record PosHomeCashierDto(
     Guid Id,
     string DisplayName,
-    string? ProfileImageUrl);
+    string? ProfileImageUrl,
+    string RoleLabel);
 
 public sealed record PosHomeDeviceDto(
     Guid Id,
@@ -76,6 +78,16 @@ public sealed record PosHomeBrandingDto(
 
 public sealed record PosHomeNotificationsDto(
     int UnreadCount);
+
+public sealed record PosHomeSessionSummaryDto(
+    string Scope,
+    string CurrencyCode,
+    double GrossSalesAmount,
+    int TransactionCount,
+    double RefundAmount,
+    int RefundCount,
+    double DiscountAmount,
+    double NetSalesAmount);
 
 public sealed record PosHomeMetricsDto(
     int ParkedSalesCount);

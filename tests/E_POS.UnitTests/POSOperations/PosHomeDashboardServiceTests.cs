@@ -127,6 +127,15 @@ public sealed class PosHomeDashboardServiceTests
         Assert.Equal(
             "https://cdn.example.test/cashier-001.jpg",
             result.Value!.Cashier!.ProfileImageUrl);
+        Assert.Equal("Cashier", result.Value.Cashier.RoleLabel);
+        Assert.NotNull(result.Value.Summary);
+        Assert.Equal("CURRENT_TILL_SESSION", result.Value.Summary!.Scope);
+        Assert.Equal(1500, result.Value.Summary.GrossSalesAmount);
+        Assert.Equal(2, result.Value.Summary.TransactionCount);
+        Assert.Equal(100, result.Value.Summary.RefundAmount);
+        Assert.Equal(1, result.Value.Summary.RefundCount);
+        Assert.Equal(50, result.Value.Summary.DiscountAmount);
+        Assert.Equal(1350, result.Value.Summary.NetSalesAmount);
         Assert.False(result.Value.Cards!.CashDrawer.Enabled);
         Assert.False(result.Value.QuickActions!.CanViewCashDrawer);
     }
@@ -148,6 +157,7 @@ public sealed class PosHomeDashboardServiceTests
                 CashierTenantUserId: context.UserId,
                 CashierDisplayName: "Cashier 001",
                 CashierProfileImageUrl: "https://cdn.example.test/cashier-001.jpg",
+                CashierRoleLabel: "Cashier",
                 DeviceId: Guid.NewGuid(),
                 DeviceCode: "POS-01",
                 DeviceName: "Front POS",
@@ -171,7 +181,13 @@ public sealed class PosHomeDashboardServiceTests
                 ReturnsRefundsCount: 0,
                 CustomersCount: 0,
                 ParkedSalesCount: 0,
-                CashDrawerBalance: 0);
+                CashDrawerBalance: 0,
+                GrossSalesAmount: 1500,
+                TransactionCount: 2,
+                RefundAmount: 100,
+                RefundCount: 1,
+                DiscountAmount: 50,
+                NetSalesAmount: 1350);
 
             return Task.FromResult(
                 new PosHomeContextResolutionResult(
