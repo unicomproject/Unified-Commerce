@@ -32,7 +32,7 @@ public sealed class TaxClassRateConfiguration : IEntityTypeConfiguration<TaxClas
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.TaxClassId).HasColumnName("tax_class_id").IsRequired();
         builder.Property(x => x.TaxRateId).HasColumnName("tax_rate_id").IsRequired();
-        builder.Property(x => x.SortOrder).HasColumnName("sort_order").HasDefaultValue(0).IsRequired();
+        builder.Property(x => x.SortOrder).HasColumnName("sort_order").IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(30)").HasMaxLength(30).IsRequired();
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_class_rates_tenant_id_tenants");

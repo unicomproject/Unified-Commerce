@@ -283,7 +283,7 @@ public sealed class DevelopmentPlatformAdminTestAccountSeederUnitTests
         public IReadOnlyList<Guid> LastAddedRoleIds { get; private set; } = [];
         public IReadOnlyList<Guid> LastReplacedRoleIds { get; private set; } = [];
 
-        public Task<PlatformUserListResponse> GetUsersAsync(CancellationToken cancellationToken) =>
+        public Task<PlatformUserListResponse> GetUsersAsync(PlatformUserListQuery query, CancellationToken cancellationToken) =>
             Task.FromResult(new PlatformUserListResponse([]));
 
         public Task<PlatformUserDetailResponse?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken) =>
@@ -310,6 +310,19 @@ public sealed class DevelopmentPlatformAdminTestAccountSeederUnitTests
             PlatformUser user,
             IReadOnlyList<Guid> roleIds,
             DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            AddCalled = true;
+            LastAddedRoleIds = roleIds.ToList();
+            UsersByNormalizedEmail[user.NormalizedEmail] = user;
+            return Task.CompletedTask;
+        }
+
+        public Task AddUserWithRolesAndInvitationAsync(
+            PlatformUser user,
+            IReadOnlyList<Guid> roleIds,
+            PlatformUserInvitation invitation,
+            E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage outboxMessage,
             CancellationToken cancellationToken)
         {
             AddCalled = true;

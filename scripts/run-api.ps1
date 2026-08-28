@@ -85,7 +85,7 @@ if ($SyncOnly) {
 Push-Location $apiDir
 try {
     Write-Host 'Building API...'
-    dotnet build $apiProject
+    dotnet build $apiProject /p:UseSharedCompilation=false
     if ($LASTEXITCODE -ne 0) {
         throw 'Build failed.'
     }

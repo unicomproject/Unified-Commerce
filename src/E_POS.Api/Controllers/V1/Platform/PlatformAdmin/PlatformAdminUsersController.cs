@@ -29,7 +29,9 @@ public sealed class PlatformAdminUsersController : ControllerBase
     [ProducesResponseType(typeof(LegacyApiResponse<PlatformUserListResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetUsers(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetUsers(
+        [FromQuery] PlatformUserListQuery query,
+        CancellationToken cancellationToken)
     {
         if (!TryGetPlatformUserId(out var platformUserId))
         {
@@ -38,7 +40,7 @@ public sealed class PlatformAdminUsersController : ControllerBase
                 "Invalid platform session."));
         }
 
-        var result = await _userService.GetUsersAsync(platformUserId, cancellationToken);
+        var result = await _userService.GetUsersAsync(query ?? new PlatformUserListQuery(), platformUserId, cancellationToken);
         return ToActionResult(result, "Platform users loaded successfully.");
     }
 

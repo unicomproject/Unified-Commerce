@@ -48,6 +48,25 @@ public sealed class AzureBlobMediaReadUrlResolverTests
     }
 
     [Fact]
+    public void ResolveReadUrl_UsesStorageKey_WhenLegacyPublicUrlIsRelative()
+    {
+        var sasTokenProvider = new RecordingSasTokenProvider();
+        var resolver = CreateResolver(sasTokenProvider);
+
+        var result = resolver.ResolveReadUrl(
+            "images",
+            "tenants/tenant-1/outlets/legacy.png",
+            "tenants/tenant-1/outlets/legacy.png");
+
+        Assert.Equal(
+            "signed:https://oneverzdevstorage01.blob.core.windows.net/images/tenants/tenant-1/outlets/legacy.png",
+            result);
+        Assert.Equal(
+            "https://oneverzdevstorage01.blob.core.windows.net/images/tenants/tenant-1/outlets/legacy.png",
+            Assert.Single(sasTokenProvider.Inputs));
+    }
+
+    [Fact]
     public void ResolveReadUrl_DoesNotDuplicateContainerWhenStorageKeyAlreadyContainsContainer()
     {
         var sasTokenProvider = new RecordingSasTokenProvider();

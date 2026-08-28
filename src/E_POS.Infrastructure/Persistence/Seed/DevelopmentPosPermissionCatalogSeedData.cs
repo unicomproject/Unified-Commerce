@@ -40,19 +40,20 @@ public static class DevelopmentPosPermissionCatalogSeedData
             created_at,
             updated_at)
         VALUES
-            ('72000000-0000-0000-0000-000000000010', '71000000-0000-0000-0000-000000000010', 'pos.home', 'pos.home', 'POS Home', true, 'POS Home', 'Cashier home dashboard and navigation.', 'ACTIVE', 10, now(), now()),
-            ('72000000-0000-0000-0000-000000000011', '71000000-0000-0000-0000-000000000010', 'pos.sales', 'pos.sales', 'POS Sales', true, 'POS Sales', 'New sale, cart, checkout, and parked sales.', 'ACTIVE', 20, now(), now()),
-            ('72000000-0000-0000-0000-000000000012', '71000000-0000-0000-0000-000000000010', 'pos.products', 'pos.products', 'POS Products', true, 'POS Products', 'Product grid and search on POS.', 'ACTIVE', 30, now(), now()),
-            ('72000000-0000-0000-0000-000000000013', '71000000-0000-0000-0000-000000000010', 'pos.customers', 'pos.customers', 'POS Customers', true, 'POS Customers', 'Customer lookup and creation on POS.', 'ACTIVE', 40, now(), now()),
-            ('72000000-0000-0000-0000-000000000014', '71000000-0000-0000-0000-000000000010', 'pos.payments', 'pos.payments', 'POS Payments', true, 'POS Payments', 'Payment method capture on POS.', 'ACTIVE', 50, now(), now()),
-            ('72000000-0000-0000-0000-000000000015', '71000000-0000-0000-0000-000000000010', 'pos.receipts', 'pos.receipts', 'POS Receipts', true, 'POS Receipts', 'Receipt view and print on POS.', 'ACTIVE', 60, now(), now()),
-            ('72000000-0000-0000-0000-000000000016', '71000000-0000-0000-0000-000000000010', 'pos.orders', 'pos.orders', 'POS Orders', true, 'POS Orders', 'Orders sidebar and order visibility on POS.', 'ACTIVE', 70, now(), now()),
-            ('72000000-0000-0000-0000-000000000017', '71000000-0000-0000-0000-000000000010', 'pos.returns', 'pos.returns', 'POS Returns', true, 'POS Returns', 'Returns and refunds on POS.', 'ACTIVE', 80, now(), now()),
-            ('72000000-0000-0000-0000-000000000022', '71000000-0000-0000-0000-000000000010', 'pos.exchanges', 'pos.exchanges', 'POS Exchanges', true, 'POS Exchanges', 'Exchange replacement and settlement on POS.', 'ACTIVE', 85, now(), now()),
-            ('72000000-0000-0000-0000-000000000018', '71000000-0000-0000-0000-000000000010', 'pos.cash_drawer', 'pos.cash_drawer', 'POS Cash Drawer', true, 'POS Cash Drawer', 'Cash drawer summary and movements.', 'ACTIVE', 90, now(), now()),
-            ('72000000-0000-0000-0000-000000000019', '71000000-0000-0000-0000-000000000010', 'pos.till', 'pos.till', 'POS Till', true, 'POS Till', 'Till session open/close and status.', 'ACTIVE', 100, now(), now()),
-            ('72000000-0000-0000-0000-000000000020', '71000000-0000-0000-0000-000000000010', 'pos.notifications', 'pos.notifications', 'POS Notifications', true, 'POS Notifications', 'Cashier notification bell.', 'ACTIVE', 110, now(), now()),
-            ('72000000-0000-0000-0000-000000000021', '71000000-0000-0000-0000-000000000010', 'tenant.till_ops', 'tenant.till_ops', 'Tenant Till Operations', true, 'Tenant Till Operations', 'Till management for device activation.', 'ACTIVE', 120, now(), now())
+            ('72000000-0000-0000-0000-000000000023', '71000000-0000-0000-0000-000000000010', 'pos_checkout', 'pos_checkout', 'POS Checkout', true, 'POS Checkout', 'Commercial POS checkout entitlement for cashier operations.', 'ACTIVE', 5, now(), now()),
+            ('72000000-0000-0000-0000-000000000010', '71000000-0000-0000-0000-000000000010', 'pos.home', 'pos.home', 'POS Home', false, 'POS Home', 'Technical permission grouping for POS home.', 'INACTIVE', 10, now(), now()),
+            ('72000000-0000-0000-0000-000000000011', '71000000-0000-0000-0000-000000000010', 'pos.sales', 'pos.sales', 'POS Sales', false, 'POS Sales', 'Technical permission grouping for POS sales.', 'INACTIVE', 20, now(), now()),
+            ('72000000-0000-0000-0000-000000000012', '71000000-0000-0000-0000-000000000010', 'pos.products', 'pos.products', 'POS Products', false, 'POS Products', 'Technical permission grouping for POS products.', 'INACTIVE', 30, now(), now()),
+            ('72000000-0000-0000-0000-000000000013', '71000000-0000-0000-0000-000000000010', 'pos.customers', 'pos.customers', 'POS Customers', false, 'POS Customers', 'Technical permission grouping for POS customers.', 'INACTIVE', 40, now(), now()),
+            ('72000000-0000-0000-0000-000000000014', '71000000-0000-0000-0000-000000000010', 'pos.payments', 'pos.payments', 'POS Payments', false, 'POS Payments', 'Technical permission grouping for POS payments.', 'INACTIVE', 50, now(), now()),
+            ('72000000-0000-0000-0000-000000000015', '71000000-0000-0000-0000-000000000010', 'pos.receipts', 'pos.receipts', 'POS Receipts', false, 'POS Receipts', 'Technical permission grouping for POS receipts.', 'INACTIVE', 60, now(), now()),
+            ('72000000-0000-0000-0000-000000000016', '71000000-0000-0000-0000-000000000010', 'pos.orders', 'pos.orders', 'POS Orders', false, 'POS Orders', 'Technical permission grouping for POS orders.', 'INACTIVE', 70, now(), now()),
+            ('72000000-0000-0000-0000-000000000017', '71000000-0000-0000-0000-000000000010', 'pos.returns', 'pos.returns', 'POS Returns', false, 'POS Returns', 'Technical permission grouping for POS returns.', 'INACTIVE', 80, now(), now()),
+            ('72000000-0000-0000-0000-000000000022', '71000000-0000-0000-0000-000000000010', 'pos.exchanges', 'pos.exchanges', 'POS Exchanges', false, 'POS Exchanges', 'Technical permission grouping for POS exchanges.', 'INACTIVE', 85, now(), now()),
+            ('72000000-0000-0000-0000-000000000018', '71000000-0000-0000-0000-000000000010', 'pos.cash_drawer', 'pos.cash_drawer', 'POS Cash Drawer', false, 'POS Cash Drawer', 'Technical permission grouping for cash drawer.', 'INACTIVE', 90, now(), now()),
+            ('72000000-0000-0000-0000-000000000019', '71000000-0000-0000-0000-000000000010', 'pos.till', 'pos.till', 'POS Till', false, 'POS Till', 'Technical permission grouping for POS till.', 'INACTIVE', 100, now(), now()),
+            ('72000000-0000-0000-0000-000000000020', '71000000-0000-0000-0000-000000000010', 'pos.notifications', 'pos.notifications', 'POS Notifications', false, 'POS Notifications', 'Technical permission grouping for POS notifications.', 'INACTIVE', 110, now(), now()),
+            ('72000000-0000-0000-0000-000000000021', '71000000-0000-0000-0000-000000000010', 'tenant.till_ops', 'tenant.till_ops', 'Tenant Till Operations', false, 'Tenant Till Operations', 'Invalid legacy technical grouping key.', 'INACTIVE', 120, now(), now())
         ON CONFLICT (feature_key) DO UPDATE
         SET platform_module_id = EXCLUDED.platform_module_id,
             feature_code = EXCLUDED.feature_code,

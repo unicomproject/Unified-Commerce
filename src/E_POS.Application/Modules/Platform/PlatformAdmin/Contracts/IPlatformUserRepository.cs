@@ -5,7 +5,7 @@ namespace E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 
 public interface IPlatformUserRepository
 {
-    Task<PlatformUserListResponse> GetUsersAsync(CancellationToken cancellationToken);
+    Task<PlatformUserListResponse> GetUsersAsync(PlatformUserListQuery query, CancellationToken cancellationToken);
 
     Task<PlatformUserDetailResponse?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken);
 
@@ -24,6 +24,13 @@ public interface IPlatformUserRepository
         PlatformUser user,
         IReadOnlyList<Guid> roleIds,
         DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task AddUserWithRolesAndInvitationAsync(
+        PlatformUser user,
+        IReadOnlyList<Guid> roleIds,
+        PlatformUserInvitation invitation,
+        E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage outboxMessage,
         CancellationToken cancellationToken);
 
     Task UpdateUserAsync(PlatformUser user, CancellationToken cancellationToken);

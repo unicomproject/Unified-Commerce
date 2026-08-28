@@ -35,6 +35,20 @@ public interface ICurrentStockRepository
         DateTimeOffset now,
         CancellationToken cancellationToken);
         
+    Task<StockAdjustmentResponse> AdjustStockAsync(
+        Guid tenantId,
+        Guid userId,
+        StockAdjustmentRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+        
+    Task<StockTransferResponse> TransferStockAsync(
+        Guid tenantId,
+        Guid userId,
+        StockTransferRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+        
     /// <summary>
     /// Processes an opening stock movement.
     /// </summary>

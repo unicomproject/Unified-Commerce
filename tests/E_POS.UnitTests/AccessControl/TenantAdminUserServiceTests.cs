@@ -42,6 +42,7 @@ public sealed class TenantAdminUserServiceTests
                     "Jane Doe",
                     "jane.doe@example.com",
                     "+1234567890",
+                    null,
                     RoleId,
                     "Store Manager",
                     "Main Outlet",

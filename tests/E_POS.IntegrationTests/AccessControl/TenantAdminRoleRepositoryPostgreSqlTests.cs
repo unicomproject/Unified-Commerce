@@ -94,7 +94,159 @@ public sealed class TenantAdminRoleRepositoryPostgreSqlTests
         Assert.False(assigningAnotherActiveUser);
     }
 
-    private static async Task<FixtureIds> SeedAsync(string connectionString)
+    [Fact]
+    public async Task WouldRemoveLastAdminAsync_IgnoresInactiveAdministrativePermissionDefinitions()
+    {
+        if (!await CanConnectAsync())
+        {
+            return;
+        }
+
+        await using var harness = await DisposablePostgresHarness.CreateAsync("tenant_role_inactive_admin_permission");
+        var fixture = await SeedAsync(harness.ConnectionString, criticalPermissionIsActive: false);
+
+        await using var db = CreateDb(harness.ConnectionString);
+        var repository = new TenantAdminRoleRepository(db);
+
+        var wouldRemoveLastAdmin = await repository.WouldRemoveLastAdminAsync(
+            fixture.TenantId,
+            fixture.AdminRoleId,
+            null,
+            false,
+            CancellationToken.None);
+
+        Assert.False(wouldRemoveLastAdmin);
+    }
+
+    [Fact]
+    public async Task GetSetupRoleOptionsAsync_ReturnsOnlyCanonicalTenantAdminAndCashierRoles()
+    {
+        if (!await CanConnectAsync())
+        {
+            return;
+        }
+
+        await using var harness = await DisposablePostgresHarness.CreateAsync("tenant_role_setup_options");
+        var fixture = await SeedAsync(harness.ConnectionString);
+
+        await using var db = CreateDb(harness.ConnectionString);
+        db.TenantRoles.Add(TenantRole.Create(
+            Guid.NewGuid(),
+            fixture.TenantId,
+            null,
+            null,
+            TenantUserConstants.DefaultCashierRoleCode,
+            "Cashier",
+            null,
+            false,
+            true,
+            fixture.ActorUserId,
+            Now));
+        db.TenantRoles.Add(TenantRole.Create(
+            Guid.NewGuid(),
+            fixture.TenantId,
+            null,
+            null,
+            "SUPER_ADMIN",
+            "Super Admin",
+            null,
+            false,
+            true,
+            fixture.ActorUserId,
+            Now));
+        await db.SaveChangesAsync();
+
+        var repository = new TenantAdminRoleRepository(db);
+        var result = await repository.GetSetupRoleOptionsAsync(fixture.TenantId, CancellationToken.None);
+
+        Assert.Collection(
+            result.OrderBy(role => role.RoleCode, StringComparer.Ordinal),
+            role => Assert.Equal(TenantUserConstants.DefaultCashierRoleCode, role.RoleCode),
+            role => Assert.Equal(TenantUserConstants.DefaultTenantAdminRoleCode, role.RoleCode));
+    }
+
+    [Fact]
+    public async Task GetPermissionCatalogAsync_IncludesActiveSystemPermissionWhenActorCanDelegateIt()
+    {
+        if (!await CanConnectAsync())
+        {
+            return;
+        }
+
+        await using var harness = await DisposablePostgresHarness.CreateAsync("tenant_role_system_catalog");
+        var fixture = await SeedAsync(harness.ConnectionString);
+
+        await using var db = CreateDb(harness.ConnectionString);
+        var moduleId = await db.PlatformModules.Select(module => module.Id).SingleAsync();
+        var featureId = await db.PlatformFeatures.Select(feature => feature.Id).SingleAsync();
+        const string permissionCode = "pos.sales.checkout";
+
+        db.PermissionDefinitions.Add(PermissionDefinition.Create(
+            Guid.NewGuid(),
+            permissionCode,
+            moduleId,
+            featureId,
+            "checkout",
+            "Checkout a POS sale.",
+            true,
+            true,
+            Now));
+        await db.SaveChangesAsync();
+
+        var repository = new TenantAdminRoleRepository(db);
+        var catalog = await repository.GetPermissionCatalogAsync(
+            fixture.TenantId,
+            [permissionCode],
+            Now,
+            CancellationToken.None);
+
+        Assert.Contains(
+            catalog.Modules.SelectMany(module => module.Features)
+                .SelectMany(feature => feature.Permissions),
+            permission => permission.Code == permissionCode && permission.Assignable);
+    }
+
+    [Fact]
+    public async Task GetAssignablePermissionsByCodeAsync_AcceptsActiveSystemPermissionWhenActorCanDelegateIt()
+    {
+        if (!await CanConnectAsync())
+        {
+            return;
+        }
+
+        await using var harness = await DisposablePostgresHarness.CreateAsync("tenant_role_system_assignable");
+        var fixture = await SeedAsync(harness.ConnectionString);
+
+        await using var db = CreateDb(harness.ConnectionString);
+        var moduleId = await db.PlatformModules.Select(module => module.Id).SingleAsync();
+        var featureId = await db.PlatformFeatures.Select(feature => feature.Id).SingleAsync();
+        const string permissionCode = "pos.sales.checkout";
+
+        db.PermissionDefinitions.Add(PermissionDefinition.Create(
+            Guid.NewGuid(),
+            permissionCode,
+            moduleId,
+            featureId,
+            "checkout",
+            "Checkout a POS sale.",
+            true,
+            true,
+            Now));
+        await db.SaveChangesAsync();
+
+        var repository = new TenantAdminRoleRepository(db);
+        var assignable = await repository.GetAssignablePermissionsByCodeAsync(
+            fixture.TenantId,
+            [permissionCode],
+            [permissionCode],
+            Now,
+            CancellationToken.None);
+
+        var permission = Assert.Single(assignable);
+        Assert.Equal(permissionCode, permission.PermissionCode);
+    }
+
+    private static async Task<FixtureIds> SeedAsync(string connectionString, bool criticalPermissionIsActive = true)
     {
         await using var db = CreateDb(connectionString);
         var fixture = FixtureIds.Create();
@@ -131,14 +283,14 @@ public sealed class TenantAdminRoleRepositoryPostgreSqlTests
             "manage",
             "Manage roles",
             false,
-            true,
+            criticalPermissionIsActive,
             Now));
         db.TenantRoles.Add(TenantRole.Create(
             fixture.AdminRoleId,
             fixture.TenantId,
             null,
             null,
-            $"ADMIN-{fixture.Suffix}",
+            TenantUserConstants.DefaultTenantAdminRoleCode,
             "Tenant Admin",
             null,
             true,

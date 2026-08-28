@@ -96,6 +96,22 @@ public sealed class ProductBarcodeConfiguration : IEntityTypeConfiguration<Produ
             .IsUnique()
             .HasDatabaseName("uq_product_barcodes_tenant_id_barcode");
 
+        builder.HasOne<UnitOfMeasure>()
+            .WithMany()
+            .HasForeignKey(x => x.UomId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_product_barcodes_uom_id_unit_of_measures");
+
+        builder.HasIndex(x => new { x.TenantId, x.ProductId })
+            .IsUnique()
+            .HasDatabaseName("uq_product_barcodes_tenant_id_product_id_primary")
+            .HasFilter("product_variant_id IS NULL AND is_primary_barcode = true AND status <> 'DELETED'");
+
+        builder.HasIndex(x => new { x.TenantId, x.ProductVariantId })
+            .IsUnique()
+            .HasDatabaseName("uq_product_barcodes_tenant_id_product_variant_id_primary")
+            .HasFilter("product_variant_id IS NOT NULL AND is_primary_barcode = true AND status <> 'DELETED'");
+
         builder.ToTable(t => t.HasCheckConstraint("ck_product_barcodes_quantity_per_scan", "quantity_per_scan > 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_product_barcodes_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
     }

@@ -484,7 +484,23 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             query = query.Where(feature => requestedFeatureCodes.Contains(feature.FeatureCode));
         }
 
-        return await query
+        var resolved = await query
+            .Select(feature => new ResolvedTenantFeature(feature.Id, feature.FeatureCode))
+            .ToListAsync(cancellationToken);
+
+        var commercialCodes = CommercialSubscriptionFeatureCatalog.NormalizeEntitlementFeatureCodes(
+            resolved.Select(feature => feature.FeatureCode));
+
+        if (commercialCodes.Count == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.PlatformFeatures
+            .AsNoTracking()
+            .Where(feature =>
+                feature.Status == "ACTIVE" &&
+                commercialCodes.Contains(feature.FeatureCode))
             .Select(feature => new ResolvedTenantFeature(feature.Id, feature.FeatureCode))
             .ToListAsync(cancellationToken);
     }

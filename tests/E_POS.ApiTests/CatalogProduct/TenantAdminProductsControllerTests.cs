@@ -782,6 +782,12 @@ public sealed class TenantAdminProductsControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(CreateResult);
 
+        public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateFromWizardAsync(
+            TenantRequestContext context,
+            TenantAdminWizardProductCreateRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(CreateResult);
+
         public Task<ApplicationResult<TenantAdminProductDetailResponse>> GetByIdAsync(
             TenantRequestContext context,
             Guid productId,
@@ -898,6 +904,18 @@ public sealed class TenantAdminProductsControllerTests
             Guid productId,
             CancellationToken cancellationToken) =>
             Task.FromResult(SetupResult);
+
+        public Task<ApplicationResult<ProductDraftResponse>> PublishAsync(
+            TenantRequestContext context,
+            Guid productId,
+            PublishProductRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(DraftResult);
+        public Task<ApplicationResult> UpdateVariantAsync(TenantRequestContext context, Guid productId, Guid variantId, TenantAdminProductVariantUpdateRequest request, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+        public Task<ApplicationResult> AddBarcodeAsync(TenantRequestContext context, Guid productId, Guid variantId, TenantAdminProductBarcodeAddRequest request, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+        public Task<ApplicationResult> DeleteBarcodeAsync(TenantRequestContext context, Guid productId, Guid variantId, Guid barcodeId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+        public Task<ApplicationResult> RestoreAsync(TenantRequestContext context, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+        public Task<ApplicationResult<TenantAdminProductCreateResponse>> DuplicateAsync(TenantRequestContext context, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<TenantAdminProductCreateResponse>.Success(new TenantAdminProductCreateResponse(Guid.NewGuid(), "Sample", "SKU", "ACTIVE")));
     }
 
 

@@ -16,9 +16,21 @@ public static class ProductConstants
     public const string PublishPermission = "catalog.products.publish";
     public const string MediaManagePermission = "catalog.product_media.manage";
     public const string ChannelManagePermission = "catalog.product_channels.manage";
+    public const string VariantsManagePermission = "catalog.variants.manage";
+    public const string ComboComponentsManagePermission = "catalog.combo_components.manage";
+    public const string BarcodesManagePermission = "catalog.barcodes.manage";
+    public const string ProductPricingManagePermission = "catalog.product_pricing.manage";
+    public const string ProductCostViewPermission = "catalog.product_cost.view";
+    public const string TaxClassesViewPermission = "pricing.tax_classes.view";
+    public const string TaxRatesViewPermission = "pricing.tax_rates.view";
+
+    public const int InitialBatchNumberMaxLength = 100;
+    public const int InitialSerialNumberMaxLength = 150;
+    public const string IdentityWithoutStockStatus = "ACTIVE";
 
     public const int MaxProductImages = 10;
     public const long MaxProductImageBytes = 5 * 1024 * 1024; // 5,242,880
+    public const int MaxVariants = 100;
     public const int ProductNameMaxLength = 200;
     public const int ProductCodeMaxLength = 80;
     public const int ShortDescriptionMaxLength = 500;

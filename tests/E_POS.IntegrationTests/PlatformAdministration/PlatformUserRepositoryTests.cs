@@ -1,4 +1,5 @@
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
@@ -21,7 +22,7 @@ public sealed class PlatformUserRepositoryTests
 
         IPlatformUserRepository repository = new PlatformUserRepository(dbContext);
 
-        var users = await repository.GetUsersAsync(CancellationToken.None);
+        var users = await repository.GetUsersAsync(new PlatformUserListQuery(), CancellationToken.None);
 
         Assert.NotEmpty(users.Users);
         var superAdmin = users.Users.Single(user =>
@@ -30,6 +31,34 @@ public sealed class PlatformUserRepositoryTests
         Assert.Equal(DevelopmentPlatformAdminSeedData.Email, superAdmin.Email);
         Assert.Contains(PlatformRoleCodes.SuperAdministrator, superAdmin.RoleCodes);
         Assert.Equal(45, superAdmin.PermissionCount);
+    }
+
+    [Fact]
+    public async Task GetUsersAsync_WithPaginationAndFilter_ReturnsMatchingPagedUsers()
+    {
+        await using var dbContext = CreateDbContext();
+        await SeedSuperAdminAsync(dbContext);
+
+        var activeUser = PlatformUser.Create(Guid.NewGuid(), "alpha.active@example.com", "hash", PlatformAuthConstants.ActiveStatus, Now);
+        var inactiveUser = PlatformUser.CreatePendingInvite(Guid.NewGuid(), "beta.inactive@example.com", Now);
+
+        dbContext.PlatformUsers.AddRange(activeUser, inactiveUser);
+        await dbContext.SaveChangesAsync();
+
+        IPlatformUserRepository repository = new PlatformUserRepository(dbContext);
+
+        var filtered = await repository.GetUsersAsync(new PlatformUserListQuery
+        {
+            PageNumber = 1,
+            PageSize = 10,
+            Search = "alpha",
+            Status = "ACTIVE"
+        }, CancellationToken.None);
+
+        Assert.Single(filtered.Items);
+        Assert.Equal("alpha.active@example.com", filtered.Items[0].Email);
+        Assert.Equal(1, filtered.TotalCount);
+        Assert.Equal(1, filtered.TotalPages);
     }
 
     [Fact]
@@ -60,7 +89,7 @@ public sealed class PlatformUserRepositoryTests
         await dbContext.SaveChangesAsync();
 
         IPlatformUserRepository repository = new PlatformUserRepository(dbContext);
-        var users = await repository.GetUsersAsync(CancellationToken.None);
+        var users = await repository.GetUsersAsync(new PlatformUserListQuery(), CancellationToken.None);
         var superAdmin = users.Users.Single(user => user.Id == userId);
 
         Assert.Equal(Now.AddMinutes(5), superAdmin.LastLoginAt);
@@ -91,7 +120,7 @@ public sealed class PlatformUserRepositoryTests
         var detail = await repository.GetUserByIdAsync(userId, CancellationToken.None);
 
         Assert.NotNull(detail);
-        Assert.Equal(PlatformAuthConstants.InactiveStatus, detail!.Status);
+        Assert.Equal(PlatformAuthConstants.InvitedStatus, detail!.Status);
         Assert.True(detail.InvitePending);
         Assert.Equal(["integration_support_role"], detail.RoleCodes);
     }

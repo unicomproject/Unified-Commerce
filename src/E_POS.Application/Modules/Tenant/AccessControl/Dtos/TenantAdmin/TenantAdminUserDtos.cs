@@ -5,6 +5,7 @@ public sealed record TenantAdminUserListItemResponse(
     string FullName,
     string Email,
     string? PhoneNumber,
+    string? StaffCode,
     Guid? RoleId,
     string RoleName,
     string OutletName,

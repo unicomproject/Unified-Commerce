@@ -4,18 +4,18 @@ public static class PricingTaxPermissions
 {
     public static class TaxClasses
     {
-        public const string View = "pricing.tax_classes.view";
-        public const string Create = "pricing.tax_classes.create";
-        public const string Update = "pricing.tax_classes.update";
-        public const string Delete = "pricing.tax_classes.delete";
+        public const string View = "tax.classes.view";
+        public const string Create = "tax.classes.create";
+        public const string Update = "tax.classes.update";
+        public const string Delete = "tax.classes.delete";
     }
 
     public static class TaxRates
     {
-        public const string View = "pricing.tax_rates.view";
-        public const string Create = "pricing.tax_rates.create";
-        public const string Update = "pricing.tax_rates.update";
-        public const string Delete = "pricing.tax_rates.delete";
+        public const string View = "tax.rates.view";
+        public const string Create = "tax.rates.create";
+        public const string Update = "tax.rates.update";
+        public const string Delete = "tax.rates.delete";
     }
 
     public static class ProductTaxAssignments

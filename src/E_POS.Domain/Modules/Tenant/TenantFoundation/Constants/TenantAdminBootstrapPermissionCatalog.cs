@@ -1,5 +1,6 @@
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.ECommerce.Storefront.Constants;
+using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
@@ -53,8 +54,12 @@ public static class TenantAdminBootstrapPermissionCatalog
                 "catalog.products.view",
                 "catalog.products.create",
                 "catalog.products.update",
-                "catalog.product_media.manage",
-                "catalog.product_channels.manage"
+                "catalog.products.publish",
+                "catalog.barcodes.manage",
+                "catalog.product_pricing.manage",
+                "catalog.variants.manage",
+                "catalog.combo_components.manage",
+                "pricing.tax_classes.view"
             ],
             [PlatformTenantFeatureCodes.InventoryTracking] =
             [
@@ -114,9 +119,11 @@ public static class TenantAdminBootstrapPermissionCatalog
                 "tenant.devices.view",
                 "tenant.devices.manage"
             ],
-            // POS checkout is a commercial entitlement. Bootstrap Tenant Admin is not a cashier —
-            // cashier POS operational permissions are intentionally not auto-granted.
-            [PlatformTenantFeatureCodes.PosCheckout] = [],
+            // POS checkout lets a Tenant Admin configure the supported Cashier template
+            // without bypassing the delegation ceiling; it grants no platform permissions.
+            [PlatformTenantFeatureCodes.PosCheckout] = TenantRoleSetupCatalog.CashierAllowedPermissionCodes
+                .OrderBy(permissionCode => permissionCode, StringComparer.Ordinal)
+                .ToArray(),
             [PlatformTenantFeatureCodes.OfflineOperationSync] = []
         };
 
@@ -160,21 +167,21 @@ public static class TenantAdminBootstrapPermissionCatalog
             }
 
             var trimmed = raw.Trim();
-            var canonical = PlatformTenantFeatureCodes.NormalizeToCanonicalOrSelf(trimmed);
-            effectiveCanonical.Add(canonical);
-
-            if (!HasExplicitMapping(canonical))
+            if (!CommercialSubscriptionFeatureCatalog.TryNormalizeToCommercialEntitlement(trimmed, out var commercial))
             {
-                // Unknown/unmapped commercial keys must not grant arbitrary permissions.
-                if (!PlatformTenantFeatureCodes.IsKnownFeatureCode(canonical) ||
-                    !PermissionsByEntitlement.ContainsKey(canonical))
-                {
-                    unknownEntitlements.Add(trimmed);
-                }
+                unknownEntitlements.Add(trimmed);
+                continue;
             }
-            else if (GetMappedPermissions(canonical).Count == 0)
+
+            effectiveCanonical.Add(commercial);
+
+            if (!HasExplicitMapping(commercial))
             {
-                intentionallyPermissionless.Add(canonical);
+                unknownEntitlements.Add(trimmed);
+            }
+            else if (GetMappedPermissions(commercial).Count == 0)
+            {
+                intentionallyPermissionless.Add(commercial);
             }
         }
 

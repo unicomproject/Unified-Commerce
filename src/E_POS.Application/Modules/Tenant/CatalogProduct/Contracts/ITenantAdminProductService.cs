@@ -35,6 +35,14 @@ public interface ITenantAdminProductService
         TenantAdminProductCreateRequest request,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Final Step 7 Create from the 7-step Product Wizard (atomic, no draft pipeline).
+    /// </summary>
+    Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateFromWizardAsync(
+        TenantRequestContext context,
+        TenantAdminWizardProductCreateRequest request,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<TenantAdminProductDetailResponse>> GetByIdAsync(
         TenantRequestContext context,
         Guid productId,
@@ -74,6 +82,43 @@ public interface ITenantAdminProductService
         CancellationToken cancellationToken);
 
     Task<ApplicationResult<ProductSetupWizardDto>> GetSetupAsync(
+        TenantRequestContext context,
+        Guid productId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<ProductDraftResponse>> PublishAsync(
+        TenantRequestContext context,
+        Guid productId,
+        PublishProductRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult> UpdateVariantAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductVariantUpdateRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult> AddBarcodeAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductBarcodeAddRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult> DeleteBarcodeAsync(
+        TenantRequestContext context,
+        Guid productId,
+        Guid variantId,
+        Guid barcodeId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult> RestoreAsync(
+        TenantRequestContext context,
+        Guid productId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<TenantAdminProductCreateResponse>> DuplicateAsync(
         TenantRequestContext context,
         Guid productId,
         CancellationToken cancellationToken);

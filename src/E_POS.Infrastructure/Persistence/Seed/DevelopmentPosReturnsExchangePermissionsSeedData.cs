@@ -13,10 +13,10 @@ public static class DevelopmentPosReturnsExchangePermissionsSeedData
         DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId;
 
     private static readonly Guid ReturnsFeatureId =
-        DevelopmentPosPermissionCatalogSeedConstants.PosReturnsFeatureId;
+        DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId;
 
     private static readonly Guid ExchangesFeatureId =
-        DevelopmentPosPermissionCatalogSeedConstants.PosExchangesFeatureId;
+        DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId;
 
     public static IReadOnlyList<TenantPermissionSeedDefinition> Definitions { get; } =
     [

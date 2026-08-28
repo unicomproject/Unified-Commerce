@@ -8,7 +8,7 @@ public static class DevelopmentPosDiscountWorkflowSeedData
         Guid.Parse("77777777-0337-4000-8000-000000000001"),
         SalesPermissions.Discount.Approve,
         DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId,
-        DevelopmentPosPermissionCatalogSeedConstants.PosSalesFeatureId,
+        DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId,
         "approve_discount",
         "Approve or reject POS discounts above cashier authority.");
 

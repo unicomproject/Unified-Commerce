@@ -206,11 +206,33 @@ public sealed class OutletRepository : IOutletRepository
                 x.CollectionCutoffTime,
                 x.City,
                 x.TillCount,
+                x.Outlet.PrimaryImageMediaAssetId,
                 TotalCount = query.Count()
             })
             .ToListAsync(cancellationToken);
 
         var totalCount = rows.FirstOrDefault()?.TotalCount ?? (pageNumber == 1 ? 0 : await query.CountAsync(cancellationToken));
+        
+        var imageAssetIds = rows.Where(x => x.PrimaryImageMediaAssetId.HasValue).Select(x => x.PrimaryImageMediaAssetId!.Value).Distinct().ToList();
+        var images = new Dictionary<Guid, OutletImageResponse>();
+        if (imageAssetIds.Count > 0)
+        {
+            images = await _dbContext.MediaAssets
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && imageAssetIds.Contains(x.Id) && x.Status == "ACTIVE")
+                .ToDictionaryAsync(
+                    x => x.Id,
+                    x => new OutletImageResponse(
+                        x.Id,
+                        x.PublicUrl ?? string.Empty,
+                        x.MimeType,
+                        x.FileExtension,
+                        x.FileSizeBytes,
+                        x.WidthPx,
+                        x.HeightPx),
+                    cancellationToken);
+        }
+
         var items = rows
             .Select(x => new OutletSummaryResponse(
                 x.Id,
@@ -227,7 +249,8 @@ public sealed class OutletRepository : IOutletRepository
                 x.PickupWindowMinutes,
                 x.CollectionCutoffTime,
                 x.City,
-                x.TillCount))
+                x.TillCount,
+                x.PrimaryImageMediaAssetId.HasValue && images.TryGetValue(x.PrimaryImageMediaAssetId.Value, out var img) ? img : null))
             .ToList();
 
         return new OutletListResponse(items, pageNumber, pageSize, totalCount);

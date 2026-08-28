@@ -149,6 +149,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasMaxLength(40)
             .IsRequired(false);
 
+        builder.Property(x => x.ReferenceCostPrice)
+            .HasColumnName("reference_cost_price")
+            .HasColumnType("numeric(18,4)")
+            .IsRequired(false);
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
@@ -184,7 +189,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.ToTable(t => 
         {
             t.HasCheckConstraint("ck_products_status", "status IN ('DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED')");
-            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 8");
+            t.HasCheckConstraint("ck_products_setup_step", "current_setup_step BETWEEN 1 AND 7");
             t.HasCheckConstraint(
                 "ck_products_desired_publish_status",
                 "desired_publish_status IS NULL OR desired_publish_status IN ('ACTIVE','INACTIVE')");

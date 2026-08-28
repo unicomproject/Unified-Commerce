@@ -16,7 +16,7 @@ public static class DevelopmentPosHardwareSettingsPermissionSeedData
         PermissionId,
         PermissionCode,
         DevelopmentPosPermissionCatalogSeedConstants.CorePosModuleId,
-        DevelopmentPosPermissionCatalogSeedConstants.PosReceiptsFeatureId,
+        DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId,
         "hardware_settings",
         "Configure and test the receipt printer assigned to this POS device.");
 
