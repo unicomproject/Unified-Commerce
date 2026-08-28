@@ -63,6 +63,14 @@ public sealed class PlatformPermissionConfiguration : IEntityTypeConfiguration<P
             .HasColumnName("updated_by_platform_user_id")
             .IsRequired(false);
 
+        builder.Property(x => x.PlatformModuleId)
+            .HasColumnName("platform_module_id")
+            .IsRequired();
+
+        builder.Property(x => x.PlatformFeatureId)
+            .HasColumnName("platform_feature_id")
+            .IsRequired();
+
         builder.HasOne<PlatformUser>()
             .WithMany()
             .HasForeignKey(x => x.CreatedByPlatformUserId)
@@ -74,6 +82,19 @@ public sealed class PlatformPermissionConfiguration : IEntityTypeConfiguration<P
             .HasForeignKey(x => x.UpdatedByPlatformUserId)
             .OnDelete(DeleteBehavior.SetNull)
             .HasConstraintName("fk_platform_permissions_updated_by_platform_user_id_platform_users");
+
+        builder.HasOne(x => x.PlatformModule)
+            .WithMany()
+            .HasForeignKey(x => x.PlatformModuleId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_platform_permissions_platform_module_id_platform_modules");
+
+        builder.HasOne(x => x.PlatformFeature)
+            .WithMany()
+            .HasForeignKey(x => x.PlatformFeatureId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_platform_permissions_platform_feature_id_platform_features");
+
 
         builder.HasIndex(x => x.PermissionCode)
             .IsUnique()

@@ -61,6 +61,14 @@ public sealed class PermissionDefinitionConfiguration : IEntityTypeConfiguration
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(x => x.Scope)
+            .HasColumnName("scope")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired()
+            .HasDefaultValue("TENANT");
+
+
         builder.HasIndex(x => x.PermissionCode)
             .IsUnique()
             .HasDatabaseName("uq_permission_definitions_permission_code");

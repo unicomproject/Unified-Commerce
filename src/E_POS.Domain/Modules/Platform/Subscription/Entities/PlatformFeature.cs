@@ -13,6 +13,7 @@ public class PlatformFeature : AuditableEntity
     public string FeatureKey { get; protected set; } = string.Empty;
     public string FeatureName { get; protected set; } = string.Empty;
     public bool IsCoreFeature { get; protected set; }
+    public string Scope { get; protected set; } = "TENANT";
 
     public static PlatformFeature Create(
         Guid id,
@@ -23,7 +24,8 @@ public class PlatformFeature : AuditableEntity
         DateTimeOffset createdAt,
         int sortOrder = 0,
         string? description = null,
-        bool isCoreFeature = false)
+        bool isCoreFeature = false,
+        string scope = "TENANT")
     {
         return new PlatformFeature
         {
@@ -37,8 +39,10 @@ public class PlatformFeature : AuditableEntity
             FeatureKey = featureCode,
             FeatureName = name,
             IsCoreFeature = isCoreFeature,
+            Scope = scope,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
     }
 }
+
