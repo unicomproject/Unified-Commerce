@@ -20,33 +20,33 @@ public partial class LinkPlatformPermissionsToCapabilityRegistry : Migration
 
             -- 2. Ensure default platform module and feature exist as safety fallback
             INSERT INTO platform_modules (id, module_code, module_key, module_name, name, description, status, sort_order, is_core_module, scope, created_at, updated_at)
-            VALUES ('11000000-0000-0000-0000-000000000001'::uuid, 'master_data', 'master_data', 'Master Data', 'Master Data', 'Platform master data module', 'ACTIVE', 1, true, 'PLATFORM', now(), now())
-            ON CONFLICT (module_code) DO UPDATE SET scope = 'PLATFORM';
+            SELECT '11000000-0000-0000-0000-000000000001'::uuid, 'master_data', 'master_data', 'Master Data', 'Master Data', 'Platform master data module', 'ACTIVE', 1, true, 'PLATFORM', now(), now()
+            WHERE NOT EXISTS (SELECT 1 FROM platform_modules WHERE module_code = 'master_data' OR module_key = 'master_data');
 
             INSERT INTO platform_features (id, platform_module_id, feature_code, feature_key, feature_name, name, description, status, sort_order, is_core_feature, scope, created_at, updated_at)
             SELECT '21000000-0000-0000-0000-000000000001'::uuid, pm.id, 'capability_catalog', 'capability_catalog', 'Capability Catalog', 'Capability Catalog', 'Capability catalog feature', 'ACTIVE', 1, true, 'PLATFORM', now(), now()
-            FROM platform_modules pm WHERE pm.module_code = 'master_data'
-            ON CONFLICT (feature_code) DO UPDATE SET scope = 'PLATFORM';
+            FROM platform_modules pm WHERE (pm.module_code = 'master_data' OR pm.module_key = 'master_data')
+            AND NOT EXISTS (SELECT 1 FROM platform_features WHERE feature_code = 'capability_catalog' OR feature_key = 'capability_catalog');
 
             -- 3. Deterministically backfill every platform_permission row with valid non-null foreign keys
             UPDATE platform_permissions pp
             SET platform_module_id = COALESCE(
-                    (SELECT pm.id FROM platform_modules pm WHERE pm.module_code = 'tenant_management' AND (pp.permission_code LIKE 'platform.tenant%' OR pp.permission_code LIKE 'platform.tenants.%') LIMIT 1),
-                    (SELECT pm.id FROM platform_modules pm WHERE pm.module_code = 'billing_core' AND (pp.permission_code LIKE 'platform.subscription%' OR pp.permission_code LIKE 'platform.billing%') LIMIT 1),
-                    (SELECT pm.id FROM platform_modules pm WHERE pm.module_code = 'user_management' AND pp.permission_code LIKE 'platform.user%' LIMIT 1),
-                    (SELECT pm.id FROM platform_modules pm WHERE pm.module_code = 'role_permission_management' AND (pp.permission_code LIKE 'platform.role%' OR pp.permission_code LIKE 'platform.permission%') LIMIT 1),
-                    (SELECT pm.id FROM platform_modules pm WHERE pm.module_code = 'audit_logging' AND pp.permission_code LIKE 'platform.audit%' LIMIT 1),
-                    (SELECT pm.id FROM platform_modules pm WHERE pm.module_code = 'integration_core' AND pp.permission_code LIKE 'platform.integration%' LIMIT 1),
+                    (SELECT pm.id FROM platform_modules pm WHERE (pm.module_code = 'tenant_management' OR pm.module_key = 'tenant_management') AND (pp.permission_code LIKE 'platform.tenant%' OR pp.permission_code LIKE 'platform.tenants.%') LIMIT 1),
+                    (SELECT pm.id FROM platform_modules pm WHERE (pm.module_code = 'billing_core' OR pm.module_key = 'billing_core') AND (pp.permission_code LIKE 'platform.subscription%' OR pp.permission_code LIKE 'platform.billing%') LIMIT 1),
+                    (SELECT pm.id FROM platform_modules pm WHERE (pm.module_code = 'user_management' OR pm.module_key = 'user_management') AND pp.permission_code LIKE 'platform.user%' LIMIT 1),
+                    (SELECT pm.id FROM platform_modules pm WHERE (pm.module_code = 'role_permission_management' OR pm.module_key = 'role_permission_management') AND (pp.permission_code LIKE 'platform.role%' OR pp.permission_code LIKE 'platform.permission%') LIMIT 1),
+                    (SELECT pm.id FROM platform_modules pm WHERE (pm.module_code = 'audit_logging' OR pm.module_key = 'audit_logging') AND pp.permission_code LIKE 'platform.audit%' LIMIT 1),
+                    (SELECT pm.id FROM platform_modules pm WHERE (pm.module_code = 'integration_core' OR pm.module_key = 'integration_core') AND pp.permission_code LIKE 'platform.integration%' LIMIT 1),
                     (SELECT id FROM platform_modules WHERE scope = 'PLATFORM' LIMIT 1),
                     (SELECT id FROM platform_modules LIMIT 1),
                     '11000000-0000-0000-0000-000000000001'::uuid),
                 platform_feature_id = COALESCE(
-                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE pm.module_code = 'tenant_management' AND (pp.permission_code LIKE 'platform.tenant%' OR pp.permission_code LIKE 'platform.tenants.%') LIMIT 1),
-                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE pm.module_code = 'billing_core' AND (pp.permission_code LIKE 'platform.subscription%' OR pp.permission_code LIKE 'platform.billing%') LIMIT 1),
-                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE pm.module_code = 'user_management' AND pp.permission_code LIKE 'platform.user%' LIMIT 1),
-                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE pm.module_code = 'role_permission_management' AND (pp.permission_code LIKE 'platform.role%' OR pp.permission_code LIKE 'platform.permission%') LIMIT 1),
-                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE pm.module_code = 'audit_logging' AND pp.permission_code LIKE 'platform.audit%' LIMIT 1),
-                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE pm.module_code = 'integration_core' AND pp.permission_code LIKE 'platform.integration%' LIMIT 1),
+                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE (pm.module_code = 'tenant_management' OR pm.module_key = 'tenant_management') AND (pp.permission_code LIKE 'platform.tenant%' OR pp.permission_code LIKE 'platform.tenants.%') LIMIT 1),
+                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE (pm.module_code = 'billing_core' OR pm.module_key = 'billing_core') AND (pp.permission_code LIKE 'platform.subscription%' OR pp.permission_code LIKE 'platform.billing%') LIMIT 1),
+                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE (pm.module_code = 'user_management' OR pm.module_key = 'user_management') AND pp.permission_code LIKE 'platform.user%' LIMIT 1),
+                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE (pm.module_code = 'role_permission_management' OR pm.module_key = 'role_permission_management') AND (pp.permission_code LIKE 'platform.role%' OR pp.permission_code LIKE 'platform.permission%') LIMIT 1),
+                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE (pm.module_code = 'audit_logging' OR pm.module_key = 'audit_logging') AND pp.permission_code LIKE 'platform.audit%' LIMIT 1),
+                    (SELECT pf.id FROM platform_features pf JOIN platform_modules pm ON pf.platform_module_id = pm.id WHERE (pm.module_code = 'integration_core' OR pm.module_key = 'integration_core') AND pp.permission_code LIKE 'platform.integration%' LIMIT 1),
                     (SELECT id FROM platform_features WHERE scope = 'PLATFORM' LIMIT 1),
                     (SELECT id FROM platform_features LIMIT 1),
                     '21000000-0000-0000-0000-000000000001'::uuid);
