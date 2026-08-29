@@ -86,7 +86,7 @@ public sealed class StorefrontService : IStorefrontService
         return _fulfillmentService.GetCollectionOptionsAsync(tenantId, outletId, days, cancellationToken);
     }
 
-    public Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
+    public Task<(Guid? TenantId, string? BaseCurrencyCode, string? StoreName, string? LogoUrl)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
     {
         return _tenantService.ResolveTenantAsync(slug, cancellationToken);
     }

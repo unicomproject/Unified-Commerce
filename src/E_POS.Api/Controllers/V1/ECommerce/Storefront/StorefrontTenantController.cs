@@ -31,6 +31,6 @@ public class StorefrontTenantController : ControllerBase
             return NotFound(new { message = "Tenant not found or inactive." });
         }
 
-        return Ok(new { tenantId = result.TenantId, currencyCode = result.BaseCurrencyCode });
+        return Ok(new { tenantId = result.TenantId, currencyCode = result.BaseCurrencyCode, storeName = result.StoreName, logoUrl = result.LogoUrl });
     }
 }

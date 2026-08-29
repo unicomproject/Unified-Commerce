@@ -6,6 +6,7 @@ public class StorefrontProductReadModel
     public string Name { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public decimal? OriginalPrice { get; set; }
     public string CurrencyCode { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
     public decimal Rating { get; set; }
@@ -19,6 +20,7 @@ public class StorefrontProductListReadModel
     public string Slug { get; set; } = string.Empty;
     public string ShortDescription { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public decimal? OriginalPrice { get; set; }
     public string CurrencyCode { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
     public decimal Rating { get; set; }
@@ -36,6 +38,7 @@ public class StorefrontProductDetailReadModel
     public string ShortDescription { get; set; } = string.Empty;
     public string LongDescription { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public decimal? OriginalPrice { get; set; }
     public string CurrencyCode { get; set; } = string.Empty;
     public decimal Rating { get; set; }
     public int ReviewCount { get; set; }
@@ -99,6 +102,7 @@ public class StorefrontProductVariantReadModel
     public string? Colour => GetOptionValue("COLOUR") ?? GetOptionValue("COLOR");
     public string? Size => GetOptionValue("SIZE");
     public decimal Price { get; set; }
+    public decimal? OriginalPrice { get; set; }
     public string CurrencyCode { get; set; } = string.Empty;
     public bool IsDefault { get; set; }
     public bool IsInStock { get; set; }
@@ -143,7 +147,10 @@ public class StorefrontStoreReadModel
     public string Address { get; set; } = string.Empty;
     public bool IsAvailable { get; set; }
     public bool IsOpen { get; set; }
+    public bool IsDefault { get; set; }
     public int PreparationLeadMinutes { get; set; }
+    public string? ImageUrl { get; set; }
+    public string? ClosingTime { get; set; }
 }
 
 public sealed class StorefrontCollectionOptionsReadModel

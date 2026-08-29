@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Dtos;
 
@@ -6,40 +6,16 @@ namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 
 public interface ICustomerAuthService
 {
-    Task<ApplicationResult> RegisterAsync(
+    Task<ApplicationResult> RequestOtpAsync(
         Guid tenantId,
-        CustomerRegisterRequest request,
+        CustomerRequestOtpRequest request,
         IPAddress? ipAddress,
         string? userAgent,
         CancellationToken cancellationToken);
 
-    Task<ApplicationResult> VerifyEmailAsync(
+    Task<ApplicationResult<CustomerAuthTokenResult>> VerifyOtpAsync(
         Guid tenantId,
-        CustomerVerifyEmailRequest request,
-        CancellationToken cancellationToken);
-
-    Task<ApplicationResult> ResendEmailVerificationAsync(
-        Guid tenantId,
-        CustomerResendEmailVerificationRequest request,
-        IPAddress? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken);
-
-    Task<ApplicationResult> ForgotPasswordAsync(
-        Guid tenantId,
-        CustomerForgotPasswordRequest request,
-        IPAddress? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken);
-
-    Task<ApplicationResult> ResetPasswordAsync(
-        Guid tenantId,
-        CustomerResetPasswordRequest request,
-        CancellationToken cancellationToken);
-
-    Task<ApplicationResult<CustomerAuthTokenResult>> LoginAsync(
-        Guid tenantId,
-        CustomerLoginRequest request,
+        CustomerVerifyOtpRequest request,
         IPAddress? ipAddress,
         string? userAgent,
         CancellationToken cancellationToken);
