@@ -13,15 +13,14 @@ public sealed record TenantAdminProductSummaryCardsResponse(
     int CategoryCount);
 
 public sealed record TenantAdminProductCategoryOptionResponse(
-    Guid CategoryId,
+    Guid Id,
+    string CategoryCode,
     string CategoryName,
-    string CategoryCode);
-
-public sealed record TenantAdminProductSubCategoryOptionResponse(
-    Guid SubCategoryId,
-    string SubCategoryName,
-    string SubCategoryCode,
-    Guid ParentCategoryId);
+    Guid? ParentCategoryId,
+    int Level,
+    string HierarchyPath,
+    bool HasChildren,
+    int SortOrder);
 
 public sealed record TenantAdminProductBrandOptionResponse(
     Guid BrandId,
@@ -54,7 +53,6 @@ public sealed record TenantAdminProductVariantOptionTemplateResponse(
 
 public sealed record TenantAdminProductCreateOptionsResponse(
     IReadOnlyList<TenantAdminProductCategoryOptionResponse> Categories,
-    IReadOnlyList<TenantAdminProductSubCategoryOptionResponse> SubCategories,
     IReadOnlyList<TenantAdminProductBrandOptionResponse> Brands,
     IReadOnlyList<TenantAdminProductUnitOptionResponse> Units,
     IReadOnlyList<TenantAdminProductTaxOptionResponse> Taxes,
@@ -106,7 +104,15 @@ public sealed class TenantAdminProductCreateRequest
     public string Sku { get; set; } = string.Empty;
     public string? Barcode { get; set; }
     public Guid CategoryId { get; set; }
+
+    /// <summary>
+    /// Deprecated compatibility field. Canonical Product Setup persists CategoryId only.
+    /// When provided, treated as the selected recursive Category identity (not a SubCategory entity)
+    /// and replaces CategoryId for the single product_categories mapping.
+    /// </summary>
     public Guid? SubCategoryId { get; set; }
+
+    public Guid ResolveSelectedCategoryId() => SubCategoryId ?? CategoryId;
     public Guid? BrandId { get; set; }
     public string UnitType { get; set; } = string.Empty;
     public string? ShortDescription { get; set; }

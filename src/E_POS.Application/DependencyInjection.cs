@@ -104,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<IReturnPolicyTemplateRequestValidator, ReturnPolicyTemplateRequestValidator>();
         services.AddScoped<IReturnPolicyRequestValidator, ReturnPolicyRequestValidator>();
         services.AddScoped<IDepartmentService, DepartmentService>();
+        services.AddScoped<CategoryAccessPolicy>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();

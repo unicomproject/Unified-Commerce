@@ -18,6 +18,7 @@ public class Product : AuditableEntity
     public string? LongDescription { get; protected set; }
     public bool IsSellable { get; protected set; } = true;
     public bool IsTaxable { get; protected set; } = true;
+    public bool IsTaxExclusive { get; protected set; } = true;
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
@@ -176,6 +177,13 @@ public class Product : AuditableEntity
     public void UpdateReferenceCost(decimal? costPrice, Guid? updatedByTenantUserId, DateTimeOffset now)
     {
         ReferenceCostPrice = costPrice;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateTaxConfiguration(bool isTaxExclusive, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        IsTaxExclusive = isTaxExclusive;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

@@ -35,14 +35,36 @@ public sealed class CategoriesController : ControllerBase
         return result.IsSuccess && result.Value is not null ? CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value) : ToErrorResult(result.Error);
     }
 
-    [HttpGet]
-    [ProducesResponseType(typeof(CategoryListResponse), StatusCodes.Status200OK)]
+    [HttpGet("tree")]
+    [ProducesResponseType(typeof(CategoryTreeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> List([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetTree(CancellationToken cancellationToken = default)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized(CreateError(new ApplicationError("category.invalid_tenant_context", "Invalid tenant context.")));
-        var result = await _categoryService.ListAsync(context, pageNumber, pageSize, search, cancellationToken);
+        var result = await _categoryService.GetTreeAsync(context, cancellationToken);
+        return result.IsSuccess && result.Value is not null ? Ok(result.Value) : ToErrorResult(result.Error);
+    }
+
+    [HttpGet]
+    [ProducesResponseType(typeof(CategoryListResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> List(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] Guid? parentCategoryId = null,
+        [FromQuery] bool rootOnly = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context)) return Unauthorized(CreateError(new ApplicationError("category.invalid_tenant_context", "Invalid tenant context.")));
+        var result = await _categoryService.ListAsync(
+            context,
+            new CategoryListQuery(pageNumber, pageSize, search, status, parentCategoryId, rootOnly),
+            cancellationToken);
         return result.IsSuccess && result.Value is not null ? Ok(result.Value) : ToErrorResult(result.Error);
     }
 
@@ -89,10 +111,11 @@ public sealed class CategoriesController : ControllerBase
     {
         return error.Code switch
         {
-            "category.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+            "category.permission_denied" or "category.entitlement_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "category.not_found" or "category.parent_not_found" => NotFound(CreateError(error)),
-            "category.duplicate_code" or "category.delete_conflict" => Conflict(CreateError(error)),
+            "category.duplicate_code" or "category.duplicate_name" or "category.delete_conflict" => Conflict(CreateError(error)),
             "category.invalid_tenant_context" => Unauthorized(CreateError(error)),
+            "category.unexpected_failure" => StatusCode(StatusCodes.Status500InternalServerError, CreateError(error)),
             _ => BadRequest(CreateError(error))
         };
     }
@@ -102,4 +125,3 @@ public sealed class CategoriesController : ControllerBase
         return new { code = error.Code, message = error.Message, details = Array.Empty<string>(), traceId = HttpContext.TraceIdentifier, timestamp = DateTimeOffset.UtcNow };
     }
 }
-

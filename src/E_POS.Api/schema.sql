@@ -2430,12 +2430,11 @@ CREATE TABLE product_collections (
 CREATE TABLE categories (
     id uuid NOT NULL,
     tenant_id uuid NOT NULL,
-    department_id uuid NOT NULL,
     parent_category_id uuid,
     category_code varchar(80) NOT NULL,
     category_name varchar(150) NOT NULL,
     category_slug varchar(180) NOT NULL,
-    description text,
+    description varchar(2000),
     image_media_asset_id uuid,
     sort_order integer NOT NULL DEFAULT 0,
     status varchar(40) NOT NULL,
@@ -2444,14 +2443,14 @@ CREATE TABLE categories (
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone NOT NULL,
     CONSTRAINT pk_categories PRIMARY KEY (id),
-    CONSTRAINT "AK_categories_tenant_id_id" UNIQUE (tenant_id, id),
+    CONSTRAINT uq_categories_tenant_id_id UNIQUE (tenant_id, id),
     CONSTRAINT ck_categories_parent_category_id CHECK (parent_category_id IS NULL OR parent_category_id <> id),
     CONSTRAINT ck_categories_sort_order CHECK (sort_order >= 0),
     CONSTRAINT ck_categories_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DELETED')),
+    CONSTRAINT ck_categories_description_length CHECK (description IS NULL OR char_length(description) <= 2000),
     CONSTRAINT fk_categories_created_by_tenant_user_id_tenant_users FOREIGN KEY (created_by_tenant_user_id) REFERENCES tenant_users (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_categories_department_id_departments FOREIGN KEY (department_id) REFERENCES departments (id) ON DELETE RESTRICT,
     CONSTRAINT fk_categories_image_media_asset_tenant FOREIGN KEY (tenant_id, image_media_asset_id) REFERENCES media_assets (tenant_id, id) ON DELETE RESTRICT,
-    CONSTRAINT fk_categories_parent_category_id_categories FOREIGN KEY (parent_category_id) REFERENCES categories (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_categories_tenant_parent_category FOREIGN KEY (tenant_id, parent_category_id) REFERENCES categories (tenant_id, id) ON DELETE RESTRICT,
     CONSTRAINT fk_categories_tenant_id_tenants FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE RESTRICT,
     CONSTRAINT fk_categories_updated_by_tenant_user_id_tenant_users FOREIGN KEY (updated_by_tenant_user_id) REFERENCES tenant_users (id) ON DELETE RESTRICT
 );
@@ -6925,28 +6924,25 @@ CREATE UNIQUE INDEX uq_cash_reconciliations_till_session_id ON cash_reconciliati
 CREATE INDEX "IX_categories_created_by_tenant_user_id" ON categories (created_by_tenant_user_id);
 
 
-CREATE INDEX "IX_categories_department_id" ON categories (department_id);
-
-
-CREATE INDEX "IX_categories_parent_category_id" ON categories (parent_category_id);
-
-
 CREATE INDEX ix_categories_tenant_id_image_media_asset_id ON categories (tenant_id, image_media_asset_id);
+
+
+CREATE INDEX ix_categories_tenant_id_parent_category_id ON categories (tenant_id, parent_category_id);
+
+
+CREATE INDEX ix_categories_tenant_id_status ON categories (tenant_id, status);
 
 
 CREATE INDEX "IX_categories_updated_by_tenant_user_id" ON categories (updated_by_tenant_user_id);
 
 
+CREATE UNIQUE INDEX uq_categories_tenant_id_category_code ON categories (tenant_id, category_code);
+
+
 CREATE UNIQUE INDEX uq_categories_tenant_id_category_slug ON categories (tenant_id, category_slug);
 
 
-CREATE UNIQUE INDEX uq_categories_tenant_id_department_id_category_code ON categories (tenant_id, department_id, category_code);
-
-
-CREATE UNIQUE INDEX uq_categories_tenant_id_department_id_id ON categories (tenant_id, department_id, id);
-
-
-CREATE UNIQUE INDEX uq_categories_tenant_id_id ON categories (tenant_id, id);
+CREATE UNIQUE INDEX uq_categories_tenant_id_normalized_category_name ON categories (tenant_id, LOWER(BTRIM(category_name)));
 
 
 CREATE INDEX "IX_checkout_events_checkout_session_id" ON checkout_events (checkout_session_id);

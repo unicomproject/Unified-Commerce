@@ -10,6 +10,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 
@@ -27,17 +28,26 @@ public sealed class CatalogMediaService : ICatalogMediaService
     private readonly IMediaObjectStorage _storage;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IMediaReadUrlResolver? _urlResolver;
+    private readonly CategoryAccessPolicy? _categoryAccessPolicy;
+    private readonly ICategoryAuditLogger? _categoryAuditLogger;
+    private readonly ILogger<CatalogMediaService>? _logger;
 
     public CatalogMediaService(
         ICatalogMediaRepository repository,
         IMediaObjectStorage storage,
         IDateTimeProvider dateTimeProvider,
-        IMediaReadUrlResolver? urlResolver = null)
+        IMediaReadUrlResolver? urlResolver = null,
+        CategoryAccessPolicy? categoryAccessPolicy = null,
+        ICategoryAuditLogger? categoryAuditLogger = null,
+        ILogger<CatalogMediaService>? logger = null)
     {
         _repository = repository;
         _storage = storage;
         _dateTimeProvider = dateTimeProvider;
         _urlResolver = urlResolver;
+        _categoryAccessPolicy = categoryAccessPolicy;
+        _categoryAuditLogger = categoryAuditLogger;
+        _logger = logger;
     }
 
     public async Task<ApplicationResult<MediaAssetUploadResponse>> UploadProductImageAsync(
@@ -629,7 +639,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
         MediaUploadFile file,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateCategoryAccess(context);
+        var accessError = await ValidateCategoryAccessAsync(context, cancellationToken);
         if (accessError is not null)
         {
             return ApplicationResult<MediaAssetUploadResponse>.Failure(accessError);
@@ -647,7 +657,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
         if (category is null)
         {
             return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
-                "media.category_not_found",
+                "category.not_found",
                 "Category was not found."));
         }
 
@@ -670,13 +680,30 @@ public sealed class CatalogMediaService : ICatalogMediaService
             mediaAssetId,
             preparedResult.Image.StorageExtension);
 
-        var uploadResult = await UploadToStorageAsync(
-            context,
-            mediaAssetId,
-            storageKey,
-            purpose,
-            preparedResult.Image,
-            cancellationToken);
+        MediaObjectUploadResult uploadResult;
+        try
+        {
+            uploadResult = await UploadToStorageAsync(
+                context,
+                mediaAssetId,
+                storageKey,
+                purpose,
+                preparedResult.Image,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(
+                ex,
+                "CATEGORY_IMAGE_STORAGE_FAILED TenantId={TenantId} CategoryId={CategoryId}",
+                context.TenantId,
+                categoryId);
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(CategoryImageUnexpectedFailure());
+        }
 
         var now = _dateTimeProvider.UtcNow;
         var mediaAsset = CreateMediaAsset(
@@ -688,29 +715,47 @@ public sealed class CatalogMediaService : ICatalogMediaService
             ActiveStatus,
             now);
 
-        category.UpdateImage(mediaAssetId, context.UserId, now);
-
         try
         {
-            await _repository.AddMediaAssetAsync(mediaAsset, cancellationToken);
-            if (previousMediaAssetId.HasValue)
+            await _repository.ExecuteInTransactionAsync(async ct =>
             {
-                await _repository.MarkMediaAssetInactiveAsync(
-                    context.TenantId,
-                    previousMediaAssetId.Value,
-                    context.UserId,
-                    now,
-                    cancellationToken);
-            }
+                category.UpdateImage(mediaAssetId, context.UserId, now);
+                await _repository.AddMediaAssetAsync(mediaAsset, ct);
+                if (previousMediaAssetId.HasValue)
+                {
+                    var ownedPrevious = await _repository.GetMediaAssetAsync(
+                        context.TenantId,
+                        previousMediaAssetId.Value,
+                        ct);
+                    if (ownedPrevious is not null)
+                    {
+                        await _repository.MarkMediaAssetInactiveAsync(
+                            context.TenantId,
+                            previousMediaAssetId.Value,
+                            context.UserId,
+                            now,
+                            ct);
+                    }
+                }
 
-            await _repository.SaveChangesAsync(cancellationToken);
+                _categoryAuditLogger?.LogImageUploaded(context.TenantId, context.UserId, categoryId, mediaAssetId);
+                await _repository.SaveChangesAsync(ct);
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            await TryDeleteUploadedBlobAsync(uploadResult, cancellationToken);
+            throw;
         }
         catch (Exception ex)
         {
             await TryDeleteUploadedBlobAsync(uploadResult, cancellationToken);
-            return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
-                "media.save_failed",
-                "Failed to save category image record: " + ex.Message));
+            _logger?.LogError(
+                ex,
+                "CATEGORY_IMAGE_SAVE_FAILED TenantId={TenantId} CategoryId={CategoryId}",
+                context.TenantId,
+                categoryId);
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(CategoryImageSaveFailed());
         }
 
         return ApplicationResult<MediaAssetUploadResponse>.Success(new MediaAssetUploadResponse(
@@ -732,6 +777,82 @@ public sealed class CatalogMediaService : ICatalogMediaService
             preparedResult.Image.WidthPx,
             preparedResult.Image.HeightPx,
             preparedResult.Image.ChecksumHash));
+    }
+
+    public async Task<ApplicationResult> RemoveCategoryImageAsync(
+        TenantRequestContext context,
+        Guid categoryId,
+        CancellationToken cancellationToken)
+    {
+        var accessError = await ValidateCategoryAccessAsync(context, cancellationToken);
+        if (accessError is not null)
+        {
+            return ApplicationResult.Failure(accessError);
+        }
+
+        var category = await _repository.GetCategoryForImageUpdateAsync(
+            context.TenantId,
+            categoryId,
+            cancellationToken);
+        if (category is null)
+        {
+            return ApplicationResult.Failure(new ApplicationError(
+                "category.not_found",
+                "Category was not found."));
+        }
+
+        var previousMediaAssetId = category.ImageMediaAssetId;
+        if (!previousMediaAssetId.HasValue)
+        {
+            _categoryAuditLogger?.LogImageRemoved(context.TenantId, context.UserId, categoryId, null, noOp: true);
+            await _repository.SaveChangesAsync(cancellationToken);
+            return ApplicationResult.Success();
+        }
+
+        try
+        {
+            await _repository.ExecuteInTransactionAsync(async ct =>
+            {
+                var now = _dateTimeProvider.UtcNow;
+                category.UpdateImage(null, context.UserId, now);
+                var ownedPrevious = await _repository.GetMediaAssetAsync(
+                    context.TenantId,
+                    previousMediaAssetId.Value,
+                    ct);
+                if (ownedPrevious is not null)
+                {
+                    await _repository.MarkMediaAssetInactiveAsync(
+                        context.TenantId,
+                        previousMediaAssetId.Value,
+                        context.UserId,
+                        now,
+                        ct);
+                }
+
+                _categoryAuditLogger?.LogImageRemoved(
+                    context.TenantId,
+                    context.UserId,
+                    categoryId,
+                    previousMediaAssetId,
+                    noOp: false);
+                await _repository.SaveChangesAsync(ct);
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(
+                ex,
+                "CATEGORY_IMAGE_REMOVE_FAILED TenantId={TenantId} CategoryId={CategoryId}",
+                context.TenantId,
+                categoryId);
+            return ApplicationResult.Failure(CategoryImageSaveFailed());
+        }
+
+        return ApplicationResult.Success();
     }
 
     public async Task<ApplicationResult<MediaAssetUploadResponse>> UploadBrandLogoAsync(
@@ -1038,17 +1159,19 @@ public sealed class CatalogMediaService : ICatalogMediaService
     private static ApplicationError? ValidateProductAccess(TenantRequestContext context) =>
         ValidateProductMediaManageAccess(context);
 
-    private static ApplicationError? ValidateCategoryAccess(TenantRequestContext context)
+    private async Task<ApplicationError?> ValidateCategoryAccessAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
     {
-        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
+        if (_categoryAccessPolicy is null)
         {
-            return new ApplicationError("media.invalid_tenant_context", "Invalid tenant context.");
+            return CategoryAccessPolicy.UnexpectedFailure;
         }
 
-        return context.HasPermission(CategoryConstants.UpdatePermission) ||
-               context.HasPermission(CategoryConstants.ManagePermission)
-            ? null
-            : PermissionDenied;
+        return await _categoryAccessPolicy.ValidateAsync(
+            context,
+            CategoryConstants.UpdatePermission,
+            cancellationToken);
     }
 
     private static ApplicationError? ValidateBrandAccess(TenantRequestContext context)
@@ -1069,6 +1192,12 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
     private static ApplicationError StorageNotConfigured() =>
         new("media.storage_not_configured", "Media storage is not configured.");
+
+    private static ApplicationError CategoryImageSaveFailed() =>
+        new("media.save_failed", "Category image could not be saved.");
+
+    private static ApplicationError CategoryImageUnexpectedFailure() =>
+        new("media.unexpected_failure", "Category image storage failed.");
 
     private static string BuildStorageKey(
         Guid tenantId,

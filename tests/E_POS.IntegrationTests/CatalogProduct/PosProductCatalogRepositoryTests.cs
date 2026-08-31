@@ -1338,7 +1338,6 @@ public sealed class PosProductCatalogRepositoryTests
         dbContext.Categories.Add(Category.Create(
             categoryId,
             tenantId,
-            departmentId,
             null,
             "APPAREL",
             "Apparel",

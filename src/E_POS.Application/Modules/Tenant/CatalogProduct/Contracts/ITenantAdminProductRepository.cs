@@ -125,7 +125,9 @@ public interface ITenantAdminProductRepository
         TenantAdminProductDashboardQuery query,
         CancellationToken cancellationToken);
 
+    Task<bool> IsCategoryEffectivelySelectableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
     Task<bool> ActiveCategoryExistsAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
+    Task<bool> CategoryExistsForExistingMappingAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
     Task<bool> ProductCodeExistsAsync(Guid tenantId, string productCode, Guid? excludeProductId, CancellationToken cancellationToken);
     Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductVariantId, CancellationToken cancellationToken);
     Task<bool> BarcodeExistsAsync(Guid tenantId, string barcodeValue, Guid? excludeProductVariantId, CancellationToken cancellationToken);

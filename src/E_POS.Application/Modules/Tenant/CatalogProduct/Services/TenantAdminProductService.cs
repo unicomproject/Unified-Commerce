@@ -728,7 +728,12 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         TenantRequestContext context,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateWizardCreateAccess(context);
+        var accessError = await _accessPolicy.ValidateWizardAccessAsync(
+            context,
+            productId: null,
+            isCreateAction: true,
+            request: null,
+            cancellationToken);
         if (accessError is not null)
         {
             return ApplicationResult<TenantAdminProductCreateOptionsResponse>.Failure(accessError);
@@ -945,10 +950,21 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         {
             if (request.CategoryId.HasValue && request.CategoryId != Guid.Empty)
             {
-                if (!await _tenantAdminProductRepository.ActiveCategoryExistsAsync(
+                var isUnchangedExistingMapping =
+                    existingSetup is not null &&
+                    existingSetup.CategoryId == request.CategoryId;
+
+                var categoryValid = isUnchangedExistingMapping
+                    ? await _tenantAdminProductRepository.CategoryExistsForExistingMappingAsync(
                         context.TenantId,
                         request.CategoryId.Value,
-                        cancellationToken))
+                        cancellationToken)
+                    : await _tenantAdminProductRepository.ActiveCategoryExistsAsync(
+                        context.TenantId,
+                        request.CategoryId.Value,
+                        cancellationToken);
+
+                if (!categoryValid)
                 {
                     return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
                         "product.validation_failed",
@@ -1373,29 +1389,15 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         TenantAdminProductCreateRequest request,
         CancellationToken cancellationToken)
     {
-        if (!await _tenantAdminProductRepository.CategoryBelongsToTenantAsync(
+        if (!await _tenantAdminProductRepository.IsCategoryEffectivelySelectableAsync(
                 context.TenantId,
-                request.CategoryId,
-                parentCategoryId: null,
+                request.ResolveSelectedCategoryId(),
                 cancellationToken))
         {
             return new ApplicationError(
                 "product.validation_failed",
                 "Product validation failed.",
                 [new ApplicationFieldError("categoryId", "Category was not found for this tenant.")]);
-        }
-
-        if (request.SubCategoryId.HasValue &&
-            !await _tenantAdminProductRepository.CategoryBelongsToTenantAsync(
-                context.TenantId,
-                request.SubCategoryId.Value,
-                request.CategoryId,
-                cancellationToken))
-        {
-            return new ApplicationError(
-                "product.validation_failed",
-                "Product validation failed.",
-                [new ApplicationFieldError("subCategoryId", "Sub-category was not found for the selected category.")]);
         }
 
         if (request.BrandId.HasValue &&

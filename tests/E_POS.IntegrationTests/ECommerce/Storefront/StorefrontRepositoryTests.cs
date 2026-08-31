@@ -753,7 +753,6 @@ public sealed class StorefrontRepositoryTests
         return Category.Create(
             Guid.NewGuid(),
             tenantId,
-            Guid.NewGuid(),
             parentCategoryId,
             code,
             name,
