@@ -22,7 +22,11 @@ public sealed class PlatformModulesCatalogRepository : IPlatformModulesCatalogRe
 
         var modulesQuery = _dbContext.PlatformModules
             .AsNoTracking()
-            .Where(module => module.Status == "ACTIVE");
+            .Where(module => module.Status == "ACTIVE" &&
+                _dbContext.PlatformFeatures.Any(feature =>
+                    feature.PlatformModuleId == module.Id &&
+                    feature.Status == "ACTIVE" &&
+                    (string.IsNullOrEmpty(normalizedScope) || normalizedScope == "ALL" || feature.Scope.ToUpper() == normalizedScope)));
 
         if (!string.IsNullOrEmpty(normalizedScope) && normalizedScope != "ALL")
         {

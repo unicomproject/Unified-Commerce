@@ -61,7 +61,7 @@ public static class DevelopmentPosPermissionCatalogSeedData
             is_core_feature = EXCLUDED.is_core_feature,
             name = EXCLUDED.name,
             description = EXCLUDED.description,
-            status = 'ACTIVE',
+            status = EXCLUDED.status,
             sort_order = EXCLUDED.sort_order,
             updated_at = now();
         """;
