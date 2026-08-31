@@ -283,7 +283,7 @@ public sealed class DevelopmentPlatformAdminTestAccountSeederUnitTests
         public IReadOnlyList<Guid> LastAddedRoleIds { get; private set; } = [];
         public IReadOnlyList<Guid> LastReplacedRoleIds { get; private set; } = [];
 
-        public Task<PlatformUserListResponse> GetUsersAsync(CancellationToken cancellationToken) =>
+        public Task<PlatformUserListResponse> GetUsersAsync(PlatformUserListQuery query, CancellationToken cancellationToken) =>
             Task.FromResult(new PlatformUserListResponse([]));
 
         public Task<PlatformUserDetailResponse?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken) =>

@@ -1,5 +1,6 @@
 using System.Reflection;
 using E_POS.Application.Modules.Shared.Media.Contracts;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -480,6 +481,8 @@ public sealed class StorefrontRepositoryTests
             ProductConstants.ActiveStatus,
             null,
             Now));
+        dbContext.FulfillmentMethods.Add(
+            FulfillmentMethod.Create(Guid.NewGuid(), tenantId, "CLICK_COLLECT", "Click & Collect", "Customer pickup from the selected outlet.", "ACTIVE", "PICKUP", Now));
         await dbContext.SaveChangesAsync();
         var repository = new StorefrontRepository(
             new StorefrontBannerRepository(dbContext),

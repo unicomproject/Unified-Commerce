@@ -9,80 +9,38 @@ namespace E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
 
 public sealed class CustomerAuthService : ICustomerAuthService
 {
-    private readonly ICustomerRegistrationService _registrationService;
-    private readonly ICustomerEmailVerificationService _emailVerificationService;
-    private readonly ICustomerPasswordResetService _passwordResetService;
-    private readonly ICustomerLoginService _loginService;
+    private readonly ICustomerOtpAuthService _otpService;
     private readonly ICustomerGoogleAuthService _googleAuthService;
     private readonly ICustomerSessionService _sessionService;
     private readonly ICustomerProfileService _profileService;
 
     public CustomerAuthService(
-        ICustomerRegistrationService registrationService,
-        ICustomerEmailVerificationService emailVerificationService,
-        ICustomerPasswordResetService passwordResetService,
-        ICustomerLoginService loginService,
+        ICustomerOtpAuthService otpService,
         ICustomerGoogleAuthService googleAuthService,
         ICustomerSessionService sessionService,
         ICustomerProfileService profileService)
     {
-        _registrationService = registrationService;
-        _emailVerificationService = emailVerificationService;
-        _passwordResetService = passwordResetService;
-        _loginService = loginService;
+        _otpService = otpService;
         _googleAuthService = googleAuthService;
         _sessionService = sessionService;
         _profileService = profileService;
     }
 
-    public Task<ApplicationResult> RegisterAsync(
+    public Task<ApplicationResult> RequestOtpAsync(
         Guid tenantId,
-        CustomerRegisterRequest request,
+        CustomerRequestOtpRequest request,
         IPAddress? ipAddress,
         string? userAgent,
         CancellationToken cancellationToken) =>
-        _registrationService.RegisterAsync(tenantId, request, ipAddress, userAgent, cancellationToken);
+        _otpService.RequestOtpAsync(tenantId, request, ipAddress, userAgent, cancellationToken);
 
-    public Task<ApplicationResult> VerifyEmailAsync(
+    public Task<ApplicationResult<CustomerAuthTokenResult>> VerifyOtpAsync(
         Guid tenantId,
-        CustomerVerifyEmailRequest request,
-        CancellationToken cancellationToken) =>
-        _emailVerificationService.VerifyEmailAsync(tenantId, request, cancellationToken);
-
-    public Task<ApplicationResult> ResendEmailVerificationAsync(
-        Guid tenantId,
-        CustomerResendEmailVerificationRequest request,
+        CustomerVerifyOtpRequest request,
         IPAddress? ipAddress,
         string? userAgent,
         CancellationToken cancellationToken) =>
-        _emailVerificationService.ResendEmailVerificationAsync(
-            tenantId,
-            request,
-            ipAddress,
-            userAgent,
-            cancellationToken);
-
-    public Task<ApplicationResult> ForgotPasswordAsync(
-        Guid tenantId,
-        CustomerForgotPasswordRequest request,
-        IPAddress? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken) =>
-        _passwordResetService.ForgotPasswordAsync(tenantId, request, ipAddress, userAgent, cancellationToken);
-
-    public Task<ApplicationResult> ResetPasswordAsync(
-        Guid tenantId,
-        CustomerResetPasswordRequest request,
-        CancellationToken cancellationToken) =>
-        _passwordResetService.ResetPasswordAsync(tenantId, request, cancellationToken);
-
-    public Task<ApplicationResult<CustomerAuthTokenResult>> LoginAsync(
-        Guid tenantId,
-        CustomerLoginRequest request,
-        IPAddress? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken) =>
-        _loginService.LoginAsync(tenantId, request, ipAddress, userAgent, cancellationToken);
+        _otpService.VerifyOtpAsync(tenantId, request, ipAddress, userAgent, cancellationToken);
 
     public Task<ApplicationResult<CustomerAuthTokenResult>> GoogleLoginAsync(
         Guid tenantId,

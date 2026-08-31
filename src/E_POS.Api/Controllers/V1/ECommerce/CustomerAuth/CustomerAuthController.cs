@@ -27,122 +27,47 @@ public sealed class CustomerAuthController : CustomerControllerBase
     }
 
     [AllowAnonymous]
-    [HttpPost("register")]
+    [HttpPost("request-otp")]
     [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
-    public async Task<IActionResult> Register(
+    public async Task<IActionResult> RequestOtp(
         [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
-        [FromBody] CustomerRegisterRequest? request,
+        [FromBody] CustomerRequestOtpRequest? request,
         CancellationToken cancellationToken)
     {
-        var result = await _service.RegisterAsync(
+        var result = await _service.RequestOtpAsync(
             tenantId,
-            request ?? new CustomerRegisterRequest(),
+            request ?? new CustomerRequestOtpRequest(),
             HttpContext.Connection.RemoteIpAddress,
             Request.Headers.UserAgent.FirstOrDefault(),
             cancellationToken);
 
         return result.IsSuccess
-            ? Ok(CreateSuccess("Registration successful. Please check your email for the verification code."))
+            ? Ok(CreateSuccess("If the email is valid, an OTP has been sent."))
             : CreateErrorResult(result.Error);
     }
 
     [AllowAnonymous]
-    [HttpPost("verify-email")]
+    [HttpPost("verify-otp")]
     [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
-    public async Task<IActionResult> VerifyEmail(
+    public async Task<IActionResult> VerifyOtp(
         [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
-        [FromBody] CustomerVerifyEmailRequest? request,
+        [FromBody] CustomerVerifyOtpRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _service.VerifyEmailAsync(
-            tenantId,
-            request ?? new CustomerVerifyEmailRequest(),
-            cancellationToken);
-
-        return result.IsSuccess
-            ? Ok(CreateSuccess("Email verified successfully."))
-            : CreateErrorResult(result.Error);
-    }
-
-    [AllowAnonymous]
-    [HttpPost("resend-email-verification")]
-    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
-    public async Task<IActionResult> ResendEmailVerification(
-        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
-        [FromBody] CustomerResendEmailVerificationRequest? request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _service.ResendEmailVerificationAsync(
-            tenantId,
-            request ?? new CustomerResendEmailVerificationRequest(),
-            HttpContext.Connection.RemoteIpAddress,
-            Request.Headers.UserAgent.FirstOrDefault(),
-            cancellationToken);
-
-        return result.IsSuccess
-            ? Ok(CreateSuccess("Verification code sent."))
-            : CreateErrorResult(result.Error);
-    }
-
-    [AllowAnonymous]
-    [HttpPost("forgot-password")]
-    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
-    public async Task<IActionResult> ForgotPassword(
-        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
-        [FromBody] CustomerForgotPasswordRequest? request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _service.ForgotPasswordAsync(
-            tenantId,
-            request ?? new CustomerForgotPasswordRequest(),
-            HttpContext.Connection.RemoteIpAddress,
-            Request.Headers.UserAgent.FirstOrDefault(),
-            cancellationToken);
-
-        return result.IsSuccess
-            ? Ok(CreateSuccess("If an account exists for this email, a password reset link has been sent."))
-            : CreateErrorResult(result.Error);
-    }
-
-    [AllowAnonymous]
-    [HttpPost("reset-password")]
-    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
-    public async Task<IActionResult> ResetPassword(
-        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
-        [FromBody] CustomerResetPasswordRequest? request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _service.ResetPasswordAsync(
-            tenantId,
-            request ?? new CustomerResetPasswordRequest(),
-            cancellationToken);
-
-        return result.IsSuccess
-            ? Ok(CreateSuccess("Password reset successful."))
-            : CreateErrorResult(result.Error);
-    }
-
-    [AllowAnonymous]
-    [HttpPost("login")]
-    [EnableRateLimiting(RateLimitingPolicies.AuthLogin)]
-    public async Task<IActionResult> Login(
-        [FromHeader(Name = "X-Tenant-Id")] Guid tenantId,
-        [FromBody] CustomerLoginRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _service.LoginAsync(
+        var result = await _service.VerifyOtpAsync(
             tenantId,
             request,
             HttpContext.Connection.RemoteIpAddress,
             Request.Headers.UserAgent.FirstOrDefault(),
             cancellationToken);
+            
         if (result.IsSuccess && result.Value is not null)
         {
             AppendRefreshTokenCookie(result.Value);
             return Ok(new
             {
                 success = true,
-                message = "Login successful.",
+                message = "Authentication successful.",
                 data = result.Value.Response
             });
         }
@@ -153,6 +78,7 @@ public sealed class CustomerAuthController : CustomerControllerBase
             "customer_auth.validation_failed" => BadRequest(error),
             "customer_auth.tenant_access_denied" => StatusCode(StatusCodes.Status403Forbidden, error),
             "customer_auth.email_not_verified" => StatusCode(StatusCodes.Status403Forbidden, error),
+            "customer_auth.invalid_verification_code" => Unauthorized(error),
             _ => Unauthorized(error)
         };
     }
@@ -193,6 +119,7 @@ public sealed class CustomerAuthController : CustomerControllerBase
             "customer_auth.email_already_registered" => Conflict(error),
             "customer_auth.external_account_conflict" => Conflict(error),
             "customer_auth.google_not_configured" => StatusCode(StatusCodes.Status500InternalServerError, error),
+            "customer_auth.google_verification_unavailable" => StatusCode(StatusCodes.Status504GatewayTimeout, error),
             _ => Unauthorized(error)
         };
     }
@@ -268,6 +195,7 @@ public sealed class CustomerAuthController : CustomerControllerBase
             "customer_auth.google_email_not_verified" => StatusCode(StatusCodes.Status403Forbidden, body),
             "customer_auth.external_account_conflict" => Conflict(body),
             "customer_auth.google_not_configured" => StatusCode(StatusCodes.Status500InternalServerError, body),
+            "customer_auth.google_verification_unavailable" => StatusCode(StatusCodes.Status504GatewayTimeout, body),
             "customer_auth.email_already_registered" => Conflict(body),
             "customer_auth.tenant_access_denied" => StatusCode(StatusCodes.Status403Forbidden, body),
             "customer_auth.email_not_verified" => StatusCode(StatusCodes.Status403Forbidden, body),

@@ -1067,6 +1067,15 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("locked_until");
 
+                    b.Property<DateTimeOffset?>("OtpExpiryUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("otp_expiry_utc");
+
+                    b.Property<string>("OtpHash")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("otp_hash");
+
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
@@ -3032,6 +3041,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(80)")
                         .HasColumnName("permission_code");
 
+                    b.Property<Guid>("PlatformFeatureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_feature_id");
+
+                    b.Property<Guid>("PlatformModuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_module_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -3054,6 +3071,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("PermissionCode")
                         .IsUnique()
                         .HasDatabaseName("uq_platform_permissions_permission_code");
+
+                    b.HasIndex("PlatformFeatureId");
+
+                    b.HasIndex("PlatformModuleId");
 
                     b.HasIndex("UpdatedByPlatformUserId");
 
@@ -4351,6 +4372,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("platform_module_id");
 
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("TENANT")
+                        .HasColumnName("scope");
+
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -4428,6 +4457,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)")
                         .HasColumnName("name");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("TENANT")
+                        .HasColumnName("scope");
 
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
@@ -10341,6 +10378,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)")
                         .HasColumnName("permission_code");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("TENANT")
+                        .HasColumnName("scope");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -26402,11 +26447,29 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_platform_permissions_created_by_platform_user_id_platform_users");
 
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", "PlatformFeature")
+                        .WithMany()
+                        .HasForeignKey("PlatformFeatureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_platform_permissions_platform_feature_id_platform_features");
+
+                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformModule", "PlatformModule")
+                        .WithMany()
+                        .HasForeignKey("PlatformModuleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_platform_permissions_platform_module_id_platform_modules");
+
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("UpdatedByPlatformUserId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_platform_permissions_updated_by_platform_user_id_platform_users");
+
+                    b.Navigation("PlatformFeature");
+
+                    b.Navigation("PlatformModule");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRefreshToken", b =>

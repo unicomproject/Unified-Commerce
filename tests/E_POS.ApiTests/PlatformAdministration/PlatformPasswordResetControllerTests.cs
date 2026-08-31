@@ -73,7 +73,7 @@ public sealed class PlatformPasswordResetControllerTests
 
     private sealed class NoOpUserService : IPlatformUserService
     {
-        public Task<ApplicationResult<PlatformUserListResponse>> GetUsersAsync(Guid platformUserId, CancellationToken cancellationToken)
+        public Task<ApplicationResult<PlatformUserListResponse>> GetUsersAsync(PlatformUserListQuery query, Guid platformUserId, CancellationToken cancellationToken)
             => throw new NotImplementedException();
 
         public Task<ApplicationResult<PlatformUserDetailResponse>> GetUserAsync(Guid userId, Guid platformUserId, CancellationToken cancellationToken)

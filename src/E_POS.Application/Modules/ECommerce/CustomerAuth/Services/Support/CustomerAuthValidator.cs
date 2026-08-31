@@ -1,4 +1,4 @@
-﻿using System.Net.Mail;
+using System.Net.Mail;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
@@ -34,8 +34,8 @@ public sealed class CustomerAuthValidator : ICustomerAuthValidator
             return emailError;
 
         var code = request.Code?.Trim() ?? string.Empty;
-        if (code.Length != 6 || code.Any(x => !char.IsDigit(x)))
-            return CustomerAuthErrors.ValidationFailed("A 6-digit verification code is required.");
+        if (code.Length != 4 || code.Any(x => !char.IsDigit(x)))
+            return CustomerAuthErrors.ValidationFailed("A 4-digit verification code is required.");
 
         return null;
     }

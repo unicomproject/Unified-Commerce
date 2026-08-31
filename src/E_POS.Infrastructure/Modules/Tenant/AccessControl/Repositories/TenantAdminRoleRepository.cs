@@ -280,7 +280,11 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
             where permission.IsActive &&
                   module.Status == "ACTIVE" &&
                   feature.Status == "ACTIVE" &&
+                  permission.Scope == "TENANT" &&
+                  module.Scope == "TENANT" &&
+                  feature.Scope == "TENANT" &&
                   !permission.PermissionCode.StartsWith("platform.")
+
             orderby module.SortOrder, module.Name, feature.SortOrder, feature.Name, permission.PermissionCode
             select new CatalogRow(
                 module.Id,
