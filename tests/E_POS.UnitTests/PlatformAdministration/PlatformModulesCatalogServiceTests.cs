@@ -20,7 +20,7 @@ public sealed class PlatformModulesCatalogServiceTests
             hasModulesView: true,
             hasFeaturesView: false);
 
-        var result = await service.GetModulesAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await service.GetModulesAsync(Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value!.Modules);
@@ -37,7 +37,7 @@ public sealed class PlatformModulesCatalogServiceTests
             hasModulesView: true,
             hasFeaturesView: true);
 
-        var result = await service.GetModulesAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await service.GetModulesAsync(Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value!.Modules);
@@ -54,7 +54,7 @@ public sealed class PlatformModulesCatalogServiceTests
             hasModulesView: false,
             hasFeaturesView: true);
 
-        var result = await service.GetModulesAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await service.GetModulesAsync(Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("platform_modules_catalog.access_denied", result.Error.Code);
@@ -68,7 +68,7 @@ public sealed class PlatformModulesCatalogServiceTests
             hasModulesView: true,
             hasFeaturesView: true);
 
-        var result = await service.GetModulesAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await service.GetModulesAsync(Guid.NewGuid(), null, CancellationToken.None);
 
         var module = Assert.Single(result.Value!.Modules);
         Assert.Equal(ModuleId, module.Id);
@@ -111,8 +111,11 @@ public sealed class PlatformModulesCatalogServiceTests
                         "POS Sales",
                         "Start sale",
                         1,
-                        "ACTIVE")
-                ])
+                        "ACTIVE",
+                        [],
+                        "TENANT")
+                ],
+                "TENANT")
         ];
     }
 
@@ -126,11 +129,13 @@ public sealed class PlatformModulesCatalogServiceTests
         }
 
         public Task<IReadOnlyList<PlatformModulesCatalogModuleDto>> GetActiveModulesAsync(
+            string? scopeFilter,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(_modules);
         }
     }
+
 
     private sealed class FakePlatformPermissionChecker : IPlatformPermissionChecker
     {

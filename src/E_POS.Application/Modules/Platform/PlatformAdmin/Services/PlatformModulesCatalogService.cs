@@ -24,6 +24,7 @@ public sealed class PlatformModulesCatalogService : IPlatformModulesCatalogServi
 
     public async Task<ApplicationResult<PlatformModulesCatalogResponse>> GetModulesAsync(
         Guid platformUserId,
+        string? scopeFilter,
         CancellationToken cancellationToken)
     {
         if (!await HasModulesViewPermissionAsync(platformUserId, cancellationToken))
@@ -32,7 +33,7 @@ public sealed class PlatformModulesCatalogService : IPlatformModulesCatalogServi
         }
 
         var includeFeatures = await HasFeaturesViewPermissionAsync(platformUserId, cancellationToken);
-        var modules = await _repository.GetActiveModulesAsync(cancellationToken);
+        var modules = await _repository.GetActiveModulesAsync(scopeFilter, cancellationToken);
         var responseModules = modules
             .Select(module => MapModule(module, includeFeatures))
             .ToList();
@@ -40,6 +41,7 @@ public sealed class PlatformModulesCatalogService : IPlatformModulesCatalogServi
         return ApplicationResult<PlatformModulesCatalogResponse>.Success(
             new PlatformModulesCatalogResponse(responseModules));
     }
+
 
     private static PlatformModulesCatalogModuleDto MapModule(
         PlatformModulesCatalogModuleDto module,

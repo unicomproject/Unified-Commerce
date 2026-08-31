@@ -75,6 +75,14 @@ public sealed class PlatformFeatureConfiguration : IEntityTypeConfiguration<Plat
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(x => x.Scope)
+            .HasColumnName("scope")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .IsRequired()
+            .HasDefaultValue("TENANT");
+
+
         builder.HasOne<PlatformModule>()
             .WithMany()
             .HasForeignKey(x => x.PlatformModuleId)

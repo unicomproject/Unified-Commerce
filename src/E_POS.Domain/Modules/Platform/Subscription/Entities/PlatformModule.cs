@@ -13,6 +13,7 @@ public class PlatformModule : AuditableEntity
     public string ModuleKey { get; protected set; } = string.Empty;
     public string ModuleName { get; protected set; } = string.Empty;
     public bool IsCoreModule { get; protected set; }
+    public string Scope { get; protected set; } = "TENANT";
 
     public static PlatformModule Create(
         Guid id,
@@ -22,7 +23,8 @@ public class PlatformModule : AuditableEntity
         string status,
         int sortOrder,
         DateTimeOffset now,
-        bool isCoreModule = false)
+        bool isCoreModule = false,
+        string scope = "TENANT")
     {
         return new PlatformModule
         {
@@ -35,8 +37,10 @@ public class PlatformModule : AuditableEntity
             ModuleKey = moduleCode,
             ModuleName = name,
             IsCoreModule = isCoreModule,
+            Scope = scope,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
 }
+

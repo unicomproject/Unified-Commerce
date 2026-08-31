@@ -23,7 +23,7 @@ public sealed class PlatformModulesCatalogRepositoryTests
 
         IPlatformModulesCatalogRepository repository = new PlatformModulesCatalogRepository(dbContext);
 
-        var modules = await repository.GetActiveModulesAsync(CancellationToken.None);
+        var modules = await repository.GetActiveModulesAsync(null, CancellationToken.None);
 
         Assert.Single(modules);
         Assert.Equal(ActiveModuleId, modules[0].Id);
