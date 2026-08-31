@@ -277,6 +277,37 @@ public sealed class PlatformSubscriptionPlanServiceTests
     }
 
     [Fact]
+    public async Task UpdateFeaturesAsync_WithInvalidOrPlatformScopedFeature_ReturnsValidationError()
+    {
+        var planId = Guid.NewGuid();
+        var platformFeatureId = Guid.NewGuid();
+        var service = CreateService(
+            new FakePlatformSubscriptionPlanRepository
+            {
+                PlanEntity = SubscriptionPlan.Create(
+                    planId,
+                    "DRAFT_PLAN",
+                    "Draft Plan",
+                    SubscriptionPlanConstants.Status.Draft,
+                    SubscriptionPlanConstants.BillingInterval.Monthly,
+                    10m,
+                    Now),
+                ActiveFeatureIds = new HashSet<Guid>() // Platform-scoped or unknown feature ID not returned by GetActiveFeatureIdsAsync
+            },
+            hasEdit: true);
+
+        var result = await service.UpdateFeaturesAsync(
+            planId,
+            new UpdateSubscriptionPlanFeaturesRequest { FeatureIds = [platformFeatureId] },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_subscription_plans.validation_failed", result.Error.Code);
+        Assert.Contains("Unknown or inactive feature ids", result.Error.Message);
+    }
+
+    [Fact]
     public async Task ReactivateAsync_ForRetiredPlan_ReactivatesPlan()
     {
         var planId = Guid.NewGuid();
