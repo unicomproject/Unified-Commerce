@@ -3,6 +3,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Shared.Audit.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
@@ -19,7 +20,30 @@ public sealed partial class TenantAdminProductRepository
     private const string DefaultCostingMethod = "WEIGHTED_AVERAGE";
     private const string StagedMediaStatus = "STAGED";
 
+    public async Task<bool> IsCategoryEffectivelySelectableAsync(
+        Guid tenantId,
+        Guid categoryId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await _dbContext.Categories
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status != CategoryConstants.DeletedStatus)
+            .Select(x => new { x.Id, x.Status, x.ParentCategoryId })
+            .ToListAsync(cancellationToken);
+
+        var statusById = rows.ToDictionary(x => x.Id, x => x.Status);
+        var parentById = rows.ToDictionary(x => x.Id, x => x.ParentCategoryId);
+
+        return CategorySelectionRules.IsEffectivelySelectable(categoryId, statusById, parentById);
+    }
+
     public Task<bool> ActiveCategoryExistsAsync(
+        Guid tenantId,
+        Guid categoryId,
+        CancellationToken cancellationToken) =>
+        IsCategoryEffectivelySelectableAsync(tenantId, categoryId, cancellationToken);
+
+    public Task<bool> CategoryExistsForExistingMappingAsync(
         Guid tenantId,
         Guid categoryId,
         CancellationToken cancellationToken)
@@ -29,7 +53,7 @@ public sealed partial class TenantAdminProductRepository
             .AnyAsync(
                 x => x.TenantId == tenantId &&
                      x.Id == categoryId &&
-                     x.Status == CategoryConstants.ActiveStatus,
+                     x.Status != CategoryConstants.DeletedStatus,
                 cancellationToken);
     }
 
@@ -1896,6 +1920,8 @@ public sealed partial class TenantAdminProductRepository
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        product.UpdateTaxConfiguration(configuration.TaxExclusive ?? true, userId, now);
+
         if (configuration.CostPrice.HasValue)
         {
             product.UpdateReferenceCost(configuration.CostPrice.Value, userId, now);
@@ -2098,7 +2124,7 @@ public sealed partial class TenantAdminProductRepository
         decimal? effectiveSellingPrice = null;
         decimal? discountAmount = null;
         decimal? discountPercentage = null;
-        bool taxExclusive = true; // Hardcoded default based on requirements
+        bool taxExclusive = product.IsTaxExclusive; // Map from DB
 
         if (defaultPriceList != null)
         {

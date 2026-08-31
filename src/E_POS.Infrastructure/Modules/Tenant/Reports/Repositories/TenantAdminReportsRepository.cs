@@ -55,11 +55,10 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
 
         var categories = await _dbContext.Categories.AsNoTracking()
             .Where(x => x.TenantId == context.TenantId &&
-                        (!request.DepartmentId.HasValue || x.DepartmentId == request.DepartmentId.Value) &&
                         x.ParentCategoryId == null &&
                         (includeInactive || x.Status == ActiveStatus))
             .OrderBy(x => x.CategoryName)
-            .Select(x => new ReportFilterOptionDto(x.Id.ToString(), x.CategoryCode, x.CategoryName, x.Status, x.DepartmentId.ToString(), null, x.Status == ActiveStatus))
+            .Select(x => new ReportFilterOptionDto(x.Id.ToString(), x.CategoryCode, x.CategoryName, x.Status, x.ParentCategoryId.HasValue ? x.ParentCategoryId.Value.ToString() : null, null, x.Status == ActiveStatus))
             .ToListAsync(cancellationToken);
 
         var subcategories = await _dbContext.Categories.AsNoTracking()

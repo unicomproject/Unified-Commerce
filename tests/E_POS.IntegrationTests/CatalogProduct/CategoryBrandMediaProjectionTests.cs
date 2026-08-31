@@ -1,3 +1,4 @@
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
@@ -84,7 +85,7 @@ public sealed class CategoryBrandMediaProjectionTests
         await dbContext.SaveChangesAsync();
         var repository = new CategoryRepository(dbContext);
 
-        var list = await repository.ListAsync(tenantId, 1, 50, null, CancellationToken.None);
+        var list = await repository.ListAsync(tenantId, new CategoryListQuery(1, 50), CancellationToken.None);
 
         Assert.Equal(4, list.TotalCount);
         var activeItem = Assert.Single(list.Items, item => item.Id == activeCategory.Id);
@@ -227,7 +228,6 @@ public sealed class CategoryBrandMediaProjectionTests
         var category = Category.Create(
             Guid.NewGuid(),
             tenantId,
-            Guid.NewGuid(),
             parentCategoryId: null,
             code,
             $"{code} Category",

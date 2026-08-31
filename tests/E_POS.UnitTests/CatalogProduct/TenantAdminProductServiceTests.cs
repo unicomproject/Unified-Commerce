@@ -1,6 +1,7 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
@@ -176,7 +177,6 @@ public sealed class TenantAdminProductServiceTests
             [],
             [],
             [],
-            [],
             []);
         var repository = new FakeTenantAdminProductRepository
         {
@@ -205,6 +205,83 @@ public sealed class TenantAdminProductServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.Empty(result.Value!.Categories);
+    }
+
+    [Fact]
+    public async Task GetCreateOptionsAsync_DoesNotRequireCategoryViewPermission()
+    {
+        var repository = new FakeTenantAdminProductRepository
+        {
+            CreateOptions = new TenantAdminProductCreateOptionsResponse(
+                [new TenantAdminProductCategoryOptionResponse(Guid.NewGuid(), "FOOD", "Food", null, 1, "Food", true, 1)],
+                [],
+                [],
+                [],
+                [],
+                [],
+                [])
+        };
+
+        var result = await CreateService(repository).GetCreateOptionsAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("FOOD", Assert.Single(result.Value!.Categories).CategoryCode);
+    }
+
+    [Fact]
+    public async Task UpdateDraftAsync_UnchangedInactiveCategoryMapping_RemainsValid()
+    {
+        var productId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var repository = new FakeTenantAdminProductRepository
+        {
+            ActiveCategoryExists = false,
+            ExistingMappingCategoryExists = true,
+            SetupDto = CreateSetup(productId, categoryId)
+        };
+
+        var result = await CreateService(repository).UpdateDraftAsync(
+            CreateContext([ProductConstants.UpdatePermission]),
+            productId,
+            new SaveProductDraftRequest
+            {
+                CurrentSetupStep = ProductWizardStage.BasicDetails,
+                ProductName = "Draft Product",
+                CategoryId = categoryId
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task UpdateDraftAsync_NewInactiveCategorySelection_IsRejected()
+    {
+        var productId = Guid.NewGuid();
+        var existingCategoryId = Guid.NewGuid();
+        var replacementCategoryId = Guid.NewGuid();
+        var repository = new FakeTenantAdminProductRepository
+        {
+            ActiveCategoryExists = false,
+            ExistingMappingCategoryExists = true,
+            SetupDto = CreateSetup(productId, existingCategoryId)
+        };
+
+        var result = await CreateService(repository).UpdateDraftAsync(
+            CreateContext([ProductConstants.UpdatePermission]),
+            productId,
+            new SaveProductDraftRequest
+            {
+                CurrentSetupStep = ProductWizardStage.BasicDetails,
+                ProductName = "Draft Product",
+                CategoryId = replacementCategoryId
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.validation_failed", result.Error.Code);
     }
 
     [Fact]
@@ -807,6 +884,29 @@ public sealed class TenantAdminProductServiceTests
             Status = ProductConstants.ActiveStatus,
         };
 
+    private static ProductSetupWizardDto CreateSetup(Guid productId, Guid categoryId) =>
+        new(
+            productId,
+            "Draft Product",
+            "DRF-001",
+            ProductConstants.DraftStatus,
+            ProductConstants.ActiveStatus,
+            1,
+            DateTimeOffset.UtcNow,
+            1,
+            categoryId,
+            null,
+            null,
+            null,
+            true,
+            false,
+            false,
+            false,
+            false,
+            "SIMPLE",
+            false,
+            []);
+
     private static TenantAdminProductDetailResponse CreateDetailResponse(Guid productId) =>
         new(
             productId,
@@ -871,7 +971,7 @@ public sealed class TenantAdminProductServiceTests
             new(0, 0, 0, 0);
 
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
-            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []);
+            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], []);
 
         public IReadOnlyDictionary<Guid, string> PrimaryImageUrls { get; init; } =
             new Dictionary<Guid, string>();
@@ -1099,6 +1199,7 @@ public sealed class TenantAdminProductServiceTests
             Task.FromResult(DashboardRaw);
 
         public bool ActiveCategoryExists { get; init; } = true;
+        public bool ExistingMappingCategoryExists { get; init; } = true;
 
         public bool ProductCodeExists { get; init; }
 
@@ -1155,11 +1256,23 @@ public sealed class TenantAdminProductServiceTests
         public Task<bool> IsInitialCreationDraftAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
+        public Task<bool> IsCategoryEffectivelySelectableAsync(
+            Guid tenantId,
+            Guid categoryId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ActiveCategoryExists);
+
         public Task<bool> ActiveCategoryExistsAsync(
             Guid tenantId,
             Guid categoryId,
             CancellationToken cancellationToken) =>
             Task.FromResult(ActiveCategoryExists);
+
+        public Task<bool> CategoryExistsForExistingMappingAsync(
+            Guid tenantId,
+            Guid categoryId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ExistingMappingCategoryExists);
 
         public Task<bool> ProductCodeExistsAsync(
             Guid tenantId,

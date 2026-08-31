@@ -233,6 +233,7 @@ public static class DependencyInjection
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
         services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
+        services.AddScoped<ICategoryAuditLogger, CategoryAuditLogger>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<ICurrentStockRepository, CurrentStockRepository>();
         services.AddScoped<IInventoryAuditLogger, InventoryAuditLogger>();

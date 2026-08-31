@@ -1,5 +1,4 @@
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
-using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -35,10 +34,6 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasColumnName("tenant_id")
             .IsRequired();
 
-        builder.Property(x => x.DepartmentId)
-            .HasColumnName("department_id")
-            .IsRequired();
-
         builder.Property(x => x.ParentCategoryId)
             .HasColumnName("parent_category_id")
             .IsRequired(false);
@@ -63,7 +58,8 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
 
         builder.Property(x => x.Description)
             .HasColumnName("description")
-            .HasColumnType("text")
+            .HasColumnType("varchar(2000)")
+            .HasMaxLength(2000)
             .IsRequired(false);
 
         builder.Property(x => x.ImageMediaAssetId)
@@ -95,17 +91,12 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_categories_tenant_id_tenants");
 
-        builder.HasOne<Department>()
-            .WithMany()
-            .HasForeignKey(x => x.DepartmentId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_categories_department_id_departments");
-
         builder.HasOne<Category>()
             .WithMany()
-            .HasForeignKey(x => x.ParentCategoryId)
+            .HasForeignKey(x => new { x.TenantId, x.ParentCategoryId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id })
             .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_categories_parent_category_id_categories");
+            .HasConstraintName("fk_categories_tenant_parent_category");
 
         builder.HasOne<MediaAsset>()
             .WithMany()
@@ -126,30 +117,29 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_categories_updated_by_tenant_user_id_tenant_users");
 
-        builder.HasIndex(x => new { x.TenantId, x.DepartmentId, x.CategoryCode })
+        builder.HasIndex(x => new { x.TenantId, x.CategoryCode })
             .IsUnique()
-            .HasDatabaseName("uq_categories_tenant_id_department_id_category_code");
+            .HasDatabaseName("uq_categories_tenant_id_category_code");
+
+        builder.HasAlternateKey(x => new { x.TenantId, x.Id })
+            .HasName("uq_categories_tenant_id_id");
 
         builder.HasIndex(x => new { x.TenantId, x.CategorySlug })
             .IsUnique()
             .HasDatabaseName("uq_categories_tenant_id_category_slug");
 
-        builder.HasIndex(x => new { x.TenantId, x.Id })
-            .IsUnique()
-            .HasDatabaseName("uq_categories_tenant_id_id");
-
         builder.HasIndex(x => new { x.TenantId, x.ImageMediaAssetId })
             .HasDatabaseName("ix_categories_tenant_id_image_media_asset_id");
 
-        builder.HasIndex(x => new { x.TenantId, x.DepartmentId, x.Id })
-            .IsUnique()
-            .HasDatabaseName("uq_categories_tenant_id_department_id_id");
+        builder.HasIndex(x => new { x.TenantId, x.Status })
+            .HasDatabaseName("ix_categories_tenant_id_status");
+
+        builder.HasIndex(x => new { x.TenantId, x.ParentCategoryId })
+            .HasDatabaseName("ix_categories_tenant_id_parent_category_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_categories_parent_category_id", "parent_category_id IS NULL OR parent_category_id <> id"));
         builder.ToTable(t => t.HasCheckConstraint("ck_categories_sort_order", "sort_order >= 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_categories_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_categories_description_length", "description IS NULL OR char_length(description) <= 2000"));
     }
 }
-
-
-

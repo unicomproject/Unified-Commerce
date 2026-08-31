@@ -11152,12 +11152,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_tenant_user_id");
 
-                    b.Property<Guid>("DepartmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("department_id");
-
                     b.Property<string>("Description")
-                        .HasColumnType("text")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)")
                         .HasColumnName("description");
 
                     b.Property<Guid?>("ImageMediaAssetId")
@@ -11195,35 +11192,34 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_categories");
 
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("uq_categories_tenant_id_id");
+
                     b.HasIndex("CreatedByTenantUserId");
 
-                    b.HasIndex("DepartmentId");
-
-                    b.HasIndex("ParentCategoryId");
-
                     b.HasIndex("UpdatedByTenantUserId");
+
+                    b.HasIndex("TenantId", "CategoryCode")
+                        .IsUnique()
+                        .HasDatabaseName("uq_categories_tenant_id_category_code");
 
                     b.HasIndex("TenantId", "CategorySlug")
                         .IsUnique()
                         .HasDatabaseName("uq_categories_tenant_id_category_slug");
 
-                    b.HasIndex("TenantId", "Id")
-                        .IsUnique()
-                        .HasDatabaseName("uq_categories_tenant_id_id");
-
                     b.HasIndex("TenantId", "ImageMediaAssetId")
                         .HasDatabaseName("ix_categories_tenant_id_image_media_asset_id");
 
-                    b.HasIndex("TenantId", "DepartmentId", "CategoryCode")
-                        .IsUnique()
-                        .HasDatabaseName("uq_categories_tenant_id_department_id_category_code");
+                    b.HasIndex("TenantId", "ParentCategoryId")
+                        .HasDatabaseName("ix_categories_tenant_id_parent_category_id");
 
-                    b.HasIndex("TenantId", "DepartmentId", "Id")
-                        .IsUnique()
-                        .HasDatabaseName("uq_categories_tenant_id_department_id_id");
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("ix_categories_tenant_id_status");
 
                     b.ToTable("categories", null, t =>
                         {
+                            t.HasCheckConstraint("ck_categories_description_length", "description IS NULL OR char_length(description) <= 2000");
+
                             t.HasCheckConstraint("ck_categories_parent_category_id", "parent_category_id IS NULL OR parent_category_id <> id");
 
                             t.HasCheckConstraint("ck_categories_sort_order", "sort_order >= 0");
@@ -12095,6 +12091,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("is_sellable");
+
+                    b.Property<bool>("IsTaxExclusive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_tax_exclusive");
 
                     b.Property<bool>("IsTaxable")
                         .ValueGeneratedOnAdd()
@@ -28477,19 +28479,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_categories_created_by_tenant_user_id_tenant_users");
 
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Department", null)
-                        .WithMany()
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_categories_department_id_departments");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", null)
-                        .WithMany()
-                        .HasForeignKey("ParentCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_categories_parent_category_id_categories");
-
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -28509,6 +28498,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_categories_image_media_asset_tenant");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ParentCategoryId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_categories_tenant_parent_category");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceGroup", b =>

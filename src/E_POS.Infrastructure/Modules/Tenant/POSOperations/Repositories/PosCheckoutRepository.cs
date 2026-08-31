@@ -673,16 +673,13 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             join parent in _dbContext.Categories.AsNoTracking()
                 on category.ParentCategoryId equals parent.Id into parents
             from parent in parents.DefaultIfEmpty()
-            join department in _dbContext.Departments.AsNoTracking()
-                on category.DepartmentId equals department.Id into departments
-            from department in departments.DefaultIfEmpty()
             where product.TenantId == tenantId && variantIds.Contains(product.Id) == false &&
                   variants.Select(v => v.ProductId).Contains(product.Id)
             select new
             {
                 product.Id,
                 BrandName = brand == null ? null : brand.BrandName,
-                DepartmentName = department == null ? null : department.DepartmentName,
+                DepartmentName = (string?)null,
                 CategoryName = category == null || category.ParentCategoryId != null ? parent == null ? category.CategoryName : parent.CategoryName : category.CategoryName,
                 SubcategoryName = category == null || category.ParentCategoryId == null ? null : category.CategoryName
             }).ToListAsync(cancellationToken);

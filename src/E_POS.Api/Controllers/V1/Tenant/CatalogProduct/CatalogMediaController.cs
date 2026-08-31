@@ -235,6 +235,31 @@ public sealed class CatalogMediaController : ControllerBase
             : ToErrorResult(result.Error);
     }
 
+    [HttpDelete("categories/{categoryId:guid}/image")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RemoveCategoryImage(
+        Guid categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "media.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _catalogMediaService.RemoveCategoryImageAsync(
+            context,
+            categoryId,
+            cancellationToken);
+
+        return result.IsSuccess ? NoContent() : ToErrorResult(result.Error);
+    }
+
     /// <summary>
     /// Uploads/replaces Brand logo and returns the refreshed Brand contract
     /// expected by Tenant Admin Flutter (<c>BrandDto</c>).
@@ -304,22 +329,31 @@ public sealed class CatalogMediaController : ControllerBase
     {
         return error.Code switch
         {
-            "media.permission_denied" or "brand.permission_denied" =>
+            "media.permission_denied" or
+                "brand.permission_denied" or
+                "category.permission_denied" or
+                "category.entitlement_denied" =>
                 StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
-            "media.invalid_tenant_context" or "brand.invalid_tenant_context" =>
+            "media.invalid_tenant_context" or "brand.invalid_tenant_context" or "category.invalid_tenant_context" =>
                 Unauthorized(CreateError(error)),
             "media.product_not_found" or
                 "media.variant_not_found" or
                 "media.category_not_found" or
                 "media.brand_not_found" or
-                "brand.not_found" => NotFound(CreateError(error)),
+                "brand.not_found" or
+                "category.not_found" => NotFound(CreateError(error)),
             "media.concurrency_conflict" =>
                 StatusCode(StatusCodes.Status409Conflict, CreateError(error)),
             "media.file_size_exceeded" =>
                 StatusCode(StatusCodes.Status413PayloadTooLarge, CreateError(error)),
             "media.max_images_exceeded" => BadRequest(CreateError(error)),
-            "media.storage_not_configured" or "media.storage_unavailable" =>
+            "media.storage_not_configured" =>
                 StatusCode(StatusCodes.Status503ServiceUnavailable, CreateError(error)),
+            "media.storage_unavailable" or
+                "media.save_failed" or
+                "media.unexpected_failure" or
+                "category.unexpected_failure" =>
+                StatusCode(StatusCodes.Status500InternalServerError, CreateError(error)),
             _ => BadRequest(CreateError(error))
         };
     }

@@ -50,6 +50,7 @@ public class TenantAdminProductDraftServiceTests
         public string TenantStatus { get; set; } = "ACTIVE";
         public bool IsInitialDraft { get; set; }
         public bool ActiveCategoryExists { get; init; } = true;
+        public bool ExistingMappingCategoryExists { get; init; } = true;
         public bool BrandBelongs { get; init; } = true;
         public bool ProductCodeExists { get; init; }
         public SaveProductDraftResult? DraftResultOverride { get; init; }
@@ -57,7 +58,7 @@ public class TenantAdminProductDraftServiceTests
         public ProductSetupWizardDto? SetupDto { get; init; }
 
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
-            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []);
+            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], []);
 
         public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult<string?>(TenantStatus);
@@ -254,8 +255,14 @@ public class TenantAdminProductDraftServiceTests
             Task.FromResult(new TenantAdminProductDashboardRawData(
                 "USD", new(0, 0), new(0, 0), new(0, 0), new(0, 0), new(0, 0), new(0, 0), 0, 0, [], []));
 
+        public Task<bool> IsCategoryEffectivelySelectableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(ActiveCategoryExists);
+
         public Task<bool> ActiveCategoryExistsAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
             Task.FromResult(ActiveCategoryExists);
+
+        public Task<bool> CategoryExistsForExistingMappingAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(ExistingMappingCategoryExists);
 
         public Task<bool> ProductCodeExistsAsync(
             Guid tenantId, string productCode, Guid? excludeProductId, CancellationToken cancellationToken) =>

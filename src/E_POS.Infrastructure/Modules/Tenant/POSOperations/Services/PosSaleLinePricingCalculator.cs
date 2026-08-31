@@ -130,7 +130,7 @@ public sealed class PosSaleLinePricingCalculator : IPosSaleLinePricingCalculator
                              taxPercentByVariant.TryGetValue(line.VariantId, out var rate)
                 ? rate
                 : 0m;
-            var unitPrice = priceList.PriceIncludesTax && taxPercent > 0m
+            var unitPrice = !product.IsTaxExclusive && taxPercent > 0m
                 ? RoundMoney(listedUnitPrice * 100m / (100m + taxPercent))
                 : listedUnitPrice;
             var lineSubtotal = RoundMoney(unitPrice * line.Quantity);

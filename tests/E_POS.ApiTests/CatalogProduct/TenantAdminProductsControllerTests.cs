@@ -72,7 +72,6 @@ public sealed class TenantAdminProductsControllerTests
             [],
             [],
             [],
-            [],
             []);
         var service = new FakeTenantAdminProductService
         {
@@ -671,7 +670,7 @@ public sealed class TenantAdminProductsControllerTests
 
         public ApplicationResult<TenantAdminProductCreateOptionsResponse> CreateOptionsResult { get; init; } =
             ApplicationResult<TenantAdminProductCreateOptionsResponse>.Success(
-                new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []));
+                new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], []));
 
         public ApplicationResult<TenantAdminProductCreateResponse> CreateResult { get; init; } =
             ApplicationResult<TenantAdminProductCreateResponse>.Success(
@@ -980,6 +979,13 @@ public sealed class TenantAdminProductsControllerTests
             MediaUploadFile file,
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<MediaAssetUploadResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
+        public Task<ApplicationResult> RemoveCategoryImageAsync(
+            TenantRequestContext context,
+            Guid categoryId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult.Failure(
                 new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
     }
 

@@ -95,6 +95,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasDefaultValue(true)
             .IsRequired();
 
+        builder.Property(x => x.IsTaxExclusive)
+            .HasColumnName("is_tax_exclusive")
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.Property(x => x.Status)
             .HasColumnName("status")
             .HasColumnType("varchar(40)")
