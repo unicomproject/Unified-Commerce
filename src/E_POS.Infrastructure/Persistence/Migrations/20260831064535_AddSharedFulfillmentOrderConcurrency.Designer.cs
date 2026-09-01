@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831064535_AddSharedFulfillmentOrderConcurrency")]
+    partial class AddSharedFulfillmentOrderConcurrency
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3050,14 +3053,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(80)")
                         .HasColumnName("permission_code");
 
-                    b.Property<Guid>("PlatformFeatureId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("platform_feature_id");
-
-                    b.Property<Guid>("PlatformModuleId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("platform_module_id");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -3080,10 +3075,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("PermissionCode")
                         .IsUnique()
                         .HasDatabaseName("uq_platform_permissions_permission_code");
-
-                    b.HasIndex("PlatformFeatureId");
-
-                    b.HasIndex("PlatformModuleId");
 
                     b.HasIndex("UpdatedByPlatformUserId");
 
@@ -4381,14 +4372,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("platform_module_id");
 
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasDefaultValue("TENANT")
-                        .HasColumnName("scope");
-
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -4466,14 +4449,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)")
                         .HasColumnName("name");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasDefaultValue("TENANT")
-                        .HasColumnName("scope");
 
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
@@ -10388,14 +10363,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(100)")
                         .HasColumnName("permission_code");
 
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)")
-                        .HasDefaultValue("TENANT")
-                        .HasColumnName("scope");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -11206,9 +11173,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_tenant_user_id");
 
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("department_id");
+
                     b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("description");
 
                     b.Property<Guid?>("ImageMediaAssetId")
@@ -11246,34 +11216,35 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_categories");
 
-                    b.HasAlternateKey("TenantId", "Id")
-                        .HasName("uq_categories_tenant_id_id");
-
                     b.HasIndex("CreatedByTenantUserId");
 
-                    b.HasIndex("UpdatedByTenantUserId");
+                    b.HasIndex("DepartmentId");
 
-                    b.HasIndex("TenantId", "CategoryCode")
-                        .IsUnique()
-                        .HasDatabaseName("uq_categories_tenant_id_category_code");
+                    b.HasIndex("ParentCategoryId");
+
+                    b.HasIndex("UpdatedByTenantUserId");
 
                     b.HasIndex("TenantId", "CategorySlug")
                         .IsUnique()
                         .HasDatabaseName("uq_categories_tenant_id_category_slug");
 
+                    b.HasIndex("TenantId", "Id")
+                        .IsUnique()
+                        .HasDatabaseName("uq_categories_tenant_id_id");
+
                     b.HasIndex("TenantId", "ImageMediaAssetId")
                         .HasDatabaseName("ix_categories_tenant_id_image_media_asset_id");
 
-                    b.HasIndex("TenantId", "ParentCategoryId")
-                        .HasDatabaseName("ix_categories_tenant_id_parent_category_id");
+                    b.HasIndex("TenantId", "DepartmentId", "CategoryCode")
+                        .IsUnique()
+                        .HasDatabaseName("uq_categories_tenant_id_department_id_category_code");
 
-                    b.HasIndex("TenantId", "Status")
-                        .HasDatabaseName("ix_categories_tenant_id_status");
+                    b.HasIndex("TenantId", "DepartmentId", "Id")
+                        .IsUnique()
+                        .HasDatabaseName("uq_categories_tenant_id_department_id_id");
 
                     b.ToTable("categories", null, t =>
                         {
-                            t.HasCheckConstraint("ck_categories_description_length", "description IS NULL OR char_length(description) <= 2000");
-
                             t.HasCheckConstraint("ck_categories_parent_category_id", "parent_category_id IS NULL OR parent_category_id <> id");
 
                             t.HasCheckConstraint("ck_categories_sort_order", "sort_order >= 0");
@@ -12145,12 +12116,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("is_sellable");
-
-                    b.Property<bool>("IsTaxExclusive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_tax_exclusive");
 
                     b.Property<bool>("IsTaxable")
                         .ValueGeneratedOnAdd()
@@ -26456,29 +26421,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_platform_permissions_created_by_platform_user_id_platform_users");
 
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformFeature", "PlatformFeature")
-                        .WithMany()
-                        .HasForeignKey("PlatformFeatureId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_platform_permissions_platform_feature_id_platform_features");
-
-                    b.HasOne("E_POS.Domain.Modules.Platform.Subscription.Entities.PlatformModule", "PlatformModule")
-                        .WithMany()
-                        .HasForeignKey("PlatformModuleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_platform_permissions_platform_module_id_platform_modules");
-
                     b.HasOne("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("UpdatedByPlatformUserId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_platform_permissions_updated_by_platform_user_id_platform_users");
-
-                    b.Navigation("PlatformFeature");
-
-                    b.Navigation("PlatformModule");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Platform.PlatformAdmin.Entities.PlatformRefreshToken", b =>
@@ -28551,6 +28498,19 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_categories_created_by_tenant_user_id_tenant_users");
 
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_categories_department_id_departments");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("ParentCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_categories_parent_category_id_categories");
+
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -28570,13 +28530,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_categories_image_media_asset_tenant");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "ParentCategoryId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_categories_tenant_parent_category");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ChoiceGroup", b =>
