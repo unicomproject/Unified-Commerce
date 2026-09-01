@@ -335,7 +335,14 @@ public sealed partial class PlatformTenantService
                 tenantId,
                 featureId,
                 TenantEntitlementStatusConstants.Enabled,
-                now))
+                TenantEntitlementSourceTypeConstants.Plan,
+                sourceReferenceId: subscriptionId,
+                isEnabled: true,
+                effectiveFrom: now,
+                effectiveUntil: null,
+                createdByPlatformUserId: platformUserId,
+                updatedByPlatformUserId: platformUserId,
+                createdAt: now))
             .ToList();
 
         var subscriptionAddons = addonSelections
