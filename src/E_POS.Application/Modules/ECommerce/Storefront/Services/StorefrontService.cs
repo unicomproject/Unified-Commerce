@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Services;
@@ -9,14 +10,14 @@ public sealed class StorefrontService : IStorefrontService
     private readonly IStorefrontBannerService _bannerService;
     private readonly IStorefrontCategoryService _categoryService;
     private readonly IStorefrontProductService _productService;
-    private readonly IStorefrontFulfillmentService _fulfillmentService;
+    private readonly IStorefrontFulfilmentService _fulfillmentService;
     private readonly IStorefrontTenantService _tenantService;
 
     public StorefrontService(
         IStorefrontBannerService bannerService,
         IStorefrontCategoryService categoryService,
         IStorefrontProductService productService,
-        IStorefrontFulfillmentService fulfillmentService,
+        IStorefrontFulfilmentService fulfillmentService,
         IStorefrontTenantService tenantService)
     {
         _bannerService = bannerService;
@@ -85,7 +86,7 @@ public sealed class StorefrontService : IStorefrontService
         return _fulfillmentService.GetCollectionOptionsAsync(tenantId, outletId, days, cancellationToken);
     }
 
-    public Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
+    public Task<(Guid? TenantId, string? BaseCurrencyCode, string? StoreName, string? LogoUrl)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
     {
         return _tenantService.ResolveTenantAsync(slug, cancellationToken);
     }

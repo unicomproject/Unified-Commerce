@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
+using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
 namespace E_POS.Application.Modules.ECommerce.Storefront.Contracts;
@@ -40,7 +40,7 @@ public interface IStorefrontProductSearchRepository
 
 public interface IStorefrontProductBestSellerRepository
 {
-    Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(
+    Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, decimal? OriginalPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default);
 }

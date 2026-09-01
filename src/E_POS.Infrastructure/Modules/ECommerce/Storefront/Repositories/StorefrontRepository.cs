@@ -1,4 +1,5 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Infrastructure.Persistence;
@@ -10,14 +11,14 @@ public sealed class StorefrontRepository : IStorefrontRepository
     private readonly IStorefrontBannerRepository _bannerRepository;
     private readonly IStorefrontCategoryRepository _categoryRepository;
     private readonly IStorefrontProductRepository _productRepository;
-    private readonly IStorefrontFulfillmentRepository _fulfillmentRepository;
+    private readonly IStorefrontFulfilmentRepository _fulfillmentRepository;
     private readonly IStorefrontTenantRepository _tenantRepository;
 
     public StorefrontRepository(
         IStorefrontBannerRepository bannerRepository,
         IStorefrontCategoryRepository categoryRepository,
         IStorefrontProductRepository productRepository,
-        IStorefrontFulfillmentRepository fulfillmentRepository,
+        IStorefrontFulfilmentRepository fulfillmentRepository,
         IStorefrontTenantRepository tenantRepository)
     {
         _bannerRepository = bannerRepository;
@@ -62,7 +63,7 @@ public sealed class StorefrontRepository : IStorefrontRepository
         return _productRepository.GetProductDetailAsync(tenantId, slug, cancellationToken);
     }
 
-    public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, decimal? OriginalPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return _productRepository.GetBestSellersAsync(tenantId, cancellationToken);
     }
@@ -90,7 +91,7 @@ public sealed class StorefrontRepository : IStorefrontRepository
             cancellationToken);
     }
 
-    public Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
+    public Task<(Guid? TenantId, string? BaseCurrencyCode, string? StoreName, string? LogoUrl)> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
     {
         return _tenantRepository.GetTenantIdBySlugAsync(slug, cancellationToken);
     }

@@ -422,6 +422,47 @@ public sealed partial class PlatformTenantService
                 now))
             .ToList();
 
+        var cashierRoleId = Guid.NewGuid();
+        var cashierRole = TenantRole.Create(
+            cashierRoleId,
+            tenantId,
+            null,
+            TenantBootstrapConstants.DefaultRoleTemplateVersionId,
+            TenantUserConstants.DefaultCashierRoleCode,
+            "Cashier",
+            "Bootstrap cashier role",
+            false,
+            true,
+            null,
+            now);
+
+        var cashierPermissionCodes = TenantRoleSetupCatalog.CashierAllowedPermissionCodes.ToList();
+        var cashierPermissionIdMap = await _repository.GetActivePermissionIdMapByCodesAsync(
+            cashierPermissionCodes,
+            cancellationToken);
+        var missingCashierPermissions = cashierPermissionCodes
+            .Where(code => !cashierPermissionIdMap.ContainsKey(code))
+            .ToList();
+        if (missingCashierPermissions.Count > 0)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                new ApplicationError(
+                    "platform_tenants.bootstrap_permission_mapping_failed",
+                    $"Required cashier bootstrap permissions are missing from the catalog: {string.Join(", ", missingCashierPermissions)}."));
+        }
+
+        var cashierRolePermissions = cashierPermissionCodes
+            .Select(code => cashierPermissionIdMap[code])
+            .Distinct()
+            .Select(permissionId => TenantRolePermission.Create(
+                Guid.NewGuid(),
+                tenantId,
+                cashierRoleId,
+                permissionId,
+                null,
+                now))
+            .ToList();
+
         if (!tenantAdmin.SendInvite)
         {
             return ApplicationResult<PlatformTenantDetailResponse>.Failure(
@@ -554,6 +595,8 @@ public sealed partial class PlatformTenantService
             SubscriptionAddons = subscriptionAddons,
             TenantAdminRole = tenantAdminRole,
             TenantAdminRolePermissions = rolePermissions,
+            CashierRole = cashierRole,
+            CashierRolePermissions = cashierRolePermissions,
             TenantAdminUser = tenantAdminUser,
             TenantAdminUserRole = tenantAdminUserRole,
             TenantAdminInvite = null,

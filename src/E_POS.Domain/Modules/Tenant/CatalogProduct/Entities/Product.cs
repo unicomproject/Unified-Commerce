@@ -18,6 +18,7 @@ public class Product : AuditableEntity
     public string? LongDescription { get; protected set; }
     public bool IsSellable { get; protected set; } = true;
     public bool IsTaxable { get; protected set; } = true;
+    public bool IsTaxExclusive { get; protected set; } = true;
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
@@ -30,6 +31,7 @@ public class Product : AuditableEntity
     public Guid? ArchivedByTenantUserId { get; protected set; }
     public long RowVersion { get; protected set; } = 1;
     public string? DesiredPublishStatus { get; protected set; }
+    public decimal? ReferenceCostPrice { get; protected set; }
 
     public static Product Create(
         Guid id,
@@ -72,7 +74,7 @@ public class Product : AuditableEntity
             UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
             UpdatedAt = now,
-            CurrentSetupStep = status == ProductConstants.DraftStatus ? 1 : 8,
+            CurrentSetupStep = status == ProductConstants.DraftStatus ? 1 : 7,
             DraftSavedAt = isExplicitDraftSave ? now : null,
             PublishedAt = status != ProductConstants.DraftStatus ? now : null,
             PublishedByTenantUserId = status != ProductConstants.DraftStatus ? createdByTenantUserId : null,
@@ -172,6 +174,20 @@ public class Product : AuditableEntity
         IncrementRowVersion();
     }
 
+    public void UpdateReferenceCost(decimal? costPrice, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        ReferenceCostPrice = costPrice;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void UpdateTaxConfiguration(bool isTaxExclusive, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        IsTaxExclusive = isTaxExclusive;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
     public void UpdateStatus(string status, Guid? updatedByTenantUserId, DateTimeOffset now)
     {
         Status = ProductConstants.NormalizeStatus(status);
@@ -184,6 +200,15 @@ public class Product : AuditableEntity
         Status = ProductConstants.ArchivedStatus;
         ArchivedAt = now;
         ArchivedByTenantUserId = updatedByTenantUserId;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void Restore(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        Status = ProductConstants.DraftStatus;
+        ArchivedAt = null;
+        ArchivedByTenantUserId = null;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
@@ -213,7 +238,7 @@ public class Product : AuditableEntity
         Status = finalStatus == ProductConstants.DraftStatus ? ProductConstants.ActiveStatus : finalStatus;
         PublishedAt = now;
         PublishedByTenantUserId = userId;
-        CurrentSetupStep = 8;
+        CurrentSetupStep = 7;
         UpdatedAt = now;
     }
 

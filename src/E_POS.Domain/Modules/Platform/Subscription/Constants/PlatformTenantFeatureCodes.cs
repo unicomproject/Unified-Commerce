@@ -88,7 +88,8 @@ public static class PlatformTenantFeatureCodes
 
     public static bool IsKnownFeatureCode(string? featureCode) =>
         !string.IsNullOrWhiteSpace(featureCode) &&
-        CanonicalByAlias.ContainsKey(featureCode.Trim());
+        (CanonicalByAlias.ContainsKey(featureCode.Trim()) ||
+         CommercialSubscriptionFeatureCatalog.IsCommercialSubscriptionSelectable(featureCode));
 
     public static bool IsLegacyAlias(string? featureCode) =>
         string.Equals(featureCode?.Trim(), OutletManagementLegacyAlias, StringComparison.OrdinalIgnoreCase);

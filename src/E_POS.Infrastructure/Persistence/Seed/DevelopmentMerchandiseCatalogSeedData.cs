@@ -203,6 +203,15 @@ public static class DevelopmentMerchandiseCatalogSeedData
             updated_at = now();
         """;
 
+    public static string CurrentSchemaUpSql =>
+        UpSql
+            .Replace(
+                "id, tenant_id, department_id, parent_category_id, category_code, category_name,",
+                "id, tenant_id, parent_category_id, category_code, category_name,")
+            .Replace(
+                "'55555555-0000-4000-8000-000000000001', 'cccc0001-0001-4000-8000-000000000001', NULL,",
+                "'55555555-0000-4000-8000-000000000001', NULL,");
+
     public const string ProductImageUpSql = """
         INSERT INTO product_images (
             id, tenant_id, product_id, product_variant_id, sales_channel_id,

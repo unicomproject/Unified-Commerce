@@ -28,7 +28,20 @@ public static class DevelopmentPlatformAdminTestAccountSeedHost
         {
             using var scope = app.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<EPosDbContext>();
-            await db.Database.ExecuteSqlRawAsync(DevelopmentMerchandiseCatalogSeedData.UpSql, cancellationToken);
+            var hasDepartmentId = await db.Database
+                .SqlQueryRaw<int>("""
+                    SELECT COUNT(*)::int AS "Value"
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'categories'
+                      AND column_name = 'department_id'
+                    """)
+                .SingleAsync(cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                hasDepartmentId > 0
+                    ? DevelopmentMerchandiseCatalogSeedData.UpSql
+                    : DevelopmentMerchandiseCatalogSeedData.CurrentSchemaUpSql,
+                cancellationToken);
             
             var seeder = scope.ServiceProvider.GetRequiredService<IDevelopmentPlatformAdminTestAccountSeeder>();
             await seeder.SeedAsync(cancellationToken);

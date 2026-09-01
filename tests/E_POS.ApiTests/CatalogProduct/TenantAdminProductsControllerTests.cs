@@ -131,7 +131,6 @@ public sealed class TenantAdminProductsControllerTests
             [],
             [],
             [],
-            [],
             []);
         var service = new FakeTenantAdminProductService
         {
@@ -730,7 +729,7 @@ public sealed class TenantAdminProductsControllerTests
 
         public ApplicationResult<TenantAdminProductCreateOptionsResponse> CreateOptionsResult { get; init; } =
             ApplicationResult<TenantAdminProductCreateOptionsResponse>.Success(
-                new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []));
+                new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], []));
 
         public ApplicationResult<TenantAdminProductCreateResponse> CreateResult { get; init; } =
             ApplicationResult<TenantAdminProductCreateResponse>.Success(
@@ -838,6 +837,12 @@ public sealed class TenantAdminProductsControllerTests
         public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
             TenantRequestContext context,
             TenantAdminProductCreateRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(CreateResult);
+
+        public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateFromWizardAsync(
+            TenantRequestContext context,
+            TenantAdminWizardProductCreateRequest request,
             CancellationToken cancellationToken) =>
             Task.FromResult(CreateResult);
 
@@ -957,6 +962,18 @@ public sealed class TenantAdminProductsControllerTests
             Guid productId,
             CancellationToken cancellationToken) =>
             Task.FromResult(SetupResult);
+
+        public Task<ApplicationResult<ProductDraftResponse>> PublishAsync(
+            TenantRequestContext context,
+            Guid productId,
+            PublishProductRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(DraftResult);
+        public Task<ApplicationResult> UpdateVariantAsync(TenantRequestContext context, Guid productId, Guid variantId, TenantAdminProductVariantUpdateRequest request, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+        public Task<ApplicationResult> AddBarcodeAsync(TenantRequestContext context, Guid productId, Guid variantId, TenantAdminProductBarcodeAddRequest request, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+        public Task<ApplicationResult> DeleteBarcodeAsync(TenantRequestContext context, Guid productId, Guid variantId, Guid barcodeId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+        public Task<ApplicationResult> RestoreAsync(TenantRequestContext context, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+        public Task<ApplicationResult<TenantAdminProductCreateResponse>> DuplicateAsync(TenantRequestContext context, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<TenantAdminProductCreateResponse>.Success(new TenantAdminProductCreateResponse(Guid.NewGuid(), "Sample", "SKU", "ACTIVE")));
     }
 
 
@@ -1042,6 +1059,13 @@ public sealed class TenantAdminProductsControllerTests
         public Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
         public Task<ApplicationResult<BrandResponse>> UpdateAsync(TenantRequestContext context, Guid brandId, BrandUpdateRequest request, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
         public Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+
+        public Task<ApplicationResult> RemoveCategoryImageAsync(
+            TenantRequestContext context,
+            Guid categoryId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory

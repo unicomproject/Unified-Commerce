@@ -1,6 +1,7 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
-using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
+using E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 using E_POS.Domain.Modules.ECommerce.Customer.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Common.Security;
@@ -482,3 +483,5 @@ public sealed class CustomerAuthRepositoryTests
         Guid RefreshTokenId,
         Guid TokenFamilyId);
 }
+
+

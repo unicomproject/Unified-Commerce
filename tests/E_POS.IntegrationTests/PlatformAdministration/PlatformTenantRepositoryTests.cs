@@ -355,6 +355,13 @@ public sealed class PlatformTenantRepositoryTests
             "ACTIVE",
             Now));
 
+        dbContext.SubscriptionPlanFeatures.Add(SubscriptionPlanFeature.CreateIncluded(
+            Guid.NewGuid(),
+            planId,
+            featureId,
+            1,
+            Now));
+
         dbContext.FeatureLimitDefinitions.Add(FeatureLimitDefinition.Create(
             limitDefinitionId,
             featureId,
@@ -393,6 +400,8 @@ public sealed class PlatformTenantRepositoryTests
         var options = await repository.GetCreateOptionsAsync(CancellationToken.None);
 
         Assert.Single(options.Plans);
+        Assert.Equal(planId, options.Plans[0].Id);
+        Assert.Equal([featureId], options.Plans[0].IncludedFeatureIds);
         Assert.Equal(2, options.Addons.Count);
 
         var addonWithLimit = options.Addons.Single(addon => addon.AddonCode == "ADDON_WITH_LIMIT");
@@ -400,6 +409,67 @@ public sealed class PlatformTenantRepositoryTests
 
         var addonWithoutLimit = options.Addons.Single(addon => addon.AddonCode == "ADDON_WITHOUT_LIMIT");
         Assert.Empty(addonWithoutLimit.LimitIncrementByKey);
+    }
+
+    [Fact]
+    public async Task GetCreateOptionsAsync_ExcludesActivePlansWithZeroIncludedFeatures()
+    {
+        await using var dbContext = CreateDbContext();
+        var usablePlanId = Guid.NewGuid();
+        var emptyPlanId = Guid.NewGuid();
+        var moduleId = Guid.NewGuid();
+        var featureId = Guid.NewGuid();
+
+        dbContext.SubscriptionPlans.AddRange(
+            SubscriptionPlan.Create(
+                usablePlanId,
+                "USABLE_PLAN",
+                "Usable Plan",
+                SubscriptionPlanConstants.Status.Active,
+                "MONTHLY",
+                49.99m,
+                Now),
+            SubscriptionPlan.Create(
+                emptyPlanId,
+                "EMPTY_PLAN",
+                "Empty Plan",
+                SubscriptionPlanConstants.Status.Active,
+                "MONTHLY",
+                19.99m,
+                Now));
+
+        dbContext.PlatformModules.Add(PlatformModule.Create(
+            moduleId,
+            "wizard_module",
+            "Wizard Module",
+            "Wizard module",
+            "ACTIVE",
+            1,
+            Now));
+
+        dbContext.PlatformFeatures.Add(PlatformFeature.Create(
+            featureId,
+            moduleId,
+            "outlet_management",
+            "Outlet Management",
+            "ACTIVE",
+            Now));
+
+        dbContext.SubscriptionPlanFeatures.Add(SubscriptionPlanFeature.CreateIncluded(
+            Guid.NewGuid(),
+            usablePlanId,
+            featureId,
+            1,
+            Now));
+
+        await dbContext.SaveChangesAsync();
+
+        IPlatformTenantRepository repository = new PlatformTenantRepository(dbContext);
+        var options = await repository.GetCreateOptionsAsync(CancellationToken.None);
+
+        Assert.Single(options.Plans);
+        Assert.Equal(usablePlanId, options.Plans[0].Id);
+        Assert.Equal([featureId], options.Plans[0].IncludedFeatureIds);
     }
 
     private static async Task SeedAsync(

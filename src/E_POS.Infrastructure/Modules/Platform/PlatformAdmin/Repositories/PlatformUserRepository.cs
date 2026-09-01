@@ -17,11 +17,88 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
         _dbContext = dbContext;
     }
 
-    public async Task<PlatformUserListResponse> GetUsersAsync(CancellationToken cancellationToken)
+    public async Task<PlatformUserListResponse> GetUsersAsync(
+        PlatformUserListQuery query,
+        CancellationToken cancellationToken)
     {
-        var users = await _dbContext.PlatformUsers
-            .AsNoTracking()
-            .OrderBy(user => user.Email)
+        query ??= new PlatformUserListQuery();
+
+        var pageNumber = Math.Max(1, query.PageNumber);
+        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+
+        var queryable = _dbContext.PlatformUsers.AsNoTracking();
+
+        // 1. Search Filter (Email or DisplayName)
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var searchPattern = $"%{query.Search.Trim().ToLower()}%";
+            queryable = queryable.Where(user =>
+                EF.Functions.Like(user.Email.ToLower(), searchPattern) ||
+                (user.DisplayName != null && EF.Functions.Like(user.DisplayName.ToLower(), searchPattern)));
+        }
+
+        // 2. Status Filter
+        if (!string.IsNullOrWhiteSpace(query.Status))
+        {
+            var targetStatus = query.Status.Trim().ToUpperInvariant();
+            queryable = queryable.Where(user => user.Status == targetStatus);
+        }
+
+        // 3. Role Filter
+        if (!string.IsNullOrWhiteSpace(query.Role))
+        {
+            var roleFilter = query.Role.Trim();
+            if (Guid.TryParse(roleFilter, out var roleGuid))
+            {
+                queryable = queryable.Where(user => _dbContext.PlatformUserRoles.Any(ur =>
+                    ur.PlatformUserId == user.Id &&
+                    ur.PlatformRoleId == roleGuid &&
+                    ur.RevokedAt == null));
+            }
+            else
+            {
+                var upperRoleCode = roleFilter.ToUpperInvariant();
+                queryable = queryable.Where(user => (
+                    from ur in _dbContext.PlatformUserRoles
+                    join r in _dbContext.PlatformRoles on ur.PlatformRoleId equals r.Id
+                    where ur.PlatformUserId == user.Id &&
+                          ur.RevokedAt == null &&
+                          (r.RoleCode.ToUpper() == upperRoleCode || r.Name.ToLower() == roleFilter.ToLower())
+                    select ur
+                ).Any());
+            }
+        }
+
+        // 4. Deterministic Ordering
+        var isAscending = string.Equals(query.SortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        queryable = (query.SortBy?.ToLowerInvariant()) switch
+        {
+            "email" => isAscending
+                ? queryable.OrderBy(u => u.Email).ThenBy(u => u.Id)
+                : queryable.OrderByDescending(u => u.Email).ThenBy(u => u.Id),
+            "status" => isAscending
+                ? queryable.OrderBy(u => u.Status).ThenBy(u => u.Email)
+                : queryable.OrderByDescending(u => u.Status).ThenBy(u => u.Email),
+            "updatedat" => isAscending
+                ? queryable.OrderBy(u => u.UpdatedAt).ThenBy(u => u.Id)
+                : queryable.OrderByDescending(u => u.UpdatedAt).ThenBy(u => u.Id),
+            _ => isAscending
+                ? queryable.OrderBy(u => u.CreatedAt).ThenBy(u => u.Id)
+                : queryable.OrderByDescending(u => u.CreatedAt).ThenBy(u => u.Id)
+        };
+
+        var totalCount = await queryable.CountAsync(cancellationToken);
+
+        if (totalCount == 0)
+        {
+            return new PlatformUserListResponse([], pageNumber, pageSize, 0, 0);
+        }
+
+        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+        var pagedUsers = await queryable
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
             .Select(user => new
             {
                 user.Id,
@@ -33,17 +110,12 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             })
             .ToListAsync(cancellationToken);
 
-        if (users.Count == 0)
-        {
-            return new PlatformUserListResponse([]);
-        }
-
-        var userIds = users.Select(user => user.Id).ToList();
+        var userIds = pagedUsers.Select(user => user.Id).ToList();
         var roleAssignments = await LoadRoleAssignmentsAsync(userIds, cancellationToken);
         var permissionCounts = await LoadPermissionCountsAsync(userIds, cancellationToken);
         var lastLogins = await LoadLastLoginTimesAsync(userIds, cancellationToken);
 
-        var items = users
+        var items = pagedUsers
             .Select(user =>
             {
                 roleAssignments.TryGetValue(user.Id, out var roles);
@@ -63,7 +135,7 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
             })
             .ToList();
 
-        return new PlatformUserListResponse(items);
+        return new PlatformUserListResponse(items, pageNumber, pageSize, totalCount, totalPages);
     }
 
     public async Task<PlatformUserDetailResponse?> GetUserByIdAsync(
@@ -157,6 +229,31 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
                 "Platform user role assignment.",
                 now));
         }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddUserWithRolesAndInvitationAsync(
+        PlatformUser user,
+        IReadOnlyList<Guid> roleIds,
+        PlatformUserInvitation invitation,
+        E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage outboxMessage,
+        CancellationToken cancellationToken)
+    {
+        _dbContext.PlatformUsers.Add(user);
+
+        foreach (var roleId in roleIds.Distinct())
+        {
+            _dbContext.PlatformUserRoles.Add(PlatformUserRole.Create(
+                Guid.NewGuid(),
+                user.Id,
+                roleId,
+                "Platform user role assignment.",
+                user.CreatedAt));
+        }
+
+        _dbContext.PlatformUserInvitations.Add(invitation);
+        _dbContext.IntegrationOutboxMessages.Add(outboxMessage);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
     }

@@ -6,16 +6,28 @@ public static class DevelopmentStorefrontSeedData
         -- 0. Update Dev Tenant Slug
         UPDATE tenants SET tenant_slug = 'arenasports' WHERE id = '55555555-0000-4000-8000-000000000001';
 
-        -- 1. Storefront Banners
-        INSERT INTO storefront_banners (
-            id, tenant_id, banner_type, title, subtitle, action_text, action_url, sort_order, status, created_at, updated_at
+        -- 1. Media Assets for Promo Banners
+        INSERT INTO media_assets (
+            id, tenant_id, container_name, storage_key, public_url, original_file_name, mime_type, file_extension, file_size_bytes, width_px, height_px, checksum_hash, asset_type, asset_purpose, status, created_at, updated_at
         )
         VALUES
-            ('dddd0001-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'HERO', 'Gear up. Rep your team.', 'Official merch. Exclusive styles.', 'SHOP NOW', '/collections/apparel', 0, 'ACTIVE', now(), now()),
-            ('dddd0001-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'HERO', 'New Arrivals Are Here', 'Upgrade your game with the latest performance gear.', 'EXPLORE NEW', '/collections/footwear', 1, 'ACTIVE', now(), now())
+            ('eeee0001-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'images', 'storefront/promo-bag.jpg', NULL, 'promo-bag.jpg', 'image/jpeg', '.jpg', 1024, 500, 500, '', 'IMAGE', 'STOREFRONT', 'ACTIVE', now(), now()),
+            ('eeee0001-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'images', 'storefront/promo-box.jpg', NULL, 'promo-box.jpg', 'image/jpeg', '.jpg', 1024, 500, 500, '', 'IMAGE', 'STOREFRONT', 'ACTIVE', now(), now())
+        ON CONFLICT (id) DO NOTHING;
+
+        -- 1.5. Storefront Banners
+        INSERT INTO storefront_banners (
+            id, tenant_id, banner_type, title, subtitle, action_text, action_url, image_media_asset_id, sort_order, status, created_at, updated_at
+        )
+        VALUES
+            ('dddd0001-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'HERO', 'Gear up. Rep your team.', 'Official merch. Exclusive styles.', 'SHOP NOW', '/collections/apparel', NULL, 0, 'ACTIVE', now(), now()),
+            ('dddd0001-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'HERO', 'New Arrivals Are Here', 'Upgrade your game with the latest performance gear.', 'EXPLORE NEW', '/collections/footwear', NULL, 1, 'ACTIVE', now(), now()),
+            ('dddd0001-0003-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'PROMO', 'Collect in<br>as little as<br>30 mins', 'CLICK & COLLECT', 'SHOP NOW', '/collections/click-collect', 'eeee0001-0001-4000-8000-000000000001', 0, 'ACTIVE', now(), now()),
+            ('dddd0001-0004-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'PROMO', 'Free delivery<br>on orders<br>over $99', 'FREE DELIVERY', 'SHOP NOW', '/collections/free-delivery', 'eeee0001-0002-4000-8000-000000000001', 1, 'ACTIVE', now(), now())
         ON CONFLICT (id) DO UPDATE
         SET title = EXCLUDED.title,
             subtitle = EXCLUDED.subtitle,
+            image_media_asset_id = EXCLUDED.image_media_asset_id,
             status = 'ACTIVE',
             updated_at = now();
 
@@ -30,12 +42,12 @@ public static class DevelopmentStorefrontSeedData
             id, tenant_id, product_id, image_purpose, sort_order, is_primary_image, status, created_at, updated_at
         )
         VALUES
-            ('dddd0002-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0001-4000-8000-000000000001', 'DEFAULT', 0, true, 'ACTIVE', now(), now()),
-            ('dddd0002-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0002-4000-8000-000000000001', 'DEFAULT', 0, true, 'ACTIVE', now(), now()),
-            ('dddd0002-0003-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0008-4000-8000-000000000001', 'DEFAULT', 0, true, 'ACTIVE', now(), now()),
-            ('dddd0002-0004-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0009-4000-8000-000000000001', 'DEFAULT', 0, true, 'ACTIVE', now(), now()),
-            ('dddd0002-0005-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000a-4000-8000-000000000001', 'DEFAULT', 0, true, 'ACTIVE', now(), now()),
-            ('dddd0002-0006-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000b-4000-8000-000000000001', 'DEFAULT', 0, true, 'ACTIVE', now(), now())
+            ('dddd0002-0001-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0001-4000-8000-000000000001', 'DEFAULT', 0, false, 'ACTIVE', now(), now()),
+            ('dddd0002-0002-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0002-4000-8000-000000000001', 'DEFAULT', 0, false, 'ACTIVE', now(), now()),
+            ('dddd0002-0003-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0008-4000-8000-000000000001', 'DEFAULT', 0, false, 'ACTIVE', now(), now()),
+            ('dddd0002-0004-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-0009-4000-8000-000000000001', 'DEFAULT', 0, false, 'ACTIVE', now(), now()),
+            ('dddd0002-0005-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000a-4000-8000-000000000001', 'DEFAULT', 0, false, 'ACTIVE', now(), now()),
+            ('dddd0002-0006-4000-8000-000000000001', '55555555-0000-4000-8000-000000000001', 'cccc0004-000b-4000-8000-000000000001', 'DEFAULT', 0, false, 'ACTIVE', now(), now())
         ON CONFLICT (id) DO UPDATE
         SET image_purpose = EXCLUDED.image_purpose,
             status = 'ACTIVE',

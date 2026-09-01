@@ -162,6 +162,7 @@ public sealed class PlatformSubscriptionPlanServiceTests
                 49.99m,
                 Now,
                 maxOutlets: 1),
+            IncludedFeatureCount = 1,
             MutationResponse = new SubscriptionPlanMutationResponse(
                 planId,
                 "DRAFT_PLAN",
@@ -200,7 +201,8 @@ public sealed class PlatformSubscriptionPlanServiceTests
                     SubscriptionPlanConstants.Status.Draft,
                     SubscriptionPlanConstants.BillingInterval.Monthly,
                     49.99m,
-                    Now)
+                    Now),
+                IncludedFeatureCount = 1
             },
             hasEdit: true);
 
@@ -208,6 +210,33 @@ public sealed class PlatformSubscriptionPlanServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("platform_subscription_plans.validation_failed", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task PublishAsync_WithoutIncludedFeatures_ReturnsValidationFailed()
+    {
+        var planId = Guid.NewGuid();
+        var service = CreateService(
+            new FakePlatformSubscriptionPlanRepository
+            {
+                PlanEntity = SubscriptionPlan.Create(
+                    planId,
+                    "DRAFT_PLAN",
+                    "Draft Plan",
+                    SubscriptionPlanConstants.Status.Draft,
+                    SubscriptionPlanConstants.BillingInterval.Monthly,
+                    49.99m,
+                    Now,
+                    maxOutlets: 1),
+                IncludedFeatureCount = 0
+            },
+            hasEdit: true);
+
+        var result = await service.PublishAsync(planId, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_subscription_plans.validation_failed", result.Error.Code);
+        Assert.Contains("feature", result.Error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -245,6 +274,37 @@ public sealed class PlatformSubscriptionPlanServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(SubscriptionPlanConstants.Status.Retired, result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task UpdateFeaturesAsync_WithInvalidOrPlatformScopedFeature_ReturnsValidationError()
+    {
+        var planId = Guid.NewGuid();
+        var platformFeatureId = Guid.NewGuid();
+        var service = CreateService(
+            new FakePlatformSubscriptionPlanRepository
+            {
+                PlanEntity = SubscriptionPlan.Create(
+                    planId,
+                    "DRAFT_PLAN",
+                    "Draft Plan",
+                    SubscriptionPlanConstants.Status.Draft,
+                    SubscriptionPlanConstants.BillingInterval.Monthly,
+                    10m,
+                    Now),
+                ActiveFeatureIds = new HashSet<Guid>() // Platform-scoped or unknown feature ID not returned by GetActiveFeatureIdsAsync
+            },
+            hasEdit: true);
+
+        var result = await service.UpdateFeaturesAsync(
+            planId,
+            new UpdateSubscriptionPlanFeaturesRequest { FeatureIds = [platformFeatureId] },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("platform_subscription_plans.validation_failed", result.Error.Code);
+        Assert.Contains("Unknown or inactive feature ids", result.Error.Message);
     }
 
     [Fact]
@@ -441,6 +501,7 @@ public sealed class PlatformSubscriptionPlanServiceTests
         public bool RemoveCalled { get; private set; }
         public bool CopyConfigurationCalled { get; private set; }
         public int PlanAssignments { get; init; }
+        public int IncludedFeatureCount { get; init; }
         private SubscriptionPlan? _addedPlan;
 
         public Task<SubscriptionPlanListResponse> GetPlansAsync(
@@ -566,7 +627,7 @@ public sealed class PlatformSubscriptionPlanServiceTests
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken)
         {
-            return Task.FromResult(0);
+            return Task.FromResult(IncludedFeatureCount);
         }
 
         public Task UpsertLegacyPlanLimitsAsync(

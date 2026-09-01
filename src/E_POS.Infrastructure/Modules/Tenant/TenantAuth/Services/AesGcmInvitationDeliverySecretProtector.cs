@@ -40,7 +40,7 @@ public sealed class AesGcmInvitationDeliverySecretProtector : IInvitationDeliver
         if (bytes.Length < 29) throw new CryptographicException("Invitation delivery secret is invalid.");
         var plaintext = new byte[bytes.Length - 28];
         using var aes = new AesGcm(_key, 16);
-        aes.Decrypt(bytes[..12], bytes[12..28], bytes[28..], plaintext, Encoding.UTF8.GetBytes(_keyVersion));
+        aes.Decrypt(bytes[..12], bytes[28..], bytes[12..28], plaintext, Encoding.UTF8.GetBytes(_keyVersion));
         return Encoding.UTF8.GetString(plaintext);
     }
 }

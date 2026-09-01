@@ -88,9 +88,9 @@ public abstract class StorefrontProductRepositoryBase
             .ToDictionary(x => x.Key, x => x.First());
     }
 
-    protected async Task<decimal?> GetProductPriceAsync(Guid tenantId, Guid productId, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
+    protected async Task<(decimal? SellingPrice, decimal? OriginalPrice)?> GetProductPriceAsync(Guid tenantId, Guid productId, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        return await (from item in DbContext.Set<PriceListItem>().AsNoTracking()
+        var result = await (from item in DbContext.Set<PriceListItem>().AsNoTracking()
                 join priceList in DbContext.Set<PriceList>().AsNoTracking()
                     on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
                 where item.TenantId == tenantId &&
@@ -108,11 +108,13 @@ public abstract class StorefrontProductRepositoryBase
                         priceList.Priority descending,
                         item.ValidFrom ?? DateTimeOffset.MinValue descending,
                         item.MinQuantity descending
-                select (decimal?)item.SellingPrice)
+                select new { item.SellingPrice, item.CompareAtPrice })
             .FirstOrDefaultAsync(cancellationToken);
+            
+        return result == null ? ((decimal? SellingPrice, decimal? OriginalPrice)?)null : (result.SellingPrice, result.CompareAtPrice);
     }
 
-    protected async Task<Dictionary<Guid, decimal?>> GetProductPricesByProductAsync(Guid tenantId, IReadOnlyCollection<Guid> productIds, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
+    protected async Task<Dictionary<Guid, (decimal? SellingPrice, decimal? OriginalPrice)>> GetProductPricesByProductAsync(Guid tenantId, IReadOnlyCollection<Guid> productIds, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var priceRows = await (from item in DbContext.Set<PriceListItem>().AsNoTracking()
                 join priceList in DbContext.Set<PriceList>().AsNoTracking()
@@ -132,15 +134,15 @@ public abstract class StorefrontProductRepositoryBase
                         priceList.Priority descending,
                         item.ValidFrom ?? DateTimeOffset.MinValue descending,
                         item.MinQuantity descending
-                select new { item.ProductId, item.SellingPrice })
+                select new { item.ProductId, item.SellingPrice, item.CompareAtPrice })
             .ToListAsync(cancellationToken);
 
         return priceRows
             .GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => (decimal?)x.First().SellingPrice);
+            .ToDictionary(x => x.Key, x => ((decimal?)x.First().SellingPrice, (decimal?)x.First().CompareAtPrice));
     }
 
-    protected async Task<Dictionary<Guid, decimal?>> GetVariantPricesByVariantAsync(Guid tenantId, Guid productId, IReadOnlyCollection<Guid> variantIds, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
+    protected async Task<Dictionary<Guid, (decimal? SellingPrice, decimal? OriginalPrice)>> GetVariantPricesByVariantAsync(Guid tenantId, Guid productId, IReadOnlyCollection<Guid> variantIds, string currencyCode, DateTimeOffset now, CancellationToken cancellationToken)
     {
         if (variantIds.Count == 0)
         {
@@ -166,12 +168,12 @@ public abstract class StorefrontProductRepositoryBase
                         priceList.Priority descending,
                         item.ValidFrom ?? DateTimeOffset.MinValue descending,
                         item.MinQuantity descending
-                select item)
+                select new { item.ProductVariantId, item.SellingPrice, item.CompareAtPrice })
             .ToListAsync(cancellationToken);
 
         return variantPriceRows
             .GroupBy(x => x.ProductVariantId!.Value)
-            .ToDictionary(x => x.Key, x => (decimal?)x.First().SellingPrice);
+            .ToDictionary(x => x.Key, x => ((decimal?)x.First().SellingPrice, (decimal?)x.First().CompareAtPrice));
     }
 
     protected async Task<Dictionary<Guid, string?>> GetPrimaryImagesByProductAsync(Guid tenantId, IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken)
@@ -436,8 +438,8 @@ public abstract class StorefrontProductRepositoryBase
 
     protected static IReadOnlyList<StorefrontProductVariantReadModel> BuildVariantModels(
         IReadOnlyList<ProductVariant> variants,
-        decimal? productPrice,
-        IReadOnlyDictionary<Guid, decimal?> variantPricesByVariant,
+        (decimal? SellingPrice, decimal? OriginalPrice)? productPrice,
+        IReadOnlyDictionary<Guid, (decimal? SellingPrice, decimal? OriginalPrice)> variantPricesByVariant,
         IReadOnlyDictionary<Guid, decimal> inventoryByVariant,
         ProductVariantOptions variantOptions,
         string currencyCode)
@@ -450,7 +452,7 @@ public abstract class StorefrontProductRepositoryBase
 
         return variants.Select(variant =>
         {
-            variantPricesByVariant.TryGetValue(variant.Id, out var variantPrice);
+            var prices = variantPricesByVariant.TryGetValue(variant.Id, out var p) ? p : (null, null);
             var variantHasInventory = inventoryByVariant.TryGetValue(variant.Id, out var variantAvailableQuantity);
 
             var optionValuesDict = new Dictionary<string, string>();
@@ -469,7 +471,8 @@ public abstract class StorefrontProductRepositoryBase
             return StorefrontProductMapper.ToVariantReadModel(
                 variant,
                 optionValuesDict,
-                variantPrice ?? productPrice ?? 0m,
+                prices.SellingPrice ?? productPrice?.SellingPrice ?? 0m,
+                prices.OriginalPrice ?? productPrice?.OriginalPrice,
                 !variantHasInventory || variantAvailableQuantity > 0m,
                 currencyCode);
         }).ToList();
@@ -527,16 +530,15 @@ public abstract class StorefrontProductRepositoryBase
         var normalizedSort = sort?.Trim().ToLowerInvariant();
         return normalizedSort switch
         {
-            "price_asc" => items.OrderBy(x => x.Price ?? decimal.MaxValue).ThenBy(x => x.Product.ProductName),
-            "price_desc" => items.OrderByDescending(x => x.Price ?? decimal.MinValue).ThenBy(x => x.Product.ProductName),
-            "newest" => items.OrderByDescending(x => x.Product.CreatedAt).ThenBy(x => x.Product.ProductName),
-            _ => items.OrderBy(x => x.SortOrder).ThenByDescending(x => x.ReviewCount).ThenByDescending(x => x.Rating).ThenBy(x => x.Product.ProductName)
+            "price_asc" => items.OrderBy(x => x.Model.Price).ThenBy(x => x.Model.Name),
+            "price_desc" => items.OrderByDescending(x => x.Model.Price).ThenBy(x => x.Model.Name),
+            "newest" => items.OrderByDescending(x => x.Model.Id).ThenBy(x => x.Model.Name),
+            _ => items.OrderBy(x => x.SortOrder).ThenByDescending(x => x.ReviewCount).ThenByDescending(x => x.Rating).ThenBy(x => x.Model.Name)
         };
     }
 
     protected sealed record ProductListingSortItem(
-        Product Product,
-        decimal? Price,
+        StorefrontProductListReadModel Model,
         int SortOrder,
         decimal Rating,
         int ReviewCount);

@@ -176,6 +176,25 @@ public sealed class PosTillsControllerTests
     }
 
     [Fact]
+    public async Task CloseTill_WhenPermissionDenied_ReturnsForbidden()
+    {
+        var service = new FakePosTillSessionService
+        {
+            CloseTillResult = ApplicationResult<CloseTillResponseDto>.Failure(
+                new ApplicationError("till_session.permission_denied", "Permission denied.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "pos.home.view");
+
+        var result = await controller.CloseTill(
+            new CloseTillRequest(Guid.NewGuid(), Guid.NewGuid(), 100m, null, null, null),
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
     public void Controller_RequiresTenantOnlyPolicy()
     {
         var authorize = Assert.Single(typeof(PosTillsController).GetCustomAttributes<AuthorizeAttribute>());

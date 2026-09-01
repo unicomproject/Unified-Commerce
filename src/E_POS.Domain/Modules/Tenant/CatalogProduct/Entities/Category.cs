@@ -1,11 +1,11 @@
 using E_POS.Domain.Common.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 
 public class Category : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
-    public Guid DepartmentId { get; protected set; }
     public Guid? ParentCategoryId { get; protected set; }
     public string CategoryCode { get; protected set; } = string.Empty;
     public string CategoryName { get; protected set; } = string.Empty;
@@ -20,7 +20,6 @@ public class Category : AuditableEntity
     public static Category Create(
         Guid id,
         Guid tenantId,
-        Guid departmentId,
         Guid? parentCategoryId,
         string categoryCode,
         string categoryName,
@@ -35,14 +34,13 @@ public class Category : AuditableEntity
         {
             Id = id,
             TenantId = tenantId,
-            DepartmentId = departmentId,
             ParentCategoryId = parentCategoryId,
-            CategoryCode = categoryCode.Trim().ToUpperInvariant(),
-            CategoryName = categoryName.Trim(),
-            CategorySlug = categorySlug.Trim().ToLowerInvariant(),
-            Description = description?.Trim(),
+            CategoryCode = CategoryConstants.NormalizeCode(categoryCode),
+            CategoryName = CategoryConstants.NormalizeName(categoryName),
+            CategorySlug = CategoryConstants.NormalizeSlug(categorySlug),
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             SortOrder = sortOrder,
-            Status = status.Trim().ToUpperInvariant(),
+            Status = CategoryConstants.NormalizeStatus(status),
             CreatedByTenantUserId = createdByTenantUserId,
             UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
@@ -51,7 +49,6 @@ public class Category : AuditableEntity
     }
 
     public void UpdateProfile(
-        Guid departmentId,
         Guid? parentCategoryId,
         string categoryCode,
         string categoryName,
@@ -62,21 +59,20 @@ public class Category : AuditableEntity
         Guid? updatedByTenantUserId,
         DateTimeOffset now)
     {
-        DepartmentId = departmentId;
         ParentCategoryId = parentCategoryId;
-        CategoryCode = categoryCode.Trim().ToUpperInvariant();
-        CategoryName = categoryName.Trim();
-        CategorySlug = categorySlug.Trim().ToLowerInvariant();
-        Description = description?.Trim();
+        CategoryCode = CategoryConstants.NormalizeCode(categoryCode);
+        CategoryName = CategoryConstants.NormalizeName(categoryName);
+        CategorySlug = CategoryConstants.NormalizeSlug(categorySlug);
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         SortOrder = sortOrder;
-        Status = status.Trim().ToUpperInvariant();
+        Status = CategoryConstants.NormalizeStatus(status);
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
 
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
-        Status = "DELETED";
+        Status = CategoryConstants.DeletedStatus;
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
@@ -90,10 +86,10 @@ public class Category : AuditableEntity
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
+
     public static Category Create(
         Guid id,
         Guid tenantId,
-        Guid departmentId,
         Guid? parentCategoryId,
         string categoryCode,
         string categoryName,
@@ -105,7 +101,18 @@ public class Category : AuditableEntity
         Guid? createdByTenantUserId,
         DateTimeOffset now)
     {
-        return Create(id, tenantId, departmentId, parentCategoryId, categoryCode, categoryName, categorySlug, description, sortOrder, status, createdByTenantUserId, now);
+        return Create(
+            id,
+            tenantId,
+            parentCategoryId,
+            categoryCode,
+            categoryName,
+            categorySlug,
+            description,
+            sortOrder,
+            status,
+            createdByTenantUserId,
+            now);
     }
 
     public void UpdateImage(

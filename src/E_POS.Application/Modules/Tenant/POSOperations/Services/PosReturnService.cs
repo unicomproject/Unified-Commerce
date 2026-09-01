@@ -5,6 +5,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.POSOperations.Access;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Application.Modules.Tenant.HardwareCash;
 using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
 using System.Text.Json;
@@ -239,7 +240,7 @@ public sealed class PosReturnService : IPosReturnService
                 var registerResult = await _drawerService.RegisterOperationAsync(
                     context,
                     new RegisterDrawerOperationRequest(
-                        Guid.NewGuid(),
+                        CashDrawerStableRequestId.ForBusinessReference(receipt.ReturnId, "cashRefund"),
                         deviceId.Value,
                         null,
                         "cashRefund",

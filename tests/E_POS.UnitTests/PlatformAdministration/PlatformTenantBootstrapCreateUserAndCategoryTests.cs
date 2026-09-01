@@ -181,7 +181,6 @@ public sealed class PlatformTenantBootstrapCreateUserAndCategoryTests
         dbContext.Categories.Add(Category.Create(
             foreignCategoryId,
             tenantB,
-            Guid.Empty,
             null,
             "FOREIGN",
             "Foreign",

@@ -43,6 +43,15 @@ public sealed class CustomerAuthAccountConfiguration : IEntityTypeConfiguration<
             .HasColumnType("varchar(255)")
             .HasMaxLength(255);
 
+        builder.Property(x => x.OtpHash)
+            .HasColumnName("otp_hash")
+            .HasColumnType("varchar(255)")
+            .HasMaxLength(255);
+
+        builder.Property(x => x.OtpExpiryUtc)
+            .HasColumnName("otp_expiry_utc")
+            .HasColumnType("timestamp with time zone");
+
         builder.Property(x => x.EmailVerifiedAt)
             .HasColumnName("email_verified_at")
             .HasColumnType("timestamp with time zone");

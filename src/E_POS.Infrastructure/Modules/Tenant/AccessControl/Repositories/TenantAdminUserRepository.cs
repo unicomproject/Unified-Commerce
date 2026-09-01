@@ -46,6 +46,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
     {
         var rows = await BuildUserRowsQuery(tenantId).ToListAsync(cancellationToken);
         await AttachOutletAssignmentsAsync(tenantId, rows, cancellationToken);
+        await AttachProfileImageUrlsAsync(tenantId, rows, cancellationToken);
 
         var filtered = rows;
         if (!string.IsNullOrWhiteSpace(status))
@@ -72,6 +73,8 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                 .Where(x =>
                     x.FullName.ToUpperInvariant().Contains(term) ||
                     x.Email.ToUpperInvariant().Contains(term) ||
+                    (!string.IsNullOrWhiteSpace(x.StaffCode) &&
+                     x.StaffCode.ToUpperInvariant().Contains(term)) ||
                     (!string.IsNullOrWhiteSpace(x.Phone) &&
                      x.Phone.ToUpperInvariant().Contains(term)))
                 .ToList();
@@ -728,38 +731,50 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         CancellationToken cancellationToken)
     {
         var existingTenantRoles = await _dbContext.TenantUserRoles
-            .Where(x => x.TenantId == tenantId && x.TenantUserId == userId && x.RevokedAt == null)
+            .Where(x => x.TenantId == tenantId && x.TenantUserId == userId)
             .ToListAsync(cancellationToken);
 
         var existingOutletRoles = await _dbContext.OutletUserRoles
-            .Where(x => x.TenantId == tenantId && x.TenantUserId == userId && x.RevokedAt == null)
+            .Where(x => x.TenantId == tenantId && x.TenantUserId == userId)
             .ToListAsync(cancellationToken);
 
-        var keepsExistingTenantRole =
-            outletIds.Count == 0 &&
-            existingOutletRoles.Count == 0 &&
-            existingTenantRoles.Count == 1 &&
-            existingTenantRoles[0].TenantRoleId == roleId;
-
-        if (!keepsExistingTenantRole)
+        foreach (var role in existingTenantRoles.Where(role =>
+                     role.RevokedAt == null &&
+                     (outletIds.Count > 0 || role.TenantRoleId != roleId)))
         {
-            foreach (var role in existingTenantRoles)
-            {
-                role.Revoke(now);
-            }
+            role.Revoke(now);
+        }
 
-            foreach (var role in existingOutletRoles)
-            {
-                role.Revoke(actingUserId, now);
-            }
+        var requestedOutletIds = outletIds.Distinct().ToHashSet();
+        foreach (var role in existingOutletRoles.Where(role =>
+                     role.RevokedAt == null &&
+                     (requestedOutletIds.Count == 0 ||
+                      role.TenantRoleId != roleId ||
+                      !requestedOutletIds.Contains(role.OutletId))))
+        {
+            role.Revoke(actingUserId, now);
+        }
 
-            if (outletIds.Count == 0)
+        if (requestedOutletIds.Count == 0)
+        {
+            var existingTenantRole = existingTenantRoles
+                .FirstOrDefault(role => role.TenantRoleId == roleId);
+            if (existingTenantRole is null)
             {
                 _dbContext.TenantUserRoles.Add(TenantUserRole.Create(Guid.NewGuid(), tenantId, userId, roleId, actingUserId, now));
             }
-            else
+            else if (existingTenantRole.RevokedAt is not null)
             {
-                foreach (var outletId in outletIds.Distinct())
+                existingTenantRole.Reactivate(actingUserId, now);
+            }
+        }
+        else
+        {
+            foreach (var outletId in requestedOutletIds)
+            {
+                var existingOutletRole = existingOutletRoles
+                    .FirstOrDefault(role => role.OutletId == outletId && role.TenantRoleId == roleId);
+                if (existingOutletRole is null)
                 {
                     _dbContext.OutletUserRoles.Add(OutletUserRole.Create(
                         Guid.NewGuid(),
@@ -770,28 +785,47 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                         actingUserId,
                         now));
                 }
+                else if (existingOutletRole.RevokedAt is not null)
+                {
+                    existingOutletRole.Reactivate(actingUserId, now);
+                }
             }
         }
 
         var existingPermissions = await _dbContext.TenantUserPermissions
-            .Where(x => x.TenantId == tenantId && x.TenantUserId == userId && x.RevokedAt == null)
+            .Where(x => x.TenantId == tenantId && x.TenantUserId == userId)
             .ToListAsync(cancellationToken);
-        foreach (var permission in existingPermissions)
+        var requestedPermissionIds = permissionOverrideEnabled
+            ? overriddenPermissionIds.Distinct().ToHashSet()
+            : new HashSet<Guid>();
+
+        foreach (var permission in existingPermissions.Where(permission =>
+                     permission.RevokedAt == null &&
+                     !requestedPermissionIds.Contains(permission.PermissionDefinitionId)))
         {
             permission.Revoke(now);
         }
 
         if (permissionOverrideEnabled)
         {
-            foreach (var permissionId in overriddenPermissionIds.Distinct())
+            foreach (var permissionId in requestedPermissionIds)
             {
-                _dbContext.TenantUserPermissions.Add(TenantUserPermission.Create(
-                    Guid.NewGuid(),
-                    tenantId,
-                    userId,
-                    permissionId,
-                    actingUserId,
-                    now));
+                var existingPermission = existingPermissions
+                    .FirstOrDefault(permission => permission.PermissionDefinitionId == permissionId);
+                if (existingPermission is null)
+                {
+                    _dbContext.TenantUserPermissions.Add(TenantUserPermission.Create(
+                        Guid.NewGuid(),
+                        tenantId,
+                        userId,
+                        permissionId,
+                        actingUserId,
+                        now));
+                }
+                else if (existingPermission.RevokedAt is not null)
+                {
+                    existingPermission.Reactivate(actingUserId, now);
+                }
             }
         }
     }
@@ -1142,6 +1176,8 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                    FullName = user.FullName,
                    Email = user.Email,
                    Phone = user.UnmaskedPhone ?? user.Phone,
+                   StaffCode = user.StaffCode,
+                   ProfileImageMediaAssetId = user.ProfileImageUrl,
                    RoleId = tenantRole != null ? tenantRole.Id : (outletRole != null ? outletRole.Id : (Guid?)null),
                    RoleName = tenantRole != null ? tenantRole.RoleName : (outletRole != null ? outletRole.RoleName : "-"),
                    RoleDescription = tenantRole != null
@@ -1267,6 +1303,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             row.FullName,
             row.Email,
             row.Phone,
+            row.StaffCode,
             row.RoleId,
             row.RoleName,
             row.Outlets.Count == 0 ? "All Outlets" : string.Join(", ", row.Outlets.Select(x => x.OutletName)),
@@ -1274,7 +1311,49 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             row.LastActiveAt,
             row.RoleDescription,
             row.Outlets,
-            row.OutletCount);
+            row.OutletCount,
+            row.ProfileImageUrl);
+    }
+
+    private async Task AttachProfileImageUrlsAsync(
+        Guid tenantId,
+        List<UserRow> rows,
+        CancellationToken cancellationToken)
+    {
+        var mediaAssetIds = rows
+            .Where(row => row.ProfileImageMediaAssetId.HasValue)
+            .Select(row => row.ProfileImageMediaAssetId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (mediaAssetIds.Count == 0)
+        {
+            return;
+        }
+
+        var mediaUrls = await _dbContext.MediaAssets
+            .AsNoTracking()
+            .Where(asset =>
+                asset.TenantId == tenantId &&
+                mediaAssetIds.Contains(asset.Id) &&
+                asset.Status == ActiveMediaStatus)
+            .Select(asset => new { asset.Id, asset.PublicUrl, asset.StorageKey })
+            .ToDictionaryAsync(
+                asset => asset.Id,
+                asset => MediaUrlResolver.PreferMediaAsset(
+                    asset.PublicUrl,
+                    null,
+                    asset.StorageKey),
+                cancellationToken);
+
+        foreach (var row in rows)
+        {
+            if (row.ProfileImageMediaAssetId is { } mediaAssetId &&
+                mediaUrls.TryGetValue(mediaAssetId, out var profileImageUrl))
+            {
+                row.ProfileImageUrl = profileImageUrl;
+            }
+        }
     }
 
     private static string FormatStatus(string status)
@@ -1435,6 +1514,9 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         public string FullName { get; init; } = string.Empty;
         public string Email { get; init; } = string.Empty;
         public string? Phone { get; init; }
+        public string? StaffCode { get; init; }
+        public Guid? ProfileImageMediaAssetId { get; init; }
+        public string? ProfileImageUrl { get; set; }
         public Guid? RoleId { get; init; }
         public string RoleName { get; init; } = string.Empty;
         public string? RoleDescription { get; init; }

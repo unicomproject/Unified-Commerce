@@ -633,15 +633,18 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             cancellationToken);
 
         string? customerNameSnapshot = null;
+        string? customerPhoneSnapshot = null;
         if (request.CustomerId is { } selectedCustomerId && selectedCustomerId != Guid.Empty)
         {
-            customerNameSnapshot = await _dbContext.Customers
+            var customerRow = await _dbContext.Customers
                 .AsNoTracking()
                 .Where(x => x.TenantId == tenantId &&
                             x.Id == selectedCustomerId &&
                             x.Status == ActiveStatus)
-                .Select(x => x.Name)
+                .Select(x => new { x.Name, x.Phone })
                 .FirstOrDefaultAsync(cancellationToken);
+            customerNameSnapshot = customerRow?.Name;
+            customerPhoneSnapshot = customerRow?.Phone;
         }
 
         var reportingOutlet = await _dbContext.Outlets
@@ -670,16 +673,13 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             join parent in _dbContext.Categories.AsNoTracking()
                 on category.ParentCategoryId equals parent.Id into parents
             from parent in parents.DefaultIfEmpty()
-            join department in _dbContext.Departments.AsNoTracking()
-                on category.DepartmentId equals department.Id into departments
-            from department in departments.DefaultIfEmpty()
             where product.TenantId == tenantId && variantIds.Contains(product.Id) == false &&
                   variants.Select(v => v.ProductId).Contains(product.Id)
             select new
             {
                 product.Id,
                 BrandName = brand == null ? null : brand.BrandName,
-                DepartmentName = department == null ? null : department.DepartmentName,
+                DepartmentName = (string?)null,
                 CategoryName = category == null || category.ParentCategoryId != null ? parent == null ? category.CategoryName : parent.CategoryName : category.CategoryName,
                 SubcategoryName = category == null || category.ParentCategoryId == null ? null : category.CategoryName
             }).ToListAsync(cancellationToken);
@@ -1135,7 +1135,10 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             receiptDiscountLines,
             receiptTaxLines,
             receiptCopyPolicy,
-            ReceiptDataJson: receiptDataJson);
+            ReceiptDataJson: receiptDataJson,
+            CustomerId: request.CustomerId,
+            CustomerName: customerNameSnapshot,
+            CustomerPhone: customerPhoneSnapshot);
 
         return new PosCheckoutStartPaymentResult(null, response);
     }
@@ -1868,7 +1871,10 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             ToMoney(order.TotalAmount), ToMoney(payment.TenderedAmount ?? payment.PaidAmount),
             ToMoney(payment.ChangeAmount), methodCode.ToLowerInvariant(), order.CurrencyCode,
             "completed", "completed", payment.PaidAt ?? payment.InitiatedAt, payment.Id, lines,
-            ReceiptDataJson: receipt.ReceiptDataJson));
+            ReceiptDataJson: receipt.ReceiptDataJson,
+            CustomerId: order.CustomerId,
+            CustomerName: order.CustomerNameSnapshot,
+            CustomerPhone: order.CustomerPhoneSnapshot));
     }
 
     private async Task<PosReceiptCopyPolicyDto> ResolveReceiptCopyPolicyAsync(

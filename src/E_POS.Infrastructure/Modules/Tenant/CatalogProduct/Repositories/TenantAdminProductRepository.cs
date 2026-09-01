@@ -3,6 +3,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Constants;
@@ -157,34 +158,52 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         Guid tenantId,
         CancellationToken cancellationToken)
     {
-        var categories = await _dbContext.Categories
+        var categoryRows = await _dbContext.Categories
             .AsNoTracking()
             .Where(x =>
                 x.TenantId == tenantId &&
-                x.Status == CategoryConstants.ActiveStatus &&
-                x.ParentCategoryId == null)
-            .OrderBy(x => x.SortOrder)
-            .ThenBy(x => x.CategoryName)
-            .Select(x => new TenantAdminProductCategoryOptionResponse(
+                x.Status != CategoryConstants.DeletedStatus)
+            .Select(x => new
+            {
                 x.Id,
+                x.CategoryCode,
                 x.CategoryName,
-                x.CategoryCode))
+                x.ParentCategoryId,
+                x.SortOrder,
+                x.Status
+            })
             .ToListAsync(cancellationToken);
 
-        var subCategories = await _dbContext.Categories
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.Status == CategoryConstants.ActiveStatus &&
-                x.ParentCategoryId != null)
+        var statusById = categoryRows.ToDictionary(x => x.Id, x => x.Status);
+        var parentById = categoryRows.ToDictionary(x => x.Id, x => x.ParentCategoryId);
+        var selectableRows = categoryRows
+            .Where(x => CategorySelectionRules.IsEffectivelySelectable(x.Id, statusById, parentById))
+            .ToList();
+
+        var nameById = selectableRows.ToDictionary(x => x.Id, x => x.CategoryName);
+        var childrenIds = selectableRows
+            .Where(x => x.ParentCategoryId.HasValue)
+            .Select(x => x.ParentCategoryId!.Value)
+            .ToHashSet();
+
+        var categories = selectableRows
+            .Select(x =>
+            {
+                var level = CategoryHierarchy.ComputeLevel(x.Id, parentById);
+                return new TenantAdminProductCategoryOptionResponse(
+                    x.Id,
+                    x.CategoryCode,
+                    x.CategoryName,
+                    x.ParentCategoryId,
+                    level,
+                    CategoryHierarchy.ComputePath(x.Id, nameById, parentById),
+                    childrenIds.Contains(x.Id),
+                    x.SortOrder);
+            })
+            .Where(x => x.Level <= CategoryConstants.MaxHierarchyDepth)
             .OrderBy(x => x.SortOrder)
-            .ThenBy(x => x.CategoryName)
-            .Select(x => new TenantAdminProductSubCategoryOptionResponse(
-                x.Id,
-                x.CategoryName,
-                x.CategoryCode,
-                x.ParentCategoryId!.Value))
-            .ToListAsync(cancellationToken);
+            .ThenBy(x => x.CategoryCode)
+            .ToList();
 
         var brands = await _dbContext.Brands
             .AsNoTracking()
@@ -276,7 +295,6 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
         return new TenantAdminProductCreateOptionsResponse(
             categories,
-            subCategories,
             brands,
             units,
             taxes,
@@ -361,7 +379,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 x => x.TenantId == tenantId &&
                      x.Id == categoryId &&
                      x.Status == CategoryConstants.ActiveStatus &&
-                     x.ParentCategoryId == parentCategoryId,
+                     (!parentCategoryId.HasValue || x.ParentCategoryId == parentCategoryId),
                 cancellationToken);
     }
 
@@ -498,13 +516,14 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 category.Id,
                 category.CategoryName,
                 category.ParentCategoryId,
+                link.IsPrimaryCategory,
             })
             .ToListAsync(cancellationToken);
 
-        var parentCategory = categoryRows.FirstOrDefault(x => x.ParentCategoryId == null);
-        var subCategory = categoryRows.FirstOrDefault(x => x.ParentCategoryId != null);
-        var categoryId = parentCategory?.Id ?? subCategory?.Id ?? Guid.Empty;
-        var categoryName = parentCategory?.CategoryName ?? subCategory?.CategoryName ?? string.Empty;
+        var selectedCategory = categoryRows.FirstOrDefault(x => x.IsPrimaryCategory) ?? categoryRows.FirstOrDefault();
+        var legacySecondary = categoryRows.FirstOrDefault(x => selectedCategory is not null && x.Id != selectedCategory.Id);
+        var categoryId = selectedCategory?.Id ?? Guid.Empty;
+        var categoryName = selectedCategory?.CategoryName ?? string.Empty;
 
         var imageRows = await (
             from image in _dbContext.ProductImages.AsNoTracking()
@@ -691,7 +710,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             defaultBarcode,
             categoryId,
             categoryName,
-            subCategory?.Id,
+            legacySecondary?.Id,
             product.BrandId,
             unitType,
             product.ShortDescription,
@@ -794,33 +813,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .ToListAsync(cancellationToken);
         _dbContext.ProductCategories.RemoveRange(existingCategoryLinks);
 
-        var categoryLinks = new List<ProductCategory>
-        {
-            ProductCategory.Create(
-                Guid.NewGuid(),
-                tenantId,
-                productId,
-                request.CategoryId,
-                isPrimaryCategory: request.SubCategoryId == null,
-                sortOrder: 0,
-                userId,
-                now),
-        };
-
-        if (request.SubCategoryId.HasValue)
-        {
-            categoryLinks.Add(ProductCategory.Create(
-                Guid.NewGuid(),
-                tenantId,
-                productId,
-                request.SubCategoryId.Value,
-                isPrimaryCategory: true,
-                sortOrder: 1,
-                userId,
-                now));
-        }
-
-        await _dbContext.ProductCategories.AddRangeAsync(categoryLinks, cancellationToken);
+        await _dbContext.ProductCategories.AddAsync(
+            CreateSelectedCategoryLink(tenantId, productId, request.ResolveSelectedCategoryId(), userId, now),
+            cancellationToken);
 
         var existingVariants = await _dbContext.ProductVariants
             .Where(x =>
@@ -1446,35 +1441,16 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
         await _dbContext.Products.AddAsync(product, cancellationToken);
 
-        if (request.CategoryId != Guid.Empty)
+        if (request.CategoryId != Guid.Empty || request.SubCategoryId.HasValue)
         {
-            var categoryLinks = new List<ProductCategory>
-            {
-                ProductCategory.Create(
-                    Guid.NewGuid(),
+            await _dbContext.ProductCategories.AddAsync(
+                CreateSelectedCategoryLink(
                     tenantId,
                     productId,
-                    request.CategoryId,
-                    isPrimaryCategory: request.SubCategoryId == null,
-                    sortOrder: 0,
+                    request.ResolveSelectedCategoryId(),
                     userId,
                     now),
-            };
-
-            if (request.SubCategoryId.HasValue)
-            {
-                categoryLinks.Add(ProductCategory.Create(
-                    Guid.NewGuid(),
-                    tenantId,
-                    productId,
-                    request.SubCategoryId.Value,
-                    isPrimaryCategory: true,
-                    sortOrder: 1,
-                    userId,
-                    now));
-            }
-
-            await _dbContext.ProductCategories.AddRangeAsync(categoryLinks, cancellationToken);
+                cancellationToken);
         }
 
         Guid? defaultVariantId = null;
@@ -2000,16 +1976,18 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             ? new Dictionary<Guid, string>()
             : await GetPrimaryImageUrlsAsync(tenantId, productIds, cancellationToken);
 
-        var barcodesByVariant = productIds.Count == 0
-            ? new Dictionary<Guid, string>()
+        var barcodesList = productIds.Count == 0
+            ? new List<ProductBarcode>()
             : await _dbContext.ProductBarcodes
                 .AsNoTracking()
                 .Where(x => x.TenantId == tenantId && productIds.Contains(x.ProductId))
-                .GroupBy(x => x.ProductId)
-                .ToDictionaryAsync(
-                    g => g.Key,
-                    g => g.OrderByDescending(x => x.IsPrimaryBarcode).ThenBy(x => x.CreatedAt).Select(x => x.Barcode).FirstOrDefault() ?? string.Empty,
-                    cancellationToken);
+                .ToListAsync(cancellationToken);
+
+        var barcodesByVariant = barcodesList
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(x => x.IsPrimaryBarcode).ThenBy(x => x.CreatedAt).Select(x => x.Barcode).FirstOrDefault() ?? string.Empty);
 
         var items = pagedProducts.Select(product =>
         {
@@ -2075,4 +2053,279 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         string? Barcode,
         decimal SellingPrice,
         decimal? DiscountPrice);
+
+    public async Task UpdateVariantAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductVariantUpdateRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var variant = await _dbContext.ProductVariants
+            .FirstOrDefaultAsync(v => v.TenantId == tenantId && v.ProductId == productId && v.Id == variantId, cancellationToken);
+            
+        if (variant == null)
+            throw new InvalidOperationException("Variant not found.");
+
+        variant.UpdateProfile(
+            variant.VariantCode,
+            variant.VariantName,
+            request.Sku,
+            variant.StockUomId,
+            variant.SalesUomId,
+            variant.IsDefaultVariant,
+            request.IsSellable,
+            request.AllowFractionalQuantity,
+            variant.Status,
+            userId,
+            now);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddBarcodeAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        TenantAdminProductBarcodeAddRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var barcode = ProductBarcode.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            variantId,
+            request.Barcode,
+            "CUSTOM",
+            null,
+            1,
+            false,
+            ProductConstants.ActiveStatus,
+            userId,
+            now);
+
+        _dbContext.ProductBarcodes.Add(barcode);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteBarcodeAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        Guid variantId,
+        Guid barcodeId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var barcode = await _dbContext.ProductBarcodes
+            .FirstOrDefaultAsync(b => b.TenantId == tenantId && b.ProductId == productId && b.ProductVariantId == variantId && b.Id == barcodeId, cancellationToken);
+
+        if (barcode != null)
+        {
+            _dbContext.ProductBarcodes.Remove(barcode);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task RestoreAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var product = await _dbContext.Products
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Id == productId, cancellationToken);
+
+        if (product == null)
+            throw new InvalidOperationException("Product not found.");
+
+        product.Restore(userId, now);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<TenantAdminProductCreateResponse> DuplicateAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var product = await _dbContext.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == productId && x.Status != ProductConstants.ArchivedStatus, cancellationToken);
+
+        if (product is null)
+        {
+            throw new InvalidOperationException("Product not found.");
+        }
+
+        var newProductId = Guid.NewGuid();
+        var suffix = $"-COPY-{newProductId.ToString().Substring(0, 4).ToUpperInvariant()}";
+        
+        var newCode = product.ProductCode.Length + suffix.Length > ProductConstants.ProductCodeMaxLength 
+            ? product.ProductCode.Substring(0, ProductConstants.ProductCodeMaxLength - suffix.Length) + suffix
+            : product.ProductCode + suffix;
+
+        var newName = product.ProductName.Length + suffix.Length > ProductConstants.ProductNameMaxLength
+            ? product.ProductName.Substring(0, ProductConstants.ProductNameMaxLength - suffix.Length) + suffix
+            : product.ProductName + suffix;
+
+        var newProduct = Product.Create(
+            newProductId,
+            tenantId,
+            newCode,
+            newName,
+            $"{product.ProductSlug}-copy",
+            product.ProductType,
+            product.ProductStructure,
+            product.BusinessTypeId,
+            product.BrandId,
+            product.ReturnPolicyId,
+            product.ShortDescription,
+            product.LongDescription,
+            product.IsSellable,
+            product.IsTaxable,
+            ProductConstants.DraftStatus,
+            userId,
+            now,
+            isExplicitDraftSave: true
+        );
+
+        _dbContext.Products.Add(newProduct);
+
+        var variants = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId && x.Status != ProductConstants.DeletedStatus)
+            .ToListAsync(cancellationToken);
+
+        var variantMap = new Dictionary<Guid, Guid>();
+
+        foreach (var variant in variants)
+        {
+            var newVariantId = Guid.NewGuid();
+            variantMap[variant.Id] = newVariantId;
+
+            var newVariantCode = variant.VariantCode.Length + suffix.Length > 80 // Assuming VariantCode max length is 80
+                ? variant.VariantCode.Substring(0, 80 - suffix.Length) + suffix
+                : variant.VariantCode + suffix;
+
+            var newVariant = ProductVariant.Create(
+                newVariantId,
+                tenantId,
+                newProductId,
+                newVariantCode,
+                variant.VariantName,
+                variant.Sku,
+                variant.StockUomId,
+                variant.SalesUomId,
+                variant.IsDefaultVariant,
+                variant.IsSellable,
+                variant.AllowFractionalQuantity,
+                ProductConstants.DraftStatus,
+                userId,
+                now
+            );
+            _dbContext.ProductVariants.Add(newVariant);
+        }
+        
+        var categories = await _dbContext.ProductCategories
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var category in categories)
+        {
+            var newCategory = ProductCategory.Create(
+                Guid.NewGuid(),
+                tenantId,
+                newProductId,
+                category.CategoryId,
+                category.IsPrimaryCategory,
+                category.SortOrder,
+                userId,
+                now
+            );
+            _dbContext.ProductCategories.Add(newCategory);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new TenantAdminProductCreateResponse(
+            newProductId,
+            newProduct.ProductName,
+            newProduct.ProductCode,
+            newProduct.Status
+        );
+    }
+
+    public Task<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationProductProjection>>([]);
+
+    public Task<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationVariantProjection>> GetVariantsForBundleValidationAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> variantIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationVariantProjection>>([]);
+
+    public Task<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationUomProjection>> GetComponentUomValidationDataAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> componentProductIds,
+        IReadOnlyCollection<Guid> componentVariantIds,
+        IReadOnlyCollection<Guid> componentUomIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.BundleValidationUomProjection>>([]);
+
+    public Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductVariantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.ProductVariants
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.Sku == sku &&
+                     x.Status != ProductConstants.ArchivedStatus &&
+                     (!excludeProductVariantId.HasValue || x.Id != excludeProductVariantId.Value),
+                cancellationToken);
+    }
+
+    public Task<bool> BarcodeExistsAsync(Guid tenantId, string barcodeValue, Guid? excludeProductVariantId, CancellationToken cancellationToken)
+    {
+        return _dbContext.ProductBarcodes
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantId &&
+                     x.Barcode == barcodeValue &&
+                     (!excludeProductVariantId.HasValue || x.ProductVariantId != excludeProductVariantId.Value),
+                cancellationToken);
+    }
+
+    public Task<bool> ProductSlugExistsAsync(string slug, CancellationToken cancellationToken)
+    {
+        return _dbContext.Products
+            .AsNoTracking()
+            .AnyAsync(x => x.ProductSlug == slug, cancellationToken);
+    }
+
+    private static ProductCategory CreateSelectedCategoryLink(
+        Guid tenantId,
+        Guid productId,
+        Guid selectedCategoryId,
+        Guid? userId,
+        DateTimeOffset now) =>
+        ProductCategory.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            selectedCategoryId,
+            isPrimaryCategory: true,
+            sortOrder: 0,
+            userId,
+            now);
 }

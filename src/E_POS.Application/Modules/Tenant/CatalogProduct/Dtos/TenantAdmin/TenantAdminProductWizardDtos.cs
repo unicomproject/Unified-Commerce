@@ -1,5 +1,9 @@
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 
+public sealed record PublishProductRequest(
+    long ExpectedRowVersion,
+    Guid? InitialTrackingAssignedVariantId = null);
+
 public sealed class SaveProductDraftRequest
 {
     public string? ProductName { get; set; }
@@ -23,6 +27,12 @@ public sealed class SaveProductDraftRequest
     public long? ExpectedRowVersion { get; set; }
     public IReadOnlyList<Guid>? StagedMediaAssetIds { get; set; }
 
+    public string? InitialBatchNumber { get; set; }
+    public DateOnly? InitialExpiryDate { get; set; }
+    public string? InitialSerialNumber { get; set; }
+    public bool ConfirmClearIncompatibleInitialTracking { get; set; }
+    public Guid? InitialTrackingAssignedVariantId { get; set; }
+
     // Step 3 — Units & Pack Conversion Properties
     public string? UnitModel { get; set; }
     public Guid? ProductUnitId { get; set; }
@@ -33,7 +43,115 @@ public sealed class SaveProductDraftRequest
     public decimal? ItemsPerPurchaseUnit { get; set; }
     public decimal? PurchaseUnitsPerOuterPack { get; set; }
     public bool AllowDecimalQuantity { get; set; }
+    
+    // Step 4 — Variant Configuration
+    public VariantConfigurationDto? VariantConfiguration { get; set; }
+    
+    // Step 4 — Bundle Configuration
+    public BundleConfigurationDto? BundleConfiguration { get; set; }
+    
+    // Step 5 — Barcode & SKU
+    public BarcodeSkuConfigurationDto? BarcodeSkuConfiguration { get; set; }
+    
+    // Step 6 — Pricing & Tax
+    public PricingTaxConfigurationDto? PricingTax { get; set; }
 }
+
+public sealed record PricingTaxConfigurationDto(
+    decimal? CostPrice,
+    decimal? StandardSellingPrice,
+    decimal? DiscountPrice,
+    Guid? TaxClassId,
+    bool? TaxExclusive);
+
+public sealed record PricingTaxResponseDto(
+    decimal? CostPrice,
+    decimal? StandardSellingPrice,
+    decimal? DiscountPrice,
+    decimal? EffectiveSellingPrice,
+    decimal? DiscountAmount,
+    decimal? DiscountPercentage,
+    Guid? TaxClassId,
+    string? TaxName,
+    decimal? TaxRatePercentage,
+    bool TaxExclusive = true);
+
+public sealed record BarcodeSkuAssignmentDto(
+    Guid? ProductVariantId,
+    string? DisplayName,
+    string? Sku,
+    string? Barcode,
+    string? Status,
+    string? ClientCombinationKey = null);
+
+public sealed record Step5IdentifierTargetDto(
+    Guid? ProductVariantId,
+    string DisplayName,
+    bool IsAssigned);
+
+public sealed record BarcodeSkuConfigurationDto(
+    IReadOnlyList<Step5IdentifierTargetDto>? IdentifierTargets,
+    IReadOnlyList<BarcodeSkuAssignmentDto>? Assignments);
+
+public sealed record BundleComponentDto(
+    Guid? ComboComponentId,
+    Guid ComponentProductId,
+    Guid? ComponentVariantId,
+    Guid ComponentUomId,
+    decimal RequiredQuantity,
+    int SortOrder);
+
+public sealed record BundleConfigurationDto(
+    Guid? ComboDefinitionId,
+    IReadOnlyList<BundleComponentDto> Components);
+
+public sealed record VariantConfigurationOptionValueDto(
+    Guid? ProductOptionValueId,
+    Guid? SourceOptionTemplateValueId,
+    string ValueCode,
+    string ValueName,
+    string? DisplayName,
+    string? ColorHex,
+    int SortOrder,
+    Guid? ImageMediaAssetId);
+
+public sealed record VariantConfigurationOptionDto(
+    Guid? ProductOptionId,
+    Guid? SourceOptionTemplateId,
+    string OptionCode,
+    string OptionName,
+    string OptionType,
+    string? InputType,
+    int SortOrder,
+    IReadOnlyList<VariantConfigurationOptionValueDto> Values);
+
+public sealed record VariantConfigurationSelectedValueDto(
+    Guid? SourceOptionTemplateId,
+    Guid? SourceOptionTemplateValueId,
+    string? OptionName,
+    string? ValueName);
+
+public sealed record VariantConfigurationVariantDto(
+    string ClientCombinationKey,
+    Guid? ProductVariantId,
+    string? VariantCode,
+    string? OptionCombinationHash,
+    string? CombinationLabel,
+    string? DisplayLabel,
+    bool Included,
+    string? Status,
+    Guid? ExactImageMediaAssetId,
+    IReadOnlyList<VariantConfigurationSelectedValueDto> SelectedValues);
+
+public sealed record VariantConfigurationDeletedCombinationDto(
+    string ClientCombinationKey,
+    Guid? ProductVariantId,
+    string? OptionCombinationHash);
+
+public sealed record VariantConfigurationDto(
+    IReadOnlyList<VariantConfigurationOptionDto> Options,
+    IReadOnlyList<VariantConfigurationVariantDto> Variants,
+    IReadOnlyList<VariantConfigurationDeletedCombinationDto> ExcludedCombinationHashes);
 
 public sealed record ProductUnitConversionResponse(
     Guid UomId,
@@ -91,7 +209,17 @@ public sealed record ProductDraftResponse(
     decimal? ItemsPerPurchaseUnit = null,
     decimal? PurchaseUnitsPerOuterPack = null,
     bool AllowDecimalQuantity = false,
-    IReadOnlyList<ProductUnitConversionResponse>? UnitConversions = null);
+    IReadOnlyList<ProductUnitConversionResponse>? UnitConversions = null,
+    VariantConfigurationDto? VariantConfiguration = null,
+    BundleConfigurationDto? BundleConfiguration = null,
+    BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
+    PricingTaxResponseDto? PricingTax = null,
+    int TotalVariantCount = 0,
+    int IncludedVariantCount = 0,
+    string? InitialBatchNumber = null,
+    DateOnly? InitialExpiryDate = null,
+    string? InitialSerialNumber = null,
+    Guid? InitialTrackingAssignedVariantId = null);
 
 public sealed record ProductSetupWizardDto(
     Guid ProductId,
@@ -138,7 +266,17 @@ public sealed record ProductSetupWizardDto(
     decimal? ItemsPerPurchaseUnit = null,
     decimal? PurchaseUnitsPerOuterPack = null,
     bool AllowDecimalQuantity = false,
-    IReadOnlyList<ProductUnitConversionResponse>? UnitConversions = null);
+    IReadOnlyList<ProductUnitConversionResponse>? UnitConversions = null,
+    VariantConfigurationDto? VariantConfiguration = null,
+    BundleConfigurationDto? BundleConfiguration = null,
+    BarcodeSkuConfigurationDto? BarcodeSkuConfiguration = null,
+    PricingTaxResponseDto? PricingTax = null,
+    int TotalVariantCount = 0,
+    int IncludedVariantCount = 0,
+    string? InitialBatchNumber = null,
+    DateOnly? InitialExpiryDate = null,
+    string? InitialSerialNumber = null,
+    Guid? InitialTrackingAssignedVariantId = null);
 
 public sealed record TenantAdminProductSalesChannelOptionResponse(
     Guid SalesChannelId,
@@ -170,3 +308,25 @@ public sealed record ProductImagesMutationResponse(
 public sealed record ReplaceProductImagesRequest(
     long ExpectedRowVersion,
     IReadOnlyList<Guid>? StagedMediaAssetIds);
+
+public sealed record BundleValidationProductProjection(
+    Guid ProductId,
+    string ProductStructure,
+    string Status,
+    bool IsSellable,
+    bool TrackInventory
+);
+
+public sealed record BundleValidationVariantProjection(
+    Guid ProductVariantId,
+    Guid ProductId,
+    string Status,
+    bool Included
+);
+
+public sealed record BundleValidationUomProjection(
+    Guid ComponentProductId,
+    Guid? ComponentVariantId,
+    Guid UomId,
+    bool AllowDecimalQuantity
+);

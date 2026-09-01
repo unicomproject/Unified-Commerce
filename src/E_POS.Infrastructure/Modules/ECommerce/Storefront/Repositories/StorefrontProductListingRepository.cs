@@ -27,29 +27,23 @@ public sealed class StorefrontProductListingRepository : StorefrontProductReposi
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var productCategoryRows = await (
-                from productCategory in DbContext.Set<ProductCategory>().AsNoTracking()
-                join product in DbContext.Set<Product>().AsNoTracking()
-                    on new { productCategory.TenantId, productCategory.ProductId }
-                    equals new { product.TenantId, ProductId = product.Id }
-                where productCategory.TenantId == tenantId &&
-                      productCategory.CategoryId == categoryId &&
-                      product.Status == ActiveStatus &&
-                      product.IsSellable
-                select new
-                {
-                    Product = product,
-                    productCategory.SortOrder,
-                    productCategory.IsPrimaryCategory
-                })
-            .ToListAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
+        var normalizedSort = sort?.Trim().ToLowerInvariant();
 
-        var products = productCategoryRows
-            .GroupBy(x => x.Product.Id)
-            .Select(g => g.OrderByDescending(x => x.IsPrimaryCategory).ThenBy(x => x.SortOrder).First())
-            .ToList();
+        var baseQuery = from productCategory in DbContext.Set<ProductCategory>().AsNoTracking()
+                        join product in DbContext.Set<Product>().AsNoTracking()
+                            on new { productCategory.TenantId, productCategory.ProductId }
+                            equals new { product.TenantId, ProductId = product.Id }
+                        where productCategory.TenantId == tenantId &&
+                              productCategory.CategoryId == categoryId &&
+                              product.Status == ActiveStatus &&
+                              product.IsSellable
+                        select new { ProductCategory = productCategory, Product = product };
 
-        if (products.Count == 0)
+        var totalCount = await baseQuery.CountAsync(cancellationToken);
+
+        if (totalCount == 0)
         {
             return new StorefrontPagedReadModel<StorefrontProductListReadModel>
             {
@@ -60,56 +54,81 @@ public sealed class StorefrontProductListingRepository : StorefrontProductReposi
             };
         }
 
-        var allProductIds = products.Select(x => x.Product.Id).ToList();
-        var now = DateTimeOffset.UtcNow;
-        var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
-        var normalizedSort = sort?.Trim().ToLowerInvariant();
+        var queryWithSortingVars = from p in baseQuery
+                                   let price = (from item in DbContext.Set<PriceListItem>().AsNoTracking()
+                                                join priceList in DbContext.Set<PriceList>().AsNoTracking()
+                                                    on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                                                where item.TenantId == tenantId &&
+                                                      item.ProductId == p.Product.Id &&
+                                                      item.ProductVariantId == null &&
+                                                      item.Status == ActiveStatus &&
+                                                      item.MinQuantity <= 1m &&
+                                                      priceList.Status == ActiveStatus &&
+                                                      priceList.CurrencyCode == currencyCode &&
+                                                      (!priceList.ValidFrom.HasValue || priceList.ValidFrom <= now) &&
+                                                      (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
+                                                      (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
+                                                      (!item.ValidUntil.HasValue || item.ValidUntil >= now)
+                                                orderby priceList.IsDefaultPriceList descending,
+                                                        priceList.Priority descending,
+                                                        item.ValidFrom ?? DateTimeOffset.MinValue descending,
+                                                        item.MinQuantity descending
+                                                select (decimal?)item.SellingPrice).FirstOrDefault()
+                                   let rating = DbContext.Set<ProductRatingSummary>().AsNoTracking()
+                                                   .Where(r => r.TenantId == tenantId && r.ProductId == p.Product.Id)
+                                                   .FirstOrDefault()
+                                   select new { p.Product, p.ProductCategory, Price = price, Rating = rating };
 
-        Dictionary<Guid, decimal?>? pricesByProduct = null;
-        Dictionary<Guid, ProductRatingSummary>? ratingsByProduct = null;
-
-        var needsPrices = normalizedSort == "price_asc" || normalizedSort == "price_desc";
-        var needsRatings = normalizedSort == "rating_desc" || string.IsNullOrEmpty(normalizedSort) || (normalizedSort != "price_asc" && normalizedSort != "price_desc" && normalizedSort != "newest");
-
-        if (needsPrices)
-            pricesByProduct = await GetProductPricesByProductAsync(tenantId, allProductIds, currencyCode, now, cancellationToken);
-
-        if (needsRatings)
-            ratingsByProduct = await GetRatingsByProductAsync(tenantId, allProductIds, cancellationToken);
-
-        var sortItems = products.Select(row =>
+        IQueryable<Product> orderedQuery;
+        if (normalizedSort == "price_asc")
         {
-            var pId = row.Product.Id;
-            var price = pricesByProduct != null && pricesByProduct.TryGetValue(pId, out var p) ? p : null;
-            var rating = ratingsByProduct != null && ratingsByProduct.TryGetValue(pId, out var r) ? r : null;
+            orderedQuery = queryWithSortingVars
+                .OrderBy(x => x.Price == null ? decimal.MaxValue : x.Price)
+                .ThenBy(x => x.Product.ProductName)
+                .Select(x => x.Product);
+        }
+        else if (normalizedSort == "price_desc")
+        {
+            orderedQuery = queryWithSortingVars
+                .OrderByDescending(x => x.Price == null ? decimal.MinValue : x.Price)
+                .ThenBy(x => x.Product.ProductName)
+                .Select(x => x.Product);
+        }
+        else if (normalizedSort == "newest")
+        {
+            orderedQuery = queryWithSortingVars
+                .OrderByDescending(x => x.Product.CreatedAt)
+                .ThenBy(x => x.Product.ProductName)
+                .Select(x => x.Product);
+        }
+        else // default sort
+        {
+            orderedQuery = queryWithSortingVars
+                .OrderByDescending(x => x.ProductCategory.IsPrimaryCategory)
+                .ThenBy(x => x.ProductCategory.SortOrder)
+                .ThenByDescending(x => x.Rating != null ? x.Rating.TotalReviews : 0)
+                .ThenByDescending(x => x.Rating != null ? x.Rating.AverageRating : 0m)
+                .ThenBy(x => x.Product.ProductName)
+                .Select(x => x.Product);
+        }
 
-            return new ProductListingSortItem(
-                row.Product,
-                price,
-                row.SortOrder,
-                rating?.AverageRating ?? 0m,
-                rating?.TotalReviews ?? 0);
-        });
-
-        var pagedSortItems = SortProductListings(sortItems, sort)
+        var pagedProducts = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync(cancellationToken);
 
-        var pagedProductIds = pagedSortItems.Select(x => x.Product.Id).ToList();
-        
-        pricesByProduct ??= await GetProductPricesByProductAsync(tenantId, pagedProductIds, currencyCode, now, cancellationToken);
-        ratingsByProduct ??= await GetRatingsByProductAsync(tenantId, pagedProductIds, cancellationToken);
-        
+        var pagedProductIds = pagedProducts.Select(x => x.Id).ToList();
+
+        var pricesByProduct = await GetProductPricesByProductAsync(tenantId, pagedProductIds, currencyCode, now, cancellationToken);
+        var ratingsByProduct = await GetRatingsByProductAsync(tenantId, pagedProductIds, cancellationToken);
         var imagesByProduct = await GetPrimaryImagesByProductAsync(tenantId, pagedProductIds, cancellationToken);
         var inventoryByProduct = await GetInventoryByProductAsync(tenantId, pagedProductIds, cancellationToken);
         var optionsByProduct = await GetVariantOptionsByProductAsync(tenantId, pagedProductIds, cancellationToken);
 
-        var items = pagedSortItems.Select(row =>
+        var items = pagedProducts.Select(product =>
         {
-            var product = row.Product;
             ratingsByProduct.TryGetValue(product.Id, out var rating);
-            pricesByProduct.TryGetValue(product.Id, out var sellingPrice);
+            var prices = pricesByProduct.TryGetValue(product.Id, out var p) ? p : (null, null);
             imagesByProduct.TryGetValue(product.Id, out var primaryImageUrl);
             var hasInventory = inventoryByProduct.TryGetValue(product.Id, out var availableQuantity);
             var averageRating = rating?.AverageRating ?? 0m;
@@ -119,7 +138,8 @@ public sealed class StorefrontProductListingRepository : StorefrontProductReposi
 
             return StorefrontProductMapper.ToListReadModel(
                 product,
-                sellingPrice,
+                prices.SellingPrice,
+                prices.OriginalPrice,
                 primaryImageUrl,
                 averageRating,
                 reviewCount,
@@ -131,7 +151,7 @@ public sealed class StorefrontProductListingRepository : StorefrontProductReposi
         return new StorefrontPagedReadModel<StorefrontProductListReadModel>
         {
             Items = items,
-            TotalCount = products.Count,
+            TotalCount = totalCount,
             Page = page,
             PageSize = pageSize
         };

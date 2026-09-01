@@ -2,6 +2,7 @@ using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Dtos;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Queries;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -73,7 +74,9 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
             from userRole in _dbContext.TenantUserRoles.AsNoTracking()
             join role in _dbContext.TenantRoles.AsNoTracking()
                 on userRole.TenantRoleId equals role.Id
-            where userRole.TenantUserId == tenantUserId
+            where userRole.TenantId == tenantId
+                  && userRole.TenantUserId == tenantUserId
+                  && userRole.RevokedAt == null
                   && role.TenantId == tenantId
                   && role.IsActive
             select new TenantAdminContextRoleDto(role.Id, role.RoleName))
@@ -111,33 +114,9 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
 
         var accessibleOutletIds = outlets.Select(x => x.Id).OrderBy(x => x).ToList();
 
-        // Effective permissions: direct + role-based
-        var directPermissions =
-            from up in _dbContext.TenantUserPermissions.AsNoTracking()
-            join pd in _dbContext.PermissionDefinitions.AsNoTracking()
-                on up.PermissionDefinitionId equals pd.Id
-            where up.TenantUserId == tenantUserId
-                  && pd.IsActive
-            select pd.PermissionCode;
-
-        var rolePermissions =
-            from ur in _dbContext.TenantUserRoles.AsNoTracking()
-            join role in _dbContext.TenantRoles.AsNoTracking()
-                on ur.TenantRoleId equals role.Id
-            join rp in _dbContext.TenantRolePermissions.AsNoTracking()
-                on role.Id equals rp.TenantRoleId
-            join pd in _dbContext.PermissionDefinitions.AsNoTracking()
-                on rp.PermissionDefinitionId equals pd.Id
-            where ur.TenantUserId == tenantUserId
-                  && role.TenantId == tenantId
-                  && role.IsActive
-                  && pd.IsActive
-            select pd.PermissionCode;
-
-        var permissions = await directPermissions
-            .Union(rolePermissions)
-            .Where(x => x != string.Empty)
-            .OrderBy(x => x)
+        var permissions = await TenantEffectivePermissionCodesQuery
+            .Build(_dbContext, tenantUserId, tenantId)
+            .OrderBy(code => code)
             .ToListAsync(cancellationToken);
 
         // Enabled feature codes from tenant feature entitlements joined to PlatformFeature.

@@ -191,6 +191,7 @@ public sealed class PlatformTenantBootstrapHttpPipelineTests
                 {
                     ["ConnectionStrings:DefaultConnection"] =
                         "Host=localhost;Port=5432;Database=BootstrapHttpPipelineTests;Username=postgres;Password=postgres",
+                    ["AzureBlobStorage:ConnectionString"] = "UseDevelopmentStorage=true",
                     ["PlatformJwt:Issuer"] = Issuer,
                     ["PlatformJwt:Audience"] = PlatformAudience,
                     ["PlatformJwt:SigningKey"] = PlatformKey,
@@ -201,6 +202,11 @@ public sealed class PlatformTenantBootstrapHttpPipelineTests
                     ["CustomerJwt:Audience"] = "TM-EPOS-Customer",
                     ["CustomerJwt:SigningKey"] = "DEV_ONLY_CUSTOMER_JWT_SIGNING_KEY_32_CHARS_MINIMUM"
                 });
+            });
+
+            builder.ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
             });
 
             builder.ConfigureServices(services =>

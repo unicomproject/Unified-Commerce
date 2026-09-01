@@ -175,9 +175,21 @@ public sealed class PlatformTenantWizardServiceTests
         // so tenant-user audit FKs (fk_tenant_roles_created_by / _updated_by) must be null, never the platform user id.
         Assert.Null(adminRole!.CreatedByTenantUserId);
         Assert.Null(adminRole.UpdatedByTenantUserId);
+        Assert.Equal(TenantUserConstants.DefaultTenantAdminRoleCode, adminRole.RoleCode);
 
         Assert.All(
             repository.LastWriteModel.TenantAdminRolePermissions,
+            permission => Assert.Null(permission.GrantedByTenantUserId));
+
+        var cashierRole = repository.LastWriteModel.CashierRole;
+        Assert.NotNull(cashierRole);
+        Assert.Equal(TenantUserConstants.DefaultCashierRoleCode, cashierRole!.RoleCode);
+        Assert.Null(cashierRole.CreatedByTenantUserId);
+        Assert.Null(cashierRole.UpdatedByTenantUserId);
+
+        Assert.NotEmpty(repository.LastWriteModel.CashierRolePermissions);
+        Assert.All(
+            repository.LastWriteModel.CashierRolePermissions,
             permission => Assert.Null(permission.GrantedByTenantUserId));
     }
 

@@ -3,11 +3,13 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Shared.Audit.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Platform.PlatformFoundation.Entities;
+using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +20,30 @@ public sealed partial class TenantAdminProductRepository
     private const string DefaultCostingMethod = "WEIGHTED_AVERAGE";
     private const string StagedMediaStatus = "STAGED";
 
+    public async Task<bool> IsCategoryEffectivelySelectableAsync(
+        Guid tenantId,
+        Guid categoryId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await _dbContext.Categories
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.Status != CategoryConstants.DeletedStatus)
+            .Select(x => new { x.Id, x.Status, x.ParentCategoryId })
+            .ToListAsync(cancellationToken);
+
+        var statusById = rows.ToDictionary(x => x.Id, x => x.Status);
+        var parentById = rows.ToDictionary(x => x.Id, x => x.ParentCategoryId);
+
+        return CategorySelectionRules.IsEffectivelySelectable(categoryId, statusById, parentById);
+    }
+
     public Task<bool> ActiveCategoryExistsAsync(
+        Guid tenantId,
+        Guid categoryId,
+        CancellationToken cancellationToken) =>
+        IsCategoryEffectivelySelectableAsync(tenantId, categoryId, cancellationToken);
+
+    public Task<bool> CategoryExistsForExistingMappingAsync(
         Guid tenantId,
         Guid categoryId,
         CancellationToken cancellationToken)
@@ -28,7 +53,7 @@ public sealed partial class TenantAdminProductRepository
             .AnyAsync(
                 x => x.TenantId == tenantId &&
                      x.Id == categoryId &&
-                     x.Status == CategoryConstants.ActiveStatus,
+                     x.Status != CategoryConstants.DeletedStatus,
                 cancellationToken);
     }
 
@@ -449,6 +474,125 @@ public sealed partial class TenantAdminProductRepository
                     userId,
                     now);
             }
+            else if (command.CurrentStage == ProductWizardStage.BarcodeSku)
+            {
+                product = await _dbContext.Products
+                    .FirstOrDefaultAsync(
+                        x => x.TenantId == tenantId &&
+                             x.Id == command.ProductId!.Value &&
+                             x.Status != ProductConstants.ArchivedStatus,
+                        cancellationToken);
+
+                if (product is null)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.not_found",
+                        "Product was not found."));
+                }
+
+                if (command.BarcodeSkuConfiguration != null)
+                {
+                    var barcodeError = await ApplyBarcodeSkuConfigurationAsync(
+                        tenantId,
+                        userId,
+                        product.Id,
+                        command.BarcodeSkuConfiguration,
+                        now,
+                        cancellationToken);
+
+                    if (barcodeError is not null)
+                    {
+                        return SaveProductDraftResult.Failure(barcodeError);
+                    }
+                }
+
+                product.SaveWizardDraft(
+                    command.TargetSetupStep,
+                    command.DesiredPublishStatus,
+                    userId,
+                    now);
+            }
+            else if (command.CurrentStage == ProductWizardStage.ProductConfiguration)
+            {
+                if (!command.ExpectedRowVersion.HasValue)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.row_version_required",
+                        "expectedRowVersion is required when updating a persisted product."));
+                }
+
+                product = await _dbContext.Products
+                    .FirstOrDefaultAsync(
+                        x => x.TenantId == tenantId &&
+                             x.Id == command.ProductId!.Value &&
+                             x.Status != ProductConstants.ArchivedStatus,
+                        cancellationToken);
+
+                if (product is null)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.not_found",
+                        "Product was not found."));
+                }
+
+                if (command.VariantConfiguration != null && string.Equals(product.ProductStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (command.VariantConfiguration.Options.Any() && !command.VariantConfiguration.Variants.Any())
+                    {
+                        return SaveProductDraftResult.Failure(new ApplicationError(
+                            "product.validation_failed",
+                            "Variant combinations are required when variant options are defined.",
+                            [new ApplicationFieldError("variants", "At least one variant must be configured.")]));
+                    }
+
+                    await SaveVariantsAsync(tenantId, product.Id, command.VariantConfiguration, cancellationToken);
+                }
+
+                product.SaveWizardDraft(
+                    command.TargetSetupStep,
+                    command.DesiredPublishStatus,
+                    userId,
+                    now,
+                    command.IsExplicitDraftSave);
+            }
+            else if (command.CurrentStage == ProductWizardStage.PricingTax)
+            {
+                product = await _dbContext.Products
+                    .FirstOrDefaultAsync(
+                        x => x.TenantId == tenantId &&
+                             x.Id == command.ProductId!.Value &&
+                             x.Status != ProductConstants.ArchivedStatus,
+                        cancellationToken);
+
+                if (product is null)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.not_found",
+                        "Product was not found."));
+                }
+
+                if (command.PricingTax != null)
+                {
+                    var pricingError = await ApplyPricingTaxConfigurationAsync(
+                        tenantId,
+                        userId,
+                        product,
+                        command.PricingTax,
+                        now,
+                        cancellationToken);
+
+                    if (pricingError is not null)
+                    {
+                        return SaveProductDraftResult.Failure(pricingError);
+                    }
+                }
+
+                product.SaveWizardDraft(
+                    command.TargetSetupStep,
+                    command.DesiredPublishStatus,
+                    userId,
+                    now);
+            }
             else
             {
                 product = await _dbContext.Products
@@ -545,12 +689,44 @@ public sealed partial class TenantAdminProductRepository
                 }
             }
 
-            if (command.CurrentStage == 8 && !command.IsExplicitDraftSave)
+            var trackingUpsert = await UpsertInitialTrackingAsync(
+                tenantId,
+                product.Id,
+                userId,
+                command.InitialBatchNumber,
+                command.InitialExpiryDate,
+                command.InitialSerialNumber,
+                command.InitialTrackingAssignedVariantId,
+                command.ConfirmClearIncompatibleInitialTracking,
+                now,
+                cancellationToken);
+
+            if (command.CurrentStage == 7 && !command.IsExplicitDraftSave)
             {
+                var identityError = await PublishInitialTrackingIdentityAsync(
+                    tenantId,
+                    product.Id,
+                    userId,
+                    normalizedStructure,
+                    command.TrackInventory,
+                    command.BatchTracking,
+                    command.ExpiryTracking,
+                    command.SerialTracking,
+                    trackingUpsert.InitialBatchNumber,
+                    trackingUpsert.InitialExpiryDate,
+                    trackingUpsert.InitialSerialNumber,
+                    trackingUpsert.AssignedProductVariantId,
+                    now,
+                    cancellationToken);
+                if (identityError is not null)
+                {
+                    return SaveProductDraftResult.Failure(identityError);
+                }
+
                 product.SetPublished(userId, now, command.DesiredPublishStatus);
             }
 
-            var auditAction = command.CurrentStage == 8 && !command.IsExplicitDraftSave
+            var auditAction = command.CurrentStage == 7 && !command.IsExplicitDraftSave
                 ? "PRODUCT_CREATED"
                 : (command.CurrentStage == ProductWizardStage.ProductTypeTracking
                     ? "PRODUCT_TYPE_TRACKING_SAVED"
@@ -638,6 +814,7 @@ public sealed partial class TenantAdminProductRepository
 
             var componentsConfigured = componentCount >= 2;
             var unitProjection = await ProjectProductUnitSettingsAsync(tenantId, product.Id, cancellationToken);
+            var trackingValues = await LoadInitialTrackingValuesAsync(tenantId, product.Id, cancellationToken);
 
             return SaveProductDraftResult.Success(new ProductDraftResponse(
                 product.Id,
@@ -684,7 +861,13 @@ public sealed partial class TenantAdminProductRepository
                 ItemsPerPurchaseUnit: unitProjection.ItemsPerPurchaseUnit,
                 PurchaseUnitsPerOuterPack: unitProjection.PurchaseUnitsPerOuterPack,
                 AllowDecimalQuantity: unitProjection.AllowDecimalQuantity,
-                UnitConversions: unitProjection.UnitConversions));
+                UnitConversions: unitProjection.UnitConversions,
+                PricingTax: await ProjectPricingTaxAsync(tenantId, product.Id, cancellationToken),
+                VariantConfiguration: command.VariantConfiguration,
+                InitialBatchNumber: trackingValues.Batch,
+                InitialExpiryDate: trackingValues.Expiry,
+                InitialSerialNumber: trackingValues.Serial,
+                InitialTrackingAssignedVariantId: trackingValues.AssignedVariantId));
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -778,6 +961,8 @@ public sealed partial class TenantAdminProductRepository
 
         var componentsConfigured = componentCount >= 2;
         var unitProjection = await ProjectProductUnitSettingsAsync(tenantId, product.Id, cancellationToken);
+        var barcodeSkuProjection = await ProjectBarcodeSkuConfigurationAsync(tenantId, product.Id, cancellationToken);
+        var trackingValues = await LoadInitialTrackingValuesAsync(tenantId, productId, cancellationToken);
 
         return new ProductSetupWizardDto(
             product.Id,
@@ -824,7 +1009,13 @@ public sealed partial class TenantAdminProductRepository
             ItemsPerPurchaseUnit: unitProjection.ItemsPerPurchaseUnit,
             PurchaseUnitsPerOuterPack: unitProjection.PurchaseUnitsPerOuterPack,
             AllowDecimalQuantity: unitProjection.AllowDecimalQuantity,
-            UnitConversions: unitProjection.UnitConversions);
+            UnitConversions: unitProjection.UnitConversions,
+            PricingTax: await ProjectPricingTaxAsync(tenantId, productId, cancellationToken),
+            BarcodeSkuConfiguration: barcodeSkuProjection,
+            InitialBatchNumber: trackingValues.Batch,
+            InitialExpiryDate: trackingValues.Expiry,
+            InitialSerialNumber: trackingValues.Serial,
+            InitialTrackingAssignedVariantId: trackingValues.AssignedVariantId);
     }
 
     private async Task<(Guid? PosSalesChannelId, Guid? OnlineSalesChannelId, ApplicationError? Error)>
@@ -1641,5 +1832,532 @@ public sealed partial class TenantAdminProductRepository
         public decimal? PurchaseUnitsPerOuterPack { get; set; }
         public bool AllowDecimalQuantity { get; set; }
         public IReadOnlyList<ProductUnitConversionResponse>? UnitConversions { get; set; }
+    }
+
+    private async Task<ApplicationError?> ApplyBarcodeSkuConfigurationAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        BarcodeSkuConfigurationDto configuration,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (configuration.Assignments == null || configuration.Assignments.Count == 0)
+            return null;
+
+        var variants = await _dbContext.ProductVariants
+            .Where(v => v.TenantId == tenantId && v.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        var variantIds = variants.Select(v => v.Id).ToList();
+
+        var existingBarcodes = await _dbContext.ProductBarcodes
+            .Where(b => b.TenantId == tenantId && b.ProductId == productId && b.ProductVariantId != null && variantIds.Contains(b.ProductVariantId.Value))
+            .ToListAsync(cancellationToken);
+
+        foreach (var assignment in configuration.Assignments)
+        {
+            var targetVariant = assignment.ProductVariantId.HasValue
+                ? variants.FirstOrDefault(v => v.Id == assignment.ProductVariantId.Value)
+                : variants.FirstOrDefault(v => v.IsDefaultVariant);
+
+            if (targetVariant == null)
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(assignment.Sku))
+            {
+                targetVariant.UpdateSku(assignment.Sku, userId, now);
+            }
+
+            var existingBarcode = existingBarcodes.FirstOrDefault(b => b.ProductVariantId == targetVariant.Id);
+
+            if (!string.IsNullOrWhiteSpace(assignment.Barcode))
+            {
+                if (existingBarcode == null)
+                {
+                    var newBarcode = ProductBarcode.Create(
+                        Guid.NewGuid(),
+                        tenantId,
+                        productId,
+                        targetVariant.Id,
+                        assignment.Barcode,
+                        "EAN13", // default type
+                        null,
+                        1m,
+                        true,
+                        ProductConstants.InactiveStatus, // Save as INACTIVE during draft phase
+                        userId,
+                        now
+                    );
+                    await _dbContext.ProductBarcodes.AddAsync(newBarcode, cancellationToken);
+                }
+                else
+                {
+                    existingBarcode.UpdateIdentifier(assignment.Barcode, existingBarcode.BarcodeType, userId, now);
+                    if (existingBarcode.Status != ProductConstants.InactiveStatus && existingBarcode.Status != ProductConstants.ActiveStatus)
+                    {
+                        existingBarcode.Deactivate(userId, now);
+                    }
+                }
+            }
+            else
+            {
+                if (existingBarcode != null)
+                {
+                    existingBarcode.Delete(userId, now);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<ApplicationError?> ApplyPricingTaxConfigurationAsync(
+        Guid tenantId,
+        Guid userId,
+        Product product,
+        PricingTaxConfigurationDto configuration,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        product.UpdateTaxConfiguration(configuration.TaxExclusive ?? true, userId, now);
+
+        if (configuration.CostPrice.HasValue)
+        {
+            product.UpdateReferenceCost(configuration.CostPrice.Value, userId, now);
+        }
+
+        var defaultPriceList = await _dbContext.PriceLists
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == "ACTIVE", cancellationToken);
+
+        if (defaultPriceList == null)
+        {
+            return new ApplicationError("pricing.default_price_list_missing", "No default price list configured for tenant.");
+        }
+
+        var activeVariants = await _dbContext.ProductVariants
+            .Where(v => v.TenantId == tenantId && v.ProductId == product.Id && v.Status != ProductConstants.ArchivedStatus)
+            .ToListAsync(cancellationToken);
+
+        var variantIds = activeVariants.Count > 0 ? activeVariants.Select(v => (Guid?)v.Id).ToList() : new List<Guid?> { null };
+
+        var existingPriceItems = await _dbContext.PriceListItems
+            .Where(x => x.TenantId == tenantId && x.PriceListId == defaultPriceList.Id && x.ProductId == product.Id)
+            .ToListAsync(cancellationToken);
+
+        decimal finalSellingPrice = configuration.StandardSellingPrice ?? 0m;
+        decimal? finalCompareAtPrice = null;
+
+        if (configuration.DiscountPrice.HasValue && configuration.StandardSellingPrice.HasValue && configuration.DiscountPrice.Value < configuration.StandardSellingPrice.Value)
+        {
+            finalSellingPrice = configuration.DiscountPrice.Value;
+            finalCompareAtPrice = configuration.StandardSellingPrice.Value;
+        }
+
+        foreach (var variantId in variantIds)
+        {
+            var existingItem = existingPriceItems.FirstOrDefault(x => x.ProductVariantId == variantId);
+            if (existingItem != null)
+            {
+                existingItem.UpdateProfile(
+                    finalSellingPrice,
+                    finalCompareAtPrice,
+                    existingItem.MinQuantity,
+                    existingItem.ValidFrom,
+                    existingItem.ValidUntil,
+                    "ACTIVE",
+                    userId,
+                    now);
+            }
+            else
+            {
+                var newItem = PriceListItem.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    defaultPriceList.Id,
+                    product.Id,
+                    variantId,
+                    null, // UomId
+                    finalSellingPrice,
+                    finalCompareAtPrice,
+                    1m, // MinQuantity
+                    null,
+                    null,
+                    "ACTIVE",
+                    userId,
+                    now);
+                await _dbContext.PriceListItems.AddAsync(newItem, cancellationToken);
+            }
+        }
+
+        if (configuration.TaxClassId.HasValue)
+        {
+            var existingTaxAssignments = await _dbContext.ProductTaxAssignments
+                .Where(x => x.TenantId == tenantId && x.ProductId == product.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var variantId in variantIds)
+            {
+                var existingAssignment = existingTaxAssignments.FirstOrDefault(x => x.ProductVariantId == variantId);
+                if (existingAssignment != null)
+                {
+                    existingAssignment.UpdateAssignment(
+                        configuration.TaxClassId.Value,
+                        existingAssignment.AppliesFrom,
+                        existingAssignment.AppliesUntil,
+                        "ACTIVE",
+                        userId,
+                        now);
+                }
+                else
+                {
+                    var newAssignment = ProductTaxAssignment.Create(
+                        tenantId,
+                        product.Id,
+                        variantId,
+                        configuration.TaxClassId.Value,
+                        null,
+                        null,
+                        userId,
+                        now);
+                    await _dbContext.ProductTaxAssignments.AddAsync(newAssignment, cancellationToken);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Projects the saved Barcode &amp; SKU data from DB into the response DTO
+    /// so Step 5 loads correctly when a draft is resumed.
+    /// Reads: product_variants (SKU) + product_barcodes (primary barcode per variant).
+    /// </summary>
+    private async Task<BarcodeSkuConfigurationDto?> ProjectBarcodeSkuConfigurationAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        // Load all variants for this product
+        var variants = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(v => v.TenantId == tenantId && v.ProductId == productId)
+            .OrderBy(v => v.Id) // stable ordering
+            .ToListAsync(cancellationToken);
+
+        if (variants.Count == 0)
+            return null;
+
+        var variantIds = variants.Select(v => v.Id).ToList();
+
+        // Load all barcodes for these variants (non-deleted)
+        var barcodes = await _dbContext.ProductBarcodes
+            .AsNoTracking()
+            .Where(b => b.TenantId == tenantId &&
+                        b.ProductId == productId &&
+                        b.ProductVariantId != null &&
+                        variantIds.Contains(b.ProductVariantId!.Value) &&
+                        b.Status != ProductConstants.DeletedStatus)
+            .ToListAsync(cancellationToken);
+
+        var assignments = new List<BarcodeSkuAssignmentDto>();
+        var identifierTargets = new List<Step5IdentifierTargetDto>();
+
+        foreach (var variant in variants)
+        {
+            var hasSku = !string.IsNullOrWhiteSpace(variant.Sku);
+
+            // Pick the primary barcode first, then any barcode for this variant
+            var primaryBarcode = barcodes
+                .Where(b => b.ProductVariantId == variant.Id)
+                .OrderByDescending(b => b.IsPrimaryBarcode)
+                .FirstOrDefault();
+
+            var hasBarcode = primaryBarcode != null;
+            var displayName = variant.VariantName.Trim().Length > 0
+                ? variant.VariantName
+                : variant.VariantCode;
+
+            identifierTargets.Add(new Step5IdentifierTargetDto(
+                ProductVariantId: variant.Id,
+                DisplayName: displayName,
+                IsAssigned: hasSku || hasBarcode));
+
+            if (hasSku || hasBarcode)
+            {
+                assignments.Add(new BarcodeSkuAssignmentDto(
+                    ProductVariantId: variant.Id,
+                    DisplayName: displayName,
+                    Sku: hasSku ? variant.Sku! : string.Empty,
+                    Barcode: hasBarcode ? primaryBarcode!.Barcode : null,
+                    Status: (hasSku && hasBarcode) ? "COMPLETE" : "INCOMPLETE"));
+            }
+        }
+
+        if (identifierTargets.Count == 0)
+            return null;
+
+        return new BarcodeSkuConfigurationDto(
+            IdentifierTargets: identifierTargets,
+            Assignments: assignments);
+    }
+
+    private async Task<PricingTaxResponseDto?> ProjectPricingTaxAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        var product = await _dbContext.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == productId, cancellationToken);
+
+        if (product == null)
+            return null;
+
+        var defaultPriceList = await _dbContext.PriceLists
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.IsDefaultPriceList && x.Status == "ACTIVE", cancellationToken);
+
+        decimal? costPrice = product.ReferenceCostPrice;
+        decimal? standardSellingPrice = null;
+        decimal? discountPrice = null;
+        decimal? effectiveSellingPrice = null;
+        decimal? discountAmount = null;
+        decimal? discountPercentage = null;
+        bool taxExclusive = product.IsTaxExclusive; // Map from DB
+
+        if (defaultPriceList != null)
+        {
+            var priceItem = await _dbContext.PriceListItems
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.PriceListId == defaultPriceList.Id && x.ProductId == productId, cancellationToken);
+
+            if (priceItem != null)
+            {
+                if (priceItem.CompareAtPrice.HasValue && priceItem.CompareAtPrice.Value > priceItem.SellingPrice)
+                {
+                    standardSellingPrice = priceItem.CompareAtPrice.Value;
+                    discountPrice = priceItem.SellingPrice;
+                    effectiveSellingPrice = priceItem.SellingPrice;
+                    discountAmount = standardSellingPrice - discountPrice;
+                    if (standardSellingPrice > 0)
+                        discountPercentage = Math.Round((discountAmount.Value / standardSellingPrice.Value) * 100, 2);
+                }
+                else
+                {
+                    standardSellingPrice = priceItem.SellingPrice;
+                    effectiveSellingPrice = priceItem.SellingPrice;
+                }
+            }
+        }
+
+        Guid? taxClassId = null;
+        string? taxName = null;
+        decimal? taxRatePercentage = null;
+
+        var taxAssignment = await _dbContext.ProductTaxAssignments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ProductId == productId, cancellationToken);
+
+        if (taxAssignment != null)
+        {
+            taxClassId = taxAssignment.TaxClassId;
+            var taxClass = await _dbContext.TaxClasses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == taxAssignment.TaxClassId, cancellationToken);
+                
+            if (taxClass != null)
+            {
+                taxName = taxClass.TaxClassName;
+                var taxClassRate = await _dbContext.TaxClassRates
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.TaxClassId == taxClass.Id, cancellationToken);
+                    
+                if (taxClassRate != null)
+                {
+                    var taxRate = await _dbContext.TaxRates
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == taxClassRate.TaxRateId, cancellationToken);
+                        
+                    if (taxRate != null)
+                    {
+                        taxRatePercentage = taxRate.RatePercent;
+                    }
+                }
+            }
+        }
+
+        return new PricingTaxResponseDto(
+            costPrice,
+            standardSellingPrice,
+            discountPrice,
+            effectiveSellingPrice,
+            discountAmount,
+            discountPercentage,
+            taxClassId,
+            taxName,
+            taxRatePercentage,
+            taxExclusive);
+    }
+    
+    public async Task SaveVariantsAsync(
+        Guid tenantId,
+        Guid productId,
+        VariantConfigurationDto variantConfiguration,
+        CancellationToken cancellationToken)
+    {
+        // Prefer Local: wizard-create adds Product in the same transaction before SaveChanges.
+        var product = _dbContext.Products.Local
+                .FirstOrDefault(p => p.Id == productId && p.TenantId == tenantId)
+            ?? await _dbContext.Products
+                .FirstOrDefaultAsync(p => p.Id == productId && p.TenantId == tenantId, cancellationToken);
+
+        if (product == null) return;
+        
+        var existingOptions = await _dbContext.ProductOptions
+            .Where(o => o.TenantId == tenantId && o.ProductId == productId)
+            .ToListAsync(cancellationToken);
+            
+        var existingValues = await _dbContext.ProductOptionValues
+            .Where(v => v.TenantId == tenantId && existingOptions.Select(o => o.Id).Contains(v.ProductOptionId))
+            .ToListAsync(cancellationToken);
+
+        var existingVariants = await _dbContext.ProductVariants
+            .Where(v => v.TenantId == tenantId && v.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        var existingVariantValues = await _dbContext.ProductVariantOptionValues
+            .Where(v => v.TenantId == tenantId && v.ProductId == productId)
+            .ToListAsync(cancellationToken);
+        
+        var now = DateTimeOffset.UtcNow;
+        var optionValueMap = new Dictionary<string, Guid>(); // key: OptionName|ValueName, value: ProductOptionValueId
+        var optionIdByValueKey = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var currentOptionIds = new List<Guid>();
+
+        // 1. Process Options and Option Values
+        foreach (var optionDto in variantConfiguration.Options)
+        {
+            var optionId = optionDto.ProductOptionId ?? Guid.NewGuid();
+            currentOptionIds.Add(optionId);
+            var existingOption = existingOptions.FirstOrDefault(o => o.Id == optionId || o.OptionCode == optionDto.OptionCode);
+            
+            if (existingOption == null)
+            {
+                existingOption = ProductOption.Create(
+                    optionId, tenantId, productId, optionDto.SourceOptionTemplateId,
+                    optionDto.OptionCode, optionDto.OptionName, optionDto.OptionType,
+                    optionDto.InputType ?? "TEXT", true, optionDto.SortOrder, "ACTIVE", null, now);
+                _dbContext.ProductOptions.Add(existingOption);
+            }
+            else
+            {
+                optionId = existingOption.Id;
+                existingOption.UpdateProfile(optionDto.OptionCode, optionDto.OptionName, optionDto.OptionType, optionDto.InputType ?? "TEXT", true, optionDto.SortOrder, null, now);
+                _dbContext.ProductOptions.Update(existingOption);
+            }
+
+            foreach (var valueDto in optionDto.Values)
+            {
+                var valId = valueDto.ProductOptionValueId ?? Guid.NewGuid();
+                var existingVal = existingValues.FirstOrDefault(v => v.Id == valId || (v.ProductOptionId == optionId && v.ValueName == valueDto.ValueName));
+                
+                if (existingVal == null)
+                {
+                    existingVal = ProductOptionValue.Create(
+                        valId, tenantId, optionId, valueDto.SourceOptionTemplateValueId,
+                        valueDto.ValueCode, valueDto.ValueName, valueDto.DisplayName,
+                        valueDto.ColorHex, valueDto.ImageMediaAssetId, valueDto.SortOrder, "ACTIVE", null, now);
+                    _dbContext.ProductOptionValues.Add(existingVal);
+                }
+                else
+                {
+                    valId = existingVal.Id;
+                    existingVal.UpdateProfile(valueDto.ValueCode, valueDto.ValueName, valueDto.DisplayName, valueDto.ColorHex, valueDto.SortOrder, null, now);
+                    existingVal.AssignImage(valueDto.ImageMediaAssetId, null, now);
+                    _dbContext.ProductOptionValues.Update(existingVal);
+                }
+
+                var valueKey = $"{optionDto.OptionName.ToLowerInvariant()}|{valueDto.ValueName.ToLowerInvariant()}";
+                optionValueMap[valueKey] = valId;
+                optionIdByValueKey[valueKey] = optionId;
+            }
+        }
+
+        // 2. Process Variants and Mappings
+        var currentVariantIds = new List<Guid>();
+        foreach (var variantDto in variantConfiguration.Variants)
+        {
+            var existingVariant = existingVariants.FirstOrDefault(v => v.OptionCombinationHash == variantDto.OptionCombinationHash);
+            var variantId = variantDto.ProductVariantId ?? Guid.NewGuid();
+            
+            if (existingVariant == null)
+            {
+                existingVariant = ProductVariant.Create(
+                    id: variantId,
+                    tenantId: tenantId,
+                    productId: productId,
+                    variantCode: variantDto.VariantCode ?? Guid.NewGuid().ToString().Substring(0, 8),
+                    variantName: variantDto.DisplayLabel ?? variantDto.CombinationLabel ?? "Variant",
+                    sku: null,
+                    stockUomId: Guid.Empty, // Simplified stub
+                    salesUomId: Guid.Empty, // Simplified stub
+                    isDefaultVariant: false,
+                    isSellable: variantDto.Included,
+                    allowFractionalQuantity: false,
+                    status: variantDto.Status ?? "ACTIVE",
+                    createdByTenantUserId: null,
+                    now: now
+                );
+                existingVariant.SetOptionCombinationHash(variantDto.OptionCombinationHash ?? string.Empty, now);
+                _dbContext.ProductVariants.Add(existingVariant);
+            }
+            else
+            {
+                variantId = existingVariant.Id;
+                existingVariant.UpdateDisplayLabel(variantDto.DisplayLabel ?? variantDto.CombinationLabel ?? "Variant", null, now);
+                existingVariant.UpdateInclusion(variantDto.Included, null, now);
+                existingVariant.UpdateStatus(variantDto.Status ?? "ACTIVE", null, now);
+                _dbContext.ProductVariants.Update(existingVariant);
+            }
+            currentVariantIds.Add(variantId);
+
+            // Reconcile Variant Option Values
+            foreach (var selVal in variantDto.SelectedValues)
+            {
+                if (selVal.OptionName != null && selVal.ValueName != null)
+                {
+                    var key = $"{selVal.OptionName.ToLowerInvariant()}|{selVal.ValueName.ToLowerInvariant()}";
+                    if (optionValueMap.TryGetValue(key, out var valId))
+                    {
+                        var mapping = existingVariantValues.FirstOrDefault(m => m.ProductVariantId == variantId && m.ProductOptionValueId == valId);
+                        if (mapping == null)
+                        {
+                            var optId = optionIdByValueKey.TryGetValue(key, out var mappedOptionId)
+                                ? mappedOptionId
+                                : (_dbContext.ProductOptionValues.Local.FirstOrDefault(v => v.Id == valId)?.ProductOptionId
+                                   ?? existingValues.FirstOrDefault(v => v.Id == valId)?.ProductOptionId
+                                   ?? Guid.Empty);
+
+                            if (optId == Guid.Empty)
+                            {
+                                continue;
+                            }
+
+                            var newMapping = ProductVariantOptionValue.Create(
+                                Guid.NewGuid(), tenantId, productId, variantId, optId, valId, null, now);
+                            _dbContext.ProductVariantOptionValues.Add(newMapping);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Remove variants and options that are no longer present
+        var variantsToRemove = existingVariants.Where(v => !currentVariantIds.Contains(v.Id)).ToList();
+        if (variantsToRemove.Any()) _dbContext.ProductVariants.RemoveRange(variantsToRemove);
+
+        // Also note: we avoid calling SaveChangesAsync here to allow the caller to manage the transaction.
+        // The calling SaveProductDraftAsync already has a transaction and calls SaveChangesAsync at the end.
     }
 }

@@ -17,6 +17,7 @@ public sealed class PosCashDrawerServiceTests
     private static readonly Guid DeviceId = Guid.NewGuid();
     private static readonly Guid SessionId = Guid.NewGuid();
     private static readonly Guid TillId = Guid.NewGuid();
+    private static readonly Guid MovementTypeId = Guid.NewGuid();
     private static readonly DateTimeOffset Now = new(2026, 8, 13, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
@@ -143,21 +144,6 @@ public sealed class PosCashDrawerServiceTests
         Assert.Equal(1, repository.CreateCalls);
     }
 
-    [Fact]
-    public async Task CreateMovement_WrongSessionOrDeviceSessionMismatch_IsRejected()
-    {
-        var repository = new FakeDrawerRepository();
-        var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
-        var mismatched = ValidCreateRequest() with { TillSessionId = Guid.NewGuid() };
-
-        var result = await service.CreateFinancialMovementAsync(
-            Context(CashDrawerPermissions.CreateMovement), mismatched, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal("cash_drawer.till_session_mismatch", result.Error.Code);
-        Assert.Equal(0, repository.CreateCalls);
-    }
-
     [Theory]
     [InlineData(0)]
     [InlineData(-100)]
@@ -175,39 +161,33 @@ public sealed class PosCashDrawerServiceTests
         Assert.Equal(0, repository.CreateCalls);
     }
 
-    [Theory]
-    [InlineData("OPENING_FLOAT")]
-    [InlineData("CASH_SALE")]
-    [InlineData("NOT_A_TYPE")]
-    public async Task CreateMovement_UnsupportedType_IsRejected(string type)
+    [Fact]
+    public async Task CreateMovement_MissingMovementTypeId_IsRejected()
     {
         var repository = new FakeDrawerRepository();
         var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
 
         var result = await service.CreateFinancialMovementAsync(
             Context(CashDrawerPermissions.CreateMovement),
-            ValidCreateRequest() with { MovementType = type },
+            ValidCreateRequest() with { MovementTypeId = Guid.Empty },
             CancellationToken.None);
 
-        Assert.Equal("cash_drawer.invalid_movement_type", result.Error.Code);
+        Assert.Equal("cash_drawer.invalid_request", result.Error.Code);
         Assert.Equal(0, repository.CreateCalls);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task CreateMovement_MissingReason_IsRejected(string? reason)
+    [Fact]
+    public async Task CreateMovement_NoteOver500Characters_IsRejected()
     {
         var repository = new FakeDrawerRepository();
         var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
 
         var result = await service.CreateFinancialMovementAsync(
             Context(CashDrawerPermissions.CreateMovement),
-            ValidCreateRequest() with { Reason = reason! },
+            ValidCreateRequest() with { Note = new string('x', 501) },
             CancellationToken.None);
 
-        Assert.Equal("cash_drawer.invalid_reason", result.Error.Code);
+        Assert.Equal("cash_drawer.invalid_note", result.Error.Code);
         Assert.Equal(0, repository.CreateCalls);
     }
 
@@ -228,6 +208,36 @@ public sealed class PosCashDrawerServiceTests
         Assert.Equal(TillId, repository.LastTrustedTillId);
     }
 
+    [Fact]
+    public async Task GetMovementTypes_AcceptsOutDirection()
+    {
+        var repository = new FakeDrawerRepository();
+        var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
+
+        var result = await service.GetMovementTypesAsync(
+            Context(CashDrawerPermissions.View), "OUT", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, repository.MovementTypesCalls);
+        Assert.Equal("OUT", repository.LastMovementTypesDirection);
+    }
+
+    [Theory]
+    [InlineData("SIDEWAYS")]
+    [InlineData("")]
+    public async Task GetMovementTypes_RejectsInvalidDirection(string direction)
+    {
+        var repository = new FakeDrawerRepository();
+        var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
+
+        var result = await service.GetMovementTypesAsync(
+            Context(CashDrawerPermissions.View), direction, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("cash_drawer.invalid_direction", result.Error.Code);
+        Assert.Equal(0, repository.MovementTypesCalls);
+    }
+
     private static PosDrawerService CreateService(
         FakeDrawerRepository repository,
         FakeTillSessionRepository tillSessions) =>
@@ -237,7 +247,7 @@ public sealed class PosCashDrawerServiceTests
         new(TenantId, UserId, permissions);
 
     private static CreatePosCashMovementRequest ValidCreateRequest() =>
-        new(Guid.NewGuid(), DeviceId, SessionId, "CASH_IN", 1000m, "Approved reason");
+        new(Guid.NewGuid(), DeviceId, MovementTypeId, 1000m, "Approved reason");
 
     private static CurrentTillSessionResolveResult OpenSession() =>
         new(true, null, new CurrentTillSessionDbSnapshot(
@@ -282,8 +292,10 @@ public sealed class PosCashDrawerServiceTests
     {
         public int SummaryCalls { get; private set; }
         public int MovementsCalls { get; private set; }
+        public int MovementTypesCalls { get; private set; }
         public int CreateCalls { get; private set; }
         public Guid LastTrustedTillId { get; private set; }
+        public string? LastMovementTypesDirection { get; private set; }
         public PosCashDrawerSummaryDto? Summary { get; init; }
         public (string? ErrorCode, PosCashDrawerMovementDto? Movement) CreateResult { get; init; } =
             (null, null);
@@ -326,6 +338,14 @@ public sealed class PosCashDrawerServiceTests
         {
             MovementsCalls++;
             return Task.FromResult(new PosCashDrawerMovementPageDto([], page, pageSize, 0, 0));
+        }
+
+        public Task<IReadOnlyList<PosCashMovementTypeDto>> GetMovementTypesAsync(
+            Guid tenantId, string direction, CancellationToken cancellationToken)
+        {
+            MovementTypesCalls++;
+            LastMovementTypesDirection = direction;
+            return Task.FromResult<IReadOnlyList<PosCashMovementTypeDto>>([]);
         }
 
         public Task<(string? ErrorCode, PosCashDrawerMovementDto? Movement)> CreateFinancialMovementAsync(

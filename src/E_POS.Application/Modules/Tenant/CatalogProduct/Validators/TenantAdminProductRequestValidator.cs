@@ -3,6 +3,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.Inventory.Services;
 
@@ -59,10 +60,10 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             fieldErrors.Add(new ApplicationFieldError("pageNumber", "Page number must be 1 or greater."));
         }
 
-        var allowedPageSizes = new[] { 6, 8, 10, 25, 50 };
+        var allowedPageSizes = new[] { 4, 5, 6, 8, 10, 25, 50 };
         if (!allowedPageSizes.Contains(pageSize))
         {
-            fieldErrors.Add(new ApplicationFieldError("pageSize", "Page size must be 6, 8, 10, 25, or 50."));
+            fieldErrors.Add(new ApplicationFieldError("pageSize", "Page size must be 4, 5, 6, 8, 10, 25, or 50."));
         }
 
         if (productStatus != null)
@@ -127,6 +128,9 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         {
             ProductWizardStage.ProductTypeTracking => ValidateProductTypeTrackingSaveDraft(request),
             ProductWizardStage.UnitsPackConversion => ValidateUnitsPackConversionDraft(request),
+            ProductWizardStage.ProductConfiguration => ValidateProductConfigurationDraft(request),
+            ProductWizardStage.BarcodeSku => ValidateBarcodeSkuDraft(request),
+            ProductWizardStage.PricingTax => ValidatePricingTaxDraft(request),
             _ => ValidateStep1Draft(request, requireProductName: false, requireCategory: false)
         };
     }
@@ -137,6 +141,9 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         {
             ProductWizardStage.ProductTypeTracking => ValidateProductTypeTrackingContinue(request),
             ProductWizardStage.UnitsPackConversion => ValidateUnitsPackConversionContinue(request),
+            ProductWizardStage.ProductConfiguration => ValidateProductConfigurationContinue(request),
+            ProductWizardStage.BarcodeSku => ValidateBarcodeSkuContinue(request),
+            ProductWizardStage.PricingTax => ValidatePricingTaxContinue(request),
             _ => ValidateStep1Draft(request, requireProductName: true, requireCategory: true)
         };
     }
@@ -275,11 +282,19 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             }
         }
 
-        if (request.CurrentSetupStep is < 1 or > 8)
+        if (request.CurrentSetupStep is < 1 or > 7)
         {
             fieldErrors.Add(new ApplicationFieldError(
                 "currentSetupStep",
-                "Current setup step must be between 1 and 8."));
+                "Current setup step must be between 1 and 7."));
+        }
+
+        var trackingLengthError = ProductSetupInitialTrackingRules.ValidateLengths(
+            request.InitialBatchNumber,
+            request.InitialSerialNumber);
+        if (trackingLengthError?.FieldErrors is { Count: > 0 } trackingErrors)
+        {
+            fieldErrors.AddRange(trackingErrors);
         }
 
         if (fieldErrors.Count == 0)
@@ -642,6 +657,467 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         {
             return null;
         }
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product validation failed.",
+            fieldErrors);
+    }
+
+    public static ApplicationError? ValidateProductConfigurationDraft(SaveProductDraftRequest request)
+    {
+        ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);
+
+        if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidateBundleConfigurationDraft(request);
+        }
+        
+        if (string.Equals(normalizedStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidateVariantConfigurationDraft(request);
+        }
+
+        // SIMPLE or others
+        return null;
+    }
+
+    public static ApplicationError? ValidateProductConfigurationContinue(SaveProductDraftRequest request)
+    {
+        ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);
+
+        if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidateBundleConfigurationContinue(request);
+        }
+
+        if (string.Equals(normalizedStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidateVariantConfigurationContinue(request);
+        }
+
+        // SIMPLE or others
+        return null;
+    }
+
+    private static ApplicationError? ValidateBundleConfigurationDraft(SaveProductDraftRequest request)
+    {
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.VariantConfiguration != null)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "variantConfiguration",
+                "Variant configuration is not applicable for a Bundle product.",
+                "product.variant_configuration_not_applicable"));
+        }
+
+        if (request.BundleConfiguration != null && request.BundleConfiguration.Components != null)
+        {
+            for (int i = 0; i < request.BundleConfiguration.Components.Count; i++)
+            {
+                var component = request.BundleConfiguration.Components[i];
+
+                if (component.ComponentProductId == Guid.Empty)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        $"bundleConfiguration.components[{i}].componentProductId",
+                        "Component Product ID is required."));
+                }
+
+                if (component.ComponentUomId == Guid.Empty)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        $"bundleConfiguration.components[{i}].componentUomId",
+                        "Component UOM ID is required."));
+                }
+
+                if (component.RequiredQuantity <= 0)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        $"bundleConfiguration.components[{i}].requiredQuantity",
+                        "Required quantity must be greater than zero.",
+                        "product.bundle.component_quantity_invalid"));
+                }
+
+                if (component.SortOrder < 0)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        $"bundleConfiguration.components[{i}].sortOrder",
+                        "Sort order must be zero or greater."));
+                }
+            }
+        }
+
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product draft validation failed.",
+            fieldErrors);
+    }
+
+    private static ApplicationError? ValidateBundleConfigurationContinue(SaveProductDraftRequest request)
+    {
+        var draftError = ValidateBundleConfigurationDraft(request);
+        if (draftError != null) return draftError;
+
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.BundleConfiguration == null || request.BundleConfiguration.Components == null || request.BundleConfiguration.Components.Count < 2)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "bundleConfiguration.components",
+                "At least 2 components are required for a Bundle product.",
+                "product.bundle.minimum_components_required"));
+        }
+
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product validation failed.",
+            fieldErrors);
+    }
+
+    private static ApplicationError? ValidateVariantConfigurationDraft(SaveProductDraftRequest request)
+    {
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.BundleConfiguration != null)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "bundleConfiguration",
+                "Bundle configuration is not applicable for a Variant product.",
+                "product.bundle_configuration_not_applicable"));
+        }
+
+        if (request.VariantConfiguration != null)
+        {
+            if (request.VariantConfiguration.Options != null)
+            {
+                var optionCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < request.VariantConfiguration.Options.Count; i++)
+                {
+                    var option = request.VariantConfiguration.Options[i];
+                    if (!string.IsNullOrWhiteSpace(option.OptionCode))
+                    {
+                        if (!optionCodes.Add(option.OptionCode))
+                        {
+                            fieldErrors.Add(new ApplicationFieldError(
+                                $"options[{i}].optionCode",
+                                $"Attribute '{option.OptionCode}' cannot be selected more than once.",
+                                "product.duplicate_attribute"));
+                        }
+                    }
+
+                    if (option.Values != null)
+                    {
+                        var valueCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        for (int j = 0; j < option.Values.Count; j++)
+                        {
+                            var val = option.Values[j];
+                            if (!string.IsNullOrWhiteSpace(val.ValueCode))
+                            {
+                                if (!valueCodes.Add(val.ValueCode))
+                                {
+                                    fieldErrors.Add(new ApplicationFieldError(
+                                        $"options[{i}].values[{j}]",
+                                        $"Value '{val.ValueCode}' cannot be repeated in attribute '{option.OptionCode}'.",
+                                        "product.duplicate_option_value"));
+                                }
+                            }
+                            
+                            if (!val.SourceOptionTemplateValueId.HasValue && string.IsNullOrWhiteSpace(val.ValueName))
+                            {
+                                fieldErrors.Add(new ApplicationFieldError(
+                                    $"options[{i}].values[{j}]",
+                                    "Selected value must have a valid identifier or name."));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (request.VariantConfiguration.Variants != null)
+            {
+                var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < request.VariantConfiguration.Variants.Count; i++)
+                {
+                    var variant = request.VariantConfiguration.Variants[i];
+                    
+                    if (!string.IsNullOrWhiteSpace(variant.ClientCombinationKey))
+                    {
+                        if (!keys.Add(variant.ClientCombinationKey))
+                        {
+                            fieldErrors.Add(new ApplicationFieldError(
+                                $"variants[{i}].clientCombinationKey",
+                                "Duplicate clientCombinationKey detected."));
+                        }
+                    }
+                    else
+                    {
+                        fieldErrors.Add(new ApplicationFieldError(
+                            $"variants[{i}].clientCombinationKey",
+                            "clientCombinationKey is required."));
+                    }
+
+                    if (variant.DisplayLabel?.Length > 150)
+                    {
+                        fieldErrors.Add(new ApplicationFieldError(
+                            $"variants[{i}].displayLabel",
+                            "Display label cannot exceed 150 characters."));
+                    }
+                }
+            }
+        }
+
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product draft validation failed.",
+            fieldErrors);
+    }
+
+    private static ApplicationError? ValidateVariantConfigurationContinue(SaveProductDraftRequest request)
+    {
+        var draftError = ValidateVariantConfigurationDraft(request);
+        if (draftError != null) return draftError;
+
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.VariantConfiguration == null || 
+            request.VariantConfiguration.Options == null || 
+            request.VariantConfiguration.Options.Count == 0)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "variantConfiguration.options",
+                "At least one attribute must be defined for a Variant product.",
+                "product.variant_options_required"));
+        }
+        else
+        {
+            long cartesianCount = 1;
+            for (int i = 0; i < request.VariantConfiguration.Options.Count; i++)
+            {
+                var option = request.VariantConfiguration.Options[i];
+                if (option.Values == null || option.Values.Count == 0)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        $"options[{i}].values",
+                        $"Attribute '{option.OptionCode}' must contain at least one selected value.",
+                        "product.option_values_required"));
+                    cartesianCount = 0; 
+                }
+                else
+                {
+                    cartesianCount *= option.Values.Count;
+                }
+            }
+
+            if (cartesianCount > ProductConstants.MaxVariants)
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    "variantConfiguration",
+                    $"Cartesian matrix produces {cartesianCount} variants, exceeding maximum allowed limit of {ProductConstants.MaxVariants}.",
+                    "product.max_variants_exceeded"));
+            }
+        }
+
+        if (request.VariantConfiguration != null && request.VariantConfiguration.Variants != null)
+        {
+            bool hasIncluded = request.VariantConfiguration.Variants.Any(v => v.Included);
+            if (!hasIncluded)
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    "variantConfiguration.variants",
+                    "At least one variant must be included in the product setup.",
+                    "product.included_variant_required"));
+            }
+            
+            for (int i = 0; i < request.VariantConfiguration.Variants.Count; i++)
+            {
+                var variant = request.VariantConfiguration.Variants[i];
+                if (variant.SelectedValues == null || variant.SelectedValues.Count == 0)
+                {
+                     fieldErrors.Add(new ApplicationFieldError(
+                        $"variants[{i}].selectedValues",
+                        "Variant must have selected option value identities."));
+                }
+            }
+        }
+        else
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "variantConfiguration.variants",
+                "At least one variant must be included in the product setup.",
+                "product.included_variant_required"));
+        }
+
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product validation failed.",
+            fieldErrors);
+    }
+
+    public static ApplicationError? ValidateBarcodeSkuDraft(SaveProductDraftRequest request)
+    {
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.BarcodeSkuConfiguration?.Assignments != null)
+        {
+            var skuSet = new HashSet<string>(StringComparer.Ordinal);
+            var barcodeSet = new HashSet<string>(StringComparer.Ordinal);
+
+            for (int i = 0; i < request.BarcodeSkuConfiguration.Assignments.Count; i++)
+            {
+                var assignment = request.BarcodeSkuConfiguration.Assignments[i];
+                var prefix = $"barcodeSkuConfiguration.assignments[{i}]";
+
+                if (assignment.ProductVariantId == Guid.Empty)
+                {
+                    fieldErrors.Add(new ApplicationFieldError($"{prefix}.productVariantId", "Product variant identifier is required."));
+                }
+
+                if (assignment.Sku?.Length > 100)
+                {
+                    fieldErrors.Add(new ApplicationFieldError($"{prefix}.sku", "SKU cannot exceed 100 characters."));
+                }
+                else if (!string.IsNullOrWhiteSpace(assignment.Sku))
+                {
+                    if (!skuSet.Add(assignment.Sku.Trim()))
+                    {
+                        fieldErrors.Add(new ApplicationFieldError($"{prefix}.sku", "Duplicate SKU in request."));
+                    }
+                }
+
+                if (assignment.Barcode?.Length > 100)
+                {
+                    fieldErrors.Add(new ApplicationFieldError($"{prefix}.barcode", "Barcode cannot exceed 100 characters."));
+                }
+                else if (!string.IsNullOrWhiteSpace(assignment.Barcode))
+                {
+                    if (!barcodeSet.Add(assignment.Barcode.Trim()))
+                    {
+                        fieldErrors.Add(new ApplicationFieldError($"{prefix}.barcode", "Duplicate barcode in request."));
+                    }
+                }
+            }
+        }
+
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product draft validation failed.",
+            fieldErrors);
+    }
+
+    public static ApplicationError? ValidateBarcodeSkuContinue(SaveProductDraftRequest request)
+    {
+        var draftError = ValidateBarcodeSkuDraft(request);
+        if (draftError != null) return draftError;
+
+        var fieldErrors = new List<ApplicationFieldError>();
+        ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);
+
+        bool isVariant = string.Equals(normalizedStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase);
+
+        if (request.BarcodeSkuConfiguration?.Assignments == null || request.BarcodeSkuConfiguration.Assignments.Count == 0)
+        {
+            fieldErrors.Add(new ApplicationFieldError("barcodeSkuConfiguration.assignments", "At least one SKU assignment is required."));
+        }
+        else
+        {
+            for (int i = 0; i < request.BarcodeSkuConfiguration.Assignments.Count; i++)
+            {
+                var assignment = request.BarcodeSkuConfiguration.Assignments[i];
+                if (string.IsNullOrWhiteSpace(assignment.Sku))
+                {
+                    fieldErrors.Add(new ApplicationFieldError($"barcodeSkuConfiguration.assignments[{i}].sku", "SKU is required."));
+                }
+            }
+        }
+
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product validation failed.",
+            fieldErrors);
+    }
+
+    public static ApplicationError? ValidatePricingTaxDraft(SaveProductDraftRequest request)
+    {
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.PricingTax != null)
+        {
+            if (request.PricingTax.CostPrice.HasValue && request.PricingTax.CostPrice.Value < 0)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.costPrice", "Cost price cannot be negative."));
+            }
+
+            if (request.PricingTax.StandardSellingPrice.HasValue && request.PricingTax.StandardSellingPrice.Value < 0)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.standardSellingPrice", "Standard selling price cannot be negative."));
+            }
+
+            if (request.PricingTax.DiscountPrice.HasValue && request.PricingTax.DiscountPrice.Value < 0)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.discountPrice", "Discount price cannot be negative."));
+            }
+
+            if (request.PricingTax.DiscountPrice.HasValue && 
+                request.PricingTax.StandardSellingPrice.HasValue && 
+                request.PricingTax.DiscountPrice.Value >= request.PricingTax.StandardSellingPrice.Value)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.discountPrice", "Discount price must be less than standard selling price."));
+            }
+
+        }
+
+        if (fieldErrors.Count == 0) return null;
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Product draft validation failed.",
+            fieldErrors);
+    }
+
+    public static ApplicationError? ValidatePricingTaxContinue(SaveProductDraftRequest request)
+    {
+        var draftError = ValidatePricingTaxDraft(request);
+        if (draftError != null) return draftError;
+
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        if (request.PricingTax == null)
+        {
+            fieldErrors.Add(new ApplicationFieldError("pricingTax", "Pricing & Tax configuration is required."));
+        }
+        else
+        {
+            if (!request.PricingTax.CostPrice.HasValue)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.costPrice", "Cost price is required."));
+            }
+
+            if (!request.PricingTax.StandardSellingPrice.HasValue)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.standardSellingPrice", "Standard selling price is required."));
+            }
+
+            if (!request.PricingTax.TaxClassId.HasValue || request.PricingTax.TaxClassId.Value == Guid.Empty)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.taxClassId", "Tax class is required."));
+            }
+        }
+
+        if (fieldErrors.Count == 0) return null;
 
         return new ApplicationError(
             "product.validation_failed",

@@ -336,6 +336,16 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
                         x.TillSessionId == session.Id &&
                         x.CurrencyCode == session.CurrencyCode)
             .ToListAsync(cancellationToken);
+        var canonicalMovements = await (
+            from movement in _dbContext.CashMovements.AsNoTracking()
+            join type in _dbContext.CashMovementTypes.AsNoTracking()
+                on movement.MovementTypeId equals type.Id
+            where movement.TenantId == tenantId &&
+                  movement.TillSessionId == session.Id &&
+                  movement.CurrencyCode == session.CurrencyCode &&
+                  type.AffectsExpectedCash
+            select new { movement.Amount, type.Direction, type.MovementTypeCode })
+            .ToListAsync(cancellationToken);
         var configuredTypes = await _dbContext.CashMovementTypes.AsNoTracking()
             .Where(x => (x.TenantId == null || x.TenantId == tenantId) && x.Status == "ACTIVE")
             .ToListAsync(cancellationToken);
@@ -358,9 +368,13 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
             .ToList();
         var cashPaymentsTotal = cashPayments.Sum(x => x.PaidAmount);
         var cashRefundsTotal = cashPayments.Sum(x => x.RefundedAmount);
-        var cashIn = includedMovements.Where(x => x.MovementType == "CASH_IN").Sum(x => x.Amount);
-        var cashOut = includedMovements.Where(x => x.MovementType == "CASH_OUT").Sum(x => x.Amount);
-        var cashDrops = includedMovements.Where(x => x.MovementType == "CASH_DROP").Sum(x => x.Amount);
+        var canonicalCashIn = canonicalMovements.Where(x => x.Direction == "IN").Sum(x => x.Amount);
+        var canonicalCashOut = canonicalMovements.Where(x => x.Direction == "OUT" && x.MovementTypeCode != "CASH_DROP").Sum(x => x.Amount);
+        var canonicalCashDrops = canonicalMovements.Where(x => x.Direction == "OUT" && x.MovementTypeCode == "CASH_DROP").Sum(x => x.Amount);
+
+        var cashIn = canonicalCashIn + includedMovements.Where(x => x.MovementType == "CASH_IN").Sum(x => x.Amount);
+        var cashOut = canonicalCashOut + includedMovements.Where(x => x.MovementType == "CASH_OUT").Sum(x => x.Amount);
+        var cashDrops = canonicalCashDrops + includedMovements.Where(x => x.MovementType == "CASH_DROP").Sum(x => x.Amount);
         var openingAdjustments = includedMovements.Where(x => x.MovementType == "OPENING_FLOAT").Sum(x => x.Amount);
         var closingRemovals = includedMovements.Where(x => x.MovementType == "CLOSING_REMOVE").Sum(x => x.Amount);
 
@@ -370,7 +384,7 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
             OpeningFloat: session.OpeningFloatAmount,
             CashPayments: cashPaymentsTotal,
             CashIn: cashIn,
-            CashOut: cashOut,
+            CashOut: cashOut + cashDrops,
             OpeningAdjustments: openingAdjustments,
             ClosingRemovals: closingRemovals,
             ExpectedCash: session.OpeningFloatAmount + cashPaymentsTotal - cashRefundsTotal + cashIn + openingAdjustments - cashOut - cashDrops - closingRemovals);
@@ -537,3 +551,4 @@ public sealed class PosTillSessionRepository : IPosTillSessionRepository
             new(false, errorCode, null);
     }
 }
+

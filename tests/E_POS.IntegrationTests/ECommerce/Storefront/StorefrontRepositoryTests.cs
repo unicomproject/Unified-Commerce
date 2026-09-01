@@ -1,5 +1,6 @@
 using System.Reflection;
 using E_POS.Application.Modules.Shared.Media.Contracts;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.ECommerce.Storefront.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -8,6 +9,7 @@ using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
+using E_POS.Infrastructure.Modules.ECommerce.FulfilmentPickup.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -38,7 +40,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetActiveBannersAsync(tenantId, " hero ", CancellationToken.None)).ToList();
@@ -86,7 +88,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetRootCategoriesAsync(tenantId, CancellationToken.None)).ToList();
@@ -154,7 +156,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetChildCategoriesAsync(tenantId, parent.Id, CancellationToken.None)).ToList();
@@ -202,7 +204,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetFeaturedCategoriesAsync(tenantId, CancellationToken.None)).ToList();
@@ -226,7 +228,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var activeResult = await repository.GetTenantIdBySlugAsync(" demo-store ", CancellationToken.None);
@@ -272,7 +274,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = await repository.GetProductsAsync(tenantId, category.Id, "popular", 1, 20, CancellationToken.None);
@@ -331,7 +333,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = await repository.GetProductsAsync(tenantId, category.Id, "price_desc", 1, 20, CancellationToken.None);
@@ -479,12 +481,14 @@ public sealed class StorefrontRepositoryTests
             ProductConstants.ActiveStatus,
             null,
             Now));
+        dbContext.FulfillmentMethods.Add(
+            FulfillmentMethod.Create(Guid.NewGuid(), tenantId, "CLICK_COLLECT", "Click & Collect", "Customer pickup from the selected outlet.", "ACTIVE", "PICKUP", Now));
         await dbContext.SaveChangesAsync();
         var repository = new StorefrontRepository(
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = await repository.GetProductDetailAsync(tenantId, " HOME ", CancellationToken.None);
@@ -581,7 +585,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = (await repository.GetBestSellersAsync(tenantId, CancellationToken.None)).ToList();
@@ -621,7 +625,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = Assert.Single(await repository.GetActiveBannersAsync(tenantId, "HERO", CancellationToken.None));
@@ -657,7 +661,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext, resolver),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = Assert.Single(await repository.GetActiveBannersAsync(tenantId, "HERO", CancellationToken.None));
@@ -682,7 +686,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = Assert.Single(await repository.GetRootCategoriesAsync(tenantId, CancellationToken.None));
@@ -729,7 +733,7 @@ public sealed class StorefrontRepositoryTests
             new StorefrontBannerRepository(dbContext),
             new StorefrontCategoryRepository(dbContext),
             new StorefrontProductRepository(dbContext),
-            new StorefrontFulfillmentRepository(dbContext),
+            new StorefrontFulfilmentRepository(dbContext),
             new StorefrontTenantRepository(dbContext));
 
         var result = await repository.GetProductsAsync(tenantId, category.Id, "popular", 1, 20, CancellationToken.None);
@@ -749,7 +753,6 @@ public sealed class StorefrontRepositoryTests
         return Category.Create(
             Guid.NewGuid(),
             tenantId,
-            Guid.NewGuid(),
             parentCategoryId,
             code,
             name,
@@ -899,3 +902,5 @@ public sealed class StorefrontRepositoryTests
         return new EPosDbContext(options);
     }
 }
+
+

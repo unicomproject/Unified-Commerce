@@ -3,6 +3,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Infrastructure.Persistence.Seed;
@@ -23,10 +24,35 @@ public sealed class PlatformUserServiceTests
             new FakePlatformUserRepository { ListResponse = CreateListResponse() },
             hasUsersView: true);
 
-        var result = await service.GetUsersAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await service.GetUsersAsync(new PlatformUserListQuery(), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value!.Users);
+    }
+
+    [Fact]
+    public async Task GetUsersAsync_WithQueryParameters_PassesQueryToRepository()
+    {
+        var repository = new FakePlatformUserRepository { ListResponse = CreateListResponse() };
+        var service = CreateService(repository, hasUsersView: true);
+        var query = new PlatformUserListQuery
+        {
+            PageNumber = 2,
+            PageSize = 5,
+            Search = "admin",
+            Status = "ACTIVE",
+            Role = "SUPER_ADMIN"
+        };
+
+        var result = await service.GetUsersAsync(query, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastReceivedQuery);
+        Assert.Equal(2, repository.LastReceivedQuery.PageNumber);
+        Assert.Equal(5, repository.LastReceivedQuery.PageSize);
+        Assert.Equal("admin", repository.LastReceivedQuery.Search);
+        Assert.Equal("ACTIVE", repository.LastReceivedQuery.Status);
+        Assert.Equal("SUPER_ADMIN", repository.LastReceivedQuery.Role);
     }
 
     [Fact]
@@ -36,7 +62,7 @@ public sealed class PlatformUserServiceTests
             new FakePlatformUserRepository { ListResponse = CreateListResponse() },
             hasUsersView: false);
 
-        var result = await service.GetUsersAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await service.GetUsersAsync(new PlatformUserListQuery(), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("platform_users.access_denied", result.Error.Code);
@@ -69,8 +95,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "Support User",
                 Email = "support.user@example.com",
-                RoleCodes = ["support_operator"]
+                RoleIds = [SupportRoleId]
             },
             SuperAdminUserId,
             CancellationToken.None);
@@ -78,7 +105,7 @@ public sealed class PlatformUserServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal("support.user@example.com", result.Value!.Email);
         Assert.True(result.Value.InvitePending);
-        Assert.True(repository.AddCalled);
+        Assert.True(repository.AddWithInvitationCalled);
     }
 
     [Fact]
@@ -98,8 +125,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "Duplicate User",
                 Email = "duplicate@example.com",
-                RoleCodes = ["support_operator"]
+                RoleIds = [SupportRoleId]
             },
             SuperAdminUserId,
             CancellationToken.None);
@@ -118,8 +146,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "Support User",
                 Email = "support.user@example.com",
-                RoleCodes = ["unknown_role"]
+                RoleIds = [Guid.NewGuid()]
             },
             SuperAdminUserId,
             CancellationToken.None);
@@ -136,8 +165,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "Support User",
                 Email = "support.user@example.com",
-                RoleCodes = ["support_operator"]
+                RoleIds = [SupportRoleId]
             },
             Guid.NewGuid(),
             CancellationToken.None);
@@ -166,8 +196,9 @@ public sealed class PlatformUserServiceTests
         var result = await service.CreateUserAsync(
             new CreatePlatformUserRequest
             {
+                FullName = "New Admin",
                 Email = "new.admin@example.com",
-                RoleCodes = [PlatformRoleCodes.SuperAdministrator]
+                RoleIds = [PlatformAdminSeedConstants.SuperAdministratorRoleId]
             },
             Guid.NewGuid(),
             CancellationToken.None);
@@ -353,7 +384,23 @@ public sealed class PlatformUserServiceTests
                 hasUsersCreate,
                 hasUsersUpdate,
                 hasUsersRolesAssign),
-            new FakeDateTimeProvider());
+            new FakeDateTimeProvider(),
+            new FakeInvitationTokenService(),
+            new FakeInvitationDeliverySecretProtector());
+    }
+
+    private sealed class FakeInvitationTokenService : IInvitationTokenService
+    {
+        public string GenerateToken() => "fake_raw_token";
+        public string HashToken(string token) => "fake_token_hash";
+    }
+
+    private sealed class FakeInvitationDeliverySecretProtector : IInvitationDeliverySecretProtector
+    {
+        public ProtectedInvitationDeliverySecret Protect(string rawToken) =>
+            new ProtectedInvitationDeliverySecret("fake_protected_token", "v1");
+
+        public string Unprotect(string ciphertext, string keyVersion) => "fake_raw_token";
     }
 
     private static PlatformUserListResponse CreateListResponse()
@@ -449,8 +496,11 @@ public sealed class PlatformUserServiceTests
         public bool AddCalled { get; private set; }
         public bool ReplaceRolesCalled { get; private set; }
 
-        public Task<PlatformUserListResponse> GetUsersAsync(CancellationToken cancellationToken)
+        public PlatformUserListQuery? LastReceivedQuery { get; private set; }
+
+        public Task<PlatformUserListResponse> GetUsersAsync(PlatformUserListQuery query, CancellationToken cancellationToken)
         {
+            LastReceivedQuery = query;
             return Task.FromResult(ListResponse);
         }
 
@@ -498,6 +548,10 @@ public sealed class PlatformUserServiceTests
             return Task.FromResult(EmailExists);
         }
 
+        public bool AddWithInvitationCalled { get; private set; }
+        public PlatformUserInvitation? InvitationEntity { get; private set; }
+        public E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage? OutboxMessageEntity { get; private set; }
+
         public Task AddUserWithRolesAsync(
             PlatformUser user,
             IReadOnlyList<Guid> roleIds,
@@ -506,6 +560,20 @@ public sealed class PlatformUserServiceTests
         {
             AddCalled = true;
             UserEntity = user;
+            return Task.CompletedTask;
+        }
+
+        public Task AddUserWithRolesAndInvitationAsync(
+            PlatformUser user,
+            IReadOnlyList<Guid> roleIds,
+            PlatformUserInvitation invitation,
+            E_POS.Domain.Modules.Shared.Integration.Entities.IntegrationOutboxMessage outboxMessage,
+            CancellationToken cancellationToken)
+        {
+            AddWithInvitationCalled = true;
+            UserEntity = user;
+            InvitationEntity = invitation;
+            OutboxMessageEntity = outboxMessage;
             return Task.CompletedTask;
         }
 

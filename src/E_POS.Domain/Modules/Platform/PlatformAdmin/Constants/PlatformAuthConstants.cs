@@ -14,5 +14,6 @@ public static class PlatformAuthConstants
     public const string ExpiredTokenStatus = "EXPIRED";
     public const string RevokedTokenStatus = "REVOKED";
     public const string InactiveStatus = "INACTIVE";
+    public const string InvitedStatus = "INVITED";
     public const string IdentityType = "platform_user";
 }

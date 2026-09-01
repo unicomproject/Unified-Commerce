@@ -30,6 +30,7 @@ public sealed class CashMovementConfiguration : IEntityTypeConfiguration<CashMov
         builder.Property(x => x.TillId).HasColumnName("till_id").IsRequired();
         builder.Property(x => x.TillSessionId).HasColumnName("till_session_id").IsRequired();
         builder.Property(x => x.PosDeviceId).HasColumnName("pos_device_id").IsRequired(false);
+        builder.Property(x => x.RequestId).HasColumnName("request_id").IsRequired(false);
         builder.Property(x => x.MovementTypeId).HasColumnName("movement_type_id").IsRequired();
         builder.Property(x => x.MovementNumber).HasColumnName("movement_number").HasColumnType("varchar(80)").HasMaxLength(80).IsRequired();
         builder.Property(x => x.Amount).HasColumnName("amount").HasPrecision(18, 4).IsRequired();
@@ -57,6 +58,9 @@ public sealed class CashMovementConfiguration : IEntityTypeConfiguration<CashMov
         builder.HasOne<SalesRefund>().WithMany().HasForeignKey(x => x.RefundId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_cash_movements_refund_id_refunds");
 
         builder.HasIndex(x => new { x.TenantId, x.MovementNumber }).IsUnique().HasDatabaseName("uq_cash_movements_tenant_id_movement_number");
+        builder.HasIndex(x => new { x.TenantId, x.RequestId }).IsUnique()
+            .HasFilter("request_id IS NOT NULL")
+            .HasDatabaseName("uq_cash_movements_tenant_id_request_id");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_cash_movements_amount", "amount >= 0"));
     }

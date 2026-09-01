@@ -123,6 +123,10 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
 
     public async Task<SubscriptionPlanCatalogResponse> GetCatalogAsync(CancellationToken cancellationToken)
     {
+        var commercialFeatureCodes = CommercialSubscriptionFeatureCatalog
+            .GetCanonicalCommercialFeatureCodes()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var modules = await _dbContext.PlatformModules
             .AsNoTracking()
             .Where(module => module.Status == "ACTIVE")
@@ -138,7 +142,9 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
                 Features = _dbContext.PlatformFeatures
                     .Where(feature =>
                         feature.PlatformModuleId == module.Id &&
-                        feature.Status == "ACTIVE")
+                        feature.Status == "ACTIVE" &&
+                        feature.Scope == "TENANT" &&
+                        commercialFeatureCodes.Contains(feature.FeatureCode))
                     .OrderBy(feature => feature.SortOrder)
                     .ThenBy(feature => feature.Name)
                     .Select(feature => new SubscriptionPlanCatalogFeatureDto(
@@ -457,7 +463,7 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
 
         var ids = await _dbContext.PlatformFeatures
             .AsNoTracking()
-            .Where(feature => featureIds.Contains(feature.Id) && feature.Status == "ACTIVE")
+            .Where(feature => featureIds.Contains(feature.Id) && feature.Status == "ACTIVE" && feature.Scope == "TENANT")
             .Select(feature => feature.Id)
             .ToListAsync(cancellationToken);
 

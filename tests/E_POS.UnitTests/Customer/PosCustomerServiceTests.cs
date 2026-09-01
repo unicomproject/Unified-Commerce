@@ -1,10 +1,9 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
-using E_POS.Application.Modules.ECommerce.Customer.Contracts;
-using E_POS.Application.Modules.ECommerce.Customer.Dtos;
-using E_POS.Application.Modules.ECommerce.Customer.Services;
-using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Application.Modules.Tenant.POSOperations.Services;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.Orders.Constants;
@@ -568,3 +567,4 @@ public sealed class PosCustomerServiceTests
             CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }
+

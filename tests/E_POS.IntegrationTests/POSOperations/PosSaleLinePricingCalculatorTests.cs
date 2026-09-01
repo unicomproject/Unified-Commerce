@@ -158,10 +158,12 @@ public sealed class PosSaleLinePricingCalculatorTests
         db.UnitOfMeasures.Add(UnitOfMeasure.Create(
             uomId, tenantId, "EA", "Each", "COUNT", "ea", null, 1m,
             ProductConstants.ActiveStatus, Now));
-        db.Products.Add(Product.Create(
+        var product = Product.Create(
             productId, tenantId, "P-1", "Exchange Product", "exchange-product",
             "STANDARD", "SIMPLE", null, null, null, null, null,
-            true, true, ProductConstants.ActiveStatus, null, Now));
+            true, true, ProductConstants.ActiveStatus, null, Now);
+        product.UpdateTaxConfiguration(!priceIncludesTax, null, Now);
+        db.Products.Add(product);
         db.ProductVariants.Add(ProductVariant.Create(
             variantId, tenantId, productId, "DEFAULT", "Exchange Product", "SKU-1",
             uomId, uomId, true, true, false, ProductConstants.ActiveStatus, null, Now));
@@ -195,7 +197,7 @@ public sealed class PosSaleLinePricingCalculatorTests
         db.TaxJurisdictions.Add(jurisdiction);
         await db.SaveChangesAsync();
 
-        var taxClass = TaxClass.Create(tenantId, "STD", "Standard", null, true, null, Now);
+        var taxClass = TaxClass.Create(tenantId, "STD", "Standard", "OTHER", null, true, null, Now);
         db.TaxClasses.Add(taxClass);
         await db.SaveChangesAsync();
 

@@ -44,7 +44,7 @@ public sealed partial class PlatformTenantRepository
             from entitlement in _dbContext.TenantFeatureEntitlements.AsNoTracking()
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on entitlement.PlatformFeatureId equals feature.Id
-            where entitlement.TenantId == tenantId
+            where entitlement.TenantId == tenantId && feature.Scope == "TENANT"
             select new EntitlementReadRow(
                 entitlement.EntitlementStatus,
                 entitlement.IsEnabled,
@@ -111,7 +111,8 @@ public sealed partial class PlatformTenantRepository
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on planFeature.PlatformFeatureId equals feature.Id
             where planFeature.Status == SubscriptionPlanConstants.PlanFeatureStatus.Included &&
-                  feature.Status == "ACTIVE"
+                  feature.Status == "ACTIVE" &&
+                  feature.Scope == "TENANT"
             select new
             {
                 planFeature.SubscriptionPlanId,

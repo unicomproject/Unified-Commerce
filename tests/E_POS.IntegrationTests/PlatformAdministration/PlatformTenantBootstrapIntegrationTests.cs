@@ -565,7 +565,6 @@ public sealed class PlatformTenantBootstrapIntegrationTests
         dbContext.Categories.Add(Category.Create(
             foreignCategoryId,
             tenantB,
-            Guid.Empty,
             null,
             "FOREIGN",
             "Foreign Category",

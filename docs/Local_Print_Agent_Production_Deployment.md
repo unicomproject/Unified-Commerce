@@ -45,20 +45,20 @@ debug symbols, test data, and source-control metadata.
 
 ## HTTP/HTTPS decision
 
-Android release configuration rejects clear-text HTTP. Production release
-therefore requires HTTPS with a certificate trusted by the POS device. Configure
-Kestrel certificate settings through protected service configuration and use an
-agent URL whose hostname is present in the certificate SAN.
+Android **release** builds require HTTPS for the Print Agent URL (cleartext
+blocked). Windows desktop POS may use private-LAN HTTP under the transitional
+boundary below. Prefer HTTPS for all store tablet deployments.
 
 Restricted HTTP may be used only as an explicitly accepted private-LAN
 transitional deployment boundary. It is not equivalent to HTTPS. It requires
 all of:
 
 - Windows network profile `Private`.
-- Firewall remote addresses restricted to the store CIDR.
+- Firewall remote addresses restricted to the store CIDR (skipped for loopback-only).
 - matching `AllowedNetworkRanges` inside the agent.
 - no router port-forward, public profile rule, VPN-wide rule, or Internet source.
-- Flutter debug build; release clear-text remains disabled.
+- Flutter: Android release must use HTTPS; debug may use HTTP; Windows desktop
+  release may use private-LAN HTTP.
 
 Never bypass certificate validation in Flutter.
 

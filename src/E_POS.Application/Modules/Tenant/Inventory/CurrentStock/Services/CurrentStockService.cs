@@ -117,6 +117,49 @@ public sealed class CurrentStockService : ICurrentStockService
         return ApplicationResult<StockInResponse>.Success(response);
     }
 
+    public async Task<ApplicationResult<StockAdjustmentResponse>> AdjustStockAsync(
+        TenantRequestContext context,
+        StockAdjustmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(StockPermissions.AdjustmentsCreate))
+            return ApplicationResult<StockAdjustmentResponse>.Failure(new ApplicationError("inventory.permission_denied", "Permission denied for processing stock adjustments."));
+
+        var outletExists = await _repository.OutletExistsAsync(context.TenantId, request.OutletId, cancellationToken);
+        if (!outletExists)
+            return ApplicationResult<StockAdjustmentResponse>.Failure(new ApplicationError("inventory.outlet_not_found", "The specified outlet was not found."));
+
+        var isIdempotent = await _repository.IdempotencyKeyExistsAsync(context.TenantId, request.IdempotencyKey, cancellationToken);
+        if (isIdempotent)
+            return ApplicationResult<StockAdjustmentResponse>.Failure(new ApplicationError("inventory.duplicate_request", "This stock adjustment request has already been processed."));
+
+        var response = await _repository.AdjustStockAsync(context.TenantId, context.UserId, request, DateTimeOffset.UtcNow, cancellationToken);
+        
+        return ApplicationResult<StockAdjustmentResponse>.Success(response);
+    }
+
+    public async Task<ApplicationResult<StockTransferResponse>> TransferStockAsync(
+        TenantRequestContext context,
+        StockTransferRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(StockPermissions.TransfersCreate))
+            return ApplicationResult<StockTransferResponse>.Failure(new ApplicationError("inventory.permission_denied", "Permission denied for processing stock transfers."));
+
+        var sourceOutletExists = await _repository.OutletExistsAsync(context.TenantId, request.SourceOutletId, cancellationToken);
+        var destOutletExists = await _repository.OutletExistsAsync(context.TenantId, request.DestinationOutletId, cancellationToken);
+        if (!sourceOutletExists || !destOutletExists)
+            return ApplicationResult<StockTransferResponse>.Failure(new ApplicationError("inventory.outlet_not_found", "The specified source or destination outlet was not found."));
+
+        var isIdempotent = await _repository.IdempotencyKeyExistsAsync(context.TenantId, request.IdempotencyKey, cancellationToken);
+        if (isIdempotent)
+            return ApplicationResult<StockTransferResponse>.Failure(new ApplicationError("inventory.duplicate_request", "This stock transfer request has already been processed."));
+
+        var response = await _repository.TransferStockAsync(context.TenantId, context.UserId, request, DateTimeOffset.UtcNow, cancellationToken);
+        
+        return ApplicationResult<StockTransferResponse>.Success(response);
+    }
+
     public async Task<ApplicationResult<ProductStockDetailResponse>> GetProductStockDetailAsync(
         TenantRequestContext context,
         Guid productVariantId,
