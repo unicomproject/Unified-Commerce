@@ -14,6 +14,46 @@ INSERT INTO media_assets (id, tenant_id, container_name, storage_key, original_f
 ('77778888-0000-4000-8000-000000000108', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'images', 'tenants/08b0c8b0-a5bf-44f0-8814-cb2fe0120000/products/jersey_blue_1787004260713.jpg', 'jersey_blue_1787004260713.jpg', 'image/jpeg', '.jpg', 10240, 1024, 1024, '', 'IMAGE', 'PRODUCT_IMAGE', 'ACTIVE', now(), now()),
 ('77778888-0000-4000-8000-000000000109', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'images', 'tenants/08b0c8b0-a5bf-44f0-8814-cb2fe0120000/products/jersey_red_1787003662760.jpg', 'jersey_red_1787003662760.jpg', 'image/jpeg', '.jpg', 10240, 1024, 1024, '', 'IMAGE', 'PRODUCT_IMAGE', 'ACTIVE', now(), now())
  ON CONFLICT (id) DO NOTHING;
+
+-- Price-list items below require this deterministic tenant-owned parent row.
+-- Keep it idempotent so partially seeded development databases can recover.
+UPDATE price_lists
+SET is_default_price_list = false,
+    updated_at = now()
+WHERE tenant_id = '08b0c8b0-a5bf-44f0-8814-cb2fe0120000'
+  AND id <> 'cccc0003-0001-4000-8000-000000000002'
+  AND is_default_price_list = true
+  AND status = 'ACTIVE';
+
+INSERT INTO price_lists (
+  id, tenant_id, price_list_code, price_list_name, price_list_type,
+  currency_code, is_default_price_list, price_includes_tax, priority,
+  status, created_at, updated_at
+)
+VALUES (
+  'cccc0003-0001-4000-8000-000000000002',
+  '08b0c8b0-a5bf-44f0-8814-cb2fe0120000',
+  'ONEVERZE-POS-DEFAULT-0002',
+  'OneVerze POS Default Price List',
+  'POS',
+  'LKR',
+  true,
+  true,
+  0,
+  'ACTIVE',
+  now(),
+  now()
+)
+ON CONFLICT (id) DO UPDATE
+SET price_list_name = EXCLUDED.price_list_name,
+    price_list_type = EXCLUDED.price_list_type,
+    currency_code = EXCLUDED.currency_code,
+    is_default_price_list = EXCLUDED.is_default_price_list,
+    price_includes_tax = EXCLUDED.price_includes_tax,
+    priority = EXCLUDED.priority,
+    status = EXCLUDED.status,
+    updated_at = now();
+
 INSERT INTO products (id, tenant_id, product_code, product_name, product_slug, product_type, product_structure, short_description, is_sellable, is_taxable, status, created_at, updated_at) VALUES
 ('77778888-0000-4000-8000-000000000200', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'OVZ-BOT', 'HydraFlask Sports Bottle', 'hydraflask-sports-bottle', 'STANDARD', 'VARIABLE', 'Premium sports water bottle.', true, true, 'ACTIVE', now(), now()),
 ('77778888-0000-4000-8000-000000000201', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'OVZ-BOTM', 'ProActive Training Bottoms', 'proactive-training-bottoms', 'STANDARD', 'VARIABLE', 'Comfortable training shorts.', true, true, 'ACTIVE', now(), now()),
@@ -217,6 +257,37 @@ INSERT INTO product_images (id, tenant_id, product_id, product_variant_id, media
 ('77778888-0000-4000-8000-000000010025', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '77778888-0000-4000-8000-000000000204', NULL, '77778888-0000-4000-8000-000000000100', 'CATALOG', 0, false, 'ACTIVE', now(), now()),
 ('77778888-0000-4000-8000-000000010026', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '77778888-0000-4000-8000-000000000204', '77778888-0000-4000-8000-000000007016', '77778888-0000-4000-8000-000000000101', 'CATALOG', 0, true, 'ACTIVE', now(), now()),
 ('77778888-0000-4000-8000-000000010027', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '77778888-0000-4000-8000-000000000204', '77778888-0000-4000-8000-000000007017', '77778888-0000-4000-8000-000000000100', 'CATALOG', 0, true, 'ACTIVE', now(), now()) ON CONFLICT (id) DO NOTHING;
+-- Inventory balances require an outlet-owned stock location.
+INSERT INTO inventory_locations (
+  id, tenant_id, outlet_id, parent_inventory_location_id,
+  location_code, location_name, location_type,
+  is_sellable_location, is_return_location, is_receiving_location,
+  is_quarantine_location, status, created_at, updated_at
+)
+VALUES (
+  '33333333-0002-4000-8000-000000000001',
+  '08b0c8b0-a5bf-44f0-8814-cb2fe0120000',
+  '22222222-0001-4000-8000-000000000001',
+  NULL,
+  'MAIN',
+  'Main Store Stock',
+  'STORE',
+  true,
+  true,
+  true,
+  false,
+  'ACTIVE',
+  now(),
+  now()
+)
+ON CONFLICT (id) DO UPDATE
+SET location_name = EXCLUDED.location_name,
+    is_sellable_location = EXCLUDED.is_sellable_location,
+    is_return_location = EXCLUDED.is_return_location,
+    is_receiving_location = EXCLUDED.is_receiving_location,
+    status = EXCLUDED.status,
+    updated_at = now();
+
 INSERT INTO inventory_balances (id, tenant_id, inventory_location_id, product_id, product_variant_id, on_hand_quantity, reserved_quantity, damaged_quantity, quarantine_quantity, row_version, created_at, updated_at) VALUES
 ('77778888-0000-4000-8000-000000011000', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '33333333-0002-4000-8000-000000000001', '77778888-0000-4000-8000-000000000200', '77778888-0000-4000-8000-000000007000', 100, 0, 0, 0, 1, now(), now()),
 ('77778888-0000-4000-8000-000000011001', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', '33333333-0002-4000-8000-000000000001', '77778888-0000-4000-8000-000000000200', '77778888-0000-4000-8000-000000007001', 100, 0, 0, 0, 1, now(), now()),

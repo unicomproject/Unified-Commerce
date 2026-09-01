@@ -190,6 +190,8 @@ public static class DependencyInjection
         services.AddScoped<ICustomerWishlistService, CustomerWishlistService>();
         services.AddScoped<ICustomerOrderService, CustomerOrderService>();
         services.AddScoped<IClickCollectOrderStatusService, ClickCollectOrderStatusService>();
+        services.AddScoped<IPosOnlineOrderDetailService, PosOnlineOrderDetailService>();
+        services.AddScoped<IPosOnlineOrderStartFulfillmentService, PosOnlineOrderStartFulfillmentService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;
