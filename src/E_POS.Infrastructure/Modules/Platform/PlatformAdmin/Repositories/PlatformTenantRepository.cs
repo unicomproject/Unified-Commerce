@@ -316,7 +316,14 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 tenant.Id,
                 featureId,
                 TenantEntitlementStatusConstants.Enabled,
-                now));
+                TenantEntitlementSourceTypeConstants.Plan,
+                sourceReferenceId: subscription.Id,
+                isEnabled: true,
+                effectiveFrom: now,
+                effectiveUntil: null,
+                createdByPlatformUserId: null,
+                updatedByPlatformUserId: null,
+                createdAt: now));
         }
 
         _dbContext.TenantSubscriptionHistory.Add(TenantSubscriptionHistory.CreateEvent(
@@ -368,7 +375,7 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task ReplaceTenantEntitlementsAsync(
+    public Task ReplaceTenantEntitlementsAsync(
         Guid tenantId,
         IReadOnlyList<Guid> enabledFeatureIds,
         DateTimeOffset now,
@@ -376,6 +383,35 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
         string? revokedReason,
         CancellationToken cancellationToken)
     {
+        return ReplaceTenantEntitlementsAsync(
+            tenantId,
+            enabledFeatureIds,
+            now,
+            actorPlatformUserId,
+            revokedReason,
+            TenantEntitlementSourceTypeConstants.Manual,
+            overrideReason: null,
+            effectiveFrom: null,
+            effectiveUntil: null,
+            cancellationToken);
+    }
+
+    public async Task ReplaceTenantEntitlementsAsync(
+        Guid tenantId,
+        IReadOnlyList<Guid> enabledFeatureIds,
+        DateTimeOffset now,
+        Guid? actorPlatformUserId,
+        string? revokedReason,
+        string sourceType,
+        string? overrideReason,
+        DateTimeOffset? effectiveFrom,
+        DateTimeOffset? effectiveUntil,
+        CancellationToken cancellationToken)
+    {
+        var normalizedSourceType = string.IsNullOrWhiteSpace(sourceType)
+            ? TenantEntitlementSourceTypeConstants.Manual
+            : sourceType.Trim().ToUpperInvariant();
+
         var requestedFeatureIds = enabledFeatureIds
             .Where(id => id != Guid.Empty)
             .Distinct()
@@ -386,7 +422,9 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
             .ToListAsync(cancellationToken);
 
         var normalizedRevokedReason = string.IsNullOrWhiteSpace(revokedReason)
-            ? "Removed by platform admin entitlement update."
+            ? (string.Equals(normalizedSourceType, TenantEntitlementSourceTypeConstants.Override, StringComparison.Ordinal)
+                ? (overrideReason?.Trim() ?? "Disabled by platform admin override.")
+                : "Removed by platform admin entitlement update.")
             : revokedReason.Trim();
 
         foreach (var entitlement in existing)
@@ -397,8 +435,11 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                     entitlement.PlatformFeatureId,
                     now,
                     actorPlatformUserId,
-                    TenantEntitlementSourceTypeConstants.Manual,
-                    sourceReferenceId: null);
+                    normalizedSourceType,
+                    sourceReferenceId: null,
+                    overrideReason: overrideReason,
+                    effectiveFrom: effectiveFrom,
+                    effectiveUntil: effectiveUntil);
                 continue;
             }
 
@@ -406,7 +447,11 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 now,
                 actorPlatformUserId,
                 normalizedRevokedReason,
-                actorPlatformUserId);
+                actorPlatformUserId,
+                sourceType: normalizedSourceType,
+                overrideReason: overrideReason,
+                effectiveFrom: effectiveFrom,
+                effectiveUntil: effectiveUntil);
         }
 
         foreach (var featureId in requestedFeatureIds)
@@ -416,14 +461,15 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
                 tenantId,
                 featureId,
                 TenantEntitlementStatusConstants.Enabled,
-                TenantEntitlementSourceTypeConstants.Manual,
+                normalizedSourceType,
                 sourceReferenceId: null,
                 isEnabled: true,
-                effectiveFrom: now,
-                effectiveUntil: null,
+                effectiveFrom: effectiveFrom ?? now,
+                effectiveUntil: effectiveUntil,
                 createdByPlatformUserId: actorPlatformUserId,
                 updatedByPlatformUserId: actorPlatformUserId,
-                createdAt: now));
+                createdAt: now,
+                overrideReason: overrideReason));
         }
 
         var tenant = await _dbContext.Tenants
@@ -431,6 +477,95 @@ public sealed partial class PlatformTenantRepository : IPlatformTenantRepository
 
         tenant.UpdateAudit(null, now);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RestoreTenantPlanEntitlementsAsync(
+        Guid tenantId,
+        Guid subscriptionPlanId,
+        DateTimeOffset now,
+        Guid? actorPlatformUserId,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var planFeatureIds = await (
+                from pf in _dbContext.SubscriptionPlanFeatures.AsNoTracking()
+                join f in _dbContext.PlatformFeatures.AsNoTracking()
+                    on pf.PlatformFeatureId equals f.Id
+                where pf.SubscriptionPlanId == subscriptionPlanId &&
+                      pf.Status == SubscriptionPlanConstants.PlanFeatureStatus.Included &&
+                      f.Status == "ACTIVE" &&
+                      f.Scope == "TENANT"
+                select f.Id)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            var requestedPlanFeatureIds = planFeatureIds.ToHashSet();
+
+            var existing = await _dbContext.TenantFeatureEntitlements
+                .Where(entitlement => entitlement.TenantId == tenantId)
+                .ToListAsync(cancellationToken);
+
+            foreach (var entitlement in existing)
+            {
+                if (string.Equals(entitlement.SourceType, TenantEntitlementSourceTypeConstants.Addon, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (requestedPlanFeatureIds.Remove(entitlement.PlatformFeatureId))
+                {
+                    entitlement.Enable(
+                        entitlement.PlatformFeatureId,
+                        now,
+                        actorPlatformUserId,
+                        TenantEntitlementSourceTypeConstants.Plan,
+                        sourceReferenceId: null,
+                        overrideReason: null,
+                        effectiveFrom: now,
+                        effectiveUntil: null);
+                    continue;
+                }
+
+                entitlement.Disable(
+                    now,
+                    actorPlatformUserId,
+                    "Restored to plan baseline; feature excluded from plan.",
+                    actorPlatformUserId,
+                    sourceType: TenantEntitlementSourceTypeConstants.Plan,
+                    overrideReason: null);
+            }
+
+            foreach (var featureId in requestedPlanFeatureIds)
+            {
+                _dbContext.TenantFeatureEntitlements.Add(TenantFeatureEntitlement.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    featureId,
+                    TenantEntitlementStatusConstants.Enabled,
+                    TenantEntitlementSourceTypeConstants.Plan,
+                    sourceReferenceId: null,
+                    isEnabled: true,
+                    effectiveFrom: now,
+                    effectiveUntil: null,
+                    createdByPlatformUserId: actorPlatformUserId,
+                    updatedByPlatformUserId: actorPlatformUserId,
+                    createdAt: now,
+                    overrideReason: null));
+            }
+
+            var tenant = await _dbContext.Tenants.FirstAsync(item => item.Id == tenantId, cancellationToken);
+            tenant.UpdateAudit(null, now);
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<IReadOnlySet<Guid>> GetIncludedFeatureIdsForPlanAsync(

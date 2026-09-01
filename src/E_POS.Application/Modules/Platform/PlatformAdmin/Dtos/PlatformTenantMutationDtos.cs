@@ -100,6 +100,14 @@ public sealed record UpdatePlatformTenantEntitlementsRequest
 
     public IReadOnlyList<string>? EnabledFeatureCodes { get; init; }
 
+    public string? SourceType { get; init; }
+
+    public string? OverrideReason { get; init; }
+
+    public DateTimeOffset? EffectiveFrom { get; init; }
+
+    public DateTimeOffset? EffectiveUntil { get; init; }
+
     public string? ConcurrencyVersion { get; init; }
 }
 
