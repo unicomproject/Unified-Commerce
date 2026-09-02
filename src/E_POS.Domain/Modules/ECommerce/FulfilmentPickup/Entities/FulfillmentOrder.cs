@@ -41,5 +41,23 @@ public class FulfillmentOrder : AuditableEntity
         UpdatedAt = now;
         RowVersion++;
     }
+
+    public void RecordPickingMutation(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
+    {
+        if (expectedVersion <= 0 || RowVersion != expectedVersion)
+            throw new InvalidOperationException("FULFILLMENT_VERSION_CONFLICT");
+
+        if (FulfillmentStatus != "PICKING")
+            throw new InvalidOperationException("FULFILLMENT_NOT_PICKABLE");
+
+        UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+        RowVersion++;
+    }
+
+    public void AddPickingNote(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
+    {
+        RecordPickingMutation(tenantUserId, expectedVersion, now);
+    }
 }
 

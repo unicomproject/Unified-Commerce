@@ -377,6 +377,7 @@ public static class DependencyInjection
         services.AddScoped<IClickCollectOrderStatusRepository, ClickCollectOrderStatusRepository>();
         services.AddScoped<IPosOnlineOrderDetailRepository, PosOnlineOrderDetailRepository>();
         services.AddScoped<IPosOnlineOrderStartFulfillmentRepository, PosOnlineOrderStartFulfillmentRepository>();
+        services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
 
         return services;

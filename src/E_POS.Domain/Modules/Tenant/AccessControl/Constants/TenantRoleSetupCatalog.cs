@@ -4,6 +4,7 @@ using E_POS.Domain.Modules.Tenant.Orders.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.Payment.Constants;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 
@@ -76,7 +77,7 @@ public static class TenantRoleSetupCatalog
             CashDrawerPermissions.View,
             CashDrawerPermissions.Manage,
             CashDrawerPermissions.CreateMovement
-        };
+        }.Concat(OnlineOrderPickingPermissions.All).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     public static IReadOnlySet<string> AdministrativePermissionCodes { get; } =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)

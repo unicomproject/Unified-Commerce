@@ -16,5 +16,24 @@ public class FulfillmentOrderLine : AuditableEntity
     public string LineStatus { get; protected set; } = string.Empty;
     public Guid? PickedByTenantUserId { get; protected set; }
     public Guid? PackedByTenantUserId { get; protected set; }
+
+    protected FulfillmentOrderLine() { }
+
+    public void Pick(decimal quantity, Guid tenantUserId, DateTimeOffset now)
+    {
+        if (quantity <= 0)
+            throw new InvalidOperationException("FULFILLMENT_PICK_QUANTITY_INVALID");
+
+        var remaining = RequestedQuantity - CancelledQuantity - PickedQuantity;
+        if (remaining <= 0 || quantity > remaining)
+            throw new InvalidOperationException("FULFILLMENT_PICK_QUANTITY_EXCEEDED");
+
+        PickedQuantity += quantity;
+        PickedByTenantUserId = tenantUserId;
+        LineStatus = PickedQuantity + CancelledQuantity >= RequestedQuantity
+            ? "PICKED"
+            : "PARTIALLY_PICKED";
+        UpdatedAt = now;
+    }
 }
 
