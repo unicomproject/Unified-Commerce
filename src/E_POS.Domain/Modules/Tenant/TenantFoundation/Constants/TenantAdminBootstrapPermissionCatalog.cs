@@ -2,6 +2,7 @@ using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.ECommerce.Storefront.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 
@@ -92,7 +93,8 @@ public static class TenantAdminBootstrapPermissionCatalog
             [
                 TenantAdminOnlineStorePermissions.FulfillmentManage,
                 "fulfillment.orders.view",
-                "fulfillment.orders.manage"
+                "fulfillment.orders.manage",
+                .. OnlineOrderPickingPermissions.All
             ],
             [PlatformTenantFeatureCodes.UserAccounts] =
             [

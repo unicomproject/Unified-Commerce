@@ -149,6 +149,74 @@ public sealed class ClickCollectOrdersControllerTests
     }
 
     [Fact]
+    public async Task PickLine_ForwardsExpectedVersionAndCanonicalArguments()
+    {
+        var picking = new FakePosOnlineOrderPickingService();
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), pickingService: picking);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(),
+            "commerce.online_order.orders.access commerce.online_order.picking.pick commerce.online_order.picking.scan");
+        var orderId = Guid.NewGuid();
+        var lineId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var request = new PosOnlineOrderPickLineRequest
+        {
+            Quantity = 1,
+            Barcode = "SKU-1",
+            InputMethod = "SCAN",
+            ExpectedVersion = 4
+        };
+
+        var result = await controller.PickLine(orderId, lineId, outletId, request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(orderId, picking.OrderId);
+        Assert.Equal(lineId, picking.LineId);
+        Assert.Equal(outletId, picking.OutletId);
+        Assert.Equal(4, picking.PickRequest?.ExpectedVersion);
+    }
+
+    [Fact]
+    public async Task PickLine_ConcurrencyConflict_Returns409()
+    {
+        var picking = new FakePosOnlineOrderPickingService
+        {
+            CommandResult = ApplicationResult<PosOnlineOrderPickingCommandResponse>.Failure(
+                new ApplicationError("online_orders.concurrency_conflict", "Conflict."))
+        };
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), pickingService: picking);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(),
+            "commerce.online_order.orders.access commerce.online_order.picking.pick commerce.online_order.picking.manual_entry");
+
+        var result = await controller.PickLine(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            new PosOnlineOrderPickLineRequest { Quantity = 1, InputMethod = "MANUAL", ExpectedVersion = 2 },
+            CancellationToken.None);
+
+        Assert.IsType<ConflictObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task AddPickingNote_ForwardsCanonicalArgumentsAndExpectedVersion()
+    {
+        var picking = new FakePosOnlineOrderPickingService();
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), pickingService: picking);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(),
+            "commerce.online_order.orders.access commerce.online_order.picking.note");
+        var orderId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var request = new PosOnlineOrderPickingNoteRequest { Note = "Shelf checked", ExpectedVersion = 9 };
+
+        var result = await controller.AddPickingNote(
+            orderId, outletId, request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(orderId, picking.OrderId);
+        Assert.Equal(outletId, picking.OutletId);
+        Assert.Equal("Shelf checked", picking.NoteRequest?.Note);
+        Assert.Equal(9, picking.NoteRequest?.ExpectedVersion);
+    }
+
+    [Fact]
     public async Task UpdateStatus_WithoutTenantClaims_ReturnsUnauthorizedWithoutCallingService()
     {
         var service = new FakeClickCollectOrderStatusService();
@@ -250,14 +318,28 @@ public sealed class ClickCollectOrdersControllerTests
             Assert.Single(typeof(ClickCollectOrdersController)
                 .GetMethod(nameof(ClickCollectOrdersController.StartFulfillment))!
                 .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/picking", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.GetPicking))!
+            .GetCustomAttributes<HttpGetAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/picking/lines/{lineId:guid}/pick", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.PickLine))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/picking/lines/{lineId:guid}/issues", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.ReportPickingIssue))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/picking/notes", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.AddPickingNote))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
     }
 
     private static ClickCollectOrdersController CreateController(
         FakeClickCollectOrderStatusService service,
         FakePosOnlineOrderDetailService? detailService = null,
-        FakePosOnlineOrderStartFulfillmentService? startService = null) =>
+        FakePosOnlineOrderStartFulfillmentService? startService = null,
+        FakePosOnlineOrderPickingService? pickingService = null) =>
         new(service, detailService ?? new FakePosOnlineOrderDetailService(),
-            startService ?? new FakePosOnlineOrderStartFulfillmentService(), new TenantRequestContextFactory())
+            startService ?? new FakePosOnlineOrderStartFulfillmentService(),
+            pickingService ?? new FakePosOnlineOrderPickingService(), new TenantRequestContextFactory())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -375,6 +457,52 @@ public sealed class ClickCollectOrdersControllerTests
             OrderId = orderId;
             Request = request;
             return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class FakePosOnlineOrderPickingService : IPosOnlineOrderPickingService
+    {
+        public ApplicationResult<PosOnlineOrderPickingCommandResponse> CommandResult { get; init; } =
+            ApplicationResult<PosOnlineOrderPickingCommandResponse>.Success(
+                new PosOnlineOrderPickingCommandResponse());
+        public Guid? OutletId { get; private set; }
+        public Guid? OrderId { get; private set; }
+        public Guid? LineId { get; private set; }
+        public PosOnlineOrderPickLineRequest? PickRequest { get; private set; }
+        public PosOnlineOrderPickingNoteRequest? NoteRequest { get; private set; }
+        public ApplicationResult<PosOnlineOrderPickingNoteCommandResponse> NoteResult { get; init; } =
+            ApplicationResult<PosOnlineOrderPickingNoteCommandResponse>.Success(
+                new PosOnlineOrderPickingNoteCommandResponse());
+
+        public Task<ApplicationResult<PosOnlineOrderPickingResponse>> GetAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId, CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosOnlineOrderPickingResponse>.Success(
+                new PosOnlineOrderPickingResponse()));
+
+        public Task<ApplicationResult<PosOnlineOrderPickingCommandResponse>> PickLineAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId, Guid lineId,
+            PosOnlineOrderPickLineRequest request, CancellationToken cancellationToken)
+        {
+            OutletId = outletId;
+            OrderId = orderId;
+            LineId = lineId;
+            PickRequest = request;
+            return Task.FromResult(CommandResult);
+        }
+
+        public Task<ApplicationResult<PosOnlineOrderPickingCommandResponse>> ReportIssueAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId, Guid lineId,
+            PosOnlineOrderPickingIssueRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(CommandResult);
+
+        public Task<ApplicationResult<PosOnlineOrderPickingNoteCommandResponse>> AddNoteAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId,
+            PosOnlineOrderPickingNoteRequest request, CancellationToken cancellationToken)
+        {
+            OutletId = outletId;
+            OrderId = orderId;
+            NoteRequest = request;
+            return Task.FromResult(NoteResult);
         }
     }
 }
