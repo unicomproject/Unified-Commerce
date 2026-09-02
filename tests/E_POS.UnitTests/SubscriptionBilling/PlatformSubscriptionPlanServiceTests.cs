@@ -405,7 +405,23 @@ public sealed class PlatformSubscriptionPlanServiceTests
             repository,
             new FakePlatformPermissionRepository(hasView, hasCreate, hasEdit),
             new FakePlatformPermissionChecker(hasView, hasCreate, hasEdit),
-            new FakeDateTimeProvider());
+            new FakeDateTimeProvider(),
+            new FakePlanBusinessCapabilityCatalogService());
+    }
+
+    private sealed class FakePlanBusinessCapabilityCatalogService : IPlanBusinessCapabilityCatalogService
+    {
+        public Task<IReadOnlyList<PlanBusinessModuleDto>> GetPlanBusinessModulesAsync(
+            IReadOnlyCollection<Guid>? selectedFeatureIds,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<PlanBusinessModuleDto>>([]);
+        }
+
+        public Task<IReadOnlyList<Guid>> GetMandatoryCoreFeatureIdsAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<Guid>>([]);
+        }
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
@@ -623,6 +639,11 @@ public sealed class PlatformSubscriptionPlanServiceTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(ActiveFeatureIds);
+        }
+
+        public Task<IReadOnlyList<PlanTechnicalFeatureLookupDto>> GetActiveTenantFeaturesAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<PlanTechnicalFeatureLookupDto>>([]);
         }
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken)

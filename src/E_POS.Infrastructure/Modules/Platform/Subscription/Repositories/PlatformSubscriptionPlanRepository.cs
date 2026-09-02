@@ -470,6 +470,23 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
         return ids.ToHashSet();
     }
 
+    public async Task<IReadOnlyList<PlanTechnicalFeatureLookupDto>> GetActiveTenantFeaturesAsync(CancellationToken cancellationToken)
+    {
+        var features = await _dbContext.PlatformFeatures
+            .AsNoTracking()
+            .Where(feature => feature.Status == "ACTIVE" && feature.Scope == "TENANT")
+            .Select(feature => new PlanTechnicalFeatureLookupDto(
+                feature.Id,
+                feature.FeatureCode,
+                feature.Name,
+                feature.Description,
+                feature.Scope,
+                feature.Status))
+            .ToListAsync(cancellationToken);
+
+        return features;
+    }
+
     public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken)
     {
         return _dbContext.SubscriptionPlanFeatures
