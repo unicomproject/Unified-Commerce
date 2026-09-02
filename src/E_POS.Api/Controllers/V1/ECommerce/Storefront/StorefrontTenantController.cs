@@ -27,9 +27,18 @@ public class StorefrontTenantController : ControllerBase
             return BadRequest(new { message = "Tenant slug or host is required." });
         }
 
-        var result = !string.IsNullOrWhiteSpace(host)
-            ? await _storefrontTenantService.ResolveTenantByHostAsync(NormalizeHost(host), cancellationToken)
-            : await _storefrontTenantService.ResolveTenantAsync(slug!, cancellationToken);
+        (Guid? TenantId, string? BaseCurrencyCode, string? StoreName, string? LogoUrl) result;
+        if (!string.IsNullOrWhiteSpace(host))
+        {
+            var hostResult = await _storefrontTenantService.ResolveTenantByHostAsync(
+                NormalizeHost(host),
+                cancellationToken);
+            result = (hostResult.TenantId, hostResult.BaseCurrencyCode, null, null);
+        }
+        else
+        {
+            result = await _storefrontTenantService.ResolveTenantAsync(slug!, cancellationToken);
+        }
 
         if (result.TenantId == null)
         {
