@@ -47,6 +47,11 @@ public interface ICatalogMediaService
         MediaUploadFile file,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult> RemoveCategoryImageAsync(
+        TenantRequestContext context,
+        Guid categoryId,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<MediaAssetUploadResponse>> UploadBrandLogoAsync(
         TenantRequestContext context,
         Guid brandId,

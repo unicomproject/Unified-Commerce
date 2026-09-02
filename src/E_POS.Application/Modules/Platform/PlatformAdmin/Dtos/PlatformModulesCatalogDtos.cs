@@ -10,7 +10,8 @@ public sealed record PlatformModulesCatalogModuleDto(
     string? Description,
     int SortOrder,
     string Status,
-    IReadOnlyList<PlatformModulesCatalogFeatureDto> Features);
+    IReadOnlyList<PlatformModulesCatalogFeatureDto> Features,
+    string Scope = "TENANT");
 
 public sealed record PlatformModulesCatalogFeatureDto(
     Guid Id,
@@ -18,5 +19,17 @@ public sealed record PlatformModulesCatalogFeatureDto(
     string Name,
     string? Description,
     int SortOrder,
-    string Status);
+    string Status,
+    IReadOnlyList<PlatformModulesCatalogPermissionDto> Permissions,
+    string Scope = "TENANT");
+
+public sealed record PlatformModulesCatalogPermissionDto(
+    Guid Id,
+    string PermissionCode,
+    string Name,
+    string? Description,
+    string ActionType,
+    string Scope = "TENANT",
+    bool IsActive = true);
+
 

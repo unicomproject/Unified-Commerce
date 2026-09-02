@@ -107,6 +107,12 @@ public sealed class FulfillmentOrderConfiguration : IEntityTypeConfiguration<Ful
             .HasColumnType("text")
             .IsRequired(false);
 
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .HasDefaultValue(1L)
+            .IsRequired()
+            .IsConcurrencyToken();
+
         builder.Property(x => x.CreatedByTenantUserId)
             .HasColumnName("created_by_tenant_user_id")
             .IsRequired(false);
@@ -170,6 +176,7 @@ public sealed class FulfillmentOrderConfiguration : IEntityTypeConfiguration<Ful
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_fulfillment_orders_status", "fulfillment_status IN ('PENDING', 'ALLOCATED', 'PICKING', 'PICKED', 'PACKED', 'READY', 'FULFILLED', 'CANCELLED')");
+            t.HasCheckConstraint("ck_fulfillment_orders_row_version", "row_version >= 1");
         });
         // </second-brain-constraints>
     }

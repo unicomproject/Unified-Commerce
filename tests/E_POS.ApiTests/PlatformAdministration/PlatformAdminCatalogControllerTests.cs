@@ -25,7 +25,7 @@ public sealed class PlatformAdminCatalogControllerTests
                 ApplicationResult<PlatformModulesCatalogResponse>.Success(CreateCatalog(includeFeatures: true))),
             Guid.NewGuid());
 
-        var result = await controller.GetModules(CancellationToken.None);
+        var result = await controller.GetModules(null, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<LegacyApiResponse<PlatformModulesCatalogResponse>>(ok.Value);
@@ -44,7 +44,7 @@ public sealed class PlatformAdminCatalogControllerTests
                     "Platform modules catalog access denied."))),
             Guid.NewGuid());
 
-        var result = await controller.GetModules(CancellationToken.None);
+        var result = await controller.GetModules(null, CancellationToken.None);
 
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
@@ -58,10 +58,25 @@ public sealed class PlatformAdminCatalogControllerTests
                 ApplicationResult<PlatformModulesCatalogResponse>.Success(CreateCatalog(includeFeatures: false))),
             platformUserId: null);
 
-        var result = await controller.GetModules(CancellationToken.None);
+        var result = await controller.GetModules(null, CancellationToken.None);
 
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
+
+    [Fact]
+    public async Task GetModules_WithInvalidScope_ReturnsBadRequest()
+    {
+        var controller = CreateController(
+            new FakePlatformModulesCatalogService(
+                ApplicationResult<PlatformModulesCatalogResponse>.Success(CreateCatalog(includeFeatures: true))),
+            Guid.NewGuid());
+
+        var result = await controller.GetModules("invalid", CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
 
     [Fact]
     public void ModulesCatalogEndpoint_RequiresPlatformOnlyPolicy()
@@ -115,9 +130,12 @@ public sealed class PlatformAdminCatalogControllerTests
                             "POS Sales",
                             "Start sale",
                             1,
-                            "ACTIVE")
+                            "ACTIVE",
+                            [],
+                            "TENANT")
                     ]
-                    : [])
+                    : [],
+                "TENANT")
         ]);
     }
 
@@ -132,10 +150,12 @@ public sealed class PlatformAdminCatalogControllerTests
 
         public Task<ApplicationResult<PlatformModulesCatalogResponse>> GetModulesAsync(
             Guid platformUserId,
+            string? scopeFilter,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(_result);
         }
     }
+
 }
 

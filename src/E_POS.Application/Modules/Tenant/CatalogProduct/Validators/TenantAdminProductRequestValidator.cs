@@ -1078,10 +1078,6 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                 fieldErrors.Add(new ApplicationFieldError("pricingTax.discountPrice", "Discount price must be less than standard selling price."));
             }
 
-            if (request.PricingTax.TaxExclusive.HasValue && !request.PricingTax.TaxExclusive.Value)
-            {
-                fieldErrors.Add(new ApplicationFieldError("pricingTax.taxExclusive", "Pricing must be tax exclusive."));
-            }
         }
 
         if (fieldErrors.Count == 0) return null;

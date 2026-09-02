@@ -525,6 +525,12 @@ public sealed class PlatformAdminTenantsControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(_entitlementOptionsResult);
 
+        public Task<ApplicationResult<PlatformTenantDetailResponse>> RestoreEntitlementsToPlanAsync(
+            Guid tenantId,
+            Guid platformUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(_detailResult);
+
         public Task<ApplicationResult<PlatformTenantDetailResponse>> ReactivateTenantAsync(
             Guid tenantId,
             Guid platformUserId,

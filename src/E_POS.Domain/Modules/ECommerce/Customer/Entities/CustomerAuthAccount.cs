@@ -15,6 +15,8 @@ public class CustomerAuthAccount : AuditableEntity
     public DateTimeOffset? LastLoginAt { get; protected set; }
     public DateTimeOffset? LastPasswordChangedAt { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
+    public string? OtpHash { get; protected set; }
+    public DateTimeOffset? OtpExpiryUtc { get; protected set; }
 
     protected CustomerAuthAccount() { }
 
@@ -114,6 +116,20 @@ public class CustomerAuthAccount : AuditableEntity
         LastLoginAt = now;
         if (string.Equals(Status, "LOCKED", StringComparison.OrdinalIgnoreCase))
             Status = "ACTIVE";
+        UpdatedAt = now;
+    }
+
+    public void SetOtp(string otpHash, DateTimeOffset expiry, DateTimeOffset now)
+    {
+        OtpHash = otpHash;
+        OtpExpiryUtc = expiry;
+        UpdatedAt = now;
+    }
+
+    public void ClearOtp(DateTimeOffset now)
+    {
+        OtpHash = null;
+        OtpExpiryUtc = null;
         UpdatedAt = now;
     }
 }

@@ -7,4 +7,6 @@ public interface ICategoryRequestValidator
 {
     ApplicationError? ValidateCreate(CategoryCreateRequest request);
     ApplicationError? ValidateUpdate(CategoryUpdateRequest request);
+    ApplicationError? ValidateList(CategoryListQuery query);
+    ApplicationError? ValidateTreeStatus(string? status);
 }

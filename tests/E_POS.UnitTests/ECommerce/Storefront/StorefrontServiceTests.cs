@@ -256,8 +256,8 @@ public sealed class StorefrontServiceTests
         {
             BestSellers =
             [
-                (productWithDetails, rating, 9.99m, "LKR", "/images/apple.jpg"),
-                (productWithFallbacks, null, null, "LKR", null)
+                (productWithDetails, rating, 9.99m, 12.99m, "LKR", "/images/apple.jpg"),
+                (productWithFallbacks, null, null, null, "LKR", null)
             ]
         };
         var service = new StorefrontService(
@@ -515,7 +515,7 @@ public sealed class StorefrontServiceTests
         public IEnumerable<StorefrontCategoryListReadModel> ChildCategories { get; init; } = [];
         public StorefrontPagedReadModel<StorefrontProductListReadModel> ProductListingPage { get; init; } = new();
         public StorefrontProductDetailReadModel? ProductDetail { get; init; }
-        public IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)> BestSellers { get; init; } = [];
+        public IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, decimal? OriginalPrice, string CurrencyCode, string? PrimaryImageUrl)> BestSellers { get; init; } = [];
         public IEnumerable<StorefrontStoreReadModel> Stores { get; init; } = [];
         public StorefrontCollectionConfigurationReadModel? CollectionConfiguration { get; init; }
         public Guid? ResolvedTenantId { get; init; }
@@ -586,7 +586,7 @@ public sealed class StorefrontServiceTests
             ProductDetailTenantId = tenantId;
             ProductDetailSlug = slug;
             return Task.FromResult(ProductDetail);
-        }        public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        }        public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, decimal? OriginalPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
         {
             BestSellersTenantId = tenantId;
             return Task.FromResult(BestSellers);
@@ -614,10 +614,10 @@ public sealed class StorefrontServiceTests
             return Task.FromResult(CollectionConfiguration);
         }
 
-        public Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
+        public Task<(Guid? TenantId, string? BaseCurrencyCode, string? StoreName, string? LogoUrl)> GetTenantIdBySlugAsync(string slug, CancellationToken cancellationToken = default)
         {
             ResolvedSlug = slug;
-            return Task.FromResult<(Guid?, string?)>((ResolvedTenantId, "USD"));
+            return Task.FromResult<(Guid?, string?, string?, string?)>((ResolvedTenantId, "USD", "Demo Store", null));
         }
 
         public Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdByHostAsync(string host, CancellationToken cancellationToken = default)
@@ -627,5 +627,3 @@ public sealed class StorefrontServiceTests
         }
     }
 }
-
-

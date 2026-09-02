@@ -9,7 +9,7 @@ public class TenantFeatureEntitlement : AuditableEntity
     public string EntitlementStatus { get; protected set; } = string.Empty;
     public Guid PlatformFeatureId { get; protected set; }
     public Guid FeatureId { get; protected set; }
-    public string SourceType { get; protected set; } = "MANUAL";
+    public string SourceType { get; protected set; } = TenantEntitlementSourceTypeConstants.Manual;
     public Guid? SourceReferenceId { get; protected set; }
     public bool IsEnabled { get; protected set; } = true;
     public DateTimeOffset EffectiveFrom { get; protected set; }
@@ -56,8 +56,17 @@ public class TenantFeatureEntitlement : AuditableEntity
         DateTimeOffset? effectiveUntil,
         Guid? createdByPlatformUserId,
         Guid? updatedByPlatformUserId,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string? overrideReason = null)
     {
+        var normalizedSourceType = string.IsNullOrWhiteSpace(sourceType)
+            ? TenantEntitlementSourceTypeConstants.Manual
+            : sourceType.Trim().ToUpperInvariant();
+
+        var normalizedOverrideReason = string.Equals(normalizedSourceType, TenantEntitlementSourceTypeConstants.Override, StringComparison.Ordinal)
+            ? overrideReason?.Trim()
+            : overrideReason?.Trim();
+
         return new TenantFeatureEntitlement
         {
             Id = id,
@@ -65,11 +74,12 @@ public class TenantFeatureEntitlement : AuditableEntity
             PlatformFeatureId = platformFeatureId,
             FeatureId = platformFeatureId,
             EntitlementStatus = entitlementStatus,
-            SourceType = sourceType,
+            SourceType = normalizedSourceType,
             SourceReferenceId = sourceReferenceId,
             IsEnabled = isEnabled,
             EffectiveFrom = effectiveFrom,
             EffectiveUntil = effectiveUntil,
+            OverrideReason = normalizedOverrideReason,
             CreatedByPlatformUserId = createdByPlatformUserId,
             UpdatedByPlatformUserId = updatedByPlatformUserId,
             CreatedAt = createdAt,
@@ -82,7 +92,10 @@ public class TenantFeatureEntitlement : AuditableEntity
         DateTimeOffset now,
         Guid? updatedByPlatformUserId,
         string sourceType = TenantEntitlementSourceTypeConstants.Manual,
-        Guid? sourceReferenceId = null)
+        Guid? sourceReferenceId = null,
+        string? overrideReason = null,
+        DateTimeOffset? effectiveFrom = null,
+        DateTimeOffset? effectiveUntil = null)
     {
         PlatformFeatureId = platformFeatureId;
         FeatureId = platformFeatureId;
@@ -92,8 +105,11 @@ public class TenantFeatureEntitlement : AuditableEntity
             ? TenantEntitlementSourceTypeConstants.Manual
             : sourceType.Trim().ToUpperInvariant();
         SourceReferenceId = sourceReferenceId;
-        EffectiveFrom = now;
-        EffectiveUntil = null;
+        OverrideReason = string.Equals(SourceType, TenantEntitlementSourceTypeConstants.Override, StringComparison.Ordinal)
+            ? overrideReason?.Trim()
+            : overrideReason?.Trim();
+        EffectiveFrom = effectiveFrom ?? now;
+        EffectiveUntil = effectiveUntil;
         RevokedAt = null;
         RevokedByPlatformUserId = null;
         RevokedReason = null;
@@ -105,10 +121,24 @@ public class TenantFeatureEntitlement : AuditableEntity
         DateTimeOffset now,
         Guid? revokedByPlatformUserId,
         string revokedReason,
-        Guid? updatedByPlatformUserId)
+        Guid? updatedByPlatformUserId,
+        string? sourceType = null,
+        string? overrideReason = null,
+        DateTimeOffset? effectiveFrom = null,
+        DateTimeOffset? effectiveUntil = null)
     {
         EntitlementStatus = TenantEntitlementStatusConstants.Disabled;
         IsEnabled = false;
+        if (!string.IsNullOrWhiteSpace(sourceType))
+        {
+            SourceType = sourceType.Trim().ToUpperInvariant();
+        }
+        if (!string.IsNullOrWhiteSpace(overrideReason))
+        {
+            OverrideReason = overrideReason.Trim();
+        }
+        EffectiveFrom = effectiveFrom ?? EffectiveFrom;
+        EffectiveUntil = effectiveUntil ?? EffectiveUntil;
         RevokedAt = now;
         RevokedByPlatformUserId = revokedByPlatformUserId;
         RevokedReason = string.IsNullOrWhiteSpace(revokedReason)
@@ -118,15 +148,15 @@ public class TenantFeatureEntitlement : AuditableEntity
         UpdatedAt = now;
     }
 
-    public void ApplyOverride(string reason, DateTimeOffset? effectiveUntil, Guid actorId, DateTimeOffset now)
+    public void ApplyOverride(string reason, DateTimeOffset? effectiveUntil, Guid actorId, DateTimeOffset now, DateTimeOffset? effectiveFrom = null)
     {
         if (string.IsNullOrWhiteSpace(reason))
             throw new ArgumentException("Override reason is required.", nameof(reason));
-        SourceType = "OVERRIDE";
+        SourceType = TenantEntitlementSourceTypeConstants.Override;
         OverrideReason = reason.Trim();
+        EffectiveFrom = effectiveFrom ?? now;
         EffectiveUntil = effectiveUntil;
         UpdatedByPlatformUserId = actorId;
         UpdatedAt = now;
     }
 }
-

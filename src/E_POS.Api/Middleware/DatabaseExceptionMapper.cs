@@ -47,6 +47,22 @@ public static class DatabaseExceptionMapper
     private static MappedDatabaseError MapUniqueViolation(PostgresException postgres)
     {
         var constraint = postgres.ConstraintName ?? string.Empty;
+        if (constraint.Contains("uq_categories_tenant_id_category_code", StringComparison.OrdinalIgnoreCase))
+        {
+            return new MappedDatabaseError(
+                StatusCodes.Status409Conflict,
+                "category.duplicate_code",
+                "Category code already exists.");
+        }
+
+        if (constraint.Contains("uq_categories_tenant_id_normalized_category_name", StringComparison.OrdinalIgnoreCase))
+        {
+            return new MappedDatabaseError(
+                StatusCodes.Status409Conflict,
+                "category.duplicate_name",
+                "Category name already exists.");
+        }
+
         if (constraint.Contains("till_code", StringComparison.OrdinalIgnoreCase) ||
             constraint.Contains("tills", StringComparison.OrdinalIgnoreCase))
         {

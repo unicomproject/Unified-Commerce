@@ -69,9 +69,7 @@ using E_POS.Infrastructure.Modules.Tenant.PricingTax.Repositories;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Infrastructure.Modules.Tenant.Discount.Repositories;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
-using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
-using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
@@ -112,7 +110,6 @@ public static class DependencyInjection
         services.Configure<InvitationDeliverySecretOptions>(configuration.GetSection(InvitationDeliverySecretOptions.SectionName));
         services.Configure<CustomerJwtOptions>(configuration.GetSection(CustomerJwtOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
-
         services.AddOptions<AzureBlobStorageOptions>()
             .Bind(configuration.GetSection(AzureBlobStorageOptions.SectionName))
             .Validate(options =>
@@ -128,7 +125,7 @@ public static class DependencyInjection
                 return true;
             }, "AzureBlobStorage:ConnectionString is not configured or malformed. Configure it using .NET User Secrets or an environment variable.")
             .ValidateOnStart();
-
+        services.AddSingleton<IValidateOptions<AzureBlobStorageOptions>, AzureBlobStorageOptionsValidator>();
         services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
         services.Configure<DevelopmentPlatformAdminSeedOptions>(
             configuration.GetSection(DevelopmentPlatformAdminSeedOptions.SectionName));
@@ -235,6 +232,7 @@ public static class DependencyInjection
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
         services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
+        services.AddScoped<ICategoryAuditLogger, CategoryAuditLogger>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<ICurrentStockRepository, CurrentStockRepository>();
         services.AddScoped<IInventoryAuditLogger, InventoryAuditLogger>();
@@ -377,6 +375,8 @@ public static class DependencyInjection
             provider.GetRequiredService<ICustomerOrderReadRepository>(),
             provider.GetRequiredService<ICustomerOrderCancelRepository>()));
         services.AddScoped<IClickCollectOrderStatusRepository, ClickCollectOrderStatusRepository>();
+        services.AddScoped<IPosOnlineOrderDetailRepository, PosOnlineOrderDetailRepository>();
+        services.AddScoped<IPosOnlineOrderStartFulfillmentRepository, PosOnlineOrderStartFulfillmentRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
 
         return services;

@@ -13,14 +13,138 @@ namespace E_POS.Api.Controllers.V1.Tenant.ECommerce;
 public sealed class ClickCollectOrdersController : ControllerBase
 {
     private readonly IClickCollectOrderStatusService _service;
+    private readonly IPosOnlineOrderDetailService _detailService;
+    private readonly IPosOnlineOrderStartFulfillmentService _startFulfillmentService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
     public ClickCollectOrdersController(
         IClickCollectOrderStatusService service,
+        IPosOnlineOrderDetailService detailService,
+        IPosOnlineOrderStartFulfillmentService startFulfillmentService,
         ITenantRequestContextFactory tenantRequestContextFactory)
     {
         _service = service;
+        _detailService = detailService;
+        _startFulfillmentService = startFulfillmentService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
+    }
+
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> List(
+        [FromQuery] Guid outletId,
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] string? sortBy,
+        [FromQuery] string? sortDirection,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "online_orders.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _detailService.ListAsync(
+            context,
+            new PosOnlineOrderListQuery(
+                outletId, search, status, sortBy, sortDirection, page, pageSize),
+            cancellationToken);
+        if (!result.IsSuccess || result.Value is null)
+            return ToDetailErrorResult(result.Error);
+
+        var value = result.Value;
+        return Ok(new
+        {
+            data = value.Items,
+            summary = value.Summary,
+            pagination = new
+            {
+                value.Page,
+                value.PageSize,
+                value.TotalCount,
+                value.TotalPages
+            },
+            value.ServerTime
+        });
+    }
+
+    [HttpPost("{orderId:guid}/fulfilment/start")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> StartFulfillment(
+        [FromRoute] Guid orderId,
+        [FromQuery] Guid outletId,
+        [FromBody] PosOnlineOrderStartFulfillmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "online_orders.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _startFulfillmentService.StartAsync(
+            context, outletId, orderId, request, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Ok(new
+            {
+                success = true,
+                message = "Fulfilment started successfully.",
+                data = result.Value
+            });
+        }
+
+        return ToStartErrorResult(result.Error);
+    }
+
+    [HttpGet("{orderId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetDetail(
+        [FromRoute] Guid orderId,
+        [FromQuery] Guid outletId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "online_orders.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _detailService.GetAsync(
+            context,
+            outletId,
+            orderId,
+            cancellationToken);
+
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Ok(new
+            {
+                success = true,
+                message = "Online order details loaded successfully.",
+                data = result.Value
+            });
+        }
+
+        return ToDetailErrorResult(result.Error);
     }
 
     [HttpPatch("{orderId:guid}/status")]
@@ -67,6 +191,29 @@ public sealed class ClickCollectOrdersController : ControllerBase
         "click_collect_orders.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
         "click_collect_orders.not_found" => NotFound(CreateError(error)),
         "click_collect_orders.invalid_transition" => StatusCode(StatusCodes.Status409Conflict, CreateError(error)),
+        _ => BadRequest(CreateError(error))
+    };
+
+    private IActionResult ToDetailErrorResult(ApplicationError error) => error.Code switch
+    {
+        "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),
+        "online_orders.permission_denied" or
+        "online_orders.feature_not_entitled" or
+        "online_orders.outlet_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+        "online_orders.not_found" => NotFound(CreateError(error)),
+        _ => BadRequest(CreateError(error))
+    };
+
+    private IActionResult ToStartErrorResult(ApplicationError error) => error.Code switch
+    {
+        "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),
+        "online_orders.permission_denied" or
+        "online_orders.feature_not_entitled" or
+        "online_orders.outlet_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+        "online_orders.not_found" => NotFound(CreateError(error)),
+        "online_orders.concurrency_conflict" or
+        "online_orders.invalid_state" or
+        "online_orders.invalid_reservation" => Conflict(CreateError(error)),
         _ => BadRequest(CreateError(error))
     };
 

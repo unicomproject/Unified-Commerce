@@ -1,11 +1,13 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Media.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
+using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
@@ -113,7 +115,15 @@ public sealed class CatalogMediaServicePhase4ETests
         var category = CreateCategory(previousMediaAssetId);
         var repository = new FakeCatalogMediaRepository { CategoryForImageUpdate = category };
         var storage = new FakeMediaObjectStorage();
-        var service = new CatalogMediaService(repository, storage, new FakeDateTimeProvider());
+        var service = new CatalogMediaService(
+            repository,
+            storage,
+            new FakeDateTimeProvider(),
+            urlResolver: null,
+            categoryAccessPolicy: new CategoryAccessPolicy(
+                new StubCategoryRepository(),
+                new AlwaysAllowedEntitlementEvaluator(),
+                new FakeDateTimeProvider()));
 
         await using var stream = new MemoryStream(CreateOnePixelPng());
         var result = await service.UploadCategoryImageAsync(
@@ -168,7 +178,6 @@ public sealed class CatalogMediaServicePhase4ETests
         var category = Category.Create(
             CategoryId,
             TenantId,
-            Guid.Parse("33333333-0000-4000-8000-000000000001"),
             parentCategoryId: null,
             "APPAREL",
             "Apparel",
@@ -221,6 +230,75 @@ public sealed class CatalogMediaServicePhase4ETests
     private sealed class FakeDateTimeProvider : IDateTimeProvider
     {
         public DateTimeOffset UtcNow => Now;
+    }
+
+    private sealed class AlwaysAllowedEntitlementEvaluator : ITenantFeatureEntitlementEvaluator
+    {
+        public Task<TenantFeatureEntitlementEvaluation> EvaluateAsync(
+            Guid tenantId,
+            string featureCode,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(TenantFeatureEntitlementEvaluation.Allowed(
+                featureCode,
+                PlatformTenantFeatureCodes.ProductCatalog,
+                false,
+                true,
+                false));
+
+        public Task<bool> IsEnabledAsync(Guid tenantId, string featureCode, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(true);
+    }
+
+    private sealed class StubCategoryRepository : ICategoryRepository
+    {
+        public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>("active");
+
+        public Task<bool> CategoryCodeExistsAsync(Guid tenantId, string categoryCode, Guid? excludeCategoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<bool> CategoryNameExistsAsync(Guid tenantId, string categoryName, Guid? excludeCategoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<bool> CategorySlugExistsAsync(Guid tenantId, string categorySlug, Guid? excludeCategoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<CategoryParentInfo?> GetParentInfoAsync(Guid tenantId, Guid parentCategoryId, CancellationToken cancellationToken) =>
+            Task.FromResult<CategoryParentInfo?>(null);
+
+        public Task<bool> WouldCreateParentCycleAsync(Guid tenantId, Guid categoryId, Guid parentCategoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<int> GetSubtreeRelativeDepthAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(1);
+
+        public Task<bool> HasChildCategoriesAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<bool> HasProductLinksAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<CategoryListResponse> ListAsync(Guid tenantId, CategoryListQuery query, CancellationToken cancellationToken) =>
+            Task.FromResult(new CategoryListResponse([], query.PageNumber, query.PageSize, 0));
+
+        public Task<CategoryTreeResponse> GetTreeAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult(new CategoryTreeResponse([]));
+
+        public Task<CategoryResponse?> GetByIdAsync(Guid tenantId, Guid categoryId, bool includeDeleted, CancellationToken cancellationToken) =>
+            Task.FromResult<CategoryResponse?>(null);
+
+        public Task<Category?> GetEditableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
+            Task.FromResult<Category?>(null);
+
+        public Task AddAsync(Category category, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task AddMediaAssetAsync(MediaAsset mediaAsset, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task MarkMediaAssetInactiveAsync(Guid tenantId, Guid mediaAssetId, Guid? updatedByTenantUserId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class FakeMediaObjectStorage : IMediaObjectStorage
@@ -342,8 +420,38 @@ public sealed class CatalogMediaServicePhase4ETests
         public Task<MediaAsset?> GetMediaAssetAsync(
             Guid tenantId,
             Guid mediaAssetId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(MediaAssets.FirstOrDefault(x => x.Id == mediaAssetId));
+            CancellationToken cancellationToken)
+        {
+            if (tenantId != TenantId)
+            {
+                return Task.FromResult<MediaAsset?>(null);
+            }
+
+            var existing = MediaAssets.FirstOrDefault(x => x.Id == mediaAssetId);
+            if (existing is not null)
+            {
+                return Task.FromResult<MediaAsset?>(existing);
+            }
+
+            return Task.FromResult<MediaAsset?>(MediaAsset.Create(
+                mediaAssetId,
+                TenantId,
+                "tenant-media",
+                $"categories/{CategoryId:D}/image/{mediaAssetId:D}.png",
+                "https://cdn.example.test/previous.png",
+                "previous.png",
+                "image/png",
+                ".png",
+                32,
+                1,
+                1,
+                "checksum",
+                "IMAGE",
+                "CATEGORY",
+                "ACTIVE",
+                UserId,
+                Now));
+        }
 
         public Task<bool> IsMediaAssetLinkedAsync(
             Guid tenantId,

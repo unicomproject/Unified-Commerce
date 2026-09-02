@@ -4,7 +4,6 @@ using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
-using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using CustomerEntity = E_POS.Domain.Modules.ECommerce.Customer.Entities.Customer;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.Orders.Constants;

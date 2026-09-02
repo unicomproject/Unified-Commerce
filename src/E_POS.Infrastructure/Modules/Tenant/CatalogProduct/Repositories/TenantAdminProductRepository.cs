@@ -3,6 +3,7 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Constants;
@@ -157,34 +158,52 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         Guid tenantId,
         CancellationToken cancellationToken)
     {
-        var categories = await _dbContext.Categories
+        var categoryRows = await _dbContext.Categories
             .AsNoTracking()
             .Where(x =>
                 x.TenantId == tenantId &&
-                x.Status == CategoryConstants.ActiveStatus &&
-                x.ParentCategoryId == null)
-            .OrderBy(x => x.SortOrder)
-            .ThenBy(x => x.CategoryName)
-            .Select(x => new TenantAdminProductCategoryOptionResponse(
+                x.Status != CategoryConstants.DeletedStatus)
+            .Select(x => new
+            {
                 x.Id,
+                x.CategoryCode,
                 x.CategoryName,
-                x.CategoryCode))
+                x.ParentCategoryId,
+                x.SortOrder,
+                x.Status
+            })
             .ToListAsync(cancellationToken);
 
-        var subCategories = await _dbContext.Categories
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == tenantId &&
-                x.Status == CategoryConstants.ActiveStatus &&
-                x.ParentCategoryId != null)
+        var statusById = categoryRows.ToDictionary(x => x.Id, x => x.Status);
+        var parentById = categoryRows.ToDictionary(x => x.Id, x => x.ParentCategoryId);
+        var selectableRows = categoryRows
+            .Where(x => CategorySelectionRules.IsEffectivelySelectable(x.Id, statusById, parentById))
+            .ToList();
+
+        var nameById = selectableRows.ToDictionary(x => x.Id, x => x.CategoryName);
+        var childrenIds = selectableRows
+            .Where(x => x.ParentCategoryId.HasValue)
+            .Select(x => x.ParentCategoryId!.Value)
+            .ToHashSet();
+
+        var categories = selectableRows
+            .Select(x =>
+            {
+                var level = CategoryHierarchy.ComputeLevel(x.Id, parentById);
+                return new TenantAdminProductCategoryOptionResponse(
+                    x.Id,
+                    x.CategoryCode,
+                    x.CategoryName,
+                    x.ParentCategoryId,
+                    level,
+                    CategoryHierarchy.ComputePath(x.Id, nameById, parentById),
+                    childrenIds.Contains(x.Id),
+                    x.SortOrder);
+            })
+            .Where(x => x.Level <= CategoryConstants.MaxHierarchyDepth)
             .OrderBy(x => x.SortOrder)
-            .ThenBy(x => x.CategoryName)
-            .Select(x => new TenantAdminProductSubCategoryOptionResponse(
-                x.Id,
-                x.CategoryName,
-                x.CategoryCode,
-                x.ParentCategoryId!.Value))
-            .ToListAsync(cancellationToken);
+            .ThenBy(x => x.CategoryCode)
+            .ToList();
 
         var brands = await _dbContext.Brands
             .AsNoTracking()
@@ -276,7 +295,6 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
         return new TenantAdminProductCreateOptionsResponse(
             categories,
-            subCategories,
             brands,
             units,
             taxes,
@@ -361,7 +379,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 x => x.TenantId == tenantId &&
                      x.Id == categoryId &&
                      x.Status == CategoryConstants.ActiveStatus &&
-                     x.ParentCategoryId == parentCategoryId,
+                     (!parentCategoryId.HasValue || x.ParentCategoryId == parentCategoryId),
                 cancellationToken);
     }
 
@@ -498,13 +516,14 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 category.Id,
                 category.CategoryName,
                 category.ParentCategoryId,
+                link.IsPrimaryCategory,
             })
             .ToListAsync(cancellationToken);
 
-        var parentCategory = categoryRows.FirstOrDefault(x => x.ParentCategoryId == null);
-        var subCategory = categoryRows.FirstOrDefault(x => x.ParentCategoryId != null);
-        var categoryId = parentCategory?.Id ?? subCategory?.Id ?? Guid.Empty;
-        var categoryName = parentCategory?.CategoryName ?? subCategory?.CategoryName ?? string.Empty;
+        var selectedCategory = categoryRows.FirstOrDefault(x => x.IsPrimaryCategory) ?? categoryRows.FirstOrDefault();
+        var legacySecondary = categoryRows.FirstOrDefault(x => selectedCategory is not null && x.Id != selectedCategory.Id);
+        var categoryId = selectedCategory?.Id ?? Guid.Empty;
+        var categoryName = selectedCategory?.CategoryName ?? string.Empty;
 
         var imageRows = await (
             from image in _dbContext.ProductImages.AsNoTracking()
@@ -691,7 +710,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             defaultBarcode,
             categoryId,
             categoryName,
-            subCategory?.Id,
+            legacySecondary?.Id,
             product.BrandId,
             unitType,
             product.ShortDescription,
@@ -794,33 +813,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .ToListAsync(cancellationToken);
         _dbContext.ProductCategories.RemoveRange(existingCategoryLinks);
 
-        var categoryLinks = new List<ProductCategory>
-        {
-            ProductCategory.Create(
-                Guid.NewGuid(),
-                tenantId,
-                productId,
-                request.CategoryId,
-                isPrimaryCategory: request.SubCategoryId == null,
-                sortOrder: 0,
-                userId,
-                now),
-        };
-
-        if (request.SubCategoryId.HasValue)
-        {
-            categoryLinks.Add(ProductCategory.Create(
-                Guid.NewGuid(),
-                tenantId,
-                productId,
-                request.SubCategoryId.Value,
-                isPrimaryCategory: true,
-                sortOrder: 1,
-                userId,
-                now));
-        }
-
-        await _dbContext.ProductCategories.AddRangeAsync(categoryLinks, cancellationToken);
+        await _dbContext.ProductCategories.AddAsync(
+            CreateSelectedCategoryLink(tenantId, productId, request.ResolveSelectedCategoryId(), userId, now),
+            cancellationToken);
 
         var existingVariants = await _dbContext.ProductVariants
             .Where(x =>
@@ -1446,35 +1441,16 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
 
         await _dbContext.Products.AddAsync(product, cancellationToken);
 
-        if (request.CategoryId != Guid.Empty)
+        if (request.CategoryId != Guid.Empty || request.SubCategoryId.HasValue)
         {
-            var categoryLinks = new List<ProductCategory>
-            {
-                ProductCategory.Create(
-                    Guid.NewGuid(),
+            await _dbContext.ProductCategories.AddAsync(
+                CreateSelectedCategoryLink(
                     tenantId,
                     productId,
-                    request.CategoryId,
-                    isPrimaryCategory: request.SubCategoryId == null,
-                    sortOrder: 0,
+                    request.ResolveSelectedCategoryId(),
                     userId,
                     now),
-            };
-
-            if (request.SubCategoryId.HasValue)
-            {
-                categoryLinks.Add(ProductCategory.Create(
-                    Guid.NewGuid(),
-                    tenantId,
-                    productId,
-                    request.SubCategoryId.Value,
-                    isPrimaryCategory: true,
-                    sortOrder: 1,
-                    userId,
-                    now));
-            }
-
-            await _dbContext.ProductCategories.AddRangeAsync(categoryLinks, cancellationToken);
+                cancellationToken);
         }
 
         Guid? defaultVariantId = null;
@@ -2336,4 +2312,20 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             .AsNoTracking()
             .AnyAsync(x => x.ProductSlug == slug, cancellationToken);
     }
+
+    private static ProductCategory CreateSelectedCategoryLink(
+        Guid tenantId,
+        Guid productId,
+        Guid selectedCategoryId,
+        Guid? userId,
+        DateTimeOffset now) =>
+        ProductCategory.Create(
+            Guid.NewGuid(),
+            tenantId,
+            productId,
+            selectedCategoryId,
+            isPrimaryCategory: true,
+            sortOrder: 0,
+            userId,
+            now);
 }

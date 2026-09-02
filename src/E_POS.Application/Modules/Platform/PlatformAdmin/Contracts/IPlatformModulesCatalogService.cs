@@ -7,6 +7,8 @@ public interface IPlatformModulesCatalogService
 {
     Task<ApplicationResult<PlatformModulesCatalogResponse>> GetModulesAsync(
         Guid platformUserId,
+        string? scopeFilter,
         CancellationToken cancellationToken);
+
 }
 

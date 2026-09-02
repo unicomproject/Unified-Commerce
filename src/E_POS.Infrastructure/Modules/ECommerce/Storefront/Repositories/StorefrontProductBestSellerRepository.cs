@@ -1,4 +1,4 @@
-﻿using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
+using E_POS.Application.Modules.ECommerce.Storefront.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
 using E_POS.Application.Modules.ECommerce.Storefront.Mappers;
 using E_POS.Application.Modules.Shared.Media;
@@ -19,17 +19,27 @@ public sealed class StorefrontProductBestSellerRepository : StorefrontProductRep
     {
     }
 
-    public async Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, decimal? OriginalPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
         var currencyCode = await ResolveCurrencyCodeAsync(tenantId, cancellationToken);
 
-        var products = await DbContext.Set<Product>()
+        var productsWithSales = await DbContext.Set<Product>()
             .AsNoTracking()
             .Where(p => p.TenantId == tenantId && p.Status == ActiveStatus && p.IsSellable)
-            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new 
+            {
+                Product = p,
+                SalesCount = DbContext.Set<E_POS.Domain.Modules.Tenant.Orders.Entities.SalesOrderLine>()
+                    .Where(l => l.ProductId == p.Id && l.TenantId == tenantId)
+                    .Sum(l => (decimal?)l.Quantity) ?? 0m
+            })
+            .OrderByDescending(x => x.SalesCount)
+            .ThenByDescending(x => x.Product.CreatedAt)
             .Take(10)
             .ToListAsync(cancellationToken);
+
+        var products = productsWithSales.Select(x => x.Product).ToList();
 
         if (products.Count == 0)
         {
@@ -44,9 +54,9 @@ public sealed class StorefrontProductBestSellerRepository : StorefrontProductRep
         return products.Select(product =>
         {
             ratingsByProduct.TryGetValue(product.Id, out var rating);
-            pricesByProduct.TryGetValue(product.Id, out var sellingPrice);
+            var prices = pricesByProduct.TryGetValue(product.Id, out var p) ? p : (null, null);
             imagesByProduct.TryGetValue(product.Id, out var primaryImageUrl);
-            return (product, rating, sellingPrice, currencyCode, primaryImageUrl);
+            return (product, rating, prices.SellingPrice, prices.OriginalPrice, currencyCode, primaryImageUrl);
         });
     }
 

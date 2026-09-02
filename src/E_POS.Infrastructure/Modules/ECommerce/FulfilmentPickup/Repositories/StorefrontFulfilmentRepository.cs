@@ -1,6 +1,8 @@
 using System.Data;
+using System.Globalization;
 using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Contracts;
 using E_POS.Application.Modules.ECommerce.Storefront.Dtos;
+using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
@@ -18,10 +20,14 @@ public sealed class StorefrontFulfilmentRepository : IStorefrontFulfilmentReposi
     ];
 
     private readonly EPosDbContext _dbContext;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
 
-    public StorefrontFulfilmentRepository(EPosDbContext dbContext)
+    public StorefrontFulfilmentRepository(
+        EPosDbContext dbContext,
+        IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<IEnumerable<StorefrontStoreReadModel>> GetAvailableStoresAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -44,17 +50,22 @@ public sealed class StorefrontFulfilmentRepository : IStorefrontFulfilmentReposi
                 SELECT o.id, o.outlet_name,
                        a.address_line1, a.city,
                        o.timezone,
+                       o.is_default_outlet,
                        (SELECT fmo.preparation_lead_minutes
                         FROM fulfillment_method_outlets fmo
                         JOIN fulfillment_methods fm ON fm.tenant_id = fmo.tenant_id AND fm.id = fmo.fulfillment_method_id
                         WHERE fmo.tenant_id = @tenantId AND fmo.outlet_id = o.id
                           AND fmo.status = 'ACTIVE' AND fm.status = 'ACTIVE' AND fm.method_type = 'PICKUP'
-                        LIMIT 1) as prep_minutes
+                        LIMIT 1) as prep_minutes,
+                       ma.container_name, ma.storage_key, ma.public_url
                 FROM outlets o
                 LEFT JOIN outlet_addresses a ON a.tenant_id = @tenantId
                     AND a.outlet_id = o.id
                     AND a.is_primary = true
                     AND a.status = 'ACTIVE'
+                LEFT JOIN media_assets ma ON ma.tenant_id = o.tenant_id
+                    AND ma.id = o.primary_image_media_asset_id
+                    AND ma.status = 'ACTIVE'
                 WHERE o.tenant_id = @tenantId
                   AND o.status = 'ACTIVE'
                   AND EXISTS (
@@ -84,7 +95,11 @@ public sealed class StorefrontFulfilmentRepository : IStorefrontFulfilmentReposi
                 var city = reader.IsDBNull(3) ? null : reader.GetString(3);
                 var id = reader.GetGuid(0);
                 var timezone = reader.IsDBNull(4) ? "UTC" : reader.GetString(4);
-                var prepMins = reader.IsDBNull(5) ? 30 : reader.GetInt32(5);
+                var isDefault = !reader.IsDBNull(5) && reader.GetBoolean(5);
+                var prepMins = reader.IsDBNull(6) ? 30 : reader.GetInt32(6);
+                var containerName = reader.IsDBNull(7) ? null : reader.GetString(7);
+                var storageKey = reader.IsDBNull(8) ? null : reader.GetString(8);
+                var publicUrl = reader.IsDBNull(9) ? null : reader.GetString(9);
 
                 stores.Add(new StorefrontStoreReadModel
                 {
@@ -92,7 +107,9 @@ public sealed class StorefrontFulfilmentRepository : IStorefrontFulfilmentReposi
                     Name = reader.GetString(1),
                     Address = addressLine1 != null ? $"{addressLine1}, {city}" : string.Empty,
                     IsAvailable = true,
-                    PreparationLeadMinutes = prepMins
+                    IsDefault = isDefault,
+                    PreparationLeadMinutes = prepMins,
+                    ImageUrl = _mediaReadUrlResolver?.ResolveReadUrl(containerName, storageKey, publicUrl) ?? publicUrl
                 });
                 storeTimezones[id] = timezone;
             }
@@ -127,6 +144,9 @@ public sealed class StorefrontFulfilmentRepository : IStorefrontFulfilmentReposi
 
                     store.IsAvailable = true;
                     store.IsOpen = todayHours != null && todayHours.OpeningTime <= localTimeOnly && todayHours.ClosingTime >= localTimeOnly;
+                    store.ClosingTime = todayHours is null
+                        ? null
+                        : todayHours.ClosingTime.Value.ToString("h:mm tt", CultureInfo.InvariantCulture);
                 }
             }
 

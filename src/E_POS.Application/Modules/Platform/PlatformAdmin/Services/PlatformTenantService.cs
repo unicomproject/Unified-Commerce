@@ -447,6 +447,43 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                 ValidationFailed with { Message = "Tenant subscription was not found." });
         }
 
+        var sourceTypeInput = request.SourceType?.Trim().ToUpperInvariant();
+        if (!string.IsNullOrWhiteSpace(sourceTypeInput) &&
+            sourceTypeInput != TenantEntitlementSourceTypeConstants.Override &&
+            sourceTypeInput != TenantEntitlementSourceTypeConstants.Manual)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with { Message = "SourceType must be OVERRIDE or MANUAL." });
+        }
+
+        var resolvedSourceType = !string.IsNullOrWhiteSpace(sourceTypeInput)
+            ? sourceTypeInput
+            : (!string.IsNullOrWhiteSpace(request.OverrideReason)
+                ? TenantEntitlementSourceTypeConstants.Override
+                : TenantEntitlementSourceTypeConstants.Manual);
+
+        if (string.Equals(resolvedSourceType, TenantEntitlementSourceTypeConstants.Override, StringComparison.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(request.OverrideReason))
+            {
+                return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                    ValidationFailed with { Message = "OverrideReason is required when sourceType is OVERRIDE." });
+            }
+
+            if (request.OverrideReason.Trim().Length > 500)
+            {
+                return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                    ValidationFailed with { Message = "OverrideReason cannot exceed 500 characters." });
+            }
+        }
+
+        if (request.EffectiveFrom.HasValue && request.EffectiveUntil.HasValue &&
+            request.EffectiveUntil.Value <= request.EffectiveFrom.Value)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with { Message = "EffectiveUntil must be greater than EffectiveFrom." });
+        }
+
         var planId = subscription.SubscriptionPlanId;
         SubscriptionPlan? selectedPlan = null;
         if (request.SubscriptionPlanId is not null && request.SubscriptionPlanId != Guid.Empty)
@@ -468,7 +505,8 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             planId,
             request.EnabledFeatureIds,
             request.EnabledFeatureCodes,
-            cancellationToken);
+            cancellationToken,
+            allowCustomOverrides: true);
 
         if (featureResolution.IsFailure)
         {
@@ -488,15 +526,74 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.subscription_changed", $"Tenant subscription plan updated to {selectedPlan?.PlanName ?? planId.ToString()}.", null, now, cancellationToken);
         }
 
+        var revokedReason = string.Equals(resolvedSourceType, TenantEntitlementSourceTypeConstants.Override, StringComparison.Ordinal)
+            ? request.OverrideReason!.Trim()
+            : "Removed by platform admin entitlement update.";
+
         await _repository.ReplaceTenantEntitlementsAsync(
             tenantId,
             featureResolution.Value!,
             now,
             platformUserId,
-            "Removed by platform admin entitlement update.",
+            revokedReason,
+            resolvedSourceType,
+            request.OverrideReason?.Trim(),
+            request.EffectiveFrom,
+            request.EffectiveUntil,
             cancellationToken);
 
-        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.entitlements_updated", "Tenant entitlements updated by platform admin.", null, now, cancellationToken);
+        var auditDetail = string.Equals(resolvedSourceType, TenantEntitlementSourceTypeConstants.Override, StringComparison.Ordinal)
+            ? $"Tenant entitlements updated with OVERRIDE: {request.OverrideReason!.Trim()}"
+            : "Tenant entitlements updated by platform admin.";
+
+        await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.entitlements_updated", auditDetail, null, now, cancellationToken);
+
+        return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+    }
+
+    public async Task<ApplicationResult<PlatformTenantDetailResponse>> RestoreEntitlementsToPlanAsync(
+        Guid tenantId,
+        Guid platformUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!await HasPermissionAsync(
+                platformUserId,
+                PlatformPermissionCodes.TenantsEntitlementsUpdate,
+                cancellationToken))
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(AccessDenied);
+        }
+
+        var tenant = await _repository.GetTenantEntityByIdAsync(tenantId, cancellationToken);
+        if (tenant is null)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(NotFound);
+        }
+
+        var subscription = await _repository.GetCurrentTenantSubscriptionEntityAsync(tenantId, cancellationToken);
+        if (subscription is null)
+        {
+            return ApplicationResult<PlatformTenantDetailResponse>.Failure(
+                ValidationFailed with { Message = "Tenant subscription was not found. Cannot restore plan baseline without a valid subscription." });
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+
+        await _repository.RestoreTenantPlanEntitlementsAsync(
+            tenantId,
+            subscription.SubscriptionPlanId,
+            now,
+            platformUserId,
+            cancellationToken);
+
+        await _repository.AddAuditLogAsync(
+            tenantId,
+            platformUserId,
+            "tenant.entitlements_restored_to_plan",
+            "Tenant entitlements restored to subscription plan baseline.",
+            null,
+            now,
+            cancellationToken);
 
         return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
     }
@@ -551,7 +648,8 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         Guid planId,
         IReadOnlyList<Guid>? featureIds,
         IReadOnlyList<string>? featureCodes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowCustomOverrides = false)
     {
         var hasFeatureIds = featureIds?.Any(id => id != Guid.Empty) == true;
         var hasFeatureCodes = featureCodes?.Any(code => !string.IsNullOrWhiteSpace(code)) == true;
@@ -601,20 +699,23 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
                 });
         }
 
-        var planFeatureIds = await _repository.GetIncludedFeatureIdsForPlanAsync(planId, cancellationToken);
-        var disallowedFeatures = resolvedFeatures
-            .Where(feature => !planFeatureIds.Contains(feature.Id))
-            .Select(feature => feature.FeatureCode)
-            .ToList();
-
-        if (disallowedFeatures.Count > 0)
+        if (!allowCustomOverrides)
         {
-            return ApplicationResult<IReadOnlyList<Guid>>.Failure(
-                ValidationFailed with
-                {
-                    Message =
-                        $"Features are not included in the selected subscription plan: {string.Join(", ", disallowedFeatures)}."
-                });
+            var planFeatureIds = await _repository.GetIncludedFeatureIdsForPlanAsync(planId, cancellationToken);
+            var disallowedFeatures = resolvedFeatures
+                .Where(feature => !planFeatureIds.Contains(feature.Id))
+                .Select(feature => feature.FeatureCode)
+                .ToList();
+
+            if (disallowedFeatures.Count > 0)
+            {
+                return ApplicationResult<IReadOnlyList<Guid>>.Failure(
+                    ValidationFailed with
+                    {
+                        Message =
+                            $"Features are not included in the selected subscription plan: {string.Join(", ", disallowedFeatures)}."
+                    });
+            }
         }
 
         return ApplicationResult<IReadOnlyList<Guid>>.Success(

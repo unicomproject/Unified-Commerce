@@ -41,17 +41,13 @@ using E_POS.Application.Modules.ECommerce.FulfilmentPickup.Services;
 using E_POS.Application.Modules.Tenant.Discount.Contracts;
 using E_POS.Application.Modules.Tenant.Discount.Services;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
-using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.ECommerce.Customer.Services;
-using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services;
-using E_POS.Application.Modules.ECommerce.Customer.Services;
-using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Services.Support;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerWishlist.Services;
@@ -108,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<IReturnPolicyTemplateRequestValidator, ReturnPolicyTemplateRequestValidator>();
         services.AddScoped<IReturnPolicyRequestValidator, ReturnPolicyRequestValidator>();
         services.AddScoped<IDepartmentService, DepartmentService>();
+        services.AddScoped<CategoryAccessPolicy>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IProductService, ProductService>();
@@ -187,6 +184,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerEmailVerificationService, CustomerEmailVerificationService>();
         services.AddScoped<ICustomerPasswordResetService, CustomerPasswordResetService>();
         services.AddScoped<ICustomerLoginService, CustomerLoginService>();
+        services.AddScoped<ICustomerOtpAuthService, CustomerOtpAuthService>();
         services.AddScoped<ICustomerGoogleAuthService, CustomerGoogleAuthService>();
         services.AddScoped<ICustomerSessionService, CustomerSessionService>();
         services.AddScoped<ICustomerProfileService, CustomerProfileService>();
@@ -195,6 +193,8 @@ public static class DependencyInjection
         services.AddScoped<ICustomerWishlistService, CustomerWishlistService>();
         services.AddScoped<ICustomerOrderService, CustomerOrderService>();
         services.AddScoped<IClickCollectOrderStatusService, ClickCollectOrderStatusService>();
+        services.AddScoped<IPosOnlineOrderDetailService, PosOnlineOrderDetailService>();
+        services.AddScoped<IPosOnlineOrderStartFulfillmentService, PosOnlineOrderStartFulfillmentService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;

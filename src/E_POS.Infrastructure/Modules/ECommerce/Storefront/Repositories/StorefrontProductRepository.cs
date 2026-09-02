@@ -61,7 +61,7 @@ public sealed class StorefrontProductRepository : IStorefrontProductRepository
         CancellationToken cancellationToken = default) =>
         _searchRepository.SearchAsync(tenantId, request, cancellationToken);
 
-    public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(
+    public Task<IEnumerable<(Product Product, ProductRatingSummary? Rating, decimal? SellingPrice, decimal? OriginalPrice, string CurrencyCode, string? PrimaryImageUrl)>> GetBestSellersAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default) =>
         _bestSellerRepository.GetBestSellersAsync(tenantId, cancellationToken);

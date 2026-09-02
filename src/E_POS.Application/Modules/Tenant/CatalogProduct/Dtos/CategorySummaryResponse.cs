@@ -11,5 +11,10 @@ public sealed record CategorySummaryResponse(
     string? ParentCategoryCode,
     string? ParentCategoryName,
     int SortOrder,
+    int Level,
+    string HierarchyPath,
+    int ChildCount,
+    int ProductCount,
+    bool HasChildren,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt);

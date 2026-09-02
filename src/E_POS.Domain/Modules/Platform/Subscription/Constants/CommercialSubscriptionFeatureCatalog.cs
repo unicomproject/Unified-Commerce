@@ -14,7 +14,6 @@ public static class CommercialSubscriptionFeatureCatalog
         {
             PlatformTenantFeatureCodes.TenantProfile,
             PlatformTenantFeatureCodes.TenantSettings,
-            PlatformTenantFeatureCodes.UserAccounts,
             PlatformTenantFeatureCodes.RoleManagement,
             PlatformTenantFeatureCodes.PermissionManagement,
             PlatformTenantFeatureCodes.OutletManagement,
@@ -34,6 +33,7 @@ public static class CommercialSubscriptionFeatureCatalog
     private static readonly HashSet<string> TechnicalPermissionGroupingCodes =
         new(StringComparer.OrdinalIgnoreCase)
         {
+            PlatformTenantFeatureCodes.UserAccounts,
             "pos.cash_drawer",
             "pos.customers",
             "pos.exchanges",
@@ -123,6 +123,12 @@ public static class CommercialSubscriptionFeatureCatalog
         if (TechnicalToCommercialEntitlement.TryGetValue(trimmed, out var mapped))
         {
             commercialFeatureCode = mapped;
+            return true;
+        }
+
+        if (TechnicalPermissionGroupingCodes.Contains(trimmed))
+        {
+            commercialFeatureCode = PlatformTenantFeatureCodes.NormalizeToCanonicalOrSelf(trimmed);
             return true;
         }
 

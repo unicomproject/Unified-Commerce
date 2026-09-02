@@ -301,6 +301,27 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
+        public Task ReplaceTenantEntitlementsAsync(
+            Guid tenantId,
+            IReadOnlyList<Guid> enabledFeatureIds,
+            DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            string? revokedReason,
+            string sourceType,
+            string? overrideReason,
+            DateTimeOffset? effectiveFrom,
+            DateTimeOffset? effectiveUntil,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task RestoreTenantPlanEntitlementsAsync(
+            Guid tenantId,
+            Guid subscriptionPlanId,
+            DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
         public Task<IReadOnlySet<Guid>> GetIncludedFeatureIdsForPlanAsync(
             Guid planId,
             CancellationToken cancellationToken) =>

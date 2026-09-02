@@ -533,10 +533,10 @@ public sealed class StorefrontControllerTests
             return Task.FromResult(CollectionOptionsResult);
         }
 
-        public Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
+        public Task<(Guid? TenantId, string? BaseCurrencyCode, string? StoreName, string? LogoUrl)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
         {
             ResolvedSlug = slug;
-            return Task.FromResult<(Guid?, string?)>((ResolvedTenantId, "USD"));
+            return Task.FromResult<(Guid?, string?, string?, string?)>((ResolvedTenantId, "USD", "Demo Store", null));
         }
 
         public Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantByHostAsync(string host, CancellationToken cancellationToken = default)
@@ -546,6 +546,3 @@ public sealed class StorefrontControllerTests
         }
     }
 }
-
-
-

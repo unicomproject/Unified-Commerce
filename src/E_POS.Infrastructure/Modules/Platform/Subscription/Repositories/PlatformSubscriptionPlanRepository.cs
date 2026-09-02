@@ -143,6 +143,7 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
                     .Where(feature =>
                         feature.PlatformModuleId == module.Id &&
                         feature.Status == "ACTIVE" &&
+                        feature.Scope == "TENANT" &&
                         commercialFeatureCodes.Contains(feature.FeatureCode))
                     .OrderBy(feature => feature.SortOrder)
                     .ThenBy(feature => feature.Name)
@@ -462,7 +463,7 @@ public sealed class PlatformSubscriptionPlanRepository : IPlatformSubscriptionPl
 
         var ids = await _dbContext.PlatformFeatures
             .AsNoTracking()
-            .Where(feature => featureIds.Contains(feature.Id) && feature.Status == "ACTIVE")
+            .Where(feature => featureIds.Contains(feature.Id) && feature.Status == "ACTIVE" && feature.Scope == "TENANT")
             .Select(feature => feature.Id)
             .ToListAsync(cancellationToken);
 
