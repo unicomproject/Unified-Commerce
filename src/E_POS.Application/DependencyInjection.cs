@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformTenantOnboardingService, PlatformTenantOnboardingService>();
         services.AddScoped<IPlatformPermissionCatalogService, PlatformPermissionCatalogService>();
         services.AddScoped<IPlatformModulesCatalogService, PlatformModulesCatalogService>();
+        services.AddScoped<IBusinessCapabilityCatalogService, BusinessCapabilityCatalogService>();
         services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
         services.AddScoped<IDefaultTenantSettingsProvider, DefaultTenantSettingsProvider>();
         services.AddScoped<IPosLoginBrandingService, PosLoginBrandingService>();
