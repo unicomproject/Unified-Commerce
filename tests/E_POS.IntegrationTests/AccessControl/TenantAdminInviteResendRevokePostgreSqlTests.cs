@@ -131,6 +131,7 @@ public sealed class TenantAdminInviteResendRevokePostgreSqlTests
             new TenantAdminUserRepository(db),
             new FixedDateTimeProvider(Now),
             new PasswordHashService(),
+            new PlatformPasswordPolicyValidator(),
             new AllowingTenantResourceLimitGuard(),
             new TenantUserStaffCodeService(db),
             tokens,
