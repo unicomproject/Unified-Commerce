@@ -22,6 +22,13 @@ public partial class DecoupleCategoryFromDepartment : Migration
             name: "fk_categories_parent_category_id_categories",
             table: "categories");
 
+        // PostgreSQL binds this composite FK to the existing
+        // uq_categories_tenant_id_id index. Rebuild the FK around the
+        // principal-key replacement instead of using DROP INDEX CASCADE.
+        migrationBuilder.DropForeignKey(
+            name: "fk_discount_policy_targets_category_id_categories",
+            table: "discount_policy_targets");
+
         migrationBuilder.Sql("""ALTER TABLE categories DROP CONSTRAINT IF EXISTS "AK_categories_tenant_id_id";""");
 
         migrationBuilder.DropIndex(
@@ -87,6 +94,14 @@ public partial class DecoupleCategoryFromDepartment : Migration
             name: "ck_categories_description_length",
             table: "categories",
             sql: "description IS NULL OR char_length(description) <= 2000");
+
+        migrationBuilder.AddForeignKey(
+            name: "fk_discount_policy_targets_category_id_categories",
+            table: "discount_policy_targets",
+            columns: ["tenant_id", "category_id"],
+            principalTable: "categories",
+            principalColumns: ["tenant_id", "id"],
+            onDelete: ReferentialAction.Restrict);
 
         migrationBuilder.AddForeignKey(
             name: "fk_categories_tenant_parent_category",
