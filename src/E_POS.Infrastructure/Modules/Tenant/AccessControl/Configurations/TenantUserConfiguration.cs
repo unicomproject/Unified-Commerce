@@ -1,4 +1,5 @@
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -82,6 +83,23 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .HasColumnType("varchar(50)")
             .HasMaxLength(50);
 
+        builder.Property(x => x.OutletAccessScope)
+            .HasColumnName("outlet_access_scope")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .HasDefaultValue(TenantUserAccessScopes.AllOutlets)
+            .IsRequired();
+
+        builder.Property(x => x.TillAccessScope)
+            .HasColumnName("till_access_scope")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .HasDefaultValue(TenantUserAccessScopes.AllAccessibleTills)
+            .IsRequired();
+
+        builder.Property(x => x.DefaultTillId)
+            .HasColumnName("default_till_id");
+
         builder.Property(x => x.EmployeeId)
             .HasColumnName("employee_id")
             .HasColumnType("varchar(100)")
@@ -161,6 +179,12 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .OnDelete(DeleteBehavior.SetNull)
             .HasConstraintName("fk_tenant_users_updated_by");
 
+        builder.HasOne<E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till>()
+            .WithMany()
+            .HasForeignKey(x => x.DefaultTillId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_tenant_users_default_till_id_tills");
+
         builder.HasIndex(x => new { x.TenantId, x.Email })
             .IsUnique()
             .HasDatabaseName("uq_tenant_users_tenant_id_email");
@@ -178,10 +202,12 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .HasDatabaseName("uq_tenant_users_tenant_id_unmasked_phone")
             .HasFilter("unmasked_phone IS NOT NULL");
 
-        builder.ToTable(t => 
+        builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_tenant_users_locked_until", "locked_until IS NULL OR locked_until > now()");
             t.HasCheckConstraint("ck_tenant_users_source_user_type", "source_user_type IN ('admin', 'outlet', 'platform')");
+            t.HasCheckConstraint("ck_tenant_users_outlet_access_scope", "outlet_access_scope IN ('ALL_OUTLETS', 'SELECTED_OUTLETS', 'NO_OUTLET_ACCESS')");
+            t.HasCheckConstraint("ck_tenant_users_till_access_scope", "till_access_scope IN ('ALL_ACCESSIBLE_TILLS', 'SELECTED_TILLS', 'NO_TILL_ACCESS')");
         });
     }
 }

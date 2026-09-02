@@ -10691,6 +10691,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(50)")
                         .HasColumnName("default_outlet_id");
 
+                    b.Property<Guid?>("DefaultTillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("default_till_id");
+
                     b.Property<string>("DisplayName")
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)")
@@ -10735,6 +10739,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("outlet_id");
 
+                    b.Property<string>("OutletAccessScope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("ALL_OUTLETS")
+                        .HasColumnName("outlet_access_scope");
+
                     b.Property<DateTimeOffset?>("PasswordChangeRequiredAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("password_change_required_at");
@@ -10770,6 +10782,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<string>("TillAccessScope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("ALL_ACCESSIBLE_TILLS")
+                        .HasColumnName("till_access_scope");
+
                     b.Property<string>("UnmaskedPhone")
                         .HasMaxLength(25)
                         .HasColumnType("varchar(25)")
@@ -10794,6 +10814,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CreatedByTenantUserId");
 
+                    b.HasIndex("DefaultTillId");
+
                     b.HasIndex("UpdatedByTenantUserId");
 
                     b.HasIndex("TenantId", "Email")
@@ -10817,8 +10839,73 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_tenant_users_locked_until", "locked_until IS NULL OR locked_until > now()");
 
+                            t.HasCheckConstraint("ck_tenant_users_outlet_access_scope", "outlet_access_scope IN ('ALL_OUTLETS', 'SELECTED_OUTLETS', 'NO_OUTLET_ACCESS')");
+
                             t.HasCheckConstraint("ck_tenant_users_source_user_type", "source_user_type IN ('admin', 'outlet', 'platform')");
+
+                            t.HasCheckConstraint("ck_tenant_users_till_access_scope", "till_access_scope IN ('ALL_ACCESSIBLE_TILLS', 'SELECTED_TILLS', 'NO_TILL_ACCESS')");
                         });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserTillAccess", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid?>("AssignedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_by_tenant_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by_tenant_user_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_user_id");
+
+                    b.Property<Guid>("TillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("till_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenant_user_till_access");
+
+                    b.HasIndex("AssignedByTenantUserId");
+                    b.HasIndex("RevokedByTenantUserId");
+                    b.HasIndex("TenantUserId");
+                    b.HasIndex("TillId");
+
+                    b.HasIndex("TenantId", "TillId")
+                        .HasDatabaseName("ix_tenant_user_till_access_tenant_till");
+
+                    b.HasIndex("TenantId", "TenantUserId", "TillId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_user_till_access_tenant_user_till");
+
+                    b.ToTable("tenant_user_till_access", (string)null);
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserCodeSequence", b =>
@@ -28349,6 +28436,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_tenant_users_created_by");
 
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", null)
+                        .WithMany()
+                        .HasForeignKey("DefaultTillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_users_default_till_id_tills");
+
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -28361,6 +28454,42 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedByTenantUserId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_tenant_users_updated_by");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserTillAccess", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_user_till_access_assigned_by_tenant_user_id");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_user_till_access_revoked_by_tenant_user_id");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_user_till_access_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_user_till_access_tenant_user_id_tenant_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities.Till", null)
+                        .WithMany()
+                        .HasForeignKey("TillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_user_till_access_till_id_tills");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUserPermission", b =>

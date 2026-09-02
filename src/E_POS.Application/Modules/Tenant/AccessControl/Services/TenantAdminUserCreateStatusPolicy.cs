@@ -8,6 +8,7 @@ public static class TenantAdminUserCreateStatusPolicy
     [
         TenantUserConstants.StatusInvited,
         TenantUserConstants.StatusInactive,
+        TenantUserConstants.StatusActive,
     ];
 
     public static string? Normalize(string? status)

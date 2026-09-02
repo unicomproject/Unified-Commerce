@@ -134,6 +134,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminTillService, TenantAdminTillService>();
         services.AddScoped<ITenantAdminHardwareService, TenantAdminHardwareService>();
         services.AddScoped<ITenantAdminUserService, TenantAdminUserService>();
+        services.AddScoped<ITenantAdminUserProfileImageService, TenantAdminUserProfileImageService>();
         services.AddScoped<ITenantAdminRoleService, TenantAdminRoleService>();
         services.AddScoped<ITillService, TillService>();
         services.AddScoped<IPosDeviceService, PosDeviceService>();
@@ -168,6 +169,7 @@ public static class DependencyInjection
 
         // ECommerce Storefront
 
+        services.AddScoped<IStorefrontBrandingService, StorefrontBrandingService>();
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
         services.AddScoped<IStorefrontCategoryService, StorefrontCategoryService>();
         services.AddScoped<IStorefrontProductService, StorefrontProductService>();

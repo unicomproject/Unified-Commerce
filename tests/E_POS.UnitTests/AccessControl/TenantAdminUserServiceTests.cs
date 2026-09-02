@@ -12,6 +12,7 @@ using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 using E_POS.Domain.Modules.Shared.Audit.Entities;
 using E_POS.Domain.Modules.Shared.Integration.Entities;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.UnitTests.TestSupport;
 using Xunit;
@@ -24,6 +25,7 @@ public sealed class TenantAdminUserServiceTests
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid RoleId = Guid.NewGuid();
     private static readonly Guid OutletId = Guid.NewGuid();
+    private static readonly Guid TillId = Guid.NewGuid();
     private static readonly DateTimeOffset Now = new(2026, 7, 8, 10, 0, 0, TimeSpan.Zero);
     private const string IdempotencyKey = "create-user-test-key";
 
@@ -86,6 +88,7 @@ public sealed class TenantAdminUserServiceTests
             repository,
             new FakeDateTimeProvider(),
             new FakePasswordHashService(),
+            new PlatformPasswordPolicyValidator(),
             new AllowingTenantResourceLimitGuard(),
             new FakeStaffCodeService(),
             new FakeInvitationTokenService(),
@@ -130,7 +133,7 @@ public sealed class TenantAdminUserServiceTests
     }
 
     [Fact]
-    public async Task GetCreateOptions_DoesNotReturnActive_WhenActiveCreateIsForbidden()
+    public async Task GetCreateOptions_ReturnsActive_WhenDirectPasswordCreateIsSupported()
     {
         var service = CreateService(new FakeTenantAdminUserRepository());
 
@@ -139,7 +142,27 @@ public sealed class TenantAdminUserServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.DoesNotContain(TenantUserConstants.StatusActive, result.Value!.SupportedStatuses);
+        Assert.Contains(TenantUserConstants.StatusActive, result.Value!.SupportedStatuses);
+    }
+
+    [Fact]
+    public async Task GetCreateOptions_ReturnsExplicitScopeCapabilitiesAndCatalogVersion()
+    {
+        var service = CreateService(new FakeTenantAdminUserRepository());
+
+        var result = await service.GetCreateOptionsAsync(
+            CreateContext([TenantAdminUserPermissions.Create]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(TenantUserAccessScopes.NoOutletAccess, result.Value!.SupportedOutletAccessScopes!);
+        Assert.Contains(TenantUserAccessScopes.SelectedTills, result.Value.SupportedTillAccessScopes!);
+        var capabilities = Assert.IsType<TenantAdminUserCreateCapabilitiesResponse>(result.Value.Capabilities);
+        Assert.True(capabilities.SupportsUserPermissionOverrides);
+        Assert.False(capabilities.SupportsPermissionDenies);
+        Assert.True(capabilities.SupportsDirectActiveCreation);
+        Assert.True(capabilities.SupportsTemporaryPassword);
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.PermissionCatalogVersion));
     }
 
     [Fact]
@@ -168,6 +191,140 @@ public sealed class TenantAdminUserServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(RoleId, repository.CreatedRoleId);
         Assert.Empty(repository.CreatedOutletIds);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithSelectedOutletAndTill_PersistsExplicitScopesAndDefaults()
+    {
+        var repository = new FakeTenantAdminUserRepository();
+        var service = CreateService(repository);
+        var request = CreateValidRequest() with
+        {
+            OutletAccessScope = TenantUserAccessScopes.SelectedOutlets,
+            OutletIds = [OutletId],
+            DefaultOutletId = OutletId,
+            TillAccessScope = TenantUserAccessScopes.SelectedTills,
+            TillIds = [TillId],
+            DefaultTillId = TillId,
+        };
+
+        var result = await service.CreateAsync(
+            CreateContext([TenantAdminUserPermissions.Create]),
+            request,
+            CancellationToken.None,
+            IdempotencyKey);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TenantUserAccessScopes.SelectedOutlets, repository.CreatedOutletAccessScope);
+        Assert.Equal([OutletId], repository.CreatedOutletIds);
+        Assert.Equal([TillId], repository.CreatedTillIds);
+        Assert.Equal(OutletId.ToString(), repository.CreatedUser!.DefaultOutletId);
+        Assert.Equal(TillId, repository.CreatedUser.DefaultTillId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithNoOutletAccess_PersistsNoOutletAndNoTillScopes()
+    {
+        var repository = new FakeTenantAdminUserRepository();
+        var service = CreateService(repository);
+
+        var result = await service.CreateAsync(
+            CreateContext([TenantAdminUserPermissions.Create]),
+            CreateValidRequest() with
+            {
+                OutletAccessScope = TenantUserAccessScopes.NoOutletAccess,
+                TillAccessScope = TenantUserAccessScopes.NoTillAccess,
+            },
+            CancellationToken.None,
+            IdempotencyKey);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TenantUserAccessScopes.NoOutletAccess, repository.CreatedOutletAccessScope);
+        Assert.Equal(TenantUserAccessScopes.NoTillAccess, repository.CreatedUser!.TillAccessScope);
+        Assert.Empty(repository.CreatedOutletIds);
+        Assert.Empty(repository.CreatedTillIds);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithNoOutletAccessAndTill_ReturnsConflictValidation()
+    {
+        var service = CreateService(new FakeTenantAdminUserRepository());
+
+        var result = await service.CreateAsync(
+            CreateContext([TenantAdminUserPermissions.Create]),
+            CreateValidRequest() with
+            {
+                OutletAccessScope = TenantUserAccessScopes.NoOutletAccess,
+                TillAccessScope = TenantUserAccessScopes.SelectedTills,
+                TillIds = [TillId],
+            },
+            CancellationToken.None,
+            IdempotencyKey);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("user.no_outlet_access_conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithPermissionDenial_ReturnsUnsupportedError()
+    {
+        var service = CreateService(new FakeTenantAdminUserRepository());
+
+        var result = await service.CreateAsync(
+            CreateContext([TenantAdminUserPermissions.Create]),
+            CreateValidRequest() with { DeniedPermissionIds = [Guid.NewGuid()] },
+            CancellationToken.None,
+            IdempotencyKey);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("user.permission_denies_unsupported", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithStalePermissionCatalog_ReturnsCatalogMismatch()
+    {
+        var permissionId = Guid.NewGuid();
+        var service = CreateService(new FakeTenantAdminUserRepository());
+
+        var result = await service.CreateAsync(
+            CreateContext([TenantAdminUserPermissions.Create, TenantAdminUserPermissions.PermissionOverride]),
+            CreateValidRequest() with
+            {
+                PermissionOverrideEnabled = true,
+                OverriddenPermissionIds = [permissionId],
+                PermissionCatalogVersion = "stale",
+            },
+            CancellationToken.None,
+            IdempotencyKey);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("user.permission_catalog_mismatch", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithTillOutsideOutletScope_ReturnsTillScopeError()
+    {
+        var repository = new FakeTenantAdminUserRepository
+        {
+            TillValidation = TenantAdminUserAccessValidationResult.Invalid(
+                TenantAdminUserAccessValidationFailure.TillOutsideOutletScope),
+        };
+        var service = CreateService(repository);
+
+        var result = await service.CreateAsync(
+            CreateContext([TenantAdminUserPermissions.Create]),
+            CreateValidRequest() with
+            {
+                OutletAccessScope = TenantUserAccessScopes.SelectedOutlets,
+                OutletIds = [OutletId],
+                TillAccessScope = TenantUserAccessScopes.SelectedTills,
+                TillIds = [TillId],
+            },
+            CancellationToken.None,
+            IdempotencyKey);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("user.till_outside_outlet_scope", result.Error.Code);
     }
 
     [Fact]
@@ -426,7 +583,7 @@ public sealed class TenantAdminUserServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_WithActiveStatus_ReturnsValidationFailure()
+    public async Task CreateAsync_WithActiveStatusAndNoPassword_ReturnsPasswordFailure()
     {
         var repository = new FakeTenantAdminUserRepository();
         var service = CreateService(repository);
@@ -439,7 +596,7 @@ public sealed class TenantAdminUserServiceTests
             IdempotencyKey);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("user.validation_failed", result.Error.Code);
+        Assert.Equal("user.password_invalid", result.Error.Code);
         Assert.Equal(0, repository.CreateCallCount);
     }
 
@@ -488,11 +645,44 @@ public sealed class TenantAdminUserServiceTests
     }
 
     [Fact]
-    public async Task CreateUser_RejectsActive()
+    public async Task CreateUser_WithValidPassword_CreatesActiveLoginAccount()
     {
         var repository = new FakeTenantAdminUserRepository();
         var service = CreateService(repository);
-        var request = CreateValidRequest() with { AccountStatus = TenantUserConstants.StatusActive };
+        var request = CreateValidRequest() with
+        {
+            AccountStatus = TenantUserConstants.StatusActive,
+            Password = "SecurePass123",
+            ConfirmPassword = "SecurePass123",
+        };
+
+        var result = await service.CreateAsync(
+            CreateContext([TenantAdminUserPermissions.Create]),
+            request,
+            CancellationToken.None,
+            IdempotencyKey);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TenantUserConstants.StatusActive, repository.CreatedUser?.AccountStatus);
+        Assert.Equal("HASH:SecurePass123", repository.CreatedUser?.EncryptedPassword);
+        Assert.Equal("pbkdf2_embedded", repository.CreatedUser?.PasswordSalt);
+        Assert.Null(repository.CreatedInvite);
+        Assert.Null(repository.CreatedDeliverySecret);
+        Assert.Null(repository.CreatedOutbox);
+        Assert.Equal(1, repository.CreateCallCount);
+    }
+
+    [Fact]
+    public async Task CreateUser_WithPasswordMismatch_DoesNotPersistUser()
+    {
+        var repository = new FakeTenantAdminUserRepository();
+        var service = CreateService(repository);
+        var request = CreateValidRequest() with
+        {
+            AccountStatus = TenantUserConstants.StatusActive,
+            Password = "SecurePass123",
+            ConfirmPassword = "DifferentPass123",
+        };
 
         var result = await service.CreateAsync(
             CreateContext([TenantAdminUserPermissions.Create]),
@@ -501,7 +691,7 @@ public sealed class TenantAdminUserServiceTests
             IdempotencyKey);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("user.validation_failed", result.Error.Code);
+        Assert.Equal("user.password_mismatch", result.Error.Code);
         Assert.Equal(0, repository.CreateCallCount);
     }
 
@@ -1313,6 +1503,7 @@ public sealed class TenantAdminUserServiceTests
             repository,
             new FakeDateTimeProvider(),
             new FakePasswordHashService(),
+            new PlatformPasswordPolicyValidator(),
             new AllowingTenantResourceLimitGuard(),
             new FakeStaffCodeService(),
             new FakeInvitationTokenService(),
@@ -1444,6 +1635,8 @@ public sealed class TenantAdminUserServiceTests
             TenantAdminUserAccessValidationResult.Valid;
         public TenantAdminUserAccessValidationResult OutletValidation { get; init; } =
             TenantAdminUserAccessValidationResult.Valid;
+        public TenantAdminUserAccessValidationResult TillValidation { get; init; } =
+            TenantAdminUserAccessValidationResult.Valid;
         public TenantAdminUserAccessValidationResult PermissionValidation { get; init; } =
             TenantAdminUserAccessValidationResult.Valid;
         public TenantAdminUserProfileMediaValidationResult ProfileMediaValidation { get; init; } =
@@ -1453,6 +1646,7 @@ public sealed class TenantAdminUserServiceTests
         public bool HasSalesReferences { get; init; }
         public TenantAdminUserListResponse? ListResponse { get; init; }
         public bool ThrowOnCreate { get; init; }
+        public bool ReturnEmptyPermissionCatalog { get; init; }
         public int ThrowOnCreateCount { get; init; }
         public TenantAdminUserInviteMutationStatus InviteMutationStatus { get; init; } =
             TenantAdminUserInviteMutationStatus.Success;
@@ -1470,6 +1664,8 @@ public sealed class TenantAdminUserServiceTests
         public IReadOnlyCollection<AuditLog> CreatedAudits { get; private set; } = [];
         public Guid? CreatedRoleId { get; private set; }
         public IReadOnlyCollection<Guid> CreatedOutletIds { get; private set; } = [];
+        public string? CreatedOutletAccessScope { get; private set; }
+        public IReadOnlyCollection<Guid> CreatedTillIds { get; private set; } = [];
         public IReadOnlyCollection<Guid> CreatedOverriddenPermissionIds { get; private set; } = [];
         public IReadOnlyCollection<Guid> ValidatedPermissionIds { get; private set; } = [];
         public Guid? ValidatedProfileMediaAssetId { get; private set; }
@@ -1495,12 +1691,28 @@ public sealed class TenantAdminUserServiceTests
         public Task<IReadOnlyList<OutletOptionResponse>> GetOutletOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<OutletOptionResponse>>([]);
 
+        public Task<IReadOnlyList<TillOptionResponse>> GetTillOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<TillOptionResponse>>([]);
+
         public Task<IReadOnlyList<PermissionGroupResponse>> GetPermissionGroupsAsync(
             Guid tenantId,
             IReadOnlyCollection<string> actorPermissionCodes,
             DateTimeOffset now,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<PermissionGroupResponse>>([]);
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyList<PermissionGroupResponse> groups =
+                ReturnEmptyPermissionCatalog || ValidatedPermissionIds.Count == 0
+                    ? []
+                    :
+                    [
+                        new PermissionGroupResponse(
+                            "Test Module",
+                            ValidatedPermissionIds
+                                .Select(id => new PermissionItemResponse(id, $"test.{id:N}", "view", "Test permission"))
+                                .ToList())
+                    ];
+            return Task.FromResult(groups);
+        }
 
         public Task<bool> RoleBelongsToTenantAsync(Guid tenantId, Guid roleId, CancellationToken cancellationToken) =>
             Task.FromResult(RoleValidation.IsValid);
@@ -1521,6 +1733,14 @@ public sealed class TenantAdminUserServiceTests
             IReadOnlyCollection<Guid> outletIds,
             CancellationToken cancellationToken) =>
             Task.FromResult(OutletValidation);
+
+        public Task<TenantAdminUserAccessValidationResult> ValidateTillSelectionAsync(
+            Guid tenantId,
+            IReadOnlyCollection<Guid> tillIds,
+            IReadOnlyCollection<Guid> allowedOutletIds,
+            bool allowAllTenantOutlets,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(TillValidation);
 
         public Task<bool> EmailExistsForTenantAsync(Guid tenantId, string normalizedEmail, Guid? excludeUserId, CancellationToken cancellationToken) =>
             Task.FromResult(EmailExists);
@@ -1577,6 +1797,35 @@ public sealed class TenantAdminUserServiceTests
             CreatedOutletIds = outletIds;
             CreatedOverriddenPermissionIds = overriddenPermissionIds;
             return Task.FromResult(user.Id);
+        }
+
+        public Task<Guid> CreateAsync(
+            TenantUser user,
+            Guid roleId,
+            string outletAccessScope,
+            IReadOnlyCollection<Guid> outletIds,
+            IReadOnlyCollection<Guid> overriddenPermissionIds,
+            IReadOnlyCollection<Guid> tillIds,
+            UserInvite? invite,
+            TenantUserInviteDeliverySecret? deliverySecret,
+            IntegrationOutboxMessage? outboxMessage,
+            IReadOnlyCollection<AuditLog> auditLogs,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            CreatedOutletAccessScope = outletAccessScope;
+            CreatedTillIds = tillIds;
+            return CreateAsync(
+                user,
+                roleId,
+                outletIds,
+                overriddenPermissionIds,
+                invite,
+                deliverySecret,
+                outboxMessage,
+                auditLogs,
+                now,
+                cancellationToken);
         }
 
         public Task<TenantAdminUserInviteMutationResult> ResendInviteAsync(
@@ -1762,6 +2011,25 @@ public sealed class TenantAdminUserServiceTests
             bool permissionOverrideEnabled, IReadOnlyCollection<Guid> overriddenPermissionIds,
             Guid actingUserId, DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.CompletedTask;
+
+        public Task ReplaceAssignmentsAsync(
+            Guid tenantId,
+            Guid userId,
+            Guid roleId,
+            string outletAccessScope,
+            IReadOnlyCollection<Guid> outletIds,
+            bool permissionOverrideEnabled,
+            IReadOnlyCollection<Guid> overriddenPermissionIds,
+            IReadOnlyCollection<Guid> tillIds,
+            Guid actingUserId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            CreatedOutletAccessScope = outletAccessScope;
+            CreatedOutletIds = outletIds;
+            CreatedTillIds = tillIds;
+            return Task.CompletedTask;
+        }
 
         public Task ApplyProfileMediaChangeAsync(
             Guid tenantId,

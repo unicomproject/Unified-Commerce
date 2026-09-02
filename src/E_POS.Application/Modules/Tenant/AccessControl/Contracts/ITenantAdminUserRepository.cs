@@ -28,6 +28,11 @@ public interface ITenantAdminUserRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<TillOptionResponse>> GetTillOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<TillOptionResponse>>([]);
+
     Task<IReadOnlyList<PermissionGroupResponse>> GetPermissionGroupsAsync(
         Guid tenantId,
         IReadOnlyCollection<string> actorPermissionCodes,
@@ -55,6 +60,14 @@ public interface ITenantAdminUserRepository
         Guid tenantId,
         IReadOnlyCollection<Guid> outletIds,
         CancellationToken cancellationToken);
+
+    Task<TenantAdminUserAccessValidationResult> ValidateTillSelectionAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> tillIds,
+        IReadOnlyCollection<Guid> allowedOutletIds,
+        bool allowAllTenantOutlets,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(TenantAdminUserAccessValidationResult.Valid);
 
     Task<bool> EmailExistsForTenantAsync(
         Guid tenantId,
@@ -90,6 +103,31 @@ public interface ITenantAdminUserRepository
         IReadOnlyCollection<AuditLog> auditLogs,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+
+    Task<Guid> CreateAsync(
+        TenantUser user,
+        Guid roleId,
+        string outletAccessScope,
+        IReadOnlyCollection<Guid> outletIds,
+        IReadOnlyCollection<Guid> overriddenPermissionIds,
+        IReadOnlyCollection<Guid> tillIds,
+        UserInvite? invite,
+        TenantUserInviteDeliverySecret? deliverySecret,
+        IntegrationOutboxMessage? outboxMessage,
+        IReadOnlyCollection<AuditLog> auditLogs,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        CreateAsync(
+            user,
+            roleId,
+            outletIds,
+            overriddenPermissionIds,
+            invite,
+            deliverySecret,
+            outboxMessage,
+            auditLogs,
+            now,
+            cancellationToken);
 
     Task<TenantAdminUserInviteMutationResult> ResendInviteAsync(
         Guid tenantId,
@@ -129,6 +167,29 @@ public interface ITenantAdminUserRepository
         Guid actingUserId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+
+    Task ReplaceAssignmentsAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid roleId,
+        string outletAccessScope,
+        IReadOnlyCollection<Guid> outletIds,
+        bool permissionOverrideEnabled,
+        IReadOnlyCollection<Guid> overriddenPermissionIds,
+        IReadOnlyCollection<Guid> tillIds,
+        Guid actingUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        ReplaceAssignmentsAsync(
+            tenantId,
+            userId,
+            roleId,
+            outletIds,
+            permissionOverrideEnabled,
+            overriddenPermissionIds,
+            actingUserId,
+            now,
+            cancellationToken);
 
     Task ApplyProfileMediaChangeAsync(
         Guid tenantId,
@@ -177,7 +238,11 @@ public enum TenantAdminUserAccessValidationFailure
     PermissionNotAssignable,
     TenantEntitlementMissing,
     ActorCannotDelegate,
-    InvalidScope
+    InvalidScope,
+    TillNotFound,
+    TillWrongTenant,
+    TillInactive,
+    TillOutsideOutletScope
 }
 
 public sealed record TenantAdminUserProfileMediaValidationResult(

@@ -16,6 +16,9 @@ public class TenantUser : AuditableEntity
     public Guid? ProfileImageUrl { get; protected set; }
     public Guid? OutletId { get; protected set; }
     public string? DefaultOutletId { get; protected set; }
+    public string OutletAccessScope { get; protected set; } = TenantUserAccessScopes.AllOutlets;
+    public string TillAccessScope { get; protected set; } = TenantUserAccessScopes.AllAccessibleTills;
+    public Guid? DefaultTillId { get; protected set; }
     public string? EmployeeId { get; protected set; }
     public string? StaffCode { get; protected set; }
     public string UserType { get; protected set; } = string.Empty;
@@ -143,6 +146,24 @@ public class TenantUser : AuditableEntity
     {
         // Legacy column name profile_image_url stores the tenant user's MediaAsset identifier.
         ProfileImageUrl = mediaAssetId;
+        UpdatedByTenantUserId = updatedBy;
+        UpdatedAt = now;
+    }
+
+    public void SetAccessScope(
+        string outletAccessScope,
+        Guid? defaultOutletId,
+        string tillAccessScope,
+        Guid? defaultTillId,
+        Guid? updatedBy,
+        DateTimeOffset now)
+    {
+        OutletAccessScope = TenantUserAccessScopes.NormalizeOutletScope(outletAccessScope)
+            ?? throw new InvalidOperationException("Invalid outlet access scope.");
+        TillAccessScope = TenantUserAccessScopes.NormalizeTillScope(tillAccessScope)
+            ?? throw new InvalidOperationException("Invalid till access scope.");
+        DefaultOutletId = defaultOutletId?.ToString();
+        DefaultTillId = defaultTillId;
         UpdatedByTenantUserId = updatedBy;
         UpdatedAt = now;
     }

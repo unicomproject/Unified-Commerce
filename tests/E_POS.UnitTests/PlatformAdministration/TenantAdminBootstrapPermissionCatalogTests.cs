@@ -15,6 +15,7 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
         Assert.Equal(
             TenantAdminBootstrapPermissionCatalog.BasePermissionCodes.OrderBy(x => x),
             plan.PermissionCodes.OrderBy(x => x));
+        Assert.Contains("tenant.settings.manage", plan.PermissionCodes);
         Assert.DoesNotContain("tenant.outlets.manage", plan.PermissionCodes);
         Assert.DoesNotContain("inventory.stock.view", plan.PermissionCodes);
         Assert.DoesNotContain("platform.tenants.create", plan.PermissionCodes);

@@ -90,4 +90,9 @@ public sealed class StorefrontService : IStorefrontService
     {
         return _tenantService.ResolveTenantAsync(slug, cancellationToken);
     }
+
+    public Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantByHostAsync(string host, CancellationToken cancellationToken = default)
+    {
+        return _tenantService.ResolveTenantByHostAsync(host, cancellationToken);
+    }
 }

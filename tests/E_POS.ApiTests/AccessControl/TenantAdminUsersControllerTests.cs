@@ -37,6 +37,38 @@ public sealed class TenantAdminUsersControllerTests
     }
 
     [Fact]
+    public async Task Create_WithCatalogMismatch_ReturnsConflict()
+    {
+        var service = new FakeTenantAdminUserService(
+            ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.permission_catalog_mismatch",
+                "Permission catalog changed.")));
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.users.create");
+
+        var result = await controller.Create(CreateRequest(), CancellationToken.None);
+
+        var objectResult = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithNonDelegableRole_ReturnsForbidden()
+    {
+        var service = new FakeTenantAdminUserService(
+            ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.role_not_delegable",
+                "Role cannot be delegated.")));
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.users.create");
+
+        var result = await controller.Create(CreateRequest(), CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
     public async Task List_WithoutTenantClaims_ReturnsUnauthorized()
     {
         var service = new FakeTenantAdminUserService(

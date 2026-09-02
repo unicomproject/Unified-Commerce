@@ -51,6 +51,20 @@ public sealed class StorefrontControllerTests
     }
 
     [Fact]
+    public async Task ResolveTenant_WithHost_NormalizesAndResolvesVerifiedDomain()
+    {
+        var tenantId = Guid.NewGuid();
+        var service = new FakeStorefrontService { ResolvedTenantId = tenantId };
+        var controller = new StorefrontTenantController(service);
+
+        var result = await controller.ResolveTenant(null, CancellationToken.None, "HTTPS://Shop.Example.COM:443/");
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal("shop.example.com", service.ResolvedHost);
+        Assert.Null(service.ResolvedSlug);
+    }
+
+    [Fact]
     public async Task GetBanners_WithMissingTenantHeader_ReturnsBadRequest()
     {
         var service = new FakeStorefrontService();
@@ -410,6 +424,7 @@ public sealed class StorefrontControllerTests
     {
         public Guid? ResolvedTenantId { get; init; }
         public string? ResolvedSlug { get; private set; }
+        public string? ResolvedHost { get; private set; }
         public Guid? BannersTenantId { get; private set; }
         public string? BannerType { get; private set; }
         public Guid? RootCategoriesTenantId { get; private set; }
@@ -521,6 +536,12 @@ public sealed class StorefrontControllerTests
         public Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantAsync(string slug, CancellationToken cancellationToken = default)
         {
             ResolvedSlug = slug;
+            return Task.FromResult<(Guid?, string?)>((ResolvedTenantId, "USD"));
+        }
+
+        public Task<(Guid? TenantId, string? BaseCurrencyCode)> ResolveTenantByHostAsync(string host, CancellationToken cancellationToken = default)
+        {
+            ResolvedHost = host;
             return Task.FromResult<(Guid?, string?)>((ResolvedTenantId, "USD"));
         }
     }
