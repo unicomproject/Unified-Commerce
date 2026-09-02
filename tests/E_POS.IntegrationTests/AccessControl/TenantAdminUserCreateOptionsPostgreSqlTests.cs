@@ -3,6 +3,7 @@ using E_POS.Application.Common.Idempotency;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.AccessControl.Services;
@@ -63,11 +64,17 @@ public sealed class TenantAdminUserCreateOptionsPostgreSqlTests
         Assert.Equal("Tenant Role", role.RoleName);
         var outlet = Assert.Single(options.Outlets);
         Assert.Equal("Tenant Outlet", outlet.OutletName);
+        var till = Assert.Single(options.Tills!);
+        Assert.Equal("Tenant Till", till.TillName);
         var group = Assert.Single(options.PermissionGroups);
         var permission = Assert.Single(group.Permissions);
         Assert.Equal("tenant.users.update", permission.PermissionCode);
         Assert.DoesNotContain(options.Roles, item => item.RoleName.Contains("Other", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(options.Roles, item => item.RoleCode.Equals("SUPER_ADMIN", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(options.Outlets, item => item.OutletName.Contains("Other", StringComparison.OrdinalIgnoreCase));
+        Assert.True(options.Capabilities!.SupportsExplicitTillAccess);
+        Assert.False(options.Capabilities.SupportsPermissionDenies);
+        Assert.False(string.IsNullOrWhiteSpace(options.PermissionCatalogVersion));
     }
 
     [Fact]
@@ -118,6 +125,7 @@ public sealed class TenantAdminUserCreateOptionsPostgreSqlTests
         var tenantRoleId = Guid.NewGuid();
         var nonDelegableRoleId = Guid.NewGuid();
         var reportsPermissionId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
 
         SeedCurrencyAndTenant(db, fixture.TenantId, fixture.Suffix);
         db.Tenants.Add(Tenant.Create(
@@ -135,12 +143,28 @@ public sealed class TenantAdminUserCreateOptionsPostgreSqlTests
         db.TenantRoles.AddRange(
             TenantRole.Create(tenantRoleId, fixture.TenantId, null, null, $"ROLE-A-{fixture.Suffix}", "Tenant Role", null, true, true, null, Now),
             TenantRole.Create(nonDelegableRoleId, fixture.TenantId, null, null, $"ROLE-NON-DELEGABLE-{fixture.Suffix}", "Nondelegable Role", null, true, true, null, Now),
+            TenantRole.Create(Guid.NewGuid(), fixture.TenantId, null, null, "SUPER_ADMIN", "Tenant Super Admin", null, true, true, null, Now),
             TenantRole.Create(Guid.NewGuid(), fixture.TenantId, null, null, $"ROLE-INACTIVE-{fixture.Suffix}", "Inactive Role", null, true, false, null, Now),
             TenantRole.Create(Guid.NewGuid(), otherTenantId, null, null, $"ROLE-B-{fixture.Suffix}", "Other Tenant Role", null, true, true, null, Now));
         db.Outlets.AddRange(
-            Outlet.Create(Guid.NewGuid(), fixture.TenantId, "Tenant Outlet", $"OUT-A-{fixture.Suffix}", OutletConstants.ActiveStatus, OutletConstants.StoreOutletType, "UTC", true, null, null, null, Now),
+            Outlet.Create(outletId, fixture.TenantId, "Tenant Outlet", $"OUT-A-{fixture.Suffix}", OutletConstants.ActiveStatus, OutletConstants.StoreOutletType, "UTC", true, null, null, null, Now),
             Outlet.Create(Guid.NewGuid(), fixture.TenantId, "Inactive Outlet", $"OUT-INACTIVE-{fixture.Suffix}", OutletConstants.InactiveStatus, OutletConstants.StoreOutletType, "UTC", false, null, null, null, Now),
             Outlet.Create(Guid.NewGuid(), otherTenantId, "Other Tenant Outlet", $"OUT-B-{fixture.Suffix}", OutletConstants.ActiveStatus, OutletConstants.StoreOutletType, "UTC", true, null, null, null, Now));
+        db.Tills.Add(Till.Create(
+            Guid.NewGuid(),
+            fixture.TenantId,
+            outletId,
+            "Tenant Till",
+            "Front Counter",
+            1,
+            $"TILL-{fixture.Suffix}",
+            TillConstants.StandardTillType,
+            0m,
+            "LKR",
+            true,
+            TillConstants.ActiveStatus,
+            null,
+            Now));
         db.PlatformModules.Add(PlatformModule.Create(moduleId, $"module-{fixture.Suffix}", "Tenant Admin", null, "ACTIVE", 1, Now));
         db.PlatformFeatures.AddRange(
             PlatformFeature.Create(userFeatureId, moduleId, PlatformTenantFeatureCodes.UserAccounts, "Users", "ACTIVE", Now),
@@ -199,6 +223,7 @@ public sealed class TenantAdminUserCreateOptionsPostgreSqlTests
             new TenantAdminUserRepository(db),
             new FixedDateTimeProvider(Now),
             new ThrowingPasswordHashService(),
+            new PlatformPasswordPolicyValidator(),
             new AllowingTenantResourceLimitGuard(),
             new TenantUserStaffCodeService(db),
             new FakeInvitationTokenService(),

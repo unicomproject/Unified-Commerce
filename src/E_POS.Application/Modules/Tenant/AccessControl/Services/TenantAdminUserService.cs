@@ -7,6 +7,7 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
@@ -51,6 +52,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
     private readonly ITenantAdminUserRepository _repository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IPasswordHashService _passwordHashService;
+    private readonly IPlatformPasswordPolicyValidator _passwordPolicyValidator;
     private readonly ITenantResourceLimitGuard _resourceLimitGuard;
     private readonly ITenantUserStaffCodeService _staffCodeService;
     private readonly IInvitationTokenService _invitationTokenService;
@@ -61,6 +63,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         ITenantAdminUserRepository repository,
         IDateTimeProvider dateTimeProvider,
         IPasswordHashService passwordHashService,
+        IPlatformPasswordPolicyValidator passwordPolicyValidator,
         ITenantResourceLimitGuard resourceLimitGuard,
         ITenantUserStaffCodeService staffCodeService,
         IInvitationTokenService invitationTokenService,
@@ -70,6 +73,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         _repository = repository;
         _dateTimeProvider = dateTimeProvider;
         _passwordHashService = passwordHashService;
+        _passwordPolicyValidator = passwordPolicyValidator;
         _resourceLimitGuard = resourceLimitGuard;
         _staffCodeService = staffCodeService;
         _invitationTokenService = invitationTokenService;
@@ -153,18 +157,39 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             }
         }
         var outlets = await _repository.GetOutletOptionsAsync(context.TenantId, cancellationToken);
+        var tills = await _repository.GetTillOptionsAsync(context.TenantId, cancellationToken);
         var permissionGroups = await _repository.GetPermissionGroupsAsync(
             context.TenantId,
             context.Permissions,
             now,
             cancellationToken);
 
+        var catalogVersion = ComputePermissionCatalogVersion(roles, permissionGroups);
         return ApplicationResult<TenantAdminUserCreateOptionsResponse>.Success(
             new TenantAdminUserCreateOptionsResponse(
                 roles,
                 outlets,
                 permissionGroups,
-                TenantAdminUserCreateStatusPolicy.SupportedStatuses));
+                TenantAdminUserCreateStatusPolicy.SupportedStatuses,
+                tills,
+                TenantUserAccessScopes.SupportedOutletScopes,
+                TenantUserAccessScopes.SupportedTillScopes,
+                new TenantAdminUserCreateCapabilitiesResponse(
+                    SupportsInvitedUserCreation: true,
+                    SupportsDirectActiveCreation: true,
+                    SupportsUserPermissionOverrides: true,
+                    SupportsPermissionDenies: false,
+                    SupportsAllOutletAccess: true,
+                    SupportsNoOutletAccess: true,
+                    SupportsExplicitTillAccess: true,
+                    SupportsDefaultOutlet: true,
+                    SupportsDefaultTill: true,
+                    SupportsAccessStartDate: false,
+                    SupportsTemporaryPassword: true,
+                    SupportsForcePasswordChange: false,
+                    SupportsTwoFactorDuringCreation: false,
+                    SupportsSaveDraft: false),
+                catalogVersion));
     }
 
     public async Task<ApplicationResult<TenantAdminUserDetailResponse>> CreateAsync(
@@ -214,9 +239,40 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(validationError);
         }
         if (createStatus is null)
-            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ValidationFailed("Create status must be Inactive or Invited."));
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ValidationFailed("Create status must be Active, Inactive, or Invited."));
+
+        if (createStatus == TenantUserConstants.StatusActive)
+        {
+            if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                    "user.password_mismatch",
+                    "Password and confirmation do not match."));
+            }
+
+            var passwordPolicyError = _passwordPolicyValidator.Validate(request.Password);
+            if (passwordPolicyError is not null)
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                    "user.password_invalid",
+                    passwordPolicyError.Message));
+            }
+        }
+        else if (!string.IsNullOrEmpty(request.Password) || !string.IsNullOrEmpty(request.ConfirmPassword))
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.password_not_allowed",
+                "A password can be supplied only when creating an active user."));
+        }
 
         var now = _dateTimeProvider.UtcNow;
+        if (NormalizeIds(request.DeniedPermissionIds).Count > 0)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.permission_denies_unsupported",
+                "Explicit permission denials are not supported; user overrides are additional grants only."));
+        }
+
         var roleValidation = await _repository.ValidateRoleAssignmentAsync(
             context.TenantId,
             request.RoleId,
@@ -229,6 +285,15 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         }
 
         var outletIds = NormalizeIds(request.OutletIds);
+        var tillIds = NormalizeIds(request.TillIds);
+        var scopeValidation = NormalizeAndValidateAccessScope(request, outletIds, tillIds);
+        if (!scopeValidation.IsValid)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(scopeValidation.Error!);
+        }
+
+        var outletAccessScope = scopeValidation.OutletAccessScope!;
+        var tillAccessScope = scopeValidation.TillAccessScope!;
         var outletValidation = await _repository.ValidateOutletSelectionAsync(
             context.TenantId,
             outletIds,
@@ -236,6 +301,43 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         if (!outletValidation.IsValid)
         {
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(outletValidation.Failure));
+        }
+
+        var tillValidation = await _repository.ValidateTillSelectionAsync(
+            context.TenantId,
+            tillIds,
+            outletIds,
+            string.Equals(outletAccessScope, TenantUserAccessScopes.AllOutlets, StringComparison.Ordinal),
+            cancellationToken);
+        if (!tillValidation.IsValid)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(tillValidation.Failure));
+        }
+
+        if (request.DefaultOutletId.HasValue)
+        {
+            var defaultOutletValidation = await _repository.ValidateOutletSelectionAsync(
+                context.TenantId,
+                [request.DefaultOutletId.Value],
+                cancellationToken);
+            if (!defaultOutletValidation.IsValid)
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(defaultOutletValidation.Failure));
+            }
+        }
+
+        if (request.DefaultTillId.HasValue)
+        {
+            var defaultTillValidation = await _repository.ValidateTillSelectionAsync(
+                context.TenantId,
+                [request.DefaultTillId.Value],
+                outletIds,
+                string.Equals(outletAccessScope, TenantUserAccessScopes.AllOutlets, StringComparison.Ordinal),
+                cancellationToken);
+            if (!defaultTillValidation.IsValid)
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(defaultTillValidation.Failure));
+            }
         }
 
         var normalizedEmail = TenantUser.NormalizeEmail(request.Email);
@@ -263,6 +365,34 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(permissionValidation.Failure));
         }
 
+
+        var currentRoles = await _repository.GetRoleOptionsAsync(context.TenantId, cancellationToken);
+        var currentPermissionGroups = await _repository.GetPermissionGroupsAsync(
+            context.TenantId,
+            context.Permissions,
+            now,
+            cancellationToken);
+        var currentCatalogVersion = ComputePermissionCatalogVersion(currentRoles, currentPermissionGroups);
+        if (permissionOverrideEnabled &&
+            currentPermissionGroups.Count == 0 &&
+            overriddenPermissionIds.Count > 0)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.permission_catalog_mismatch",
+                "Permission catalog is incomplete. Reload create options before creating the user."));
+        }
+
+        if (permissionOverrideEnabled &&
+            !string.IsNullOrWhiteSpace(request.PermissionCatalogVersion) &&
+            !CryptographicOperations.FixedTimeEquals(
+                 Encoding.UTF8.GetBytes(currentCatalogVersion),
+                 Encoding.UTF8.GetBytes(request.PermissionCatalogVersion.Trim().ToLowerInvariant())))
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.permission_catalog_mismatch",
+                "Permission catalog changed or was not supplied. Reload create options before creating the user."));
+        }
+
         if (request.ProfileMediaAssetId.HasValue)
         {
             var mediaValidation = await _repository.ValidateProfileMediaAsync(
@@ -286,9 +416,10 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         TenantUserInviteDeliverySecret? deliverySecret = null;
         IntegrationOutboxMessage? outbox = null;
         var audit = new List<AuditLog>();
-        var increasesCountedSeat = createStatus == TenantUserConstants.StatusInvited;
+        var isInvited = createStatus == TenantUserConstants.StatusInvited;
+        var increasesCountedSeat = CountsTowardUserLimit(createStatus);
 
-        if (increasesCountedSeat)
+        if (isInvited)
         {
             user = TenantUser.Create(userId, context.TenantId, request.Email.Trim(), trimmedFullName, trimmedPhone, trimmedPhone,
                 TenantUserConstants.PendingInvitePasswordHash, "empty_salt", TenantUserConstants.StatusInvited, "admin", "admin", null, now,
@@ -315,6 +446,25 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 JsonSerializer.Serialize(new { tenantId = context.TenantId, tenantUserId = userId, inviteId = invite.Id }),
                 $"tenant.user_invited:{invite.Id:N}", now);
         }
+        else if (createStatus == TenantUserConstants.StatusActive)
+        {
+            user = TenantUser.Create(
+                userId,
+                context.TenantId,
+                request.Email.Trim(),
+                trimmedFullName,
+                trimmedPhone,
+                trimmedPhone,
+                _passwordHashService.HashPassword(request.Password!),
+                "pbkdf2_embedded",
+                TenantUserConstants.StatusActive,
+                "admin",
+                "admin",
+                null,
+                now,
+                request.EmployeeId,
+                staffCode);
+        }
         else
         {
             user = TenantUser.Create(
@@ -335,6 +485,14 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 staffCode);
         }
 
+        user.SetAccessScope(
+            outletAccessScope,
+            request.DefaultOutletId,
+            tillAccessScope,
+            request.DefaultTillId,
+            null,
+            now);
+
         if (request.ProfileMediaAssetId.HasValue)
         {
             user.SetProfileMediaAsset(request.ProfileMediaAssetId.Value, context.UserId, now);
@@ -342,6 +500,11 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
 
         audit.Add(NewAudit(context, userId, "user.created", now));
         audit.Add(NewAudit(context, userId, "user.access_assigned", now));
+        audit.Add(NewAudit(context, userId, "user.outlet_access_assigned", now));
+        if (!string.Equals(tillAccessScope, TenantUserAccessScopes.NoTillAccess, StringComparison.Ordinal))
+        {
+            audit.Add(NewAudit(context, userId, "user.till_access_assigned", now));
+        }
         if (invite is not null) audit.Add(NewAudit(context, userId, "user.invited", now, invite.Id));
         if (overriddenPermissionIds.Count > 0) audit.Add(NewAudit(context, userId, "user.permission_override_changed", now));
         if (request.ProfileMediaAssetId.HasValue)
@@ -351,7 +514,19 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
 
         async Task<ApplicationResult<TenantAdminUserDetailResponse>> PersistAsync(CancellationToken ct)
         {
-            await _repository.CreateAsync(user, request.RoleId, outletIds, overriddenPermissionIds, invite, deliverySecret, outbox, audit, now, ct);
+            await _repository.CreateAsync(
+                user,
+                request.RoleId,
+                outletAccessScope,
+                outletIds,
+                overriddenPermissionIds,
+                tillIds,
+                invite,
+                deliverySecret,
+                outbox,
+                audit,
+                now,
+                ct);
             var response = await _repository.GetDetailAsync(context.TenantId, userId, ct);
             return response is null
                 ? ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound)
@@ -444,6 +619,13 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         }
 
         var now = _dateTimeProvider.UtcNow;
+        if (NormalizeIds(request.DeniedPermissionIds).Count > 0)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.permission_denies_unsupported",
+                "Explicit permission denials are not supported; user overrides are additional grants only."));
+        }
+
         var roleValidation = await _repository.ValidateRoleAssignmentAsync(
             context.TenantId,
             request.RoleId,
@@ -456,6 +638,21 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         }
 
         var outletIds = NormalizeIds(request.OutletIds);
+        var tillIds = NormalizeIds(request.TillIds);
+        var scopeValidation = NormalizeAndValidateAccessScope(
+            request.OutletAccessScope,
+            request.DefaultOutletId,
+            request.TillAccessScope,
+            request.DefaultTillId,
+            outletIds,
+            tillIds);
+        if (!scopeValidation.IsValid)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(scopeValidation.Error!);
+        }
+
+        var outletAccessScope = scopeValidation.OutletAccessScope!;
+        var tillAccessScope = scopeValidation.TillAccessScope!;
         var outletValidation = await _repository.ValidateOutletSelectionAsync(
             context.TenantId,
             outletIds,
@@ -463,6 +660,43 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         if (!outletValidation.IsValid)
         {
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(outletValidation.Failure));
+        }
+
+        var tillValidation = await _repository.ValidateTillSelectionAsync(
+            context.TenantId,
+            tillIds,
+            outletIds,
+            string.Equals(outletAccessScope, TenantUserAccessScopes.AllOutlets, StringComparison.Ordinal),
+            cancellationToken);
+        if (!tillValidation.IsValid)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(tillValidation.Failure));
+        }
+
+        if (request.DefaultOutletId.HasValue)
+        {
+            var defaultOutletValidation = await _repository.ValidateOutletSelectionAsync(
+                context.TenantId,
+                [request.DefaultOutletId.Value],
+                cancellationToken);
+            if (!defaultOutletValidation.IsValid)
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(defaultOutletValidation.Failure));
+            }
+        }
+
+        if (request.DefaultTillId.HasValue)
+        {
+            var defaultTillValidation = await _repository.ValidateTillSelectionAsync(
+                context.TenantId,
+                [request.DefaultTillId.Value],
+                outletIds,
+                string.Equals(outletAccessScope, TenantUserAccessScopes.AllOutlets, StringComparison.Ordinal),
+                cancellationToken);
+            if (!defaultTillValidation.IsValid)
+            {
+                return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(defaultTillValidation.Failure));
+            }
         }
 
         var normalizedEmail = TenantUser.NormalizeEmail(request.Email);
@@ -487,6 +721,31 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         if (!permissionValidation.IsValid)
         {
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(permissionValidation.Failure));
+        }
+
+        var currentRoles = await _repository.GetRoleOptionsAsync(context.TenantId, cancellationToken);
+        var currentPermissionGroups = await _repository.GetPermissionGroupsAsync(
+            context.TenantId,
+            context.Permissions,
+            now,
+            cancellationToken);
+        var currentCatalogVersion = ComputePermissionCatalogVersion(currentRoles, currentPermissionGroups);
+        if (permissionOverrideEnabled && currentPermissionGroups.Count == 0 && overriddenPermissionIds.Count > 0)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.permission_catalog_mismatch",
+                "Permission catalog is incomplete. Reload create options before updating the user."));
+        }
+
+        if (permissionOverrideEnabled &&
+            !string.IsNullOrWhiteSpace(request.PermissionCatalogVersion) &&
+            !CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(currentCatalogVersion),
+                Encoding.UTF8.GetBytes(request.PermissionCatalogVersion.Trim().ToLowerInvariant())))
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
+                "user.permission_catalog_mismatch",
+                "Permission catalog changed. Reload user options before updating the user."));
         }
 
         var previousStatus = user.AccountStatus;
@@ -521,6 +780,13 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 request.PhoneNumber?.Trim(),
                 nextStatus,
                 now);
+            user.SetAccessScope(
+                outletAccessScope,
+                request.DefaultOutletId,
+                tillAccessScope,
+                request.DefaultTillId,
+                context.UserId,
+                now);
 
             if (profileMediaChange.ShouldApply)
             {
@@ -540,9 +806,11 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 context.TenantId,
                 userId,
                 request.RoleId,
+                outletAccessScope,
                 outletIds,
                 permissionOverrideEnabled,
                 overriddenPermissionIds,
+                tillIds,
                 context.UserId,
                 now,
                 ct);
@@ -667,18 +935,18 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         DateTimeOffset now,
         Guid? inviteId = null,
         Guid? mediaAssetId = null) => new()
-    {
-        TenantId = context.TenantId,
-        ActorUserId = context.UserId,
-        ActorType = "TENANT_USER",
-        EntityType = "TENANT_USER",
-        EntityId = userId,
-        Action = action,
-        NewValues = inviteId.HasValue || mediaAssetId.HasValue
+        {
+            TenantId = context.TenantId,
+            ActorUserId = context.UserId,
+            ActorType = "TENANT_USER",
+            EntityType = "TENANT_USER",
+            EntityId = userId,
+            Action = action,
+            NewValues = inviteId.HasValue || mediaAssetId.HasValue
             ? JsonSerializer.Serialize(new { inviteId, mediaAssetId })
             : null,
-        CreatedAt = now
-    };
+            CreatedAt = now
+        };
 
     private static IReadOnlyList<Guid> NormalizeIds(IReadOnlyCollection<Guid>? ids) =>
         ids is null || ids.Count == 0
@@ -703,6 +971,20 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 ? NormalizeIdsForFingerprint(request.OverriddenPermissionIds)
                 : [],
             profileMediaAssetId = request.ProfileMediaAssetId,
+            outletAccessScope = TenantUserAccessScopes.NormalizeOutletScope(request.OutletAccessScope) ??
+                (NormalizeIdsForFingerprint(request.OutletIds).Count == 0
+                    ? TenantUserAccessScopes.AllOutlets
+                    : TenantUserAccessScopes.SelectedOutlets),
+            defaultOutletId = request.DefaultOutletId,
+            tillAccessScope = TenantUserAccessScopes.NormalizeTillScope(request.TillAccessScope) ??
+                (NormalizeIdsForFingerprint(request.TillIds).Count == 0
+                    ? TenantUserAccessScopes.AllAccessibleTills
+                    : TenantUserAccessScopes.SelectedTills),
+            tillIds = NormalizeIdsForFingerprint(request.TillIds),
+            defaultTillId = request.DefaultTillId,
+            permissionCatalogVersion = NormalizeOptionalText(request.PermissionCatalogVersion)?.ToLowerInvariant(),
+            deniedPermissionIds = NormalizeIdsForFingerprint(request.DeniedPermissionIds),
+            passwordProvided = !string.IsNullOrEmpty(request.Password),
         };
 
         var json = JsonSerializer.Serialize(canonical);
@@ -774,8 +1056,180 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             TenantAdminUserAccessValidationFailure.InvalidScope => new ApplicationError(
                 "user.permission_invalid_scope",
                 "One or more selected permissions are not valid for tenant users."),
+            TenantAdminUserAccessValidationFailure.TillNotFound => new ApplicationError(
+                "user.till_not_found",
+                "One or more selected tills were not found."),
+            TenantAdminUserAccessValidationFailure.TillWrongTenant => new ApplicationError(
+                "user.till_wrong_tenant",
+                "One or more selected tills do not belong to this tenant."),
+            TenantAdminUserAccessValidationFailure.TillInactive => new ApplicationError(
+                "user.till_inactive",
+                "One or more selected tills are inactive or deleted."),
+            TenantAdminUserAccessValidationFailure.TillOutsideOutletScope => new ApplicationError(
+                "user.till_outside_outlet_scope",
+                "One or more selected tills are outside the selected outlet scope."),
             _ => InvalidPermissions,
         };
+
+    private static AccessScopeValidationResult NormalizeAndValidateAccessScope(
+        TenantAdminUserCreateRequest request,
+        IReadOnlyCollection<Guid> outletIds,
+        IReadOnlyCollection<Guid> tillIds) =>
+        NormalizeAndValidateAccessScope(
+            request.OutletAccessScope,
+            request.DefaultOutletId,
+            request.TillAccessScope,
+            request.DefaultTillId,
+            outletIds,
+            tillIds);
+
+    private static AccessScopeValidationResult NormalizeAndValidateAccessScope(
+        string? requestedOutletAccessScope,
+        Guid? defaultOutletId,
+        string? requestedTillAccessScope,
+        Guid? defaultTillId,
+        IReadOnlyCollection<Guid> outletIds,
+        IReadOnlyCollection<Guid> tillIds)
+    {
+        var outletScope = TenantUserAccessScopes.NormalizeOutletScope(requestedOutletAccessScope);
+        if (outletScope is null)
+        {
+            if (!string.IsNullOrWhiteSpace(requestedOutletAccessScope))
+            {
+                return AccessScopeValidationResult.Invalid(
+                    "user.invalid_outlet_scope",
+                    "Outlet access scope is invalid.");
+            }
+
+            outletScope = outletIds.Count == 0
+                ? TenantUserAccessScopes.AllOutlets
+                : TenantUserAccessScopes.SelectedOutlets;
+        }
+
+        var tillScope = TenantUserAccessScopes.NormalizeTillScope(requestedTillAccessScope);
+        if (tillScope is null)
+        {
+            if (!string.IsNullOrWhiteSpace(requestedTillAccessScope))
+            {
+                return AccessScopeValidationResult.Invalid(
+                    "user.invalid_till_scope",
+                    "Till access scope is invalid.");
+            }
+
+            tillScope = outletScope == TenantUserAccessScopes.NoOutletAccess
+                ? TenantUserAccessScopes.NoTillAccess
+                : tillIds.Count == 0
+                    ? TenantUserAccessScopes.AllAccessibleTills
+                    : TenantUserAccessScopes.SelectedTills;
+        }
+
+        if (outletScope == TenantUserAccessScopes.SelectedOutlets && outletIds.Count == 0)
+        {
+            return AccessScopeValidationResult.Invalid(
+                "user.selected_outlets_required",
+                "Selected-outlets scope requires at least one outlet.");
+        }
+
+        if (outletScope == TenantUserAccessScopes.AllOutlets && outletIds.Count > 0)
+        {
+            return AccessScopeValidationResult.Invalid(
+                "user.outlet_ids_not_allowed",
+                "Outlet IDs must be empty for all-outlets scope.");
+        }
+
+        if (outletScope == TenantUserAccessScopes.NoOutletAccess &&
+            (outletIds.Count > 0 || defaultOutletId.HasValue || tillIds.Count > 0 ||
+             defaultTillId.HasValue || tillScope != TenantUserAccessScopes.NoTillAccess))
+        {
+            return AccessScopeValidationResult.Invalid(
+                "user.no_outlet_access_conflict",
+                "No-outlet-access scope cannot include outlet, till, or default assignments.");
+        }
+
+        if (outletScope == TenantUserAccessScopes.SelectedOutlets &&
+            defaultOutletId.HasValue &&
+            !outletIds.Contains(defaultOutletId.Value))
+        {
+            return AccessScopeValidationResult.Invalid(
+                "user.invalid_default_outlet",
+                "Default outlet must be one of the selected outlets.");
+        }
+
+        if (tillScope == TenantUserAccessScopes.SelectedTills && tillIds.Count == 0)
+        {
+            return AccessScopeValidationResult.Invalid(
+                "user.selected_tills_required",
+                "Selected-tills scope requires at least one till.");
+        }
+
+        if (tillScope != TenantUserAccessScopes.SelectedTills && tillIds.Count > 0)
+        {
+            return AccessScopeValidationResult.Invalid(
+                "user.till_ids_not_allowed",
+                "Till IDs are allowed only for selected-tills scope.");
+        }
+
+        if (tillScope == TenantUserAccessScopes.NoTillAccess && defaultTillId.HasValue)
+        {
+            return AccessScopeValidationResult.Invalid(
+                "user.invalid_default_till",
+                "Default till must be empty when till access is disabled.");
+        }
+
+        if (tillScope == TenantUserAccessScopes.SelectedTills &&
+            defaultTillId.HasValue &&
+            !tillIds.Contains(defaultTillId.Value))
+        {
+            return AccessScopeValidationResult.Invalid(
+                "user.invalid_default_till",
+                "Default till must be one of the selected tills.");
+        }
+
+        return AccessScopeValidationResult.Valid(outletScope, tillScope);
+    }
+
+    private static string ComputePermissionCatalogVersion(
+        IReadOnlyCollection<RoleOptionResponse> roles,
+        IReadOnlyCollection<PermissionGroupResponse> permissionGroups)
+    {
+        var canonical = new
+        {
+            roles = roles
+                .OrderBy(role => role.RoleId)
+                .Select(role => new
+                {
+                    role.RoleId,
+                    code = role.RoleCode.Trim().ToUpperInvariant(),
+                    role.IsActive,
+                    permissions = (role.PermissionPreview ?? []).OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
+                }),
+            permissions = permissionGroups
+                .SelectMany(group => group.Permissions)
+                .OrderBy(permission => permission.PermissionId)
+                .Select(permission => new
+                {
+                    permission.PermissionId,
+                    code = permission.PermissionCode.Trim().ToUpperInvariant(),
+                    permission.IsAssignable,
+                    permission.IsLocked
+                })
+        };
+        var json = JsonSerializer.Serialize(canonical);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
+    }
+
+    private sealed record AccessScopeValidationResult(
+        bool IsValid,
+        string? OutletAccessScope,
+        string? TillAccessScope,
+        ApplicationError? Error)
+    {
+        public static AccessScopeValidationResult Valid(string outletAccessScope, string tillAccessScope) =>
+            new(true, outletAccessScope, tillAccessScope, null);
+
+        public static AccessScopeValidationResult Invalid(string code, string message) =>
+            new(false, null, null, new ApplicationError(code, message));
+    }
 
     private static ApplicationError ToProfileMediaError(TenantAdminUserProfileMediaValidationFailure failure) =>
         failure switch

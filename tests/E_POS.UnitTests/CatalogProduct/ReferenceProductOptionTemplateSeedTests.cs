@@ -1,4 +1,7 @@
 using E_POS.Infrastructure.Persistence.Seed;
+using E_POS.Infrastructure.Persistence.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
+using System.Reflection;
 using Xunit;
 
 namespace E_POS.UnitTests.CatalogProduct;
@@ -29,5 +32,18 @@ public sealed class ReferenceProductOptionTemplateSeedTests
         Assert.Contains("DELETE FROM product_option_template_values", ReferenceProductOptionTemplateSeedData.DownSql);
         Assert.Contains("DELETE FROM product_option_templates", ReferenceProductOptionTemplateSeedData.DownSql);
         Assert.Contains(ReferenceProductOptionTemplateSeedConstants.SizeTemplateId.ToString(), ReferenceProductOptionTemplateSeedData.DownSql);
+    }
+
+    [Fact]
+    public void CorrectiveSeedMigration_RunsBeforeDevelopmentVariableCatalogSeed()
+    {
+        var correctiveMigrationId = typeof(SeedReferenceProductOptionsBeforeVariableCatalog)
+            .GetCustomAttribute<MigrationAttribute>()!
+            .Id;
+        var variableCatalogMigrationId = typeof(SeedDevelopmentVariableProductCatalog)
+            .GetCustomAttribute<MigrationAttribute>()!
+            .Id;
+
+        Assert.True(string.CompareOrdinal(correctiveMigrationId, variableCatalogMigrationId) < 0);
     }
 }

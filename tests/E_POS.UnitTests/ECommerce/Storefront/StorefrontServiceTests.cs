@@ -483,6 +483,19 @@ public sealed class StorefrontServiceTests
         Assert.Equal("demo-store", repository.ResolvedSlug);
     }
 
+    [Fact]
+    public async Task ResolveTenantByHostAsync_ReturnsRepositoryTenantId()
+    {
+        var resolvedTenantId = Guid.NewGuid();
+        var repository = new FakeStorefrontRepository { ResolvedTenantId = resolvedTenantId };
+        var service = new StorefrontTenantService(repository);
+
+        var result = await service.ResolveTenantByHostAsync("shop.example.com", CancellationToken.None);
+
+        Assert.Equal(resolvedTenantId, result.TenantId);
+        Assert.Equal("shop.example.com", repository.ResolvedHost);
+    }
+
     private static void Set<T>(object entity, string propertyName, T value)
     {
         var property = entity.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
@@ -524,6 +537,7 @@ public sealed class StorefrontServiceTests
         public Guid? CollectionConfigurationTenantId { get; private set; }
         public Guid? CollectionConfigurationOutletId { get; private set; }
         public string? ResolvedSlug { get; private set; }
+        public string? ResolvedHost { get; private set; }
 
         public Task<IEnumerable<StorefrontBannerReadModel>> GetActiveBannersAsync(Guid tenantId, string bannerType, CancellationToken cancellationToken = default)
         {
@@ -604,6 +618,12 @@ public sealed class StorefrontServiceTests
         {
             ResolvedSlug = slug;
             return Task.FromResult<(Guid?, string?, string?, string?)>((ResolvedTenantId, "USD", "Demo Store", null));
+        }
+
+        public Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdByHostAsync(string host, CancellationToken cancellationToken = default)
+        {
+            ResolvedHost = host;
+            return Task.FromResult<(Guid?, string?)>((ResolvedTenantId, "USD"));
         }
     }
 }

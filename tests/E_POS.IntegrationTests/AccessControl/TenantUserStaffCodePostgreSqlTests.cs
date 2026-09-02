@@ -5,6 +5,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.AccessControl.Services;
@@ -292,6 +293,7 @@ public sealed class TenantUserStaffCodePostgreSqlTests
             new TenantAdminUserRepository(db),
             new FixedDateTimeProvider(Now),
             new ThrowingPasswordHashService(),
+            new PlatformPasswordPolicyValidator(),
             new AllowingTenantResourceLimitGuard(),
             new TenantUserStaffCodeService(db),
             new FakeInvitationTokenService(),

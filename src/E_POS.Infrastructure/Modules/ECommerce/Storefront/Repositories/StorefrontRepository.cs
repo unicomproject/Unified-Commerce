@@ -95,4 +95,9 @@ public sealed class StorefrontRepository : IStorefrontRepository
     {
         return _tenantRepository.GetTenantIdBySlugAsync(slug, cancellationToken);
     }
+
+    public Task<(Guid? TenantId, string? BaseCurrencyCode)> GetTenantIdByHostAsync(string host, CancellationToken cancellationToken = default)
+    {
+        return _tenantRepository.GetTenantIdByHostAsync(host, cancellationToken);
+    }
 }

@@ -112,6 +112,18 @@ public static class DependencyInjection
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.AddOptions<AzureBlobStorageOptions>()
             .Bind(configuration.GetSection(AzureBlobStorageOptions.SectionName))
+            .Validate(options =>
+            {
+                if (options.AllowLocalFallback)
+                    return !string.IsNullOrWhiteSpace(options.ContainerName);
+                if (string.IsNullOrWhiteSpace(options.ConnectionString))
+                    return false;
+                if (!options.ConnectionString.Contains("AccountKey=") &&
+                    !options.ConnectionString.Contains("SharedAccessSignature=") &&
+                    !options.ConnectionString.Contains("UseDevelopmentStorage=true"))
+                    return false;
+                return true;
+            }, "AzureBlobStorage:ConnectionString is not configured or malformed. Configure it using .NET User Secrets or an environment variable.")
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<AzureBlobStorageOptions>, AzureBlobStorageOptionsValidator>();
         services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
@@ -238,6 +250,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminHardwareRepository, TenantAdminHardwareRepository>();
         services.AddScoped<ITenantAdminHardwareAuditLogger, TenantAdminHardwareAuditLogger>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
+        services.AddScoped<ITenantAdminUserProfileImageRepository, TenantAdminUserProfileImageRepository>();
         services.AddScoped<ITenantAdminRoleRepository, TenantAdminRoleRepository>();
         services.AddScoped<ITenantUserStaffCodeService, TenantUserStaffCodeService>();
         services.AddScoped<ITillRepository, TillRepository>();
@@ -305,9 +318,40 @@ public static class DependencyInjection
             provider.GetRequiredService<IStorefrontProductSearchRepository>(),
             provider.GetRequiredService<IStorefrontProductBestSellerRepository>()));
         services.AddScoped<IStorefrontFulfilmentRepository, StorefrontFulfilmentRepository>();
+        services.AddScoped<IStorefrontBrandingRepository, StorefrontBrandingRepository>();
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
         services.AddScoped<ITenantAdminOnlineStoreService, TenantAdminOnlineStoreService>();
+        services.AddOptions<OnlineStoreSetupOptions>()
+            .Bind(configuration.GetSection(OnlineStoreSetupOptions.SectionName));
+        services.AddOptions<DomainVerificationOptions>()
+            .Bind(configuration.GetSection(DomainVerificationOptions.SectionName))
+            .Validate(options => !options.Enabled ||
+                Uri.TryCreate(options.QueryEndpoint, UriKind.Absolute, out var endpoint) &&
+                endpoint.Scheme == Uri.UriSchemeHttps &&
+                !string.IsNullOrWhiteSpace(options.RecordNamePrefix) &&
+                options.TimeoutSeconds is >= 1 and <= 60,
+                "OnlineStoreDomainVerification requires an HTTPS query endpoint, record prefix and a timeout between 1 and 60 seconds when enabled.")
+            .ValidateOnStart();
+        services.AddOptions<CertificateProvisioningOptions>()
+            .Bind(configuration.GetSection(CertificateProvisioningOptions.SectionName))
+            .Validate(options => !options.Enabled ||
+                Uri.TryCreate(options.ProvisionEndpoint, UriKind.Absolute, out var provisionEndpoint) &&
+                provisionEndpoint.Scheme == Uri.UriSchemeHttps &&
+                Uri.TryCreate(options.StatusEndpoint, UriKind.Absolute, out var statusEndpoint) &&
+                statusEndpoint.Scheme == Uri.UriSchemeHttps &&
+                !string.IsNullOrWhiteSpace(options.BearerToken) &&
+                options.TimeoutSeconds is >= 1 and <= 120,
+                "OnlineStoreCertificateProvisioning requires HTTPS provision/status endpoints, a bearer token and a timeout between 1 and 120 seconds when enabled.")
+            .ValidateOnStart();
+        services.AddSingleton<IDomainVerificationProvider>(provider =>
+            new DnsOverHttpsDomainVerificationProvider(
+                new HttpClient(),
+                provider.GetRequiredService<IOptions<DomainVerificationOptions>>()));
+        services.AddSingleton<ICertificateProvisioningProvider>(provider =>
+            new HttpCertificateProvisioningProvider(
+                new HttpClient(),
+                provider.GetRequiredService<IOptions<CertificateProvisioningOptions>>()));
         services.AddScoped<IStorefrontCartRepository, StorefrontCartRepository>();
         services.AddScoped<IStorefrontCheckoutSessionRepository, StorefrontCheckoutSessionRepository>();
         services.AddScoped<IStorefrontCheckoutConfirmationRepository, StorefrontCheckoutConfirmationRepository>();

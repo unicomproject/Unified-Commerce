@@ -75,9 +75,37 @@ public class TenantDomain : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void MarkVerificationFailed(string status, Guid? updatedByPlatformUserId, DateTimeOffset now)
+    {
+        VerificationStatus = status.Trim().ToUpperInvariant();
+        VerifiedAt = null;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
     public void MarkSslProvisioning(Guid? updatedByPlatformUserId, DateTimeOffset now)
     {
         SslStatus = "PENDING";
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void MarkSslActive(
+        DateTimeOffset issuedAt,
+        DateTimeOffset? expiresAt,
+        Guid? updatedByPlatformUserId,
+        DateTimeOffset now)
+    {
+        SslStatus = "ACTIVE";
+        SslIssuedAt = issuedAt;
+        SslExpiresAt = expiresAt;
+        UpdatedByPlatformUserId = updatedByPlatformUserId;
+        UpdatedAt = now;
+    }
+
+    public void MarkSslFailed(string status, Guid? updatedByPlatformUserId, DateTimeOffset now)
+    {
+        SslStatus = status.Trim().ToUpperInvariant();
         UpdatedByPlatformUserId = updatedByPlatformUserId;
         UpdatedAt = now;
     }

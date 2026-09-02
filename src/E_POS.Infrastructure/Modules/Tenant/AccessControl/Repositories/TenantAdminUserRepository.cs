@@ -10,6 +10,7 @@ using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 using E_POS.Domain.Modules.Shared.Audit.Entities;
 using E_POS.Domain.Modules.Shared.Integration.Entities;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
+using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Queries;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,6 +25,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
     private const string DeletePendingMediaStatus = "DELETE_PENDING";
     private const string DeletedMediaStatus = "DELETED";
     private const string ImageAssetType = "IMAGE";
+    private const string ProfileImageAssetPurpose = "TENANT_USER_PROFILE_IMAGE";
 
     private readonly EPosDbContext _dbContext;
 
@@ -96,16 +98,60 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         Guid tenantId,
         CancellationToken cancellationToken)
     {
-        return await _dbContext.TenantRoles
+        var roles = await _dbContext.TenantRoles
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.IsActive)
             .OrderBy(x => x.RoleName)
-            .Select(x => new RoleOptionResponse(
-                x.Id,
-                x.RoleName,
-                x.RoleCode,
-                x.RoleDescription))
+            .Select(x => new { x.Id, x.RoleName, x.RoleCode, x.RoleDescription, x.IsActive })
             .ToListAsync(cancellationToken);
+
+        var roleIds = roles.Select(role => role.Id).ToList();
+        var permissionRows = await (
+            from rolePermission in _dbContext.TenantRolePermissions.AsNoTracking()
+            join permission in _dbContext.PermissionDefinitions.AsNoTracking()
+                on rolePermission.PermissionDefinitionId equals permission.Id
+            join module in _dbContext.PlatformModules.AsNoTracking()
+                on permission.ModuleId equals module.Id
+            where rolePermission.TenantId == tenantId &&
+                  roleIds.Contains(rolePermission.TenantRoleId) &&
+                  rolePermission.RevokedAt == null &&
+                  permission.IsActive &&
+                  module.Status == "ACTIVE" &&
+                  !permission.PermissionCode.StartsWith("platform.")
+            select new
+            {
+                RoleId = rolePermission.TenantRoleId,
+                PermissionCode = permission.PermissionCode,
+                ModuleId = module.Id,
+                ModuleName = module.Name
+            }).ToListAsync(cancellationToken);
+
+        var metadataByRole = permissionRows
+            .GroupBy(row => row.RoleId)
+            .ToDictionary(
+                group => group.Key,
+                group => new
+                {
+                    ModuleCount = group.Select(row => row.ModuleId).Distinct().Count(),
+                    PermissionCount = group.Select(row => row.PermissionCode).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+                    Modules = (IReadOnlyList<string>)group.Select(row => row.ModuleName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name).Take(5).ToList(),
+                    Permissions = (IReadOnlyList<string>)group.Select(row => row.PermissionCode).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(code => code).Take(8).ToList()
+                });
+
+        return roles.Select(role =>
+        {
+            metadataByRole.TryGetValue(role.Id, out var metadata);
+            return new RoleOptionResponse(
+                role.Id,
+                role.RoleName,
+                role.RoleCode,
+                role.RoleDescription,
+                role.IsActive,
+                metadata?.ModuleCount ?? 0,
+                metadata?.PermissionCount ?? 0,
+                metadata?.Modules ?? [],
+                metadata?.Permissions ?? []);
+        }).ToList();
     }
 
     public async Task<IReadOnlyList<OutletOptionResponse>> GetOutletOptionsAsync(
@@ -123,6 +169,26 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TillOptionResponse>> GetTillOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Tills
+            .AsNoTracking()
+            .Where(till => till.TenantId == tenantId &&
+                           till.Status != TillConstants.DeletedStatus &&
+                           till.Status != TillConstants.InactiveStatus)
+            .OrderBy(till => till.OutletId)
+            .ThenBy(till => till.TillName)
+            .Select(till => new TillOptionResponse(
+                till.Id,
+                till.OutletId,
+                till.TillName,
+                till.TillCode,
+                till.Status))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<PermissionGroupResponse>> GetPermissionGroupsAsync(
         Guid tenantId,
         IReadOnlyCollection<string> actorPermissionCodes,
@@ -133,19 +199,27 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             from permission in _dbContext.PermissionDefinitions.AsNoTracking()
             join feature in _dbContext.PlatformFeatures.AsNoTracking()
                 on permission.FeatureId equals feature.Id
+            join module in _dbContext.PlatformModules.AsNoTracking()
+                on permission.ModuleId equals module.Id
             where permission.IsActive &&
+                  feature.Status == "ACTIVE" &&
+                  module.Status == "ACTIVE" &&
                   !permission.IsSystem &&
                   !permission.PermissionCode.StartsWith("platform.")
-            orderby feature.SortOrder, feature.Name, permission.PermissionCode
+            orderby module.SortOrder, feature.SortOrder, permission.PermissionCode
             select new PermissionOptionRow(
-                feature.Name,
+                module.Name,
                 permission.Id,
                 permission.PermissionCode,
                 permission.ActionType,
                 permission.Description,
                 feature.Id,
                 feature.FeatureCode,
-                feature.IsCoreFeature)).ToListAsync(cancellationToken);
+                feature.IsCoreFeature,
+                module.Id,
+                module.ModuleCode,
+                module.Description,
+                module.SortOrder)).ToListAsync(cancellationToken);
 
         var enabledFeatureIds = await GetEnabledFeatureIdsAsync(tenantId, now, cancellationToken);
         rows = rows
@@ -154,11 +228,25 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             .ToList();
 
         return rows
-            .GroupBy(x => x.Name)
+            .GroupBy(x => new { x.ModuleId, x.ModuleCode, x.Name, x.ModuleDescription, x.ModuleSortOrder })
+            .OrderBy(group => group.Key.ModuleSortOrder)
             .Select(group => new PermissionGroupResponse(
-                group.Key,
-                group.Select(x => new PermissionItemResponse(x.Id, x.PermissionCode, x.ActionType, x.Description))
-                    .ToList()))
+                group.Key.Name,
+                group.Select(x => new PermissionItemResponse(
+                        x.Id,
+                        x.PermissionCode,
+                        x.ActionType,
+                        x.Description,
+                        x.Description ?? x.PermissionCode,
+                        x.ModuleId,
+                        x.ModuleCode,
+                        x.Name,
+                        x.ModuleSortOrder))
+                    .ToList(),
+                group.Key.ModuleId,
+                group.Key.ModuleCode,
+                group.Key.ModuleDescription,
+                group.Key.ModuleSortOrder))
             .ToList();
     }
 
@@ -182,7 +270,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         var role = await _dbContext.TenantRoles
             .AsNoTracking()
             .Where(x => x.Id == roleId)
-            .Select(x => new { x.TenantId, x.IsActive })
+            .Select(x => new { x.TenantId, x.IsActive, x.RoleCode })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (role is null)
@@ -200,6 +288,11 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.RoleInactive);
         }
 
+        if (IsForbiddenTenantRoleCode(role.RoleCode))
+        {
+            return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.RoleNotDelegable);
+        }
+
         var permissionIds = await _dbContext.TenantRolePermissions
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.TenantRoleId == roleId && x.RevokedAt == null)
@@ -213,7 +306,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             actorPermissionCodes,
             now,
             allowSystemPermissions: true,
-            enforceEntitlements: false,
+            enforceEntitlements: true,
             cancellationToken);
 
         return validation.IsValid
@@ -272,6 +365,49 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                 string.Equals(x.Status, OutletConstants.InactiveStatus, StringComparison.OrdinalIgnoreCase)))
         {
             return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.OutletInactive);
+        }
+
+        return TenantAdminUserAccessValidationResult.Valid;
+    }
+
+    public async Task<TenantAdminUserAccessValidationResult> ValidateTillSelectionAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> tillIds,
+        IReadOnlyCollection<Guid> allowedOutletIds,
+        bool allowAllTenantOutlets,
+        CancellationToken cancellationToken)
+    {
+        if (tillIds.Count == 0)
+        {
+            return TenantAdminUserAccessValidationResult.Valid;
+        }
+
+        var normalizedIds = tillIds.Distinct().ToList();
+        var rows = await _dbContext.Tills
+            .AsNoTracking()
+            .Where(till => normalizedIds.Contains(till.Id))
+            .Select(till => new { till.Id, till.TenantId, till.OutletId, till.Status })
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count != normalizedIds.Count)
+        {
+            return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.TillNotFound);
+        }
+
+        if (rows.Any(till => till.TenantId != tenantId))
+        {
+            return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.TillWrongTenant);
+        }
+
+        if (rows.Any(till => till.Status == TillConstants.DeletedStatus || till.Status == TillConstants.InactiveStatus))
+        {
+            return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.TillInactive);
+        }
+
+        var allowedOutletSet = allowedOutletIds.ToHashSet();
+        if (!allowAllTenantOutlets && rows.Any(till => !allowedOutletSet.Contains(till.OutletId)))
+        {
+            return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.TillOutsideOutletScope);
         }
 
         return TenantAdminUserAccessValidationResult.Valid;
@@ -353,6 +489,12 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                 TenantAdminUserProfileMediaValidationFailure.NotImage);
         }
 
+        if (!string.Equals(mediaAsset.AssetPurpose, ProfileImageAssetPurpose, StringComparison.OrdinalIgnoreCase))
+        {
+            return TenantAdminUserProfileMediaValidationResult.Invalid(
+                TenantAdminUserProfileMediaValidationFailure.IncompatibleOwner);
+        }
+
         if (string.Equals(mediaAsset.Status, DeletedMediaStatus, StringComparison.OrdinalIgnoreCase))
         {
             return TenantAdminUserProfileMediaValidationResult.Invalid(
@@ -401,7 +543,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             MediaUrlResolver.PreferMediaAsset(mediaAsset.PublicUrl, null, mediaAsset.StorageKey));
     }
 
-    public async Task<Guid> CreateAsync(
+    public Task<Guid> CreateAsync(
         TenantUser user,
         Guid roleId,
         IReadOnlyCollection<Guid> outletIds,
@@ -411,11 +553,38 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         IntegrationOutboxMessage? outboxMessage,
         IReadOnlyCollection<AuditLog> auditLogs,
         DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        CreateAsync(
+            user,
+            roleId,
+            outletIds.Count == 0 ? TenantUserAccessScopes.AllOutlets : TenantUserAccessScopes.SelectedOutlets,
+            outletIds,
+            overriddenPermissionIds,
+            [],
+            invite,
+            deliverySecret,
+            outboxMessage,
+            auditLogs,
+            now,
+            cancellationToken);
+
+    public async Task<Guid> CreateAsync(
+        TenantUser user,
+        Guid roleId,
+        string outletAccessScope,
+        IReadOnlyCollection<Guid> outletIds,
+        IReadOnlyCollection<Guid> overriddenPermissionIds,
+        IReadOnlyCollection<Guid> tillIds,
+        UserInvite? invite,
+        TenantUserInviteDeliverySecret? deliverySecret,
+        IntegrationOutboxMessage? outboxMessage,
+        IReadOnlyCollection<AuditLog> auditLogs,
+        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         _dbContext.TenantUsers.Add(user);
 
-        if (outletIds.Count == 0)
+        if (!string.Equals(outletAccessScope, TenantUserAccessScopes.SelectedOutlets, StringComparison.Ordinal))
         {
             _dbContext.TenantUserRoles.Add(TenantUserRole.Create(
                 Guid.NewGuid(),
@@ -448,6 +617,17 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                 user.Id,
                 permissionId,
                 null,
+                now));
+        }
+
+        foreach (var tillId in tillIds.Distinct())
+        {
+            _dbContext.TenantUserTillAccess.Add(TenantUserTillAccess.Create(
+                Guid.NewGuid(),
+                user.TenantId,
+                user.Id,
+                tillId,
+                user.CreatedByTenantUserId,
                 now));
         }
 
@@ -659,7 +839,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         }
 
         var roleAssignment = await GetActiveRoleAssignmentAsync(tenantId, userId, cancellationToken);
-        var outletIds = await GetActiveOutletIdsAsync(tenantId, userId, cancellationToken);
+        var outletIds = await GetEffectiveOutletIdsAsync(tenantId, userId, cancellationToken);
         var outlets = outletIds.Count == 0
             ? new List<OutletOptionResponse>()
             : await _dbContext.Outlets
@@ -688,6 +868,14 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             user.AccountStatus,
             cancellationToken);
         var profileImageUrl = await ResolveProfileImageUrlAsync(tenantId, user.ProfileImageUrl, cancellationToken);
+        var tills = await GetEffectiveTillOptionsAsync(user, outletIds, cancellationToken);
+        var effectivePermissionCodes = await GetEffectivePermissionCodesAsync(tenantId, userId, cancellationToken);
+        var invitationStatus = await _dbContext.UserInvites
+            .AsNoTracking()
+            .Where(invite => invite.TenantId == tenantId && invite.TenantUserId == userId)
+            .OrderByDescending(invite => invite.CreatedAt)
+            .Select(invite => invite.InviteStatus)
+            .FirstOrDefaultAsync(cancellationToken);
 
         return new TenantAdminUserDetailResponse(
             user.Id,
@@ -707,7 +895,15 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             accessSummary.OutletCount,
             accessSummary,
             user.EmployeeId,
-            user.StaffCode);
+            user.StaffCode,
+            roleAssignment?.RoleCode,
+            user.OutletAccessScope,
+            ParseGuid(user.DefaultOutletId),
+            user.TillAccessScope,
+            tills,
+            user.DefaultTillId,
+            invitationStatus,
+            effectivePermissionCodes);
     }
 
     public Task<TenantUser?> GetEditableAsync(
@@ -719,13 +915,38 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == userId, cancellationToken);
     }
 
-    public async Task ReplaceAssignmentsAsync(
+    public Task ReplaceAssignmentsAsync(
         Guid tenantId,
         Guid userId,
         Guid roleId,
         IReadOnlyCollection<Guid> outletIds,
         bool permissionOverrideEnabled,
         IReadOnlyCollection<Guid> overriddenPermissionIds,
+        Guid actingUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        ReplaceAssignmentsAsync(
+            tenantId,
+            userId,
+            roleId,
+            outletIds.Count == 0 ? TenantUserAccessScopes.AllOutlets : TenantUserAccessScopes.SelectedOutlets,
+            outletIds,
+            permissionOverrideEnabled,
+            overriddenPermissionIds,
+            [],
+            actingUserId,
+            now,
+            cancellationToken);
+
+    public async Task ReplaceAssignmentsAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid roleId,
+        string outletAccessScope,
+        IReadOnlyCollection<Guid> outletIds,
+        bool permissionOverrideEnabled,
+        IReadOnlyCollection<Guid> overriddenPermissionIds,
+        IReadOnlyCollection<Guid> tillIds,
         Guid actingUserId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
@@ -740,7 +961,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
 
         foreach (var role in existingTenantRoles.Where(role =>
                      role.RevokedAt == null &&
-                     (outletIds.Count > 0 || role.TenantRoleId != roleId)))
+                     (outletAccessScope == TenantUserAccessScopes.SelectedOutlets || role.TenantRoleId != roleId)))
         {
             role.Revoke(now);
         }
@@ -755,7 +976,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             role.Revoke(actingUserId, now);
         }
 
-        if (requestedOutletIds.Count == 0)
+        if (outletAccessScope != TenantUserAccessScopes.SelectedOutlets)
         {
             var existingTenantRole = existingTenantRoles
                 .FirstOrDefault(role => role.TenantRoleId == roleId);
@@ -826,6 +1047,37 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                 {
                     existingPermission.Reactivate(actingUserId, now);
                 }
+            }
+        }
+
+
+        var existingTillAccess = await _dbContext.TenantUserTillAccess
+            .Where(x => x.TenantId == tenantId && x.TenantUserId == userId)
+            .ToListAsync(cancellationToken);
+        var requestedTillIds = tillIds.Distinct().ToHashSet();
+
+        foreach (var tillAccess in existingTillAccess.Where(x =>
+                     x.RevokedAt == null && !requestedTillIds.Contains(x.TillId)))
+        {
+            tillAccess.Revoke(actingUserId, now);
+        }
+
+        foreach (var tillId in requestedTillIds)
+        {
+            var existing = existingTillAccess.FirstOrDefault(x => x.TillId == tillId);
+            if (existing is null)
+            {
+                _dbContext.TenantUserTillAccess.Add(TenantUserTillAccess.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    userId,
+                    tillId,
+                    actingUserId,
+                    now));
+            }
+            else if (existing.RevokedAt is not null)
+            {
+                existing.Reactivate(actingUserId, now);
             }
         }
     }
@@ -961,7 +1213,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             CreatedAt = now
         };
 
-    private async Task<(Guid RoleId, string RoleName, string? RoleDescription)?> GetActiveRoleAssignmentAsync(
+    private async Task<(Guid RoleId, string RoleName, string RoleCode, string? RoleDescription)?> GetActiveRoleAssignmentAsync(
         Guid tenantId,
         Guid userId,
         CancellationToken cancellationToken)
@@ -971,12 +1223,12 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             join role in _dbContext.TenantRoles.AsNoTracking() on userRole.TenantRoleId equals role.Id
             where userRole.TenantId == tenantId && userRole.TenantUserId == userId && userRole.RevokedAt == null
             orderby userRole.AssignedAt descending
-            select new { role.Id, role.RoleName, role.RoleDescription }
+            select new { role.Id, role.RoleName, role.RoleCode, role.RoleDescription }
         ).FirstOrDefaultAsync(cancellationToken);
 
         if (tenantRole is not null)
         {
-            return (tenantRole.Id, tenantRole.RoleName, tenantRole.RoleDescription);
+            return (tenantRole.Id, tenantRole.RoleName, tenantRole.RoleCode, tenantRole.RoleDescription);
         }
 
         var outletRole = await (
@@ -984,12 +1236,12 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             join role in _dbContext.TenantRoles.AsNoTracking() on userRole.TenantRoleId equals role.Id
             where userRole.TenantId == tenantId && userRole.TenantUserId == userId && userRole.RevokedAt == null
             orderby userRole.AssignedAt descending
-            select new { role.Id, role.RoleName, role.RoleDescription }
+            select new { role.Id, role.RoleName, role.RoleCode, role.RoleDescription }
         ).FirstOrDefaultAsync(cancellationToken);
 
         return outletRole is null
             ? null
-            : (outletRole.Id, outletRole.RoleName, outletRole.RoleDescription);
+            : (outletRole.Id, outletRole.RoleName, outletRole.RoleCode, outletRole.RoleDescription);
     }
 
     private async Task<List<Guid>> GetActiveOutletIdsAsync(
@@ -1019,11 +1271,6 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         string accountStatus,
         CancellationToken cancellationToken)
     {
-        if (!string.Equals(accountStatus, TenantUserConstants.StatusActive, StringComparison.OrdinalIgnoreCase))
-        {
-            return new TenantAdminUserAccessSummaryResponse(0, 0, 0);
-        }
-
         var outletIds = await GetEffectiveOutletIdsAsync(tenantId, userId, cancellationToken);
 
         var tenantRolePermissionIds =
@@ -1093,10 +1340,28 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
             .Select(permission => new { permission.Id, permission.ModuleId })
             .ToListAsync(cancellationToken);
 
+        var user = await _dbContext.TenantUsers
+            .AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.Id == userId)
+            .Select(item => new { item.TillAccessScope })
+            .SingleAsync(cancellationToken);
+        var tillCount = await GetEffectiveTillCountAsync(tenantId, userId, user.TillAccessScope, outletIds, cancellationToken);
+        var inheritedPermissionCount = await tenantRolePermissionIds
+            .Concat(outletRolePermissionIds)
+            .Distinct()
+            .CountAsync(cancellationToken);
+        var directPermissionCount = await directPermissionIds
+            .Concat(outletPermissionIds)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
         return new TenantAdminUserAccessSummaryResponse(
             outletIds.Count,
             effectivePermissions.Select(permission => permission.ModuleId).Distinct().Count(),
-            effectivePermissions.Select(permission => permission.Id).Distinct().Count());
+            effectivePermissions.Select(permission => permission.Id).Distinct().Count(),
+            tillCount,
+            inheritedPermissionCount,
+            directPermissionCount);
     }
 
     private async Task<List<Guid>> GetEffectiveOutletIdsAsync(
@@ -1104,6 +1369,16 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         Guid userId,
         CancellationToken cancellationToken)
     {
+        var scope = await _dbContext.TenantUsers
+            .AsNoTracking()
+            .Where(user => user.TenantId == tenantId && user.Id == userId)
+            .Select(user => user.OutletAccessScope)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (string.Equals(scope, TenantUserAccessScopes.NoOutletAccess, StringComparison.Ordinal))
+        {
+            return [];
+        }
+
         var assignedOutletIds = await GetActiveOutletIdsAsync(tenantId, userId, cancellationToken);
         var outlets = _dbContext.Outlets
             .AsNoTracking()
@@ -1112,7 +1387,7 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
                 outlet.Status.ToUpper() != OutletConstants.DeletedStatus &&
                 outlet.Status.ToUpper() != OutletConstants.InactiveStatus);
 
-        if (assignedOutletIds.Count > 0)
+        if (string.Equals(scope, TenantUserAccessScopes.SelectedOutlets, StringComparison.Ordinal))
         {
             outlets = outlets.Where(outlet => assignedOutletIds.Contains(outlet.Id));
         }
@@ -1145,6 +1420,94 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         return mediaAsset is null
             ? null
             : MediaUrlResolver.PreferMediaAsset(mediaAsset.PublicUrl, null, mediaAsset.StorageKey);
+    }
+
+    private async Task<IReadOnlyList<TillOptionResponse>> GetEffectiveTillOptionsAsync(
+        TenantUser user,
+        IReadOnlyCollection<Guid> effectiveOutletIds,
+        CancellationToken cancellationToken)
+    {
+        if (effectiveOutletIds.Count == 0 ||
+            string.Equals(user.TillAccessScope, TenantUserAccessScopes.NoTillAccess, StringComparison.Ordinal))
+        {
+            return [];
+        }
+
+        var query = _dbContext.Tills
+            .AsNoTracking()
+            .Where(till => till.TenantId == user.TenantId &&
+                           effectiveOutletIds.Contains(till.OutletId) &&
+                           till.Status != TillConstants.DeletedStatus &&
+                           till.Status != TillConstants.InactiveStatus);
+
+        if (string.Equals(user.TillAccessScope, TenantUserAccessScopes.SelectedTills, StringComparison.Ordinal))
+        {
+            var selectedTillIds = _dbContext.TenantUserTillAccess
+                .AsNoTracking()
+                .Where(access => access.TenantId == user.TenantId &&
+                                 access.TenantUserId == user.Id &&
+                                 access.RevokedAt == null)
+                .Select(access => access.TillId);
+            query = query.Where(till => selectedTillIds.Contains(till.Id));
+        }
+
+        return await query
+            .OrderBy(till => till.OutletId)
+            .ThenBy(till => till.TillName)
+            .Select(till => new TillOptionResponse(till.Id, till.OutletId, till.TillName, till.TillCode, till.Status))
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<int> GetEffectiveTillCountAsync(
+        Guid tenantId,
+        Guid userId,
+        string tillAccessScope,
+        IReadOnlyCollection<Guid> effectiveOutletIds,
+        CancellationToken cancellationToken)
+    {
+        if (effectiveOutletIds.Count == 0 ||
+            string.Equals(tillAccessScope, TenantUserAccessScopes.NoTillAccess, StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        var query = _dbContext.Tills
+            .AsNoTracking()
+            .Where(till => till.TenantId == tenantId &&
+                           effectiveOutletIds.Contains(till.OutletId) &&
+                           till.Status != TillConstants.DeletedStatus &&
+                           till.Status != TillConstants.InactiveStatus);
+        if (string.Equals(tillAccessScope, TenantUserAccessScopes.SelectedTills, StringComparison.Ordinal))
+        {
+            var selectedTillIds = _dbContext.TenantUserTillAccess
+                .AsNoTracking()
+                .Where(access => access.TenantId == tenantId &&
+                                 access.TenantUserId == userId &&
+                                 access.RevokedAt == null)
+                .Select(access => access.TillId);
+            query = query.Where(till => selectedTillIds.Contains(till.Id));
+        }
+
+        return await query.CountAsync(cancellationToken);
+    }
+
+    private Task<List<string>> GetEffectivePermissionCodesAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        TenantEffectivePermissionCodesQuery.Build(_dbContext, userId, tenantId)
+            .Distinct()
+            .OrderBy(code => code)
+            .ToListAsync(cancellationToken);
+
+    private static Guid? ParseGuid(string? value) =>
+        Guid.TryParse(value, out var parsed) ? parsed : null;
+
+    private static bool IsForbiddenTenantRoleCode(string roleCode)
+    {
+        var normalized = roleCode.Trim().Replace('-', '_').ToUpperInvariant();
+        return normalized is "SUPER_ADMIN" or "PLATFORM_ADMIN" or "SUPER_ADMINISTRATOR" or "PLATFORM_SUPER_ADMIN" ||
+               normalized.StartsWith("PLATFORM_", StringComparison.Ordinal);
     }
 
     private IQueryable<UserRow> BuildUserRowsQuery(Guid tenantId)
@@ -1497,7 +1860,11 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         string? Description,
         Guid FeatureId,
         string FeatureCode,
-        bool IsCoreFeature);
+        bool IsCoreFeature,
+        Guid ModuleId,
+        string ModuleCode,
+        string? ModuleDescription,
+        int ModuleSortOrder);
 
     private sealed record AssignablePermissionRow(
         Guid Id,

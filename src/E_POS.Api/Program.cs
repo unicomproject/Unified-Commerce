@@ -43,7 +43,8 @@ builder.Services.AddCors(options =>
         }
         else if (builder.Environment.IsDevelopment())
         {
-            policy.SetIsOriginAllowed(IsDevelopmentOrigin);
+            var hostedStoreDomain = builder.Configuration["OnlineStoreSetup:HostedDomain"];
+            policy.SetIsOriginAllowed(origin => IsDevelopmentOrigin(origin, hostedStoreDomain));
         }
 
         policy.AllowAnyMethod()
@@ -226,7 +227,7 @@ await DevelopmentTenantRoleAccessTestAccountSeedHost.RunIfDevelopmentAsync(app);
 
 app.Run();
 
-static bool IsDevelopmentOrigin(string origin)
+static bool IsDevelopmentOrigin(string origin, string? hostedStoreDomain)
 {
     if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
         return false;
@@ -234,6 +235,13 @@ static bool IsDevelopmentOrigin(string origin)
     var host = uri.Host;
     if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    var normalizedHostedDomain = hostedStoreDomain?.Trim().Trim('.');
+    if (!string.IsNullOrWhiteSpace(normalizedHostedDomain) &&
+        host.EndsWith($".{normalizedHostedDomain}", StringComparison.OrdinalIgnoreCase))
     {
         return true;
     }
