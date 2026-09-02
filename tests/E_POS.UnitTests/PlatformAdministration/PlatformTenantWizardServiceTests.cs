@@ -1275,6 +1275,10 @@ public sealed class PlatformTenantWizardServiceTests
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
+        public Task<IReadOnlyList<PlanTechnicalFeatureLookupDto>> GetActiveTenantFeaturesAsync(
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<PlanTechnicalFeatureLookupDto>>([]);
+
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 

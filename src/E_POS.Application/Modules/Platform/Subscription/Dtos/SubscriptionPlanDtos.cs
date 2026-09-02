@@ -61,8 +61,46 @@ public sealed record SubscriptionPlanCatalogModuleDto(
     int SortOrder,
     IReadOnlyList<SubscriptionPlanCatalogFeatureDto> Features);
 
+public sealed record PlanTechnicalFeatureLookupDto(
+    Guid Id,
+    string FeatureCode,
+    string Name,
+    string? Description,
+    string Scope,
+    string Status);
+
+public sealed record PlanBusinessCapabilityDto(
+    string Code,
+    string Name,
+    string Description,
+    string CommercialClassification,
+    IReadOnlyList<string> MappedTechnicalFeatureCodes);
+
+public sealed record PlanTechnicalFeatureDto(
+    Guid Id,
+    string FeatureCode,
+    string Name,
+    string? Description,
+    bool IsActive,
+    bool IsPlanEligible,
+    string CommercialClassification,
+    string SelectionBehavior,
+    bool IsSelected = false);
+
+public sealed record PlanBusinessModuleDto(
+    string Code,
+    string Name,
+    string Description,
+    int DisplayOrder,
+    string CurrentR1Status,
+    string CommercialState,
+    IReadOnlyList<PlanBusinessCapabilityDto> Capabilities,
+    IReadOnlyList<PlanTechnicalFeatureDto> TechnicalFeatures,
+    string ModuleSelectionState = "NOT_INCLUDED");
+
 public sealed record SubscriptionPlanCatalogResponse(
-    IReadOnlyList<SubscriptionPlanCatalogModuleDto> Modules);
+    IReadOnlyList<SubscriptionPlanCatalogModuleDto> Modules,
+    IReadOnlyList<PlanBusinessModuleDto>? BusinessModules = null);
 
 public sealed record CreateSubscriptionPlanRequest
 {
@@ -176,5 +214,6 @@ public sealed record SubscriptionPlanDetailResponse(
     DateTimeOffset CreatedAt,
     IReadOnlyList<SubscriptionPlanDetailLimitDto> Limits,
     IReadOnlyList<SubscriptionPlanDetailModuleDto> Modules,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<PlanBusinessModuleDto>? BusinessModules = null);
 

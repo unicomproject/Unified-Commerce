@@ -92,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformPasswordResetService, PlatformPasswordResetService>();
         services.AddScoped<IPlatformPasswordPolicyValidator, PlatformPasswordPolicyValidator>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
+        services.AddScoped<IPlanBusinessCapabilityCatalogService, PlanBusinessCapabilityCatalogService>();
         services.AddScoped<ITenantUsageCounterService, TenantUsageCounterService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
         services.AddScoped<ITenantAdminInvitationAcceptanceService, TenantAdminInvitationAcceptanceService>();

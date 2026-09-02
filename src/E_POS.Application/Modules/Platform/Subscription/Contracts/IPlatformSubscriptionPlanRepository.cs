@@ -40,6 +40,9 @@ public interface IPlatformSubscriptionPlanRepository
         IReadOnlyCollection<Guid> featureIds,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<PlanTechnicalFeatureLookupDto>> GetActiveTenantFeaturesAsync(
+        CancellationToken cancellationToken);
+
     Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken);
 
     Task UpsertLegacyPlanLimitsAsync(

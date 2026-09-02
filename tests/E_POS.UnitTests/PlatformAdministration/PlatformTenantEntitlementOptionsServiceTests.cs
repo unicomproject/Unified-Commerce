@@ -443,6 +443,10 @@ public sealed class PlatformTenantEntitlementOptionsServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
 
+        public Task<IReadOnlyList<PlanTechnicalFeatureLookupDto>> GetActiveTenantFeaturesAsync(
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<PlanTechnicalFeatureLookupDto>>([]);
+
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
             Task.FromResult(0);
 
