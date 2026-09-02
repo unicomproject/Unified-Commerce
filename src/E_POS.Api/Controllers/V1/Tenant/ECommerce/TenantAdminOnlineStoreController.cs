@@ -48,6 +48,10 @@ public sealed class TenantAdminOnlineStoreController : ControllerBase
     public async Task<IActionResult> UpdateIdentity([FromBody] UpdateOnlineStoreIdentityRequest request, CancellationToken cancellationToken) =>
         await Execute(context => _service.UpdateIdentityAsync(context, request, cancellationToken));
 
+    [HttpGet("checkout-rules")]
+    public async Task<IActionResult> GetCheckoutRules(CancellationToken cancellationToken) =>
+        await Execute(context => _service.GetCheckoutRulesAsync(context, cancellationToken));
+
     [HttpGet("url-domain")]
     public async Task<IActionResult> GetUrlDomain(CancellationToken cancellationToken) =>
         await Execute(context => _service.GetUrlDomainAsync(context, cancellationToken));
