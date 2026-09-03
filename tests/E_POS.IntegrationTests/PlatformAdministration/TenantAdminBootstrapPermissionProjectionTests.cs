@@ -1,5 +1,6 @@
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Persistence;
@@ -31,6 +32,28 @@ public sealed class TenantAdminBootstrapPermissionProjectionTests
         Assert.True(map.ContainsKey("inventory.stock.view"));
         Assert.False(map.ContainsKey("platform.tenants.create"));
         Assert.False(map.ContainsKey("missing.code"));
+    }
+
+    [Fact]
+    public async Task GetActivePermissionIdMapByCodesAsync_ResolvesAllCashierBootstrapPermissionCodes()
+    {
+        await using var db = CreateDbContext();
+        foreach (var code in TenantRoleSetupCatalog.CashierAllowedPermissionCodes)
+        {
+            SeedPermission(db, code);
+        }
+        await db.SaveChangesAsync();
+
+        var repository = new PlatformTenantRepository(db);
+        var map = await repository.GetActivePermissionIdMapByCodesAsync(
+            TenantRoleSetupCatalog.CashierAllowedPermissionCodes.ToList(),
+            CancellationToken.None);
+
+        var missing = TenantRoleSetupCatalog.CashierAllowedPermissionCodes
+            .Where(code => !map.ContainsKey(code))
+            .ToList();
+
+        Assert.Empty(missing);
     }
 
     [Fact]

@@ -294,6 +294,7 @@ public sealed class PosPermissionSeedTests
             .Concat(DevelopmentPosPaymentReceiptPermissionsSeedData.Definitions.Select(definition => definition.Id))
             .Concat(DevelopmentPosReturnsExchangePermissionsSeedData.Definitions.Select(definition => definition.Id))
             .Concat(DevelopmentPosDiscountWorkflowSeedData.PermissionDefinitions.Select(definition => definition.Id))
+            .Concat(DevelopmentPosCashierOnlineOrderPermissionsSeedData.Definitions.Select(definition => definition.Id))
             .ToList();
 
         Assert.Equal(allIds.Count, allIds.Distinct().Count());
@@ -303,8 +304,8 @@ public sealed class PosPermissionSeedTests
         Assert.Contains(
             Guid.Parse("77777777-0316-4000-8000-000000000001"),
             DevelopmentPosPaymentReceiptPermissionsSeedData.Definitions
-                .Where(definition => definition.PermissionCode == SalesPermissions.Sale.Checkout)
-                .Select(definition => definition.Id));
+            .Where(definition => definition.PermissionCode == SalesPermissions.Sale.Checkout)
+            .Select(definition => definition.Id));
     }
 
     [Fact]
@@ -369,5 +370,62 @@ public sealed class PosPermissionSeedTests
             DevelopmentTenantSeedConstants.CashierRoleId.ToString(),
             DevelopmentPosHardwareSettingsPermissionSeedData.CashierAssignmentUpSql,
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CashierOnlineOrderPermissions_ContainAll8CanonicalCodes()
+    {
+        var definitions = DevelopmentPosCashierOnlineOrderPermissionsSeedData.Definitions;
+        Assert.Equal(8, definitions.Count);
+
+        var codes = definitions.Select(d => d.PermissionCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var requiredCode in DevelopmentPosCashierOnlineOrderPermissionsSeedData.CashierPermissionCodes)
+        {
+            Assert.Contains(requiredCode, codes);
+        }
+    }
+
+    [Fact]
+    public void CashierOnlineOrderPermissions_ExactFeatureOwnership()
+    {
+        var definitions = DevelopmentPosCashierOnlineOrderPermissionsSeedData.Definitions
+            .ToDictionary(d => d.PermissionCode, d => d.FeatureId, StringComparer.OrdinalIgnoreCase);
+
+        var salesOrdersFeatureId = DevelopmentPosCashierOnlineOrderPermissionsSeedData.SalesOrdersFeatureId;
+        var clickCollectFeatureId = DevelopmentPosCashierOnlineOrderPermissionsSeedData.ClickCollectFeatureId;
+
+        // orders.access and orders.view -> sales_orders
+        Assert.Equal(salesOrdersFeatureId, definitions["commerce.online_order.orders.access"]);
+        Assert.Equal(salesOrdersFeatureId, definitions["commerce.online_order.orders.view"]);
+
+        // picking.* -> click_collect
+        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.view"]);
+        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.pick"]);
+        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.scan"]);
+        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.manual_entry"]);
+        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.report_issue"]);
+        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.note"]);
+    }
+
+    [Fact]
+    public void CashierAllowedPermissionCodes_SubsetOfActiveTenantPermissionCatalog()
+    {
+        var seededCatalogCodes = DevelopmentPosNewSalePermissionsSeedData.Definitions
+            .Select(d => d.PermissionCode)
+            .Concat(DevelopmentPosPaymentReceiptPermissionsSeedData.Definitions.Select(d => d.PermissionCode))
+            .Concat(DevelopmentPosReturnsExchangePermissionsSeedData.Definitions.Select(d => d.PermissionCode))
+            .Concat(DevelopmentPosCashDrawerPermissionsSeedData.Definitions.Select(d => d.PermissionCode))
+            .Concat(DevelopmentPosCashierOnlineOrderPermissionsSeedData.Definitions.Select(d => d.PermissionCode))
+            .Concat(new[]
+            {
+                DevelopmentPosCustomerCreatePermissionSeedData.Definition.PermissionCode,
+                DevelopmentPosHardwareSettingsPermissionSeedData.PermissionCode
+            })
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var cashierCode in TenantRoleSetupCatalog.CashierAllowedPermissionCodes)
+        {
+            Assert.Contains(cashierCode, seededCatalogCodes);
+        }
     }
 }
