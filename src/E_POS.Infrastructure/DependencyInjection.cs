@@ -208,6 +208,7 @@ public static class DependencyInjection
                 section["ResetPath"] ?? "/reset-password");
         });
         services.AddScoped<IPlatformPasswordResetDeliveryService, AcsPlatformPasswordResetDeliveryService>();
+        services.AddScoped<ITenantAdminInvitationDeliveryService, TenantAdminInvitationDeliveryService>();
         services.AddScoped(static provider =>
         {
             var configuration = provider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
