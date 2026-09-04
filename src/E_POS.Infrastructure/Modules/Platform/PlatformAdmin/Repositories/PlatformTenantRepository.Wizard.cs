@@ -601,6 +601,16 @@ public sealed partial class PlatformTenantRepository
         };
     }
 
+    public async Task MarkTenantAdminInviteSentAsync(Guid inviteId, DateTimeOffset sentAt, CancellationToken cancellationToken)
+    {
+        var invite = await _dbContext.UserInvites.SingleOrDefaultAsync(x => x.Id == inviteId, cancellationToken);
+        if (invite is not null)
+        {
+            invite.MarkSent(sentAt);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     private static string ToLookupLabel(string value)
     {
         var spaced = value.Replace("_", " ", StringComparison.Ordinal);

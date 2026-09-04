@@ -43,7 +43,7 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .HasColumnName("encrypted_password")
             .HasColumnType("varchar(255)")
             .HasMaxLength(255)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.Phone)
             .HasColumnName("phone")
@@ -59,7 +59,7 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUse
             .HasColumnName("password_salt")
             .HasColumnType("varchar(255)")
             .HasMaxLength(255)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.FullName)
             .HasColumnName("full_name")

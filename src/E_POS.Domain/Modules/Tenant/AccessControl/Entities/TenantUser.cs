@@ -7,10 +7,10 @@ public class TenantUser : AuditableEntity
 {
     public Guid TenantId { get; protected set; }
     public string Email { get; protected set; } = string.Empty;
-    public string EncryptedPassword { get; protected set; } = string.Empty;
+    public string? EncryptedPassword { get; protected set; }
     public string? Phone { get; protected set; }
     public string? UnmaskedPhone { get; protected set; }
-    public string PasswordSalt { get; protected set; } = string.Empty;
+    public string? PasswordSalt { get; protected set; }
     public string FullName { get; protected set; } = string.Empty;
     public string? DisplayName { get; protected set; }
     public Guid? ProfileImageUrl { get; protected set; }
@@ -40,8 +40,8 @@ public class TenantUser : AuditableEntity
         string fullName,
         string? phone,
         string? unmaskedPhone,
-        string encryptedPassword,
-        string passwordSalt,
+        string? encryptedPassword,
+        string? passwordSalt,
         string accountStatus,
         string userType,
         string sourceUserType,
@@ -91,8 +91,8 @@ public class TenantUser : AuditableEntity
             fullName,
             phone,
             unmaskedPhone,
-            TenantUserConstants.PendingInvitePasswordHash, // using constant as placeholder
-            "empty_salt",
+            null,
+            null,
             TenantUserConstants.StatusInvited,
             "admin", // default
             "admin", // default
