@@ -56,6 +56,9 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
     private readonly IPasswordHashService _passwordHashService;
     private readonly ITenantUsageCounterService _tenantUsageCounterService;
     private readonly IDefaultTenantSettingsProvider _defaultTenantSettingsProvider;
+    private readonly IInvitationTokenService? _invitationTokenService;
+    private readonly ITenantAdminInvitationDeliveryService? _invitationDeliveryService;
+    private readonly Microsoft.Extensions.Logging.ILogger<PlatformTenantService>? _logger;
 
     public PlatformTenantService(
         IPlatformTenantRepository repository,
@@ -65,7 +68,10 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         IDateTimeProvider dateTimeProvider,
         IPasswordHashService passwordHashService,
         ITenantUsageCounterService tenantUsageCounterService,
-        IDefaultTenantSettingsProvider defaultTenantSettingsProvider)
+        IDefaultTenantSettingsProvider defaultTenantSettingsProvider,
+        IInvitationTokenService? invitationTokenService = null,
+        ITenantAdminInvitationDeliveryService? invitationDeliveryService = null,
+        Microsoft.Extensions.Logging.ILogger<PlatformTenantService>? logger = null)
     {
         _repository = repository;
         _subscriptionPlanRepository = subscriptionPlanRepository;
@@ -75,6 +81,9 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
         _passwordHashService = passwordHashService;
         _tenantUsageCounterService = tenantUsageCounterService;
         _defaultTenantSettingsProvider = defaultTenantSettingsProvider;
+        _invitationTokenService = invitationTokenService;
+        _invitationDeliveryService = invitationDeliveryService;
+        _logger = logger;
     }
 
     public async Task<ApplicationResult<PlatformTenantListResponse>> GetTenantsAsync(

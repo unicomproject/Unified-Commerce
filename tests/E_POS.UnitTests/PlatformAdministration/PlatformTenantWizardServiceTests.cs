@@ -91,8 +91,11 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.True(repository.CreateWizardCalled);
         Assert.NotNull(repository.LastWriteModel);
         Assert.Single(repository.LastWriteModel!.Entitlements);
-        Assert.Equal(FeatureId, repository.LastWriteModel.Entitlements[0].PlatformFeatureId);
-        Assert.Null(repository.LastWriteModel.TenantAdminInvite);
+        Assert.NotNull(repository.LastWriteModel.TenantAdminInvite);
+        Assert.Equal("PENDING", repository.LastWriteModel.TenantAdminInvite.InviteStatus);
+        Assert.Equal("INVITED", repository.LastWriteModel.TenantAdminUser!.AccountStatus);
+        Assert.Null(repository.LastWriteModel.TenantAdminUser.EncryptedPassword);
+        Assert.Null(repository.LastWriteModel.TenantAdminUser.PasswordSalt);
         Assert.Equal(TenantStatusConstants.Active, repository.LastWriteModel.Tenant.Status);
         Assert.NotNull(repository.LastWriteModel.Tenant.ActivatedAt);
         Assert.Equal("LKR", repository.LastWriteModel.Tenant.BaseCurrencyCode);
@@ -865,7 +868,9 @@ public sealed class PlatformTenantWizardServiceTests
         IReadOnlySet<string> permissions,
         IPasswordHashService? passwordHashService = null,
         FakeTenantUsageCounterService? tenantUsageCounterService = null,
-        IDefaultTenantSettingsProvider? defaultTenantSettingsProvider = null)
+        IDefaultTenantSettingsProvider? defaultTenantSettingsProvider = null,
+        IInvitationTokenService? invitationTokenService = null,
+        ITenantAdminInvitationDeliveryService? invitationDeliveryService = null)
     {
         var subscriptionRepository = new FakePlatformSubscriptionPlanRepository
         {
@@ -890,7 +895,37 @@ public sealed class PlatformTenantWizardServiceTests
             new FakeDateTimeProvider(),
             passwordHashService ?? new FakePasswordHashService(),
             tenantUsageCounterService ?? new FakeTenantUsageCounterService(),
-            defaultTenantSettingsProvider ?? new PassingDefaultTenantSettingsProvider());
+            defaultTenantSettingsProvider ?? new PassingDefaultTenantSettingsProvider(),
+            invitationTokenService ?? new FakeInvitationTokenService(),
+            invitationDeliveryService ?? new FakeInvitationDeliveryService());
+    }
+
+    private sealed class FakeInvitationTokenService : IInvitationTokenService
+    {
+        public string GeneratedToken { get; set; } = "sec_tok_fake_url_safe_128bit_entropy_abc";
+        public string GeneratedHash { get; set; } = "hash_fake_invitation_token_sha256";
+
+        public string GenerateToken() => GeneratedToken;
+        public string HashToken(string rawToken) => GeneratedHash;
+    }
+
+    private sealed class FakeInvitationDeliveryService : ITenantAdminInvitationDeliveryService
+    {
+        public List<TenantAdminInvitationDeliveryRequest> DeliveredRequests { get; } = [];
+        public bool ShouldSucceed { get; set; } = true;
+
+        public Task<TenantAdminInvitationDeliveryResult> DeliverAsync(
+            TenantAdminInvitationDeliveryRequest request,
+            CancellationToken cancellationToken)
+        {
+            DeliveredRequests.Add(request);
+            if (ShouldSucceed)
+            {
+                return Task.FromResult(new TenantAdminInvitationDeliveryResult(true));
+            }
+
+            return Task.FromResult(new TenantAdminInvitationDeliveryResult(false, "delivery_error", "Delivery failed."));
+        }
     }
 
     private static PlatformTenantDetailResponse CreateDetail(Guid tenantId) =>
@@ -952,6 +987,14 @@ public sealed class PlatformTenantWizardServiceTests
         {
             UpsertedProfile = profile;
             ProfileEntity = profile;
+            return Task.CompletedTask;
+        }
+
+        public Guid? LastSentInviteId { get; private set; }
+
+        public Task MarkTenantAdminInviteSentAsync(Guid inviteId, DateTimeOffset sentAt, CancellationToken cancellationToken)
+        {
+            LastSentInviteId = inviteId;
             return Task.CompletedTask;
         }
 

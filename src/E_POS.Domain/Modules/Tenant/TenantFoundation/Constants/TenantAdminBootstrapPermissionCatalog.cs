@@ -87,7 +87,9 @@ public static class TenantAdminBootstrapPermissionCatalog
             [PlatformTenantFeatureCodes.SalesOrders] =
             [
                 "fulfillment.orders.view",
-                "fulfillment.orders.manage"
+                "fulfillment.orders.manage",
+                OnlineOrderPickingPermissions.OrdersAccess,
+                OnlineOrderPickingPermissions.OrdersView
             ],
             [PlatformTenantFeatureCodes.ClickCollect] =
             [
