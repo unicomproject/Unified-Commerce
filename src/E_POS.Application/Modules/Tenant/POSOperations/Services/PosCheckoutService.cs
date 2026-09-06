@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.AccessControl.SensitiveData;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Application.Modules.Tenant.HardwareCash;
@@ -92,7 +93,7 @@ public sealed class PosCheckoutService : IPosCheckoutService
                 ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(CartPermissionDenied));
         }
 
-        return CalculateSummaryAsync(context, request, cancellationToken);
+        return CalculateSummaryAsync(context, request, isCartContext: true, cancellationToken);
     }
 
     public async Task<ApplicationResult<PosCheckoutSummaryResponseDto>> GetSummaryAsync(
@@ -105,12 +106,13 @@ public sealed class PosCheckoutService : IPosCheckoutService
             return ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(PermissionDenied);
         }
 
-        return await CalculateSummaryAsync(context, request, cancellationToken);
+        return await CalculateSummaryAsync(context, request, isCartContext: false, cancellationToken);
     }
 
     private async Task<ApplicationResult<PosCheckoutSummaryResponseDto>> CalculateSummaryAsync(
         TenantRequestContext context,
         PosCheckoutSummaryRequestDto request,
+        bool isCartContext,
         CancellationToken cancellationToken)
     {
 
@@ -187,7 +189,8 @@ public sealed class PosCheckoutService : IPosCheckoutService
                 });
         }
 
-        return ApplicationResult<PosCheckoutSummaryResponseDto>.Success(result.Summary);
+        return ApplicationResult<PosCheckoutSummaryResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterCheckoutSummary(context, result.Summary, isCartContext));
     }
 
     public async Task<ApplicationResult<PosCheckoutStartPaymentResponseDto>> StartPaymentAsync(
@@ -335,7 +338,8 @@ public sealed class PosCheckoutService : IPosCheckoutService
             }
         }
 
-        return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Success(payment);
+        return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterStartPayment(context, payment));
     }
 
     private static bool IsSupportedSaleType(string? saleType) =>

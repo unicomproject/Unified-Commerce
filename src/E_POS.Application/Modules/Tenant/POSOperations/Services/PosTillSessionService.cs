@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.AccessControl.SensitiveData;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
@@ -114,9 +115,13 @@ public sealed class PosTillSessionService : IPosTillSessionService
         }
 
         var canViewSession =
-            context.HasPermission(PosPermissions.Till.Open) ||
-            context.HasPermission(PosPermissions.Till.Close) ||
-            context.HasPermission(PosPermissions.Till.ViewSession);
+            context.HasAnyPermission(
+                PosPermissions.Till.Open,
+                PosPermissions.Till.SessionOpen,
+                PosPermissions.Till.Close,
+                PosPermissions.Till.SessionClose,
+                PosPermissions.Till.ViewSession,
+                PosPermissions.Till.SessionView);
 
         if (!canViewSession)
         {
@@ -134,7 +139,8 @@ public sealed class PosTillSessionService : IPosTillSessionService
                 MapResolveError(result.ErrorCode));
         }
 
-        return ApplicationResult<CurrentTillSessionResponseDto>.Success(MapToResponse(result.Snapshot));
+        return ApplicationResult<CurrentTillSessionResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterCurrentTillSessionResponse(context, MapToResponse(result.Snapshot)));
     }
 
     public async Task<ApplicationResult<CurrentTillSessionResponseDto>> OpenTillAsync(
@@ -157,7 +163,7 @@ public sealed class PosTillSessionService : IPosTillSessionService
             return ApplicationResult<CurrentTillSessionResponseDto>.Failure(InvalidOpeningFloat);
         }
 
-        if (!context.HasPermission(PosPermissions.Till.Open))
+        if (!context.HasAnyPermission(PosPermissions.Till.Open, PosPermissions.Till.SessionOpen))
         {
             return ApplicationResult<CurrentTillSessionResponseDto>.Failure(OpenPermissionDenied);
         }
@@ -179,7 +185,8 @@ public sealed class PosTillSessionService : IPosTillSessionService
                 MapOpenError(result.ErrorCode));
         }
 
-        return ApplicationResult<CurrentTillSessionResponseDto>.Success(MapToResponse(result.Snapshot));
+        return ApplicationResult<CurrentTillSessionResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterCurrentTillSessionResponse(context, MapToResponse(result.Snapshot)));
     }
 
     public async Task<ApplicationResult<CloseTillResponseDto>> CloseTillAsync(
@@ -202,7 +209,7 @@ public sealed class PosTillSessionService : IPosTillSessionService
             return ApplicationResult<CloseTillResponseDto>.Failure(InvalidCountedCash);
         }
 
-        if (!context.HasPermission(PosPermissions.Till.Close))
+        if (!context.HasAnyPermission(PosPermissions.Till.Close, PosPermissions.Till.SessionClose))
         {
             return ApplicationResult<CloseTillResponseDto>.Failure(ClosePermissionDenied);
         }
@@ -226,7 +233,8 @@ public sealed class PosTillSessionService : IPosTillSessionService
                 MapCloseError(result.ErrorCode));
         }
 
-        return ApplicationResult<CloseTillResponseDto>.Success(MapCloseToResponse(result.Snapshot));
+        return ApplicationResult<CloseTillResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterCloseTillResponse(context, MapCloseToResponse(result.Snapshot)));
     }
 
     private static ApplicationError MapResolveError(string? errorCode) =>

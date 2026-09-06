@@ -306,6 +306,19 @@ public sealed class PosDrawerRepository : IPosDrawerRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<PosCashMovementTypeDto?> GetMovementTypeByIdAsync(
+        Guid tenantId, Guid movementTypeId, CancellationToken cancellationToken)
+    {
+        return await _db.CashMovementTypes.AsNoTracking()
+            .Where(x => x.Id == movementTypeId &&
+                        (x.TenantId == null || x.TenantId == tenantId) &&
+                        x.Status == "ACTIVE")
+            .Select(x => new PosCashMovementTypeDto(
+                x.Id, x.MovementTypeCode, x.MovementTypeName, x.Direction,
+                x.RequiresReason, x.AffectsExpectedCash))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public Task<(string? ErrorCode, PosCashDrawerMovementDto? Movement)> CreateFinancialMovementAsync(
         Guid tenantId, Guid userId, Guid trustedTillId, CreatePosCashMovementRequest request,
         DateTimeOffset now, CancellationToken cancellationToken) =>

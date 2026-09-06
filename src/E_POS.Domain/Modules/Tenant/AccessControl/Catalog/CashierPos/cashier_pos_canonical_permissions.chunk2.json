@@ -1,0 +1,3524 @@
+{
+  "chunk": 2,
+  "taxonomy": "domain.module.feature.action",
+  "deviceScope": "all",
+  "kindCounts": {
+    "pre_auth": 7,
+    "existing": 49,
+    "split": 280,
+    "documented_resolved": 1,
+    "new": 14
+  },
+  "definitions": [
+    {
+      "code": "pre_auth.login.screen.view",
+      "parent": null,
+      "module": "PreAuth",
+      "type": "PRE_AUTH_CONFIGURATION",
+      "sensitive": false,
+      "kind": "pre_auth",
+      "reason": "Login screen container",
+      "roleAssignable": false
+    },
+    {
+      "code": "pre_auth.login.branding.view",
+      "parent": null,
+      "module": "PreAuth",
+      "type": "PRE_AUTH_CONFIGURATION",
+      "sensitive": false,
+      "kind": "pre_auth",
+      "reason": "Login branding",
+      "roleAssignable": false
+    },
+    {
+      "code": "pre_auth.login.email.input",
+      "parent": null,
+      "module": "PreAuth",
+      "type": "PRE_AUTH_CONFIGURATION",
+      "sensitive": false,
+      "kind": "pre_auth",
+      "reason": "Email input",
+      "roleAssignable": false
+    },
+    {
+      "code": "pre_auth.login.password.input",
+      "parent": null,
+      "module": "PreAuth",
+      "type": "PRE_AUTH_CONFIGURATION",
+      "sensitive": false,
+      "kind": "pre_auth",
+      "reason": "Password input",
+      "roleAssignable": false
+    },
+    {
+      "code": "pre_auth.login.password_visibility.toggle",
+      "parent": null,
+      "module": "PreAuth",
+      "type": "PRE_AUTH_CONFIGURATION",
+      "sensitive": false,
+      "kind": "pre_auth",
+      "reason": "Password visibility",
+      "roleAssignable": false
+    },
+    {
+      "code": "pre_auth.login.submit.execute",
+      "parent": null,
+      "module": "PreAuth",
+      "type": "PRE_AUTH_CONFIGURATION",
+      "sensitive": false,
+      "kind": "pre_auth",
+      "reason": "Login submit",
+      "roleAssignable": false
+    },
+    {
+      "code": "pre_auth.login.validation.message",
+      "parent": null,
+      "module": "PreAuth",
+      "type": "PRE_AUTH_CONFIGURATION",
+      "sensitive": false,
+      "kind": "pre_auth",
+      "reason": "Validation message",
+      "roleAssignable": false
+    },
+    {
+      "code": "pos.sales.dashboard.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.new_sale.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.new_sale.create",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.catalog.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.catalog.search",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.cart.manage",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.cart.add_item",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.cart.update_item",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.cart.remove_item",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.cart.clear",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.checkout.execute",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.manual_discount.apply",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.held_sales.create",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.held_sales.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.held_sales.recall",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.order_history.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.payments.cash.accept",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.payments.card.accept",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.payments.qr.accept",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.payments.split.accept",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.digital.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.physical.print",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.history.reprint",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.orders.history.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.management.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.management.create",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.management.update",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.returns.search_sale.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.returns.workflow.create",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.position.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.physical.manage",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.create",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.session.open",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.session.close",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.session.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.hardware.local_agent.settings",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.alerts.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.orders.access",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.orders.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.fulfilment.start",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.picking.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.picking.pick",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.picking.scan",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.picking.manual_entry",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.picking.report_issue",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.picking.note",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.packing.view",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.packing.pack",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.collection.mark_ready",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.topbar.container",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Top bar container",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.topbar.brand",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Brand/logo",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.topbar.session_status",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "STATUS",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Till session status",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.topbar.outlet",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Outlet",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.topbar.till",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Till",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.topbar.connectivity",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "STATUS",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Connectivity state",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.topbar.clock",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Clock",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.topbar.notification_bell",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "NAVIGATION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Notification bell chrome",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.bottom_nav.container",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Bottom navigation container",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.panel.view",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Notification panel",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.panel.unread_count",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Unread count",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.messages.list",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Message list",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.messages.title",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Message title",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.messages.body",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Message body",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.messages.timestamp",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Message timestamp",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.messages.open",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open message",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.messages.mark_read",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Mark read",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.messages.dismiss",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Dismiss",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.notifications.messages.mark_all_read",
+      "parent": "pos.notifications.alerts.view",
+      "module": "Notifications",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Mark all read",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.profile.view",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cashier profile",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.profile.avatar",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Avatar",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.profile.name",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cashier name",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.profile.role",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cashier role",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.session_summary.view",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Session summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.session_summary.total_sales",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Total sales",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.session_summary.transaction_count",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Transaction count",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.session_summary.returns",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Returns metric",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.session_summary.discounts",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Discounts",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.session_summary.net_sales",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Home",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Net sales",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.sections.quick_products",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick products",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.sections.popular",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Popular",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.sections.frequently_sold",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Frequently sold",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.sections.offers",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Offers",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.sections.sort",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Sort",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_card.image",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Card image",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_card.name",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Card name",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_card.regular_price",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Regular price",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_card.sale_price",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Sale price",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_card.discount_badge",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Discount badge",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_card.open_details",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open details",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.view",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Detail view",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.close",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Close detail",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.image",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Detail image",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.name",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Detail name",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.price",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Detail price",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.stock",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Detail stock",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.sku",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Detail SKU",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.description",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Description",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.variants",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Variants",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.variant_select",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Variant selection",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.available_qty",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Available quantity",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.quantity_display",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quantity display",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.note_view",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Note view",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.note_entry",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Note entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.recommendations",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Recommendations",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.product_detail.cancel",
+      "parent": "pos.sales.catalog.view",
+      "module": "Catalog",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cancel detail",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.popup.view",
+      "parent": "pos.sales.held_sales.create",
+      "module": "HeldSales",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Park popup",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.popup.reference",
+      "parent": "pos.sales.held_sales.create",
+      "module": "HeldSales",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Park reference",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.popup.note",
+      "parent": "pos.sales.held_sales.create",
+      "module": "HeldSales",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Park note",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.popup.expiry",
+      "parent": "pos.sales.held_sales.create",
+      "module": "HeldSales",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Park expiry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.filters",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Filters",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.active_count",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Active count",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.customer",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Customer",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.value",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Value",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.item_count",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Item count",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.parked_time",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Parked time",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.expiry_time",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Expiry time",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.items",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Items",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.pagination",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Pagination",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.held_sales.list.summary",
+      "parent": "pos.sales.held_sales.view",
+      "module": "HeldSales",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Summary values",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sales.held_sales.cancel",
+      "parent": "pos.sales.held_sales.create",
+      "module": "HeldSales",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "documented_resolved",
+      "reason": "Approve independent cancel; historical create-alias insufficient for fine-grained target",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.summary.view",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cart summary container",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.summary.item_count",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cart item count",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.summary.subtotal",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cart subtotal",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.summary.discount",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Cart discount",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.summary.tax",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cart tax",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.summary.total",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Cart total",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.lines.list",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cart lines list",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.lines.name",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Line product name",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.lines.quantity",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Line quantity display",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.lines.unit_price",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Line unit price",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.lines.line_total",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Line total",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.lines.note",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Line note display",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cart.lines.image",
+      "parent": "pos.sales.cart.manage",
+      "module": "Cart",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Line product image",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.search.bar",
+      "parent": "pos.sales.catalog.search",
+      "module": "Catalog",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Search bar",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.search.clear",
+      "parent": "pos.sales.catalog.search",
+      "module": "Catalog",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Clear search",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.search.results",
+      "parent": "pos.sales.catalog.search",
+      "module": "Catalog",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Search results",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.search.empty_state",
+      "parent": "pos.sales.catalog.search",
+      "module": "Catalog",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Empty search state",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.catalog.search.scanner_hint",
+      "parent": "pos.sales.catalog.search",
+      "module": "Catalog",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Scanner hint",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.methods.cash_tile",
+      "parent": "pos.payments.cash.accept",
+      "module": "Checkout",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cash method tile chrome",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.methods.card_tile",
+      "parent": "pos.payments.card.accept",
+      "module": "Checkout",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Card method tile chrome",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.methods.qr_tile",
+      "parent": "pos.payments.qr.accept",
+      "module": "Checkout",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "QR method tile chrome",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.methods.split_tile",
+      "parent": "pos.payments.split.accept",
+      "module": "Checkout",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Split method tile chrome",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.methods.container",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Payment methods container",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.discount.panel.view",
+      "parent": "pos.sales.manual_discount.apply",
+      "module": "Discount",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Discount panel",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.discount.panel.amount_entry",
+      "parent": "pos.sales.manual_discount.apply",
+      "module": "Discount",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Discount amount entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.discount.panel.reason_entry",
+      "parent": "pos.sales.manual_discount.apply",
+      "module": "Discount",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Discount reason",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.discount.panel.apply_action",
+      "parent": "pos.sales.manual_discount.apply",
+      "module": "Discount",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Apply discount control",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.discount.panel.cancel_action",
+      "parent": "pos.sales.manual_discount.apply",
+      "module": "Discount",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cancel discount control",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.new_sale.chrome.header",
+      "parent": "pos.sales.new_sale.view",
+      "module": "NewSale",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "New sale header",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.new_sale.chrome.park_action",
+      "parent": "pos.sales.new_sale.view",
+      "module": "NewSale",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Park action chrome",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.new_sale.chrome.customer_chip",
+      "parent": "pos.sales.new_sale.view",
+      "module": "NewSale",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Customer chip",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.new_sale.chrome.empty_cart",
+      "parent": "pos.sales.new_sale.view",
+      "module": "NewSale",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Empty cart message",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.new_sale.chrome.checkout_action",
+      "parent": "pos.sales.new_sale.view",
+      "module": "NewSale",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Proceed to checkout chrome",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.new_sale.chrome.held_count",
+      "parent": "pos.sales.new_sale.view",
+      "module": "NewSale",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Held sales count badge",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.new_sale.chrome.clear_cart_action",
+      "parent": "pos.sales.new_sale.view",
+      "module": "NewSale",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Clear cart chrome",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.payment",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Payment summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.items",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Items",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.quantity",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quantity",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.price",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Price",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.line_total",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Line total",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.customer.summary",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Customer summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.subtotal",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Subtotal",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.discount",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Discount",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.tax",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Tax",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.checkout.summary.total",
+      "parent": "pos.sales.checkout.execute",
+      "module": "Checkout",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Total",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.summary.order",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Order summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.line.item",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Item",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.line.quantity",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quantity",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.line.price",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Price",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.line.item_total",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Item total",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.summary.subtotal",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Subtotal",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.summary.discount",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Discount",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.summary.tax",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Tax",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.summary.total_due",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Total due",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.tender.amount_received_view",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Amount received display",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.tender.amount_received_entry",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Amount received entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.tender.due_amount",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Due amount",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.tender.exact",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Exact Cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.quick_amounts.container",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick Amount container",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.quick_amounts.slot_1",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick Amount slot 1",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.quick_amounts.slot_2",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick Amount slot 2",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.quick_amounts.slot_3",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick Amount slot 3",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.container",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Numpad container",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_0",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 0",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_1",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 1",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_2",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 2",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_3",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 3",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_4",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 4",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_5",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 5",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_6",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 6",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_7",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 7",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_8",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 8",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_9",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 9",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.digit_00",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Key 00",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.numpad.decimal",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Decimal",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.controls.backspace",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Backspace",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.controls.clear",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Clear",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.tender.change_due",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Change due",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_payment.completion.execute",
+      "parent": "pos.payments.cash.accept",
+      "module": "CashPayment",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Complete sale",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.message.success",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Success message",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.details.receipt_number",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Receipt number",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.details.payment_method",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Payment method",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.details.datetime",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Date/time",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.details.cashier",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cashier",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.details.customer",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Customer",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.details.cash_received",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Cash received",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.details.change_due",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Change due",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.sale_complete.details.total_paid",
+      "parent": "pos.receipts.digital.view",
+      "module": "SaleComplete",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Total paid",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.store",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Store",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.receipt_number",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Receipt number",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.datetime",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Date/time",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.cashier",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cashier",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.customer",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Customer",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.terminal",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Terminal",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.payment_method",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Payment method",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.items",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Items",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.item_quantity",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Item quantity",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.item_value",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Item value",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.item_rate",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Item rate",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.subtotal",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Subtotal",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.discount",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Discount",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.total",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Total",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.paid_amount",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Paid amount",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.receipts.details.change_due",
+      "parent": "pos.receipts.digital.view",
+      "module": "Receipts",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Change due",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.search",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Search",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.filters",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Filters",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.id",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "ID",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.name",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Name",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.phone",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Phone",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.email",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Email",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.source",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Source",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.status",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Status",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.order_count",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Order count",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.total_spend",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Total spend",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.list.pagination",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Pagination",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.details.joined_date",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Joined date",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.details.average_order_value",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "AOV",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.history.recent_purchases",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Recent purchases",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.history.purchase_amounts",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Purchase amounts",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.history.purchase_history",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Purchase history",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.summary.till",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Till",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.summary.status",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "STATUS",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Status",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.summary.opening_cash",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Opening cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.summary.cash_sales",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Cash sales",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.summary.expected_cash",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Expected cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.list",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Movement list",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.type",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Movement type",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.date",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Movement date",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.time",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Movement time",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.cashier",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Movement cashier",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.amount_view",
+      "parent": "pos.cash_drawer.position.view",
+      "module": "CashDrawer",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Movement amount",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.open_popup.view",
+      "parent": "pos.cash_drawer.physical.manage",
+      "module": "CashDrawer",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open drawer popup",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.open_popup.cancel",
+      "parent": "pos.cash_drawer.physical.manage",
+      "module": "CashDrawer",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Cancel",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.open_popup.continue",
+      "parent": "pos.cash_drawer.physical.manage",
+      "module": "CashDrawer",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Continue",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.starting_cash_view",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Starting cash view",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.starting_cash_entry",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Starting cash entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.validation_message",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Validation",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.note_view",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Note view",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.note_entry",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Note entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.quick_amounts",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick amounts",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.quick_slot_1",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick slot 1",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.quick_slot_2",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick slot 2",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.quick_slot_3",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Quick slot 3",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.numpad",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTAINER",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Numpad",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.backspace",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Backspace",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.clear",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Clear",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.confirm_message",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Confirm message",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_0",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 0",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_1",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 1",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_2",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 2",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_3",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 3",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_4",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 4",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_5",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 5",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_6",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 6",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_7",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 7",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_8",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 8",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_9",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 9",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_00",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key 00",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.opening.key_decimal",
+      "parent": "pos.till.session.open",
+      "module": "Till",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Open till numpad key decimal",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.back",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "NAVIGATION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Back",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.till",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Till",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.opened_by",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Opened by",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.opened_time",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Opened time",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.expected_cash",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Expected cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.counted_cash_entry",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Counted cash entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.difference",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Difference",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.balance_status",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "STATUS",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Balance status",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.mismatch_reason",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Mismatch reason",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.notes",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Notes",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.summary",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.expected_cash_summary",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Expected cash summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.counted_cash_summary",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Counted cash summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.difference_summary",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "Difference summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.till.closing.status_summary",
+      "parent": "pos.till.session.close",
+      "module": "Till",
+      "type": "STATUS",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "Status summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.navigation.settings",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "NAVIGATION",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Settings destination \u2014 no existing business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.management.attach_sale",
+      "parent": "pos.customers.management.view",
+      "module": "Customers",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Attach customer to active sale",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.customers.management.deactivate",
+      "parent": "pos.customers.management.update",
+      "module": "Customers",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Deactivate customer",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.cash_in",
+      "parent": "pos.cash_drawer.movements.create",
+      "module": "CashDrawer",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Independent Cash In action",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.cash_out",
+      "parent": "pos.cash_drawer.movements.create",
+      "module": "CashDrawer",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Independent Cash Out action",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.movements.cash_drop",
+      "parent": "pos.cash_drawer.movements.create",
+      "module": "CashDrawer",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Independent Cash Drop action",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.open_reason.provide_change",
+      "parent": "pos.cash_drawer.physical.manage",
+      "module": "CashDrawer",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Open reason: provide change",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.open_reason.till_check",
+      "parent": "pos.cash_drawer.physical.manage",
+      "module": "CashDrawer",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Open reason: till check",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.open_reason.cash_count",
+      "parent": "pos.cash_drawer.physical.manage",
+      "module": "CashDrawer",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Open reason: cash count",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.open_reason.manager_operation",
+      "parent": "pos.cash_drawer.physical.manage",
+      "module": "CashDrawer",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Open reason: manager operation",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_drawer.open_reason.other",
+      "parent": "pos.cash_drawer.physical.manage",
+      "module": "CashDrawer",
+      "type": "CONTROL",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Open reason: other",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.shell.navigation.offline_banner",
+      "parent": "pos.sales.dashboard.view",
+      "module": "Shell",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Offline/connectivity banner surface",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.actions.online_orders_entry",
+      "parent": "commerce.online_order.orders.access",
+      "module": "Home",
+      "type": "NAVIGATION",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Home Online Orders entry chrome under commerce access",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.home.actions.returns_entry",
+      "parent": "pos.returns.search_sale.view",
+      "module": "Home",
+      "type": "NAVIGATION",
+      "sensitive": false,
+      "kind": "new",
+      "reason": "Home Returns entry chrome under returns view",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.till",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_in Till",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.expected_cash",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_in Expected cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.available_cash",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_in Available/opening cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.amount_entry",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_in Amount entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.reason",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_in Reason",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.note",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_in Note",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.manager_pin",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_in Manager PIN",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.summary",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_in Summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.resulting_balance",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_in Resulting balance",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.validation_message",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_in Validation",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.confirm",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_in Confirm",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_in.cancel",
+      "parent": "pos.cash_drawer.movements.cash_in",
+      "module": "CashMovements",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_in Cancel",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.till",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_out Till",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.expected_cash",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_out Expected cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.available_cash",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_out Available/opening cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.amount_entry",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_out Amount entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.reason",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_out Reason",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.note",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_out Note",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.manager_pin",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_out Manager PIN",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.summary",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_out Summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.resulting_balance",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_out Resulting balance",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.validation_message",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_out Validation",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.confirm",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_out Confirm",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_out.cancel",
+      "parent": "pos.cash_drawer.movements.cash_out",
+      "module": "CashMovements",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_out Cancel",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.till",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "FIELD",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_drop Till",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.expected_cash",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_drop Expected cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.available_cash",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_drop Available/opening cash",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.amount_entry",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_drop Amount entry",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.reason",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_drop Reason",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.note",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_drop Note",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.manager_pin",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "INPUT",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_drop Manager PIN",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.summary",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "SECTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_drop Summary",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.resulting_balance",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "SENSITIVE_FIELD",
+      "sensitive": true,
+      "kind": "split",
+      "reason": "cash_drop Resulting balance",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.validation_message",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "MESSAGE",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_drop Validation",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.confirm",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_drop Confirm",
+      "roleAssignable": true
+    },
+    {
+      "code": "pos.cash_movements.cash_drop.cancel",
+      "parent": "pos.cash_drawer.movements.cash_drop",
+      "module": "CashMovements",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "split",
+      "reason": "cash_drop Cancel",
+      "roleAssignable": true
+    }
+  ]
+}

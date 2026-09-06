@@ -51,13 +51,13 @@ public sealed class PosCashDrawerServiceTests
     }
 
     [Fact]
-    public async Task CreateMovement_WithoutCashDrawerMovementCreate_IsDeniedAndDoesNotPersist()
+    public async Task CreateMovement_WithoutCashInPermission_IsDeniedAndDoesNotPersist()
     {
         var repository = new FakeDrawerRepository();
         var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
 
         var result = await service.CreateFinancialMovementAsync(
-            Context(CashDrawerPermissions.View, "Manager", "Cashier"),
+            Context(CashDrawerPermissions.View, CashDrawerPermissions.CreateMovement, "Manager", "Cashier"),
             ValidCreateRequest(),
             CancellationToken.None);
 
@@ -77,7 +77,7 @@ public sealed class PosCashDrawerServiceTests
             Result = new CurrentTillSessionResolveResult(false, errorCode, null)
         };
         var service = CreateService(repository, tillSessions);
-        var context = Context(CashDrawerPermissions.View, CashDrawerPermissions.CreateMovement);
+        var context = Context(CashDrawerPermissions.View, CashDrawerPermissions.Canonical.CashIn);
 
         var summary = await service.GetFinancialSummaryAsync(context, DeviceId, CancellationToken.None);
         var movements = await service.GetFinancialMovementsAsync(context, DeviceId, 1, 25, CancellationToken.None);
@@ -100,7 +100,7 @@ public sealed class PosCashDrawerServiceTests
             Result = new CurrentTillSessionResolveResult(false, "till_session.device_not_trusted", null)
         };
         var service = CreateService(repository, tillSessions);
-        var context = Context(CashDrawerPermissions.View, CashDrawerPermissions.CreateMovement);
+        var context = Context(CashDrawerPermissions.View, CashDrawerPermissions.Canonical.CashIn);
 
         var create = await service.CreateFinancialMovementAsync(context, ValidCreateRequest(), CancellationToken.None);
 
@@ -125,7 +125,7 @@ public sealed class PosCashDrawerServiceTests
                 : new CurrentTillSessionResolveResult(false, resolveError, null)
         };
         var service = CreateService(repository, tillSessions);
-        var context = Context(CashDrawerPermissions.View, CashDrawerPermissions.CreateMovement);
+        var context = Context(CashDrawerPermissions.View, CashDrawerPermissions.Canonical.CashIn);
 
         if (resolveError == "till_session.not_found")
         {
@@ -153,7 +153,7 @@ public sealed class PosCashDrawerServiceTests
         var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
 
         var result = await service.CreateFinancialMovementAsync(
-            Context(CashDrawerPermissions.CreateMovement),
+            Context(CashDrawerPermissions.Canonical.CashIn),
             ValidCreateRequest() with { Amount = amount },
             CancellationToken.None);
 
@@ -168,7 +168,7 @@ public sealed class PosCashDrawerServiceTests
         var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
 
         var result = await service.CreateFinancialMovementAsync(
-            Context(CashDrawerPermissions.CreateMovement),
+            Context(CashDrawerPermissions.Canonical.CashIn),
             ValidCreateRequest() with { MovementTypeId = Guid.Empty },
             CancellationToken.None);
 
@@ -183,7 +183,7 @@ public sealed class PosCashDrawerServiceTests
         var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
 
         var result = await service.CreateFinancialMovementAsync(
-            Context(CashDrawerPermissions.CreateMovement),
+            Context(CashDrawerPermissions.Canonical.CashIn),
             ValidCreateRequest() with { Note = new string('x', 501) },
             CancellationToken.None);
 
@@ -200,7 +200,7 @@ public sealed class PosCashDrawerServiceTests
         var service = CreateService(repository, new FakeTillSessionRepository { Result = OpenSession() });
 
         var result = await service.CreateFinancialMovementAsync(
-            Context(CashDrawerPermissions.CreateMovement), ValidCreateRequest(), CancellationToken.None);
+            Context(CashDrawerPermissions.Canonical.CashIn), ValidCreateRequest(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(movement.MovementId, result.Value!.MovementId);
@@ -347,6 +347,17 @@ public sealed class PosCashDrawerServiceTests
             LastMovementTypesDirection = direction;
             return Task.FromResult<IReadOnlyList<PosCashMovementTypeDto>>([]);
         }
+
+        public Task<PosCashMovementTypeDto?> GetMovementTypeByIdAsync(
+            Guid tenantId, Guid movementTypeId, CancellationToken cancellationToken) =>
+            Task.FromResult<PosCashMovementTypeDto?>(
+                new PosCashMovementTypeDto(
+                    MovementTypeId,
+                    "CASH_IN",
+                    "Cash In",
+                    "IN",
+                    false,
+                    true));
 
         public Task<(string? ErrorCode, PosCashDrawerMovementDto? Movement)> CreateFinancialMovementAsync(
             Guid tenantId, Guid userId, Guid trustedTillId, CreatePosCashMovementRequest request,

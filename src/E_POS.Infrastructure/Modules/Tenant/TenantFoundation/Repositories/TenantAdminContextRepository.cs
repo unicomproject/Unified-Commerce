@@ -119,10 +119,13 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
 
         var accessibleOutletIds = outlets.Select(x => x.Id).OrderBy(x => x).ToList();
 
-        var permissions = await TenantEffectivePermissionCodesQuery
-            .Build(_dbContext, tenantUserId, tenantId)
-            .OrderBy(code => code)
-            .ToListAsync(cancellationToken);
+        var permissions = await TenantEffectivePermissionResolution.ResolveAsync(
+            _dbContext,
+            tenantUserId,
+            tenantId,
+            DateTimeOffset.UtcNow,
+            logger: null,
+            cancellationToken);
 
         // Enabled feature codes from tenant feature entitlements joined to PlatformFeature.
         // Outlet management uses Strategy B via ITenantFeatureEntitlementEvaluator so that:

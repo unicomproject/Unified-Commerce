@@ -275,7 +275,7 @@ public sealed class PosPermissionSeedTests
                     + Environment.NewLine
                     + DevelopmentPosCustomerCreatePermissionSeedData.CashierAssignmentUpSql;
 
-        Assert.Contains("customers.create", upSql, StringComparison.Ordinal);
+        Assert.Contains("pos.customers.management.create", upSql, StringComparison.Ordinal);
         Assert.Contains(
             DevelopmentPosCustomerCreatePermissionSeedData.PermissionId.ToString(),
             upSql,
@@ -326,7 +326,7 @@ public sealed class PosPermissionSeedTests
                     + Environment.NewLine
                     + DevelopmentPosCustomerUpdatePermissionSeedData.CashierAssignmentUpSql;
 
-        Assert.Contains("customers.update", upSql, StringComparison.Ordinal);
+        Assert.Contains("pos.customers.management.update", upSql, StringComparison.Ordinal);
         Assert.Contains(
             DevelopmentPosCustomerUpdatePermissionSeedData.PermissionId.ToString(),
             upSql,
@@ -345,9 +345,12 @@ public sealed class PosPermissionSeedTests
             DevelopmentPosCustomerUpdatePermissionSeedData.PermissionId.ToString(),
             downSql,
             StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("AND permission_code = 'customers.update'", downSql, StringComparison.Ordinal);
+        Assert.Contains(
+            "AND permission_code = 'pos.customers.management.update'",
+            downSql,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
-            "WHERE permission_code = 'customers.update';",
+            "WHERE permission_code = 'pos.customers.management.update';",
             downSql,
             StringComparison.Ordinal);
     }

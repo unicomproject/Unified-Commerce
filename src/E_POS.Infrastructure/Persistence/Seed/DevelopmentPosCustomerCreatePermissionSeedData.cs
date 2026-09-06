@@ -3,7 +3,7 @@ using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 namespace E_POS.Infrastructure.Persistence.Seed;
 
 /// <summary>
-/// Idempotent seed SQL for the canonical POS <c>customers.create</c> permission.
+/// Idempotent seed SQL for the canonical POS <c>pos.customers.management.create</c> permission.
 /// </summary>
 public static class DevelopmentPosCustomerCreatePermissionSeedData
 {
@@ -30,7 +30,7 @@ public static class DevelopmentPosCustomerCreatePermissionSeedData
                   AND permission_code <> '{{PermissionCode}}'
             ) THEN
                 RAISE EXCEPTION
-                    'customers.create seed UUID {{PermissionId}} is already owned by another permission';
+                    'pos.customers.management.create seed UUID {{PermissionId}} is already owned by another permission';
             END IF;
         END $$;
 

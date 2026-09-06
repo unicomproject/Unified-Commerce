@@ -17,7 +17,7 @@ public partial class SeedPosCustomerUpdatePermission : Migration
 {
     /// <summary>
     /// Deterministic ID for customers.update. Must remain unique across permission_definitions.
-    /// Do not reuse 77777777-0316 (owned by sales.checkout).
+    /// Do not reuse 77777777-0316 (owned by the POS checkout permission).
     /// </summary>
     public const string CustomersUpdatePermissionId =
         "77777777-0338-4000-8000-000000000001";

@@ -70,7 +70,7 @@ public sealed class PosCheckoutRepositoryTests
         Assert.Equal("LKR", result.Summary.BillingSummary.Currency);
         Assert.Equal("New Sale", result.Summary.SaleDetails.SaleType);
         Assert.Equal("Cashier 001", result.Summary.SaleDetails.CashierName);
-        Assert.Equal(["cash", "card"], result.Summary.PaymentMethods);
+        Assert.Equal(["cash"], result.Summary.PaymentMethods);
         Assert.Empty(result.Summary.ValidationMessages);
     }
 

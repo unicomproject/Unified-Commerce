@@ -69,8 +69,8 @@ public sealed class TenantAdminBootstrapPermissionProjectionTests
         Assert.DoesNotContain("inventory.stock.view", plan.PermissionCodes);
         Assert.DoesNotContain("fulfillment.orders.manage", plan.PermissionCodes);
         Assert.Contains("sales.create", plan.PermissionCodes);
-        Assert.Contains("payments.cash.accept", plan.PermissionCodes);
-        Assert.DoesNotContain("payments.card.accept", plan.PermissionCodes);
+        Assert.Contains("pos.payments.cash.accept", plan.PermissionCodes);
+        Assert.DoesNotContain("pos.payments.card.accept", plan.PermissionCodes);
     }
 
     [Fact]

@@ -4,16 +4,19 @@ using E_POS.Domain.Modules.Tenant.TenantAuth.Entities;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Queries;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
 
 public sealed class TenantAuthRepository : ITenantAuthRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly ILogger<TenantAuthRepository> _logger;
 
-    public TenantAuthRepository(EPosDbContext dbContext)
+    public TenantAuthRepository(EPosDbContext dbContext, ILogger<TenantAuthRepository> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     public Task<TenantLoginAccount?> FindLoginAccountByNormalizedEmailAsync(
@@ -41,10 +44,13 @@ public sealed class TenantAuthRepository : ITenantAuthRepository
         Guid tenantId,
         CancellationToken cancellationToken)
     {
-        return await TenantEffectivePermissionCodesQuery
-            .Build(_dbContext, tenantUserId, tenantId)
-            .OrderBy(code => code)
-            .ToListAsync(cancellationToken);
+        return await TenantEffectivePermissionResolution.ResolveAsync(
+            _dbContext,
+            tenantUserId,
+            tenantId,
+            DateTimeOffset.UtcNow,
+            _logger,
+            cancellationToken);
     }
 
     public async Task SaveFailedLoginAuditAsync(TenantLoginAudit audit, CancellationToken cancellationToken)

@@ -8,6 +8,7 @@ using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace E_POS.IntegrationTests.TenantAuth;
@@ -55,7 +56,7 @@ public sealed class TenantAuthRepositoryPermissionTests
             TenantRolePermission.Create(Guid.NewGuid(), fixture.TenantId, outletRole.Id, outletRolePermission.Id, fixture.TenantUserId, Now));
         await dbContext.SaveChangesAsync();
 
-        var repository = new TenantAuthRepository(dbContext);
+        var repository = new TenantAuthRepository(dbContext, NullLogger<TenantAuthRepository>.Instance);
         var permissions = await repository.GetActivePermissionCodesAsync(fixture.TenantUserId, fixture.TenantId, CancellationToken.None);
 
         Assert.Empty(permissions);
@@ -101,7 +102,7 @@ public sealed class TenantAuthRepositoryPermissionTests
         dbContext.OutletUserPermissions.Add(OutletUserPermission.Create(Guid.NewGuid(), foreignTenantId, outlet.Id, fixture.TenantUserId, outletDirectPermission.Id, fixture.TenantUserId, Now));
         await dbContext.SaveChangesAsync();
 
-        var repository = new TenantAuthRepository(dbContext);
+        var repository = new TenantAuthRepository(dbContext, NullLogger<TenantAuthRepository>.Instance);
         var permissions = await repository.GetActivePermissionCodesAsync(fixture.TenantUserId, fixture.TenantId, CancellationToken.None);
 
         Assert.Empty(permissions);
