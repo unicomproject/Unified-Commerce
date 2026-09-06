@@ -419,6 +419,7 @@ public sealed class PosPermissionSeedTests
             .Concat(DevelopmentPosReturnsExchangePermissionsSeedData.Definitions.Select(d => d.PermissionCode))
             .Concat(DevelopmentPosCashDrawerPermissionsSeedData.Definitions.Select(d => d.PermissionCode))
             .Concat(DevelopmentPosCashierOnlineOrderPermissionsSeedData.Definitions.Select(d => d.PermissionCode))
+            .Concat(CashierPosChunk3PermissionSeedData.RoleAssignableDefinitions.Select(d => d.Code))
             .Concat(new[]
             {
                 DevelopmentPosCustomerCreatePermissionSeedData.Definition.PermissionCode,
