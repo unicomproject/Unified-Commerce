@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.AccessControl.SensitiveData;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Domain.Modules.Tenant.Orders.Constants;
@@ -28,7 +29,7 @@ public sealed class PosHoldService : IPosHoldService
         string? reason,
         CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(SalesPermissions.Park.Create))
+        if (!context.HasPermission(SalesPermissions.HeldSales.Cancel))
             return CancelFailure("pos_holds.permission_denied",
                 "You do not have permission to cancel parked POS sales.");
         if (holdId == Guid.Empty)
@@ -67,7 +68,7 @@ public sealed class PosHoldService : IPosHoldService
         PosRecallHoldRequestDto request,
         CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(SalesPermissions.Park.Recall))
+        if (!context.HasAnyPermission(SalesPermissions.Park.Recall, SalesPermissions.HeldSales.Recall))
             return RecallFailure("pos_holds.permission_denied",
                 "You do not have permission to recall parked POS sales.");
         if (holdId == Guid.Empty)
@@ -95,7 +96,8 @@ public sealed class PosHoldService : IPosHoldService
             });
         }
 
-        return ApplicationResult<PosRecallHoldResponseDto>.Success(result.Recall);
+        return ApplicationResult<PosRecallHoldResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterRecallHold(context, result.Recall));
     }
 
     public async Task<ApplicationResult<PosHoldListItemDto>> CreateHoldAsync(
@@ -103,7 +105,7 @@ public sealed class PosHoldService : IPosHoldService
         PosCreateHoldRequestDto request,
         CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(SalesPermissions.Park.Create))
+        if (!context.HasAnyPermission(SalesPermissions.Park.Create, SalesPermissions.HeldSales.Create))
         {
             return ApplicationResult<PosHoldListItemDto>.Failure(new ApplicationError(
                 "pos_holds.permission_denied",
@@ -149,7 +151,8 @@ public sealed class PosHoldService : IPosHoldService
             });
         }
 
-        return ApplicationResult<PosHoldListItemDto>.Success(result.Hold);
+        return ApplicationResult<PosHoldListItemDto>.Success(
+            PosSensitiveResponseFilter.FilterHoldItem(context, result.Hold));
     }
 
     public async Task<ApplicationResult<PosHoldListResponseDto>> GetHoldsAsync(
@@ -157,7 +160,7 @@ public sealed class PosHoldService : IPosHoldService
         PosHoldListQueryDto query,
         CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(SalesPermissions.Park.View))
+        if (!context.HasAnyPermission(SalesPermissions.Park.View, SalesPermissions.HeldSales.View))
         {
             return ApplicationResult<PosHoldListResponseDto>.Failure(PermissionDenied);
         }
@@ -207,13 +210,15 @@ public sealed class PosHoldService : IPosHoldService
         }
 
         return ApplicationResult<PosHoldListResponseDto>.Success(
-            new PosHoldListResponseDto(
-                result.Holds,
-                result.TotalCount,
-                result.TotalValue,
-                result.Currency!,
-                query.Page,
-                query.PageSize));
+            PosSensitiveResponseFilter.FilterHoldList(
+                context,
+                new PosHoldListResponseDto(
+                    result.Holds,
+                    result.TotalCount,
+                    result.TotalValue,
+                    result.Currency!,
+                    query.Page,
+                    query.PageSize)));
     }
 
     private static ApplicationResult<PosHoldListItemDto> Failure(string code, string message) =>

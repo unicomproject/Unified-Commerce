@@ -18,11 +18,16 @@ public static class PosPermissions
         public const string Open = "pos.till.open";
         public const string Close = "pos.till.close";
         public const string ViewSession = "till.session.view";
+
+        /// <summary>Canonical till session codes (Chunk 2). Prefer alongside legacy Open/Close/ViewSession.</summary>
+        public const string SessionOpen = "pos.till.session.open";
+        public const string SessionClose = "pos.till.session.close";
+        public const string SessionView = "pos.till.session.view";
     }
 
     public static class Notifications
     {
-        public const string View = "notifications.view";
+        public const string View = "pos.notifications.alerts.view";
     }
 
     public static class Hardware

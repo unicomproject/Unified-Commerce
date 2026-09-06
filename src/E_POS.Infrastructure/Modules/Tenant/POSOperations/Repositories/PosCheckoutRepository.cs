@@ -20,6 +20,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.Payment.Services;
 
 namespace E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 
@@ -30,19 +31,24 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
     private readonly EPosDbContext _dbContext;
     private readonly IPosTillSessionRepository _tillSessionRepository;
     private readonly ICardPaymentGateway _cardPaymentGateway;
+    private readonly IPaymentMethodCapabilityResolver _paymentMethodCapabilityResolver;
     private readonly IReceiptTemplateResolutionService _receiptTemplateResolutionService;
 
     public PosCheckoutRepository(
         EPosDbContext dbContext,
         IPosTillSessionRepository tillSessionRepository,
         IReceiptTemplateResolutionService receiptTemplateResolutionService,
-        ICardPaymentGateway? cardPaymentGateway = null)
+        ICardPaymentGateway? cardPaymentGateway = null,
+        IPaymentMethodCapabilityResolver? paymentMethodCapabilityResolver = null)
     {
         _dbContext = dbContext;
         _tillSessionRepository = tillSessionRepository;
         _receiptTemplateResolutionService = receiptTemplateResolutionService;
         _cardPaymentGateway = cardPaymentGateway ?? new
             E_POS.Infrastructure.Modules.Tenant.Payment.UnavailableCardPaymentGateway();
+        _paymentMethodCapabilityResolver = paymentMethodCapabilityResolver ??
+            new PaymentMethodCapabilityResolver(
+                [new E_POS.Infrastructure.Modules.Tenant.Payment.CashPaymentExecutionCapability()]);
     }
 
     public async Task<PosCheckoutCalculationResult> CalculateSummaryAsync(
@@ -265,7 +271,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 itemCount,
                 now,
                 cashierName),
-            await ResolvePaymentMethodsAsync(tenantId, permissions, cancellationToken),
+            await ResolvePaymentMethodsAsync(
+                tenantId, tenantUserId, request.DeviceId, permissions, cancellationToken),
             validationMessages,
             responseLines);
 
@@ -1420,6 +1427,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
 
     private async Task<IReadOnlyList<string>> ResolvePaymentMethodsAsync(
         Guid tenantId,
+        Guid tenantUserId,
+        Guid deviceId,
         IReadOnlyCollection<string> permissions,
         CancellationToken cancellationToken)
     {
@@ -1430,10 +1439,21 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             .Select(x => x.MethodCode)
             .ToListAsync(cancellationToken);
 
-        return configuredCodes
+        var authorizedCodes = configuredCodes
             .Where(code => HasPaymentPermission(code, permissions))
-            .Select(code => code.ToLowerInvariant())
             .ToList();
+        var context = new PaymentMethodCapabilityContext(tenantId, tenantUserId, deviceId);
+        var executableCodes = new List<string>(authorizedCodes.Count);
+        foreach (var code in authorizedCodes)
+        {
+            if (await _paymentMethodCapabilityResolver.IsExecutableAsync(
+                    code, context, cancellationToken))
+            {
+                executableCodes.Add(code.ToLowerInvariant());
+            }
+        }
+
+        return executableCodes;
     }
 
     private static string FormatSaleType(string? saleType)

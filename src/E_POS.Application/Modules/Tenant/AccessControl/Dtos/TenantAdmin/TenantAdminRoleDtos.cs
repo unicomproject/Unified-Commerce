@@ -101,7 +101,10 @@ public sealed record TenantPermissionCatalogPermissionResponse(
     bool IsActive,
     string Source,
     bool Assignable = true,
-    string? BlockedReason = null);
+    string? BlockedReason = null,
+    string? ParentCode = null,
+    bool IsSensitive = false,
+    string? SemanticType = null);
 
 public sealed record TenantRolePermissionsResponse(
     Guid RoleId,

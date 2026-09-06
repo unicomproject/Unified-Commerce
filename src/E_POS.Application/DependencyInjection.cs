@@ -153,6 +153,7 @@ public static class DependencyInjection
         services.AddScoped<IPosHomeDashboardService, PosHomeDashboardService>();
         services.AddScoped<IPosTillSessionService, PosTillSessionService>();
         services.AddScoped<IPosCheckoutService, PosCheckoutService>();
+        services.AddScoped<IPosNotificationService, PosNotificationService>();
         services.AddScoped<IPosReceiptService, PosReceiptService>();
         services.AddScoped<IPosReturnService, PosReturnService>();
         services.AddScoped<IPosHoldService, PosHoldService>();

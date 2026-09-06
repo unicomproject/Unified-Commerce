@@ -1041,6 +1041,18 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             TenantAdminUserAccessValidationFailure.PermissionNotFound => new ApplicationError(
                 "user.permission_not_found",
                 "One or more selected permissions were not found."),
+            TenantAdminUserAccessValidationFailure.InvalidPermissionFormat => new ApplicationError(
+                "user.invalid_permission_format",
+                "One or more selected permissions have an invalid canonical format."),
+            TenantAdminUserAccessValidationFailure.PreAuthPermissionNotAssignable => new ApplicationError(
+                "user.pre_auth_permission_not_assignable",
+                "Pre-auth permissions cannot be assigned to tenant users."),
+            TenantAdminUserAccessValidationFailure.UnknownCanonicalPermission => new ApplicationError(
+                "user.unknown_permission",
+                "One or more selected permissions are not approved role-assignable canonical codes."),
+            TenantAdminUserAccessValidationFailure.ParentPermissionRequired => new ApplicationError(
+                "user.parent_permission_required",
+                "One or more selected child permissions require their parent permission in the same override set."),
             TenantAdminUserAccessValidationFailure.PermissionInactive => new ApplicationError(
                 "user.permission_inactive",
                 "One or more selected permissions are inactive."),

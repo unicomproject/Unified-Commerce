@@ -22,6 +22,7 @@ using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.Payment.Contracts;
+using E_POS.Application.Modules.Tenant.Payment.Services;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
@@ -31,6 +32,7 @@ using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Integrations.Google;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
@@ -38,7 +40,6 @@ using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
-using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Application.Common.Email;
 using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
@@ -285,6 +286,7 @@ public static class DependencyInjection
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
         services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IPosNotificationRepository, NotificationRepository>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
@@ -380,6 +382,9 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderStartFulfillmentRepository, PosOnlineOrderStartFulfillmentRepository>();
         services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
+        services.AddScoped<IPaymentMethodExecutionCapability, CashPaymentExecutionCapability>();
+        services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();
+        services.AddScoped<IPaymentMethodCapabilityResolver, PaymentMethodCapabilityResolver>();
 
         return services;
     }

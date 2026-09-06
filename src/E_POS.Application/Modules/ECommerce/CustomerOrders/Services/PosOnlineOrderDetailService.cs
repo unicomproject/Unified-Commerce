@@ -3,14 +3,15 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 
 namespace E_POS.Application.Modules.ECommerce.CustomerOrders.Services;
 
 public sealed class PosOnlineOrderDetailService : IPosOnlineOrderDetailService
 {
-    public const string AccessPermission = "commerce.online_order.orders.access";
-    public const string ViewPermission = "commerce.online_order.orders.view";
+    public const string AccessPermission = OnlineOrderPickingPermissions.OrdersAccess;
+    public const string ViewPermission = OnlineOrderPickingPermissions.OrdersView;
 
     private readonly IPosOnlineOrderDetailRepository _repository;
     private readonly ITenantFeatureEntitlementEvaluator _entitlements;

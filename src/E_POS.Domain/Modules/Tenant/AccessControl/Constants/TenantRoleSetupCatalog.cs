@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.Tenant.AccessControl.Catalog.CashierPos;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.Orders.Constants;
@@ -33,8 +34,8 @@ public static class TenantRoleSetupCatalog
         .Select(static role => role.RoleCode)
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-    public static IReadOnlySet<string> CashierAllowedPermissionCodes { get; } =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> LegacyCashierAllowedPermissionCodes =
+        new(StringComparer.OrdinalIgnoreCase)
         {
             PosPermissions.Home.View,
             PosPermissions.Home.ViewDashboard,
@@ -62,6 +63,9 @@ public static class TenantRoleSetupCatalog
             SalesPermissions.Park.Recall,
             SalesPermissions.Orders.View,
             PaymentPermissions.AcceptCash,
+            PaymentPermissions.AcceptCard,
+            PaymentPermissions.AcceptQr,
+            PaymentPermissions.AcceptSplit,
             ReceiptPermissions.View,
             ReceiptPermissions.Print,
             ReceiptPermissions.Reprint,
@@ -74,10 +78,32 @@ public static class TenantRoleSetupCatalog
             CustomerPermissions.View,
             CustomerPermissions.Create,
             CustomerPermissions.Update,
+            CustomerPermissions.AttachSale,
+            CustomerPermissions.Deactivate,
             CashDrawerPermissions.View,
             CashDrawerPermissions.Manage,
-            CashDrawerPermissions.CreateMovement
-        }.Concat(OnlineOrderPickingPermissions.All).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            CashDrawerPermissions.CreateMovement,
+            CashDrawerPermissions.Canonical.PositionView,
+            CashDrawerPermissions.Canonical.PhysicalManage,
+            CashDrawerPermissions.Canonical.MovementsCreate,
+            CashDrawerPermissions.Canonical.CashIn,
+            CashDrawerPermissions.Canonical.CashOut,
+            CashDrawerPermissions.Canonical.CashDrop,
+            SalesPermissions.HeldSales.Create,
+            SalesPermissions.HeldSales.View,
+            SalesPermissions.HeldSales.Recall,
+            SalesPermissions.HeldSales.Cancel,
+        };
+
+    /// <summary>
+    /// Cashier ceiling: legacy aliases + all Chunk 2/3 role-assignable Cashier POS codes.
+    /// Ongoing assignment still validates format/pre-auth/parent independently.
+    /// </summary>
+    public static IReadOnlySet<string> CashierAllowedPermissionCodes { get; } =
+        LegacyCashierAllowedPermissionCodes
+            .Concat(OnlineOrderPickingPermissions.All)
+            .Concat(CashierPosPermissionAssignmentRules.RoleAssignablePermissionCodes)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     public static IReadOnlySet<string> AdministrativePermissionCodes { get; } =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)

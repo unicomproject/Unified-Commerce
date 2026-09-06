@@ -160,14 +160,29 @@ public sealed class PosCustomerRepository : IPosCustomerRepository
         var searchTerm = search?.Trim();
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var pattern = $"%{searchTerm}%";
-            query = query.Where(x =>
-                EF.Functions.ILike(x.Name, pattern) ||
-                (x.Phone != null && EF.Functions.ILike(x.Phone, pattern)) ||
-                (x.NormalizedPhone != null && EF.Functions.ILike(x.NormalizedPhone, pattern)) ||
-                (x.Email != null && EF.Functions.ILike(x.Email, pattern)) ||
-                (x.NormalizedEmail != null && EF.Functions.ILike(x.NormalizedEmail, pattern)) ||
-                EF.Functions.ILike(x.CustomerCode, pattern));
+            var isPhoneShaped = searchTerm.All(character =>
+                char.IsDigit(character) ||
+                char.IsWhiteSpace(character) ||
+                character is '+' or '-' or '(' or ')');
+            var normalizedPhone = isPhoneShaped
+                ? CustomerEntity.NormalizePhone(searchTerm)
+                : null;
+
+            if (normalizedPhone is not null && normalizedPhone.Count(char.IsDigit) >= 7)
+            {
+                query = query.Where(x => x.NormalizedPhone == normalizedPhone);
+            }
+            else
+            {
+                var pattern = $"%{searchTerm}%";
+                query = query.Where(x =>
+                    EF.Functions.ILike(x.Name, pattern) ||
+                    (x.Phone != null && EF.Functions.ILike(x.Phone, pattern)) ||
+                    (x.NormalizedPhone != null && EF.Functions.ILike(x.NormalizedPhone, pattern)) ||
+                    (x.Email != null && EF.Functions.ILike(x.Email, pattern)) ||
+                    (x.NormalizedEmail != null && EF.Functions.ILike(x.NormalizedEmail, pattern)) ||
+                    EF.Functions.ILike(x.CustomerCode, pattern));
+            }
         }
 
         var totalCount = await query.CountAsync(cancellationToken);

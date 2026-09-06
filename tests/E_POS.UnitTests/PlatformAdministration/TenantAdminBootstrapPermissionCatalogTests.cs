@@ -87,8 +87,11 @@ public sealed class TenantAdminBootstrapPermissionCatalogTests
         Assert.DoesNotContain(PlatformTenantFeatureCodes.PosCheckout, plan.IntentionallyPermissionlessEntitlements);
         Assert.Contains("sales.create", plan.PermissionCodes);
         Assert.Contains("pos.till.open", plan.PermissionCodes);
-        Assert.Contains("payments.cash.accept", plan.PermissionCodes);
-        Assert.DoesNotContain("payments.card.accept", plan.PermissionCodes);
+        Assert.Contains("pos.payments.cash.accept", plan.PermissionCodes);
+        // Cashier template ceiling (Chunk 2/3) includes all role-assignable payment methods.
+        Assert.Contains("pos.payments.card.accept", plan.PermissionCodes);
+        Assert.Contains("pos.payments.qr.accept", plan.PermissionCodes);
+        Assert.Contains("pos.payments.split.accept", plan.PermissionCodes);
         Assert.DoesNotContain("tenant.roles.manage", plan.PermissionCodes);
     }
 

@@ -10,4 +10,7 @@ public sealed record TenantRequestContext(Guid TenantId, Guid UserId, IReadOnlyC
             Permissions as IReadOnlyList<string> ?? Permissions.ToList());
         return expanded.Contains(permissionCode, StringComparer.OrdinalIgnoreCase);
     }
+
+    public bool HasAnyPermission(params string[] permissionCodes) =>
+        permissionCodes.Any(HasPermission);
 }

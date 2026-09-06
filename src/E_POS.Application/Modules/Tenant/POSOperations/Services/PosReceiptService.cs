@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.AccessControl.SensitiveData;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
@@ -71,7 +72,9 @@ public sealed class PosReceiptService : IPosReceiptService
         }
 
         return ApplicationResult<PosReceiptSearchResponseDto>.Success(
-            await _repository.SearchAsync(context.TenantId, request, cancellationToken));
+            PosSensitiveResponseFilter.FilterReceiptSearch(
+                context,
+                await _repository.SearchAsync(context.TenantId, request, cancellationToken)));
     }
 
     public async Task<ApplicationResult<PosReceiptDetailDto>> GetDetailAsync(
@@ -94,7 +97,8 @@ public sealed class PosReceiptService : IPosReceiptService
         var detail = await _repository.GetDetailAsync(context.TenantId, receiptId, cancellationToken);
         return detail is null
             ? ApplicationResult<PosReceiptDetailDto>.Failure(ReceiptNotFound)
-            : ApplicationResult<PosReceiptDetailDto>.Success(detail);
+            : ApplicationResult<PosReceiptDetailDto>.Success(
+                PosSensitiveResponseFilter.FilterReceiptDetail(context, detail));
     }
 
     public async Task<ApplicationResult<PosReceiptReprintAuthorizationResponseDto>> AuthorizeReprintAsync(

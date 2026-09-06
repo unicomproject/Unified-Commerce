@@ -54,8 +54,10 @@ public static class DevelopmentPosCashierOnlineOrderPermissionsSeedData
         new(PickingNoteId, OnlineOrderPickingPermissions.PickingNote, CoreCommerceModuleId, ClickCollectFeatureId, "note", "Add notes to online order picking fulfillment.")
     ];
 
-    public static IReadOnlyList<string> CashierPermissionCodes =>
-        OnlineOrderPickingPermissions.All;
+    public static IReadOnlyList<string> CashierPermissionCodes { get; } =
+        Definitions
+            .Select(static definition => definition.PermissionCode)
+            .ToList();
 
     public const string UpSql = """
         -- 1. Ensure sales_orders feature exists in platform_features under core_commerce

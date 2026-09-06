@@ -2,6 +2,7 @@ using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
+using E_POS.Domain.Modules.Tenant.AccessControl.Catalog.CashierPos;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
@@ -1762,6 +1763,27 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         if (rows.Count != normalizedIds.Count)
         {
             return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.PermissionNotFound);
+        }
+
+        var catalogValidation = CashierPosPermissionAssignmentRules.ValidateAssignmentSet(
+            rows.Select(row => row.PermissionCode),
+            currentlyGrantedCodes: Array.Empty<string>(),
+            availableParentCodes: rows.Select(row => row.PermissionCode));
+        if (!catalogValidation.IsValid)
+        {
+            var failure = catalogValidation.Failures[0];
+            return TenantAdminUserAccessValidationResult.Invalid(failure.Kind switch
+            {
+                CashierPosPermissionAssignmentRules.FailureKind.InvalidFormat =>
+                    TenantAdminUserAccessValidationFailure.InvalidPermissionFormat,
+                CashierPosPermissionAssignmentRules.FailureKind.PreAuthNotAssignable =>
+                    TenantAdminUserAccessValidationFailure.PreAuthPermissionNotAssignable,
+                CashierPosPermissionAssignmentRules.FailureKind.UnknownCanonicalPermission =>
+                    TenantAdminUserAccessValidationFailure.UnknownCanonicalPermission,
+                CashierPosPermissionAssignmentRules.FailureKind.ParentPermissionRequired =>
+                    TenantAdminUserAccessValidationFailure.ParentPermissionRequired,
+                _ => TenantAdminUserAccessValidationFailure.PermissionNotAssignable,
+            });
         }
 
         if (rows.Any(row => !row.IsActive))
