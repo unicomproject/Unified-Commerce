@@ -192,6 +192,51 @@ public sealed class StorefrontNotificationsControllerTests
             return Task.FromResult(MarkAllReadResult);
         }
 
+        public Task<ApplicationResult<NotificationInboxListResponse>> GetTenantUserInboxAsync(
+            Guid tenantId,
+            Guid tenantUserId,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken)
+        {
+            Capture(tenantId, tenantUserId);
+            Page = page;
+            PageSize = pageSize;
+            return Task.FromResult(InboxResult);
+        }
+
+        public Task<ApplicationResult<NotificationUnreadCountResponse>> GetTenantUserUnreadCountAsync(
+            Guid tenantId,
+            Guid tenantUserId,
+            CancellationToken cancellationToken)
+        {
+            Capture(tenantId, tenantUserId);
+            return Task.FromResult(UnreadCountResult);
+        }
+
+        public Task<ApplicationResult<NotificationMarkReadResponse>> MarkTenantUserInboxItemReadAsync(
+            Guid tenantId,
+            Guid tenantUserId,
+            Guid inboxItemId,
+            string? ipAddress,
+            string? userAgent,
+            CancellationToken cancellationToken)
+        {
+            Capture(tenantId, tenantUserId);
+            return Task.FromResult(MarkReadResult);
+        }
+
+        public Task<ApplicationResult<NotificationMarkAllReadResponse>> MarkAllTenantUserInboxItemsReadAsync(
+            Guid tenantId,
+            Guid tenantUserId,
+            string? ipAddress,
+            string? userAgent,
+            CancellationToken cancellationToken)
+        {
+            Capture(tenantId, tenantUserId);
+            return Task.FromResult(MarkAllReadResult);
+        }
+
         private void Capture(Guid tenantId, Guid customerId)
         {
             CallCount++;
