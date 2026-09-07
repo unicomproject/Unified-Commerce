@@ -166,6 +166,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<INotificationInboxService, NotificationInboxService>();
         services.AddScoped<INotificationChannelHandler, InAppNotificationChannelHandler>();
+        services.AddScoped<INotificationChannelHandler, RealtimeNotificationChannelHandler>();
 
         // ECommerce Storefront
 

@@ -25,6 +25,8 @@ using E_POS.Application.Modules.Tenant.Payment.Contracts;
 using E_POS.Application.Modules.Tenant.Payment.Services;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
+using E_POS.Infrastructure.Modules.Shared.Realtime;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Infrastructure.Common;
@@ -287,6 +289,10 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IPosNotificationRepository, NotificationRepository>();
+        services.AddScoped<ITenantStaffNotificationRecipientRepository, TenantStaffNotificationRecipientRepository>();
+        services.AddSingleton<TenantNotificationSocketRegistry>();
+        services.AddSingleton<ITenantNotificationSocketRegistry>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
+        services.AddSingleton<IRealtimeNotificationPublisher>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
