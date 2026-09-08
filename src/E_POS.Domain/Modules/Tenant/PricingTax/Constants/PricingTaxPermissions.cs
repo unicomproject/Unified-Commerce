@@ -4,18 +4,31 @@ public static class PricingTaxPermissions
 {
     public static class TaxClasses
     {
-        public const string View = "tax.classes.view";
-        public const string Create = "tax.classes.create";
-        public const string Update = "tax.classes.update";
-        public const string Delete = "tax.classes.delete";
+        /// <summary>TARGET canonical permission (Tax Setup view).</summary>
+        public const string View = "pricing.tax_classes.view";
+        public const string Create = "pricing.tax_classes.create";
+        public const string Update = "pricing.tax_classes.update";
+        public const string StatusManage = "pricing.tax_classes.status.manage";
+        public const string ProductsView = "pricing.tax_classes.products.view";
+
+        /// <summary>Legacy runtime codes (compatibility / seeded historically).</summary>
+        public const string LegacyView = "tax.classes.view";
+        public const string LegacyCreate = "tax.classes.create";
+        public const string LegacyUpdate = "tax.classes.update";
+        public const string LegacyDelete = "tax.classes.delete";
+        public const string LegacyManage = "tax.classes.manage";
     }
 
     public static class TaxRates
     {
-        public const string View = "tax.rates.view";
-        public const string Create = "tax.rates.create";
-        public const string Update = "tax.rates.update";
-        public const string Delete = "tax.rates.delete";
+        public const string View = "pricing.tax_rates.view";
+        public const string ScheduleManage = "pricing.tax_rates.schedule.manage";
+
+        public const string LegacyView = "tax.rates.view";
+        public const string LegacyCreate = "tax.rates.create";
+        public const string LegacyUpdate = "tax.rates.update";
+        public const string LegacyDelete = "tax.rates.delete";
+        public const string LegacyManage = "tax.rates.manage";
     }
 
     public static class ProductTaxAssignments
@@ -27,4 +40,3 @@ public static class PricingTaxPermissions
         public const string Manage = "pricing.product_tax_assignments.manage";
     }
 }
-

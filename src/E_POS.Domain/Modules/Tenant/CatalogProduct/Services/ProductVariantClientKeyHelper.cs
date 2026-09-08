@@ -21,4 +21,15 @@ public static class ProductVariantClientKeyHelper
         var stringPairs = sortedPairs.Select(pair => $"{pair.SourceOptionTemplateId:D}:{pair.SourceOptionTemplateValueId:D}");
         return string.Join(";", stringPairs);
     }
+
+    /// <summary>
+    /// Name-based client key used by legacy wizard payloads before template IDs are bound.
+    /// Example: Color:Red;Size:Small
+    /// </summary>
+    public static string BuildNameBasedClientCombinationKey(IEnumerable<(string OptionName, string ValueName)> pairs)
+    {
+        return string.Join(";", pairs
+            .OrderBy(p => p.OptionName, StringComparer.OrdinalIgnoreCase)
+            .Select(p => $"{p.OptionName}:{p.ValueName}"));
+    }
 }

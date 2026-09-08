@@ -310,6 +310,10 @@ public sealed class PosSaleLinePricingCalculator : IPosSaleLinePricingCalculator
             .ToListAsync(cancellationToken);
         var classIds = assignments.Select(x => x.TaxClassId).Distinct().ToList();
         var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var exemptClassIds = await _dbContext.TaxClasses.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && classIds.Contains(x.Id) && x.TaxTreatment == "EXEMPT")
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
         var rates = await (
                 from classRate in _dbContext.TaxClassRates.AsNoTracking()
                 join taxRate in _dbContext.TaxRates.AsNoTracking()
@@ -330,10 +334,15 @@ public sealed class PosSaleLinePricingCalculator : IPosSaleLinePricingCalculator
 
         var effectiveByClass = rates.GroupBy(x => x.TaxClassId).ToDictionary(
             group => group.Key,
-            group => group.OrderBy(x => x.SortOrder).Aggregate(0m, (effective, rate) =>
-                effective + (rate.IsCompound
-                    ? (100m + effective) * rate.RatePercent / 100m
-                    : rate.RatePercent)));
+            group => exemptClassIds.Contains(group.Key)
+                ? 0m
+                : group.OrderBy(x => x.SortOrder).Aggregate(0m, (effective, rate) =>
+                    effective + (rate.IsCompound
+                        ? (100m + effective) * rate.RatePercent / 100m
+                        : rate.RatePercent)));
+
+        foreach (var exemptId in exemptClassIds)
+            effectiveByClass[exemptId] = 0m;
 
         var result = new Dictionary<Guid, decimal>();
         foreach (var input in inputs)

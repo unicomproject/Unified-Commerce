@@ -31,6 +31,12 @@ public static class ProductConstants
     public const int MaxProductImages = 10;
     public const long MaxProductImageBytes = 5 * 1024 * 1024; // 5,242,880
     public const int MaxVariants = 100;
+
+    /// <summary>
+    /// Canonical Second Brain alias for the maximum Cartesian variant combinations per product.
+    /// </summary>
+    public const int MaxVariantCombinationsPerProduct = MaxVariants;
+
     public const int ProductNameMaxLength = 200;
     public const int ProductCodeMaxLength = 80;
     public const int ShortDescriptionMaxLength = 500;

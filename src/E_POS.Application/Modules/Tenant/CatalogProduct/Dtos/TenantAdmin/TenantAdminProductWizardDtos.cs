@@ -15,7 +15,7 @@ public sealed class SaveProductDraftRequest
     public string? LongDescription { get; set; }
     public bool DesiredPublishActive { get; set; } = true;
     public bool PosSellable { get; set; } = true;
-    public bool TrackInventory { get; set; } = true;
+    public bool TrackInventory { get; set; } = false;
     public bool BatchTracking { get; set; }
     public bool ExpiryTracking { get; set; }
     public bool SerialTracking { get; set; }
@@ -57,12 +57,31 @@ public sealed class SaveProductDraftRequest
     public PricingTaxConfigurationDto? PricingTax { get; set; }
 }
 
+/// <summary>
+/// Per-variant selling price for VARIANT Product Setup Step 6.
+/// Identity: prefer <see cref="ProductVariantId"/> once persisted; use <see cref="ClientCombinationKey"/>
+/// as the wizard-create bridge (maps to <c>option_combination_hash</c>).
+/// <see cref="SellingPrice"/> null = PENDING (draft); &gt; 0 = PRICED; &lt; 0 invalid.
+/// </summary>
+public sealed record VariantPriceConfigurationDto(
+    Guid? ProductVariantId,
+    string? ClientCombinationKey,
+    decimal? SellingPrice);
+
 public sealed record PricingTaxConfigurationDto(
     decimal? CostPrice,
     decimal? StandardSellingPrice,
     decimal? DiscountPrice,
     Guid? TaxClassId,
-    bool? TaxExclusive);
+    bool? TaxExclusive,
+    IReadOnlyList<VariantPriceConfigurationDto>? VariantPrices = null);
+
+public sealed record VariantPriceResponseDto(
+    Guid ProductVariantId,
+    string? ClientCombinationKey,
+    decimal? SellingPrice,
+    string? DisplayName = null,
+    string? Sku = null);
 
 public sealed record PricingTaxResponseDto(
     decimal? CostPrice,
@@ -74,7 +93,12 @@ public sealed record PricingTaxResponseDto(
     Guid? TaxClassId,
     string? TaxName,
     decimal? TaxRatePercentage,
-    bool TaxExclusive = true);
+    bool TaxExclusive = true,
+    IReadOnlyList<VariantPriceResponseDto>? VariantPrices = null,
+    int? PricedVariantCount = null,
+    int? PendingVariantCount = null,
+    decimal? PriceFrom = null,
+    decimal? PriceTo = null);
 
 public sealed record BarcodeSkuAssignmentDto(
     Guid? ProductVariantId,
@@ -82,7 +106,17 @@ public sealed record BarcodeSkuAssignmentDto(
     string? Sku,
     string? Barcode,
     string? Status,
-    string? ClientCombinationKey = null);
+    string? ClientCombinationKey = null,
+    string? BarcodeType = null);
+
+/// <summary>
+/// Authoritative Step 5 target from persisted included/sellable variants.
+/// </summary>
+public sealed record BarcodeSkuVariantTargetProjection(
+    Guid ProductVariantId,
+    string DisplayName,
+    string? Sku,
+    string? OptionCombinationHash);
 
 public sealed record Step5IdentifierTargetDto(
     Guid? ProductVariantId,
