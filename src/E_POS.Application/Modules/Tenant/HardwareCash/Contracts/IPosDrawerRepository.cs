@@ -41,6 +41,9 @@ public interface IPosDrawerRepository
     Task<IReadOnlyList<PosCashMovementTypeDto>> GetMovementTypesAsync(
         Guid tenantId, string direction, CancellationToken cancellationToken);
 
+    Task<PosCashMovementTypeDto?> GetMovementTypeByIdAsync(
+        Guid tenantId, Guid movementTypeId, CancellationToken cancellationToken);
+
     Task<(string? ErrorCode, PosCashDrawerMovementDto? Movement)> CreateFinancialMovementAsync(
         Guid tenantId,
         Guid userId,

@@ -20,6 +20,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.Payment.Services;
 
 namespace E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 
@@ -30,19 +31,24 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
     private readonly EPosDbContext _dbContext;
     private readonly IPosTillSessionRepository _tillSessionRepository;
     private readonly ICardPaymentGateway _cardPaymentGateway;
+    private readonly IPaymentMethodCapabilityResolver _paymentMethodCapabilityResolver;
     private readonly IReceiptTemplateResolutionService _receiptTemplateResolutionService;
 
     public PosCheckoutRepository(
         EPosDbContext dbContext,
         IPosTillSessionRepository tillSessionRepository,
         IReceiptTemplateResolutionService receiptTemplateResolutionService,
-        ICardPaymentGateway? cardPaymentGateway = null)
+        ICardPaymentGateway? cardPaymentGateway = null,
+        IPaymentMethodCapabilityResolver? paymentMethodCapabilityResolver = null)
     {
         _dbContext = dbContext;
         _tillSessionRepository = tillSessionRepository;
         _receiptTemplateResolutionService = receiptTemplateResolutionService;
         _cardPaymentGateway = cardPaymentGateway ?? new
             E_POS.Infrastructure.Modules.Tenant.Payment.UnavailableCardPaymentGateway();
+        _paymentMethodCapabilityResolver = paymentMethodCapabilityResolver ??
+            new PaymentMethodCapabilityResolver(
+                [new E_POS.Infrastructure.Modules.Tenant.Payment.CashPaymentExecutionCapability()]);
     }
 
     public async Task<PosCheckoutCalculationResult> CalculateSummaryAsync(
@@ -265,7 +271,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 itemCount,
                 now,
                 cashierName),
-            await ResolvePaymentMethodsAsync(tenantId, permissions, cancellationToken),
+            await ResolvePaymentMethodsAsync(
+                tenantId, tenantUserId, request.DeviceId, permissions, cancellationToken),
             validationMessages,
             responseLines);
 
@@ -765,6 +772,28 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 now);
 
             _dbContext.SalesOrderLines.Add(orderLine);
+            if (builtLine.TaxDetail is not null)
+            {
+                var taxableAmount = Math.Max(0m, builtLine.LineSubtotal - builtLine.LineDiscount);
+                _dbContext.SalesOrderTaxes.Add(SalesOrderTax.Create(
+                    tenantId,
+                    saleId,
+                    orderLine.Id,
+                    null,
+                    builtLine.TaxDetail.TaxClassId,
+                    builtLine.TaxDetail.TaxRateId,
+                    builtLine.TaxDetail.TaxCode,
+                    null,
+                    builtLine.TaxDetail.TaxName,
+                    builtLine.TaxDetail.TaxTreatment,
+                    null,
+                    builtLine.TaxDetail.RatePercent,
+                    taxableAmount,
+                    builtLine.LineTax,
+                    priceList.PriceIncludesTax,
+                    1,
+                    now));
+            }
             orderLine.SetLineNote(builtLine.LineNote, now);
             responseLines.Add(new PosCheckoutStartPaymentLineResponseDto(
                 builtLine.Variant.ProductName,
@@ -1381,12 +1410,13 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                                equals new { taxClass.TenantId, taxClass.Id }
                            where classRate.TenantId == tenantId && classRate.Status == ActiveStatus &&
                                  classIds.Contains(classRate.TaxClassId) && taxRate.Status == ActiveStatus &&
-                                 taxClass.Status == ActiveStatus &&
+                                 taxClass.Status != "DELETED" &&
                                  (!taxRate.ValidFrom.HasValue || taxRate.ValidFrom <= today) &&
                                  (!taxRate.ValidUntil.HasValue || taxRate.ValidUntil >= today)
                            select new TaxRateRow(classRate.TaxClassId, classRate.SortOrder,
                                taxRate.RatePercent, taxRate.IsCompound,
-                               taxClass.TaxClassCode, taxClass.TaxClassName))
+                               taxClass.TaxClassCode, taxClass.TaxClassName, taxClass.TaxTreatment,
+                               taxRate.Id, taxClass.Id))
             .ToListAsync(cancellationToken);
 
         var effectiveByClass = rates.GroupBy(x => x.TaxClassId).ToDictionary(
@@ -1394,14 +1424,20 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             group =>
             {
                 var ordered = group.OrderBy(x => x.SortOrder).ToList();
-                var effective = ordered.Aggregate(0m, (value, rate) =>
-                    value + (rate.IsCompound
-                        ? (100m + value) * rate.RatePercent / 100m
-                        : rate.RatePercent));
+                var treatment = ordered[0].TaxTreatment;
+                var effective = string.Equals(treatment, "EXEMPT", StringComparison.OrdinalIgnoreCase)
+                    ? 0m
+                    : ordered.Aggregate(0m, (value, rate) =>
+                        value + (rate.IsCompound
+                            ? (100m + value) * rate.RatePercent / 100m
+                            : rate.RatePercent));
                 return new ResolvedTax(
                     ordered[0].TaxClassCode,
                     ordered[0].TaxClassName,
-                    effective);
+                    effective,
+                    treatment,
+                    ordered[0].TaxClassId,
+                    ordered[0].TaxRateId);
             });
         var result = new Dictionary<Guid, ResolvedTax>();
         foreach (var input in inputs)
@@ -1420,6 +1456,8 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
 
     private async Task<IReadOnlyList<string>> ResolvePaymentMethodsAsync(
         Guid tenantId,
+        Guid tenantUserId,
+        Guid deviceId,
         IReadOnlyCollection<string> permissions,
         CancellationToken cancellationToken)
     {
@@ -1430,10 +1468,21 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             .Select(x => x.MethodCode)
             .ToListAsync(cancellationToken);
 
-        return configuredCodes
+        var authorizedCodes = configuredCodes
             .Where(code => HasPaymentPermission(code, permissions))
-            .Select(code => code.ToLowerInvariant())
             .ToList();
+        var context = new PaymentMethodCapabilityContext(tenantId, tenantUserId, deviceId);
+        var executableCodes = new List<string>(authorizedCodes.Count);
+        foreach (var code in authorizedCodes)
+        {
+            if (await _paymentMethodCapabilityResolver.IsExecutableAsync(
+                    code, context, cancellationToken))
+            {
+                executableCodes.Add(code.ToLowerInvariant());
+            }
+        }
+
+        return executableCodes;
     }
 
     private static string FormatSaleType(string? saleType)
@@ -1535,8 +1584,17 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         decimal RatePercent,
         bool IsCompound,
         string TaxClassCode,
-        string TaxClassName);
-    private sealed record ResolvedTax(string TaxCode, string TaxName, decimal RatePercent);
+        string TaxClassName,
+        string TaxTreatment,
+        Guid TaxRateId,
+        Guid TaxSetupId);
+    private sealed record ResolvedTax(
+        string TaxCode,
+        string TaxName,
+        decimal RatePercent,
+        string TaxTreatment,
+        Guid TaxClassId,
+        Guid TaxRateId);
     private sealed record CalculatedCheckoutLine(Guid VariantId, decimal Subtotal, decimal Tax);
     private sealed record AutomaticPromotionInput(
         Guid VariantId, Guid ProductId, int Quantity, decimal NetUnitPrice);

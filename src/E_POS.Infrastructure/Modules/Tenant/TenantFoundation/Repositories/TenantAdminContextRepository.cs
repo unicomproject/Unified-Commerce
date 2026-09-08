@@ -42,7 +42,8 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                 TenantName = tenant.DisplayName,
                 TenantTimezone = tenant.DefaultTimezone,
                 CurrencyCode = tenant.BaseCurrencyCode,
-                Locale = tenant.DefaultLocale
+                Locale = tenant.DefaultLocale,
+                user.OutletAccessScope
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -103,7 +104,11 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
                         o.Status.ToUpper() != "DELETED" &&
                         o.Status.ToUpper() != "INACTIVE");
 
-        if (assignedOutletIds.Count > 0)
+        if (string.Equals(userInfo.OutletAccessScope, E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.NoOutletAccess, StringComparison.Ordinal))
+        {
+            outletQuery = outletQuery.Where(_ => false);
+        }
+        else if (string.Equals(userInfo.OutletAccessScope, E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.SelectedOutlets, StringComparison.Ordinal))
         {
             outletQuery = outletQuery.Where(o => assignedOutletIds.Contains(o.Id));
         }
@@ -114,10 +119,13 @@ public sealed class TenantAdminContextRepository : ITenantAdminContextRepository
 
         var accessibleOutletIds = outlets.Select(x => x.Id).OrderBy(x => x).ToList();
 
-        var permissions = await TenantEffectivePermissionCodesQuery
-            .Build(_dbContext, tenantUserId, tenantId)
-            .OrderBy(code => code)
-            .ToListAsync(cancellationToken);
+        var permissions = await TenantEffectivePermissionResolution.ResolveAsync(
+            _dbContext,
+            tenantUserId,
+            tenantId,
+            DateTimeOffset.UtcNow,
+            logger: null,
+            cancellationToken);
 
         // Enabled feature codes from tenant feature entitlements joined to PlatformFeature.
         // Outlet management uses Strategy B via ITenantFeatureEntitlementEvaluator so that:

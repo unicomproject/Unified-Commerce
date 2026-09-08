@@ -2,12 +2,17 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Globalization;
+using System.Xml;
+using System.Xml.Linq;
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Email;
 using E_POS.Application.Common.Idempotency;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Media.Dtos;
+using E_POS.Application.Modules.Tenant.OnlineStoreSetup;
 using E_POS.Application.Modules.Tenant.OnlineStoreSetup.Contracts;
 using E_POS.Application.Modules.Tenant.OnlineStoreSetup.Dtos;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
@@ -21,6 +26,7 @@ using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
 
 namespace E_POS.Infrastructure.Modules.Tenant.OnlineStoreSetup.Services;
@@ -38,26 +44,39 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     private const long MaxMediaBytes = 5 * 1024 * 1024;
     private const long MaxPixels = 16_000_000;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly string[] RequiredPolicyTypes = ["TERMS", "PRIVACY", "CANCELLATION", "COLLECTION", "RETURN_REFUND"];
-
     private readonly EPosDbContext _db;
     private readonly IDateTimeProvider _clock;
     private readonly ITenantFeatureEntitlementEvaluator _entitlements;
     private readonly IMediaObjectStorage _storage;
     private readonly IIdempotencyService _idempotency;
+    private readonly IApplicationEmailSender _emailSender;
+    private readonly IDomainVerificationProvider _domainVerificationProvider;
+    private readonly ICertificateProvisioningProvider _certificateProvisioningProvider;
+    private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
+    private readonly OnlineStoreSetupOptions _options;
 
     public TenantAdminOnlineStoreService(
         EPosDbContext db,
         IDateTimeProvider clock,
         ITenantFeatureEntitlementEvaluator entitlements,
         IMediaObjectStorage storage,
-        IIdempotencyService idempotency)
+        IIdempotencyService idempotency,
+        IApplicationEmailSender emailSender,
+        IDomainVerificationProvider domainVerificationProvider,
+        ICertificateProvisioningProvider certificateProvisioningProvider,
+        IOptions<OnlineStoreSetupOptions> options,
+        IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _db = db;
         _clock = clock;
         _entitlements = entitlements;
         _storage = storage;
         _idempotency = idempotency;
+        _emailSender = emailSender;
+        _domainVerificationProvider = domainVerificationProvider;
+        _certificateProvisioningProvider = certificateProvisioningProvider;
+        _options = options.Value;
+        _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
     public async Task<ApplicationResult<OnlineStoreOverviewResponse>> GetOverviewAsync(TenantRequestContext context, CancellationToken cancellationToken)
@@ -66,6 +85,17 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (access is not null) return access;
         var state = await LoadStateAsync(context.TenantId, ensureChannel: true, cancellationToken);
         var readiness = await BuildReadinessAsync(state, cancellationToken);
+        var domains = await GetDomainsAsync(state.Channel.Id, state.Tenant.Id, cancellationToken);
+        var primaryDomain = domains.FirstOrDefault(domain => domain.IsPrimary && string.Equals(domain.DomainType, "CUSTOM", StringComparison.OrdinalIgnoreCase));
+        var branding = ReadObject(state.Settings, "branding");
+        var support = ReadObject(state.Settings, "support");
+        var collection = await BuildCollectionOutletsAsync(state.Tenant.Id, cancellationToken);
+        var totalProducts = await _db.Products.CountAsync(product => product.TenantId == state.Tenant.Id && product.Status != Deleted, cancellationToken);
+        var visibleProducts = await _db.ProductChannelVisibilities.CountAsync(visibility => visibility.TenantId == state.Tenant.Id && visibility.SalesChannelId == state.Channel.Id && visibility.IsVisible && visibility.Status == Active, cancellationToken);
+        var publishedPolicyTypes = await _db.StorefrontPolicies.AsNoTracking().Where(policy => policy.TenantId == state.Tenant.Id && policy.SalesChannelId == state.Channel.Id && policy.Status == Published).Select(policy => policy.PolicyType).ToListAsync(cancellationToken);
+        var publishedPolicies = OnlineStoreContractRules.CountPublishedRequiredPolicies(publishedPolicyTypes);
+        var supportComplete = IsSupportReady(support);
+        var eligibleOutletCount = collection.Count(outlet => outlet.Eligible);
         return ApplicationResult<OnlineStoreOverviewResponse>.Success(new OnlineStoreOverviewResponse(
             state.Channel.Id,
             ReadString(state.Settings, "storeStatus") ?? Draft,
@@ -78,7 +108,18 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
             TotalSteps,
             readiness.Steps.Count(x => x.Status == "PASS") * 100 / TotalSteps,
             readiness.Steps,
-            readiness));
+            readiness,
+            new OnlineStoreDomainSummary(primaryDomain is not null, primaryDomain?.DomainName, primaryDomain?.VerificationStatus, primaryDomain?.SslStatus, primaryDomain?.IsPrimary ?? false),
+            new OnlineStoreSectionSummary(branding is not null ? "CONFIGURED" : "INCOMPLETE"),
+            new OnlineStoreSectionSummary(supportComplete ? "COMPLETE" : "INCOMPLETE"),
+            new OnlineStoreClickCollectSummary(collection.Any(outlet => outlet.Status == Active), eligibleOutletCount, eligibleOutletCount > 0 ? "READY" : "INCOMPLETE"),
+            new OnlineStoreCatalogOverview(totalProducts, visibleProducts),
+            new OnlineStorePolicySummary(OnlineStoreContractRules.RequiredPolicyTypes.Count, publishedPolicies, publishedPolicies == OnlineStoreContractRules.RequiredPolicyTypes.Count ? "COMPLETE" : "INCOMPLETE"),
+            OnlineStoreReleaseOnePolicy.CustomerAccountMode,
+            OnlineStoreReleaseOnePolicy.EmailVerificationRequired,
+            OnlineStoreReleaseOnePolicy.PaymentMode,
+            _emailSender.IsConfigured ? "READY" : "NOT_READY",
+            readiness.Steps.Where(step => step.Status != "PASS").Select(step => new OnlineStoreNextActionDto(step.Code.ToUpperInvariant(), step.StepNumber, true)).ToList()));
     }
 
     public async Task<ApplicationResult<OnlineStoreReadinessResponse>> GetReadinessAsync(TenantRequestContext context, CancellationToken cancellationToken)
@@ -123,16 +164,52 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         var errors = ValidateIdentity(request);
         if (errors.Count > 0) return Failure<OnlineStoreIdentityResponse>("online_store.identity_invalid", "Store identity is invalid.", errors);
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
-        state.Channel.Update(request.StoreName, state.Channel.Status, state.Channel.SortOrder, _clock.UtcNow);
+        state.Channel.Update(request.StoreName.Trim(), state.Channel.Status, state.Channel.SortOrder, _clock.UtcNow);
         state.Settings["businessDisplayName"] = request.BusinessDisplayName.Trim();
         state.Settings["storeDescription"] = Clean(request.StoreDescription);
-        state.Settings["storeEmail"] = Clean(request.StoreEmail);
-        state.Settings["storePhone"] = Clean(request.StorePhone);
+        state.Settings["storeEmail"] = string.IsNullOrWhiteSpace(request.StoreEmail) ? null : request.StoreEmail.Trim();
+        state.Settings["storePhone"] = OnlineStoreContractRules.NormalizePhone(request.StorePhone);
         state.Settings["supportTagline"] = Clean(request.SupportTagline);
         await SaveSettingsAsync(state, context.UserId, cancellationToken);
         AddAudit(context, "online_store.identity_updated", "ONLINE_STORE", state.Channel.Id, new { request.StoreName, request.BusinessDisplayName });
         await _db.SaveChangesAsync(cancellationToken);
         return ApplicationResult<OnlineStoreIdentityResponse>.Success(BuildIdentity(state));
+    }
+
+    public async Task<ApplicationResult<OnlineStoreCheckoutRulesResponse>> GetCheckoutRulesAsync(TenantRequestContext context, CancellationToken cancellationToken)
+    {
+        var access = await RequireAsync<OnlineStoreCheckoutRulesResponse>(context, TenantAdminOnlineStorePermissions.View, PlatformTenantFeatureCodes.OnlineStore, cancellationToken);
+        if (access is not null) return access;
+
+        var clickCollectEnabled = await _entitlements.IsEnabledAsync(
+            context.TenantId,
+            PlatformTenantFeatureCodes.ClickCollect,
+            _clock.UtcNow,
+            cancellationToken);
+        var collectionOutlets = await BuildCollectionOutletsAsync(context.TenantId, cancellationToken);
+
+        return ApplicationResult<OnlineStoreCheckoutRulesResponse>.Success(new OnlineStoreCheckoutRulesResponse(
+            OnlineStoreReleaseOnePolicy.Release,
+            new OnlineStoreCustomerAccountRuleDto(
+                OnlineStoreReleaseOnePolicy.CustomerRegistrationRequired,
+                OnlineStoreReleaseOnePolicy.CustomerAccountMode,
+                OnlineStoreReleaseOnePolicy.CustomerAccountLabel),
+            new OnlineStoreGuestCheckoutRuleDto(
+                OnlineStoreReleaseOnePolicy.GuestCheckoutAvailable,
+                OnlineStoreReleaseOnePolicy.GuestCheckoutMode,
+                OnlineStoreReleaseOnePolicy.GuestCheckoutLabel),
+            new OnlineStoreEmailVerificationRuleDto(
+                OnlineStoreReleaseOnePolicy.EmailVerificationRequired,
+                OnlineStoreReleaseOnePolicy.EmailVerificationMode,
+                OnlineStoreReleaseOnePolicy.EmailVerificationLabel),
+            new OnlineStoreFulfilmentRuleDto(
+                OnlineStoreReleaseOnePolicy.FulfilmentMode,
+                OnlineStoreReleaseOnePolicy.FulfilmentLabel,
+                clickCollectEnabled,
+                clickCollectEnabled && collectionOutlets.Any(outlet => outlet.Status == Active && outlet.Eligible)),
+            new OnlineStorePaymentRuleDto(
+                OnlineStoreReleaseOnePolicy.PaymentMode,
+                OnlineStoreReleaseOnePolicy.PaymentLabel)));
     }
 
     public async Task<ApplicationResult<OnlineStoreUrlDomainResponse>> GetUrlDomainAsync(TenantRequestContext context, CancellationToken cancellationToken)
@@ -150,9 +227,17 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     {
         var access = await RequireAsync<OnlineStoreUrlDomainResponse>(context, TenantAdminOnlineStorePermissions.Manage, PlatformTenantFeatureCodes.OnlineStore, cancellationToken);
         if (access is not null) return access;
-        var slug = NormalizeSlug(request.StoreSlug);
-        if (slug is null) return Failure<OnlineStoreUrlDomainResponse>("online_store.slug_invalid", "Store slug is invalid.", [new("storeSlug", "Store slug must contain letters, numbers or hyphens.")]);
+        var slug = OnlineStoreContractRules.NormalizeSlug(request.StoreSlug);
+        if (slug is null) return Failure<OnlineStoreUrlDomainResponse>("online_store.slug_invalid", "Store slug is invalid.", [new("storeSlug", "Use 3-63 lowercase letters, numbers or single hyphens; reserved names are not allowed.")]);
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
+        if (string.Equals(ReadString(state.Settings, "storeStatus"), Published, StringComparison.OrdinalIgnoreCase))
+            return Failure<OnlineStoreUrlDomainResponse>("online_store.slug_immutable", "Store slug cannot be changed after publishing.");
+        var definitionId = await _db.SettingDefinitions.Where(x => x.SettingKey == TenantSettingKeys.OnlineStoreDefaults).Select(x => x.Id).SingleAsync(cancellationToken);
+        var slugInUse = await _db.TenantSettings.AsNoTracking()
+            .Where(x => x.SettingDefinitionId == definitionId && x.TenantId != context.TenantId)
+            .AnyAsync(x => EF.Functions.ILike(x.SettingValue, $"%\"storeSlug\":\"{slug}\"%"), cancellationToken);
+        if (slugInUse)
+            return Failure<OnlineStoreUrlDomainResponse>("online_store.slug_conflict", "Store slug is already in use.", [new("storeSlug", "Choose another store slug.")]);
         state.Settings["storeSlug"] = slug;
         await SaveSettingsAsync(state, context.UserId, cancellationToken);
         AddAudit(context, "online_store.url_updated", "ONLINE_STORE", state.Channel.Id, new { storeSlug = slug });
@@ -172,36 +257,58 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     {
         var access = await RequireAsync<OnlineStoreDomainTokenResponse>(context, TenantAdminOnlineStorePermissions.DomainsManage, PlatformTenantFeatureCodes.OnlineStore, cancellationToken);
         if (access is not null) return access;
-        var domainName = NormalizeDomain(request.DomainName);
+        var domainName = OnlineStoreContractRules.NormalizeDomain(request.DomainName);
         if (domainName is null) return Failure<OnlineStoreDomainTokenResponse>("online_store.domain_invalid", "Domain name is invalid.", [new("domainName", "Enter a valid domain name.")]);
+        if (NormalizeDomainType(request.DomainType) != "CUSTOM")
+            return Failure<OnlineStoreDomainTokenResponse>("online_store.domain_type_invalid", "Only custom domains can be created here.");
+        if (request.IsPrimary)
+            return Failure<OnlineStoreDomainTokenResponse>("online_store.domain_not_ready", "A new domain must be verified and have active SSL before it can become primary.");
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
-        if (await _db.TenantDomains.AnyAsync(x => x.TenantId == context.TenantId && x.DomainName == domainName && x.Status != Deleted, cancellationToken))
-            return Failure<OnlineStoreDomainTokenResponse>("online_store.domain_conflict", "Domain already exists for this tenant.", [new("domainName", "Domain already exists.")]);
+        if (await _db.TenantDomains.AnyAsync(x => x.DomainName == domainName && x.Status != Deleted, cancellationToken))
+            return Failure<OnlineStoreDomainTokenResponse>("online_store.domain_conflict", "Domain is already registered.", [new("domainName", "Domain is already registered.")]);
         var now = _clock.UtcNow;
         var token = CreateRawToken();
-        if (request.IsPrimary)
-        {
-            await ClearPrimaryDomainsAsync(context.TenantId, state.Channel.Id, now, cancellationToken);
-        }
-        var domain = TenantDomain.Create(Guid.NewGuid(), context.TenantId, state.Channel.Id, NormalizeDomainType(request.DomainType), domainName, request.IsPrimary, "PENDING", HashToken(token), null, "NOT_REQUESTED", null, null, Active, null, now);
+        var domain = TenantDomain.Create(Guid.NewGuid(), context.TenantId, state.Channel.Id, "CUSTOM", domainName, false, "PENDING", HashToken(token), null, "NOT_REQUESTED", null, null, Active, null, now);
         _db.TenantDomains.Add(domain);
         AddAudit(context, "online_store.domain_created", "TENANT_DOMAIN", domain.Id, new { domainName, domainType = domain.DomainType, domain.IsPrimary });
         await _db.SaveChangesAsync(cancellationToken);
         return ApplicationResult<OnlineStoreDomainTokenResponse>.Success(new OnlineStoreDomainTokenResponse(domain.Id, domain.DomainName, token));
     }
 
-    public async Task<ApplicationResult<OnlineStoreDomainDto>> VerifyDomainAsync(TenantRequestContext context, Guid domainId, VerifyOnlineStoreDomainRequest request, CancellationToken cancellationToken)
+    public async Task<ApplicationResult<OnlineStoreDomainDto>> VerifyDomainAsync(TenantRequestContext context, Guid domainId, VerifyOnlineStoreDomainRequest _, CancellationToken cancellationToken)
     {
         var access = await RequireAsync<OnlineStoreDomainDto>(context, TenantAdminOnlineStorePermissions.DomainsManage, PlatformTenantFeatureCodes.OnlineStore, cancellationToken);
         if (access is not null) return access;
         var domain = await FindDomainAsync(context.TenantId, domainId, cancellationToken);
         if (domain is null) return NotFound<OnlineStoreDomainDto>("online_store.domain_not_found", "Domain was not found.");
-        if (!string.Equals(domain.VerificationTokenHash, HashToken(request.VerificationToken), StringComparison.Ordinal))
-            return Failure<OnlineStoreDomainDto>("online_store.domain_verification_failed", "Verification token did not match.", [new("verificationToken", "Token did not match.")]);
-        domain.MarkVerified(null, _clock.UtcNow);
-        AddAudit(context, "online_store.domain_verified", "TENANT_DOMAIN", domain.Id, new { domain.DomainName });
+        if (string.IsNullOrWhiteSpace(domain.VerificationTokenHash))
+            return Failure<OnlineStoreDomainDto>("online_store.domain_verification_invalid", "Domain verification token is not configured.");
+        var verification = await _domainVerificationProvider.VerifyTxtRecordAsync(
+            domain.DomainName,
+            domain.VerificationTokenHash,
+            cancellationToken);
+        var now = _clock.UtcNow;
+        if (verification.Status == DomainVerificationProviderStatus.Verified)
+        {
+            domain.MarkVerified(null, now);
+            AddAudit(context, "online_store.domain_verified", "TENANT_DOMAIN", domain.Id, new { domain.DomainName, providerStatus = verification.Status.ToString() });
+        }
+        else
+        {
+            domain.MarkVerificationFailed(
+                verification.Status == DomainVerificationProviderStatus.Timeout ? "TIMEOUT" : "FAILED",
+                null,
+                now);
+            AddAudit(context, "online_store.domain_verification_failed", "TENANT_DOMAIN", domain.Id, new { domain.DomainName, providerStatus = verification.Status.ToString(), verification.FailureCode });
+        }
         await _db.SaveChangesAsync(cancellationToken);
-        return ApplicationResult<OnlineStoreDomainDto>.Success(ToDomainDto(domain));
+        return verification.Status switch
+        {
+            DomainVerificationProviderStatus.Verified => ApplicationResult<OnlineStoreDomainDto>.Success(ToDomainDto(domain)),
+            DomainVerificationProviderStatus.Unavailable => Failure<OnlineStoreDomainDto>("online_store.domain_verification_provider_unavailable", "Domain verification provider is unavailable."),
+            DomainVerificationProviderStatus.Timeout => Failure<OnlineStoreDomainDto>("online_store.domain_verification_timeout", "Domain verification timed out."),
+            _ => Failure<OnlineStoreDomainDto>("online_store.domain_verification_failed", "The expected DNS TXT verification record was not found.")
+        };
     }
 
     public async Task<ApplicationResult<OnlineStoreDomainTokenResponse>> RotateDomainTokenAsync(TenantRequestContext context, Guid domainId, CancellationToken cancellationToken)
@@ -217,8 +324,15 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         return ApplicationResult<OnlineStoreDomainTokenResponse>.Success(new OnlineStoreDomainTokenResponse(domain.Id, domain.DomainName, token));
     }
 
-    public async Task<ApplicationResult<OnlineStoreDomainDto>> GetDomainStatusAsync(TenantRequestContext context, Guid domainId, CancellationToken cancellationToken) =>
-        await DomainRead(context, domainId, cancellationToken);
+    public async Task<ApplicationResult<OnlineStoreDomainDto>> GetDomainStatusAsync(TenantRequestContext context, Guid domainId, CancellationToken cancellationToken)
+    {
+        var access = await RequireAsync<OnlineStoreDomainDto>(context, TenantAdminOnlineStorePermissions.View, PlatformTenantFeatureCodes.OnlineStore, cancellationToken);
+        if (access is not null) return access;
+        var domain = await FindDomainAsync(context.TenantId, domainId, cancellationToken);
+        if (domain is null) return NotFound<OnlineStoreDomainDto>("online_store.domain_not_found", "Domain was not found.");
+        await ReconcileDomainProviderStateAsync(context, domain, cancellationToken);
+        return ApplicationResult<OnlineStoreDomainDto>.Success(ToDomainDto(domain));
+    }
 
     public async Task<ApplicationResult<OnlineStoreDomainDto>> ProvisionDomainSslAsync(TenantRequestContext context, Guid domainId, CancellationToken cancellationToken)
     {
@@ -228,10 +342,34 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (domain is null) return NotFound<OnlineStoreDomainDto>("online_store.domain_not_found", "Domain was not found.");
         if (domain.VerificationStatus != "VERIFIED")
             return Failure<OnlineStoreDomainDto>("online_store.domain_not_verified", "Domain must be verified before SSL provisioning.");
-        domain.MarkSslProvisioning(null, _clock.UtcNow);
-        AddAudit(context, "online_store.domain_ssl_requested", "TENANT_DOMAIN", domain.Id, new { domain.DomainName });
+        if (domain.Status != Active)
+            return Failure<OnlineStoreDomainDto>("online_store.domain_inactive", "Domain must be active before SSL provisioning.");
+        if (domain.SslStatus == "ACTIVE")
+            return ApplicationResult<OnlineStoreDomainDto>.Success(ToDomainDto(domain));
+        if (domain.SslStatus == "PENDING")
+        {
+            if (await ReconcileCertificateStateAsync(context, domain, cancellationToken))
+            {
+                AddAudit(context, "online_store.domain_ssl_reconciled", "TENANT_DOMAIN", domain.Id, new { domain.DomainName, domain.SslStatus });
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            return ApplicationResult<OnlineStoreDomainDto>.Success(ToDomainDto(domain));
+        }
+        var provision = await _certificateProvisioningProvider.RequestAsync(
+            context.TenantId,
+            domain.Id,
+            domain.DomainName,
+            cancellationToken);
+        ApplyCertificateProviderResult(domain, provision, _clock.UtcNow);
+        AddAudit(context, "online_store.domain_ssl_requested", "TENANT_DOMAIN", domain.Id, new { domain.DomainName, providerStatus = provision.Status.ToString(), provision.FailureCode });
         await _db.SaveChangesAsync(cancellationToken);
-        return ApplicationResult<OnlineStoreDomainDto>.Success(ToDomainDto(domain));
+        return provision.Status switch
+        {
+            CertificateProvisioningProviderStatus.Unavailable => Failure<OnlineStoreDomainDto>("online_store.certificate_provider_unavailable", "Certificate provisioning provider is unavailable."),
+            CertificateProvisioningProviderStatus.Timeout => Failure<OnlineStoreDomainDto>("online_store.certificate_provisioning_timeout", "Certificate provisioning timed out."),
+            CertificateProvisioningProviderStatus.Failed => Failure<OnlineStoreDomainDto>("online_store.certificate_provisioning_failed", "Certificate provisioning failed."),
+            _ => ApplicationResult<OnlineStoreDomainDto>.Success(ToDomainDto(domain))
+        };
     }
 
     public async Task<ApplicationResult<OnlineStoreDomainDto>> SetPrimaryDomainAsync(TenantRequestContext context, Guid domainId, CancellationToken cancellationToken)
@@ -241,6 +379,11 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
         var domain = await FindDomainAsync(context.TenantId, domainId, cancellationToken);
         if (domain is null) return NotFound<OnlineStoreDomainDto>("online_store.domain_not_found", "Domain was not found.");
+        if (domain.SalesChannelId != state.Channel.Id)
+            return NotFound<OnlineStoreDomainDto>("online_store.domain_not_found", "Domain was not found.");
+        await ReconcileDomainProviderStateAsync(context, domain, cancellationToken);
+        if (domain.VerificationStatus != "VERIFIED" || domain.SslStatus != "ACTIVE")
+            return Failure<OnlineStoreDomainDto>("online_store.domain_not_ready", "Domain must be verified with active SSL before it can become primary.");
         await ClearPrimaryDomainsAsync(context.TenantId, state.Channel.Id, _clock.UtcNow, cancellationToken);
         domain.SetPrimary(true, null, _clock.UtcNow);
         AddAudit(context, "online_store.domain_primary_changed", "TENANT_DOMAIN", domain.Id, new { domain.DomainName });
@@ -273,8 +416,9 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (access is not null) return access;
         if (!IsHexColor(request.PrimaryColor) || !IsHexColor(request.SecondaryColor))
             return Failure<OnlineStoreBrandingResponse>("online_store.branding_invalid", "Branding colours are invalid.");
-        await ValidateMediaOwnershipAsync(context.TenantId, request.LogoMediaAssetId, cancellationToken);
-        await ValidateMediaOwnershipAsync(context.TenantId, request.FaviconMediaAssetId, cancellationToken);
+        if (!await MediaBelongsToTenantAsync(context.TenantId, request.LogoMediaAssetId, "ONLINE_STORE_LOGO", cancellationToken) ||
+            !await MediaBelongsToTenantAsync(context.TenantId, request.FaviconMediaAssetId, "ONLINE_STORE_FAVICON", cancellationToken))
+            return Failure<OnlineStoreBrandingResponse>("online_store.media_not_found", "A branding media asset was not found for this tenant.");
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
         var branding = EnsureObject(state.Settings, "branding");
         branding["logoMediaAssetId"] = request.LogoMediaAssetId?.ToString();
@@ -345,7 +489,8 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (access is not null) return access;
         var validation = ValidateBanner(request);
         if (validation.Count > 0) return Failure<OnlineStoreBannerDto>("online_store.banner_invalid", "Banner is invalid.", validation);
-        await ValidateMediaOwnershipAsync(context.TenantId, request.ImageMediaAssetId, cancellationToken);
+        if (!await MediaBelongsToTenantAsync(context.TenantId, request.ImageMediaAssetId, "STOREFRONT_BANNER", cancellationToken))
+            return Failure<OnlineStoreBannerDto>("online_store.media_not_found", "Banner media asset was not found for this tenant.");
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
         var banner = StorefrontBanner.Create(context.TenantId, state.Channel.Id, request.BannerType.Trim().ToUpperInvariant(), request.Title.Trim(), Clean(request.Subtitle), request.ImageMediaAssetId, Clean(request.ActionText), Clean(request.ActionUrl), request.SortOrder, NormalizeRecordStatus(request.Status));
         _db.StorefrontBanners.Add(banner);
@@ -360,7 +505,8 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (access is not null) return access;
         var validation = ValidateBanner(request);
         if (validation.Count > 0) return Failure<OnlineStoreBannerDto>("online_store.banner_invalid", "Banner is invalid.", validation);
-        await ValidateMediaOwnershipAsync(context.TenantId, request.ImageMediaAssetId, cancellationToken);
+        if (!await MediaBelongsToTenantAsync(context.TenantId, request.ImageMediaAssetId, "STOREFRONT_BANNER", cancellationToken))
+            return Failure<OnlineStoreBannerDto>("online_store.media_not_found", "Banner media asset was not found for this tenant.");
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
         var banner = await _db.StorefrontBanners.FirstOrDefaultAsync(x => x.TenantId == context.TenantId && x.SalesChannelId == state.Channel.Id && x.Id == bannerId, cancellationToken);
         if (banner is null) return NotFound<OnlineStoreBannerDto>("online_store.banner_not_found", "Banner was not found.");
@@ -388,8 +534,12 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         var access = await RequireAsync<IReadOnlyList<OnlineStoreBannerDto>>(context, TenantAdminOnlineStorePermissions.BrandingManage, PlatformTenantFeatureCodes.OnlineStore, cancellationToken);
         if (access is not null) return access;
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
+        if (request.Items.Count == 0 || request.Items.Select(x => x.BannerId).Distinct().Count() != request.Items.Count || request.Items.Select(x => x.SortOrder).Distinct().Count() != request.Items.Count || request.Items.Any(x => x.SortOrder < 0))
+            return Failure<IReadOnlyList<OnlineStoreBannerDto>>("online_store.banner_order_invalid", "Banner order must contain unique banner IDs and sort positions.");
         var ids = request.Items.Select(x => x.BannerId).ToArray();
-        var banners = await _db.StorefrontBanners.Where(x => x.TenantId == context.TenantId && x.SalesChannelId == state.Channel.Id && ids.Contains(x.Id)).ToListAsync(cancellationToken);
+        var banners = await _db.StorefrontBanners.Where(x => x.TenantId == context.TenantId && x.SalesChannelId == state.Channel.Id && x.Status != Deleted && ids.Contains(x.Id)).ToListAsync(cancellationToken);
+        if (banners.Count != ids.Length)
+            return Failure<IReadOnlyList<OnlineStoreBannerDto>>("online_store.banner_order_invalid", "One or more banners were not found for this tenant.");
         foreach (var item in request.Items)
         {
             banners.FirstOrDefault(x => x.Id == item.BannerId)?.Reorder(item.SortOrder, _clock.UtcNow);
@@ -423,10 +573,12 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     {
         var access = await RequireAsync<OnlineStoreSupportResponse>(context, TenantAdminOnlineStorePermissions.SupportManage, PlatformTenantFeatureCodes.OnlineStore, cancellationToken);
         if (access is not null) return access;
+        var supportErrors = ValidateSupport(request);
+        if (supportErrors.Count > 0) return Failure<OnlineStoreSupportResponse>("online_store.support_invalid", "Support details are invalid.", supportErrors);
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
         var support = EnsureObject(state.Settings, "support");
         support["email"] = Clean(request.Email);
-        support["phone"] = Clean(request.Phone);
+        support["phone"] = OnlineStoreContractRules.NormalizePhone(request.Phone);
         support["whatsapp"] = Clean(request.Whatsapp);
         support["helpUrl"] = Clean(request.HelpUrl);
         support["contactUsEnabled"] = request.ContactUsEnabled;
@@ -472,8 +624,10 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     {
         var access = await RequireAsync<OnlineStoreCollectionOutletDto>(context, TenantAdminOnlineStorePermissions.FulfillmentManage, PlatformTenantFeatureCodes.ClickCollect, cancellationToken);
         if (access is not null) return access;
+        var validation = ValidateCollectionRules(request.PreparationLeadMinutes, request.PickupWindowMinutes, request.CutoffTime);
+        if (validation.Count > 0) return Failure<OnlineStoreCollectionOutletDto>("online_store.collection_rules_invalid", "Collection rules are invalid.", validation);
         var method = await EnsurePickupMethodAsync(context.TenantId, cancellationToken);
-        var outletExists = await _db.Outlets.AnyAsync(x => x.TenantId == context.TenantId && x.Id == outletId && x.Status != Deleted, cancellationToken);
+        var outletExists = await _db.Outlets.AnyAsync(x => x.TenantId == context.TenantId && x.Id == outletId && x.Status == Active, cancellationToken);
         if (!outletExists) return NotFound<OnlineStoreCollectionOutletDto>("online_store.outlet_not_found", "Outlet was not found.");
         var mapping = await _db.FulfillmentMethodOutlets.FirstOrDefaultAsync(x => x.TenantId == context.TenantId && x.FulfillmentMethodId == method.Id && x.OutletId == outletId, cancellationToken);
         if (mapping is null)
@@ -508,10 +662,31 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     {
         var access = await RequireAsync<IReadOnlyList<OnlineStoreCollectionOutletDto>>(context, TenantAdminOnlineStorePermissions.FulfillmentManage, PlatformTenantFeatureCodes.ClickCollect, cancellationToken);
         if (access is not null) return access;
-        foreach (var outletId in request.OutletIds.Distinct())
+        var outletIds = request.OutletIds.Distinct().ToArray();
+        if (outletIds.Length == 0)
+            return Failure<IReadOnlyList<OnlineStoreCollectionOutletDto>>("online_store.collection_outlets_required", "Select at least one outlet.");
+        var validation = ValidateCollectionRules(request.PreparationLeadMinutes, request.PickupWindowMinutes, request.CutoffTime);
+        if (validation.Count > 0) return Failure<IReadOnlyList<OnlineStoreCollectionOutletDto>>("online_store.collection_rules_invalid", "Collection rules are invalid.", validation);
+        var validOutletCount = await _db.Outlets.CountAsync(x => x.TenantId == context.TenantId && outletIds.Contains(x.Id) && x.Status == Active, cancellationToken);
+        if (validOutletCount != outletIds.Length)
+            return Failure<IReadOnlyList<OnlineStoreCollectionOutletDto>>("online_store.collection_outlet_invalid", "One or more outlets are unavailable for collection.");
+        var method = await EnsurePickupMethodAsync(context.TenantId, cancellationToken);
+        var mappings = await _db.FulfillmentMethodOutlets.Where(x => x.TenantId == context.TenantId && x.FulfillmentMethodId == method.Id && outletIds.Contains(x.OutletId)).ToListAsync(cancellationToken);
+        foreach (var outletId in outletIds)
         {
-            _ = await UpsertCollectionOutletAsync(context, outletId, new UpsertCollectionOutletRequest(request.PreparationLeadMinutes, request.PickupWindowMinutes, request.CutoffTime, request.Status), cancellationToken);
+            var mapping = mappings.FirstOrDefault(x => x.OutletId == outletId);
+            if (mapping is null)
+            {
+                mapping = FulfillmentMethodOutlet.Create(Guid.NewGuid(), context.TenantId, method.Id, outletId, request.PreparationLeadMinutes, request.PickupWindowMinutes, ParseTime(request.CutoffTime), NormalizeRecordStatus(request.Status), _clock.UtcNow);
+                _db.FulfillmentMethodOutlets.Add(mapping);
+            }
+            else
+            {
+                mapping.ConfigureCollection(request.PreparationLeadMinutes, request.PickupWindowMinutes, ParseTime(request.CutoffTime), NormalizeRecordStatus(request.Status), _clock.UtcNow);
+            }
         }
+        AddAudit(context, "online_store.collection_outlets_bulk_updated", "FULFILLMENT_METHOD", method.Id, new { outletIds, request.Status });
+        await _db.SaveChangesAsync(cancellationToken);
         return await ListCollectionOutletsAsync(context, cancellationToken);
     }
 
@@ -537,7 +712,7 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (!string.IsNullOrWhiteSpace(search)) query = query.Where(x => EF.Functions.ILike(x.ProductName, $"%{search.Trim()}%"));
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderBy(x => x.ProductName).Skip((pageNumber - 1) * pageSize).Take(pageSize)
-            .GroupJoin(_db.ProductChannelVisibilities.AsNoTracking().Where(x => x.SalesChannelId == state.Channel.Id && x.ProductVariantId == null), p => p.Id, v => v.ProductId, (p, vis) => new { p, vis = vis.FirstOrDefault() })
+            .GroupJoin(_db.ProductChannelVisibilities.AsNoTracking().Where(x => x.TenantId == context.TenantId && x.SalesChannelId == state.Channel.Id && x.ProductVariantId == null), p => p.Id, v => v.ProductId, (p, vis) => new { p, vis = vis.FirstOrDefault() })
             .Select(x => new OnlineStoreCatalogProductDto(x.p.Id, null, x.p.ProductName, null, x.vis == null ? false : x.vis.IsVisible, x.vis == null ? false : x.vis.IsOrderable, x.vis == null ? null : x.vis.AvailableFrom, x.vis == null ? null : x.vis.AvailableUntil, x.vis == null ? Inactive : x.vis.Status))
             .ToListAsync(cancellationToken);
         return ApplicationResult<OnlineStoreCatalogProductListResponse>.Success(new OnlineStoreCatalogProductListResponse(pageNumber, pageSize, total, rows));
@@ -587,6 +762,8 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (normalizedType is null) return Failure<OnlineStorePolicyDto>("online_store.policy_type_invalid", "Policy type is invalid.");
         if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content) || string.IsNullOrWhiteSpace(request.Version))
             return Failure<OnlineStorePolicyDto>("online_store.policy_invalid", "Policy title, content and version are required.");
+        if (OnlineStoreContractRules.ContainsUnsafeMarkup(request.Content))
+            return Failure<OnlineStorePolicyDto>("online_store.policy_content_unsafe", "Policy content contains unsafe markup.", [new("content", "Scripts, iframes, event handlers and executable URLs are not allowed.")]);
         var state = await LoadStateAsync(context.TenantId, true, cancellationToken);
         var policy = await _db.StorefrontPolicies.FirstOrDefaultAsync(x => x.TenantId == context.TenantId && x.SalesChannelId == state.Channel.Id && x.PolicyType == normalizedType && x.Version == request.Version.Trim(), cancellationToken);
         if (policy is null)
@@ -596,6 +773,8 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         }
         else
         {
+            if (policy.Status != Draft)
+                return Failure<OnlineStorePolicyDto>("online_store.policy_version_immutable", "Published or archived policy versions cannot be edited. Create a new version.");
             policy.UpdateDraft(request.Title, request.Content, request.Version, context.UserId, _clock.UtcNow);
         }
         AddAudit(context, "online_store.policy_saved", "STOREFRONT_POLICY", policy.Id, new { normalizedType, request.Version });
@@ -664,7 +843,17 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
             await SaveSettingsAsync(state, context.UserId, ct);
             AddAudit(context, "online_store.published", "ONLINE_STORE", state.Channel.Id, new { publishedAt = now });
             await _db.SaveChangesAsync(ct);
-            return ApplicationResult<OnlineStorePublishResponse>.Success(new OnlineStorePublishResponse(Published, Active, now, readiness));
+            var primaryDomain = await _db.TenantDomains.AsNoTracking()
+                .Where(x => x.TenantId == context.TenantId && x.SalesChannelId == state.Channel.Id && x.IsPrimary && x.Status == Active)
+                .Select(x => x.DomainName)
+                .FirstOrDefaultAsync(ct);
+            return ApplicationResult<OnlineStorePublishResponse>.Success(new OnlineStorePublishResponse(
+                Published,
+                Active,
+                now,
+                readiness,
+                BuildHostedUrl(ReadString(state.Settings, "storeSlug")),
+                primaryDomain));
         }, cancellationToken);
     }
 
@@ -674,6 +863,95 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (access is not null) return access;
         var domain = await FindDomainAsync(context.TenantId, domainId, cancellationToken);
         return domain is null ? NotFound<OnlineStoreDomainDto>("online_store.domain_not_found", "Domain was not found.") : ApplicationResult<OnlineStoreDomainDto>.Success(ToDomainDto(domain));
+    }
+
+    private async Task ReconcileDomainProviderStateAsync(
+        TenantRequestContext context,
+        TenantDomain domain,
+        CancellationToken cancellationToken)
+    {
+        var changed = false;
+        if (domain.VerificationStatus != "VERIFIED" && !string.IsNullOrWhiteSpace(domain.VerificationTokenHash))
+        {
+            var verification = await _domainVerificationProvider.VerifyTxtRecordAsync(
+                domain.DomainName,
+                domain.VerificationTokenHash,
+                cancellationToken);
+            if (verification.Status == DomainVerificationProviderStatus.Verified)
+            {
+                domain.MarkVerified(null, _clock.UtcNow);
+                changed = true;
+            }
+            else if (verification.Status is DomainVerificationProviderStatus.NotFound or DomainVerificationProviderStatus.Timeout or DomainVerificationProviderStatus.Failed)
+            {
+                domain.MarkVerificationFailed(
+                    verification.Status == DomainVerificationProviderStatus.Timeout ? "TIMEOUT" : "FAILED",
+                    null,
+                    _clock.UtcNow);
+                changed = true;
+            }
+        }
+
+        if (domain.VerificationStatus == "VERIFIED" && domain.SslStatus is "PENDING" or "ACTIVE")
+        {
+            changed |= await ReconcileCertificateStateAsync(context, domain, cancellationToken);
+        }
+
+        if (changed)
+        {
+            AddAudit(context, "online_store.domain_status_reconciled", "TENANT_DOMAIN", domain.Id, new
+            {
+                domain.DomainName,
+                domain.VerificationStatus,
+                domain.SslStatus
+            });
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private async Task<bool> ReconcileCertificateStateAsync(
+        TenantRequestContext context,
+        TenantDomain domain,
+        CancellationToken cancellationToken)
+    {
+        var status = await _certificateProvisioningProvider.GetStatusAsync(
+            context.TenantId,
+            domain.Id,
+            domain.DomainName,
+            cancellationToken);
+        if (status.Status == CertificateProvisioningProviderStatus.Unavailable)
+        {
+            return false;
+        }
+
+        ApplyCertificateProviderResult(domain, status, _clock.UtcNow);
+        return true;
+    }
+
+    private static void ApplyCertificateProviderResult(
+        TenantDomain domain,
+        CertificateProvisioningProviderResult result,
+        DateTimeOffset now)
+    {
+        switch (result.Status)
+        {
+            case CertificateProvisioningProviderStatus.Active:
+                domain.MarkSslActive(result.IssuedAt ?? now, result.ExpiresAt, null, now);
+                break;
+            case CertificateProvisioningProviderStatus.Provisioning:
+                domain.MarkSslProvisioning(null, now);
+                break;
+            case CertificateProvisioningProviderStatus.Timeout:
+                domain.MarkSslFailed("TIMEOUT", null, now);
+                break;
+            case CertificateProvisioningProviderStatus.Failed:
+            case CertificateProvisioningProviderStatus.Unavailable:
+                domain.MarkSslFailed("FAILED", null, now);
+                break;
+            default:
+                domain.MarkSslFailed("NOT_REQUESTED", null, now);
+                break;
+        }
     }
 
     private async Task<OnlineStoreCatalogProductDto> ToCatalogDtoAsync(Product product, Guid? variantId, Guid channelId, CancellationToken cancellationToken)
@@ -719,10 +997,10 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         var domains = await GetDomainsAsync(state.Channel.Id, state.Tenant.Id, cancellationToken);
         var banners = await GetBannersAsync(state.Tenant.Id, state.Channel.Id, cancellationToken);
         var collection = await BuildCollectionOutletsAsync(state.Tenant.Id, cancellationToken);
-        var policies = await _db.StorefrontPolicies.AsNoTracking().Where(x => x.TenantId == state.Tenant.Id && x.SalesChannelId == state.Channel.Id && x.Status == Published).Select(x => x.PolicyType).Distinct().ToListAsync(cancellationToken);
+        var policies = await _db.StorefrontPolicies.AsNoTracking().Where(x => x.TenantId == state.Tenant.Id && x.SalesChannelId == state.Channel.Id && x.Status == Published).Select(x => x.PolicyType).ToListAsync(cancellationToken);
         var totalProducts = await _db.Products.CountAsync(x => x.TenantId == state.Tenant.Id && x.Status != Deleted, cancellationToken);
         var visibleProducts = await _db.ProductChannelVisibilities.CountAsync(x => x.TenantId == state.Tenant.Id && x.SalesChannelId == state.Channel.Id && x.IsVisible && x.Status == Active, cancellationToken);
-        Add(1, "overview", "Online Store Overview", true);
+        Add(1, "overview", "Online Store Overview", string.Equals(state.Tenant.Status, TenantStatusConstants.Active, StringComparison.OrdinalIgnoreCase), "Tenant is not active.");
         Add(2, "activation", "Activation & Access", ReadBool(state.Settings, "setupEnabled") == true, "Online Store setup is not enabled.");
         Add(3, "identity", "Store Identity", !string.IsNullOrWhiteSpace(state.Channel.CustomName) && !string.IsNullOrWhiteSpace(ReadString(state.Settings, "businessDisplayName")), "Store identity is incomplete.");
         var storeSlugConfigured = !string.IsNullOrWhiteSpace(ReadString(state.Settings, "storeSlug"));
@@ -736,10 +1014,10 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
             ? "Hosted store URL slug is missing."
             : "Primary custom domain verification or SSL is incomplete.");
         Add(5, "branding", "Branding & Appearance", ReadObject(state.Settings, "branding") is not null && banners.Any(x => x.Status == Active), "Branding or active banner is missing.");
-        Add(6, "support", "Contact & Support", !string.IsNullOrWhiteSpace(ReadObjectString(state.Settings, "support", "email")) && !string.IsNullOrWhiteSpace(ReadObjectString(state.Settings, "support", "phone")), "Support email or phone is missing.");
-        Add(7, "click_collect", "Click & Collect Configuration", collection.Any(x => x.Status == Active && x.BusinessHoursConfigured), "No active collection outlet with business hours configured.");
-        Add(8, "products_policies", "Products & Policies", totalProducts == 0 || visibleProducts > 0 && RequiredPolicyTypes.All(policies.Contains), "Visible products or published policies are incomplete.");
-        Add(9, "review_publish", "Review & Publish", true);
+        Add(6, "support", "Contact & Support", IsSupportReady(ReadObject(state.Settings, "support")), "Valid support email, phone, business address and support hours are required.");
+        Add(7, "click_collect", "Click & Collect Configuration", collection.Any(x => x.Status == Active && x.Eligible), "No eligible active collection outlet with usable business hours is configured.");
+        Add(8, "products_policies", "Products & Policies", totalProducts > 0 && visibleProducts > 0 && OnlineStoreContractRules.AreRequiredPoliciesPublished(policies), "At least one visible product and every required published policy are required.");
+        Add(9, "review_publish", "Review & Publish", _emailSender.IsConfigured, "Email service is not configured.");
         return new OnlineStoreReadinessResponse(blockers.Count == 0, blockers.Distinct().ToList(), steps);
     }
 
@@ -788,12 +1066,62 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     private async Task<OnlineStoreActivationResponse> BuildActivationAsync(OnlineStoreState state, CancellationToken cancellationToken)
     {
         var now = _clock.UtcNow;
+        var onlineStoreEnabled = await _entitlements.IsEnabledAsync(state.Tenant.Id, PlatformTenantFeatureCodes.OnlineStore, now, cancellationToken);
+        var clickCollectEnabled = await _entitlements.IsEnabledAsync(state.Tenant.Id, PlatformTenantFeatureCodes.ClickCollect, now, cancellationToken);
         var entitlements = new List<OnlineStoreEntitlementDto>
         {
-            new(PlatformTenantFeatureCodes.OnlineStore, await _entitlements.IsEnabledAsync(state.Tenant.Id, PlatformTenantFeatureCodes.OnlineStore, now, cancellationToken) ? "ENABLED" : "DISABLED"),
-            new(PlatformTenantFeatureCodes.ClickCollect, await _entitlements.IsEnabledAsync(state.Tenant.Id, PlatformTenantFeatureCodes.ClickCollect, now, cancellationToken) ? "ENABLED" : "DISABLED")
+            new(PlatformTenantFeatureCodes.OnlineStore, onlineStoreEnabled ? "ENABLED" : "DISABLED"),
+            new(PlatformTenantFeatureCodes.ClickCollect, clickCollectEnabled ? "ENABLED" : "DISABLED")
         };
-        return new OnlineStoreActivationResponse(ReadBool(state.Settings, "setupEnabled") ?? false, ReadString(state.Settings, "storeStatus") ?? Draft, state.Channel.Status, state.Channel.Status == Active ? "LIVE" : "NOT_LIVE", entitlements);
+        var collectionOutlets = await BuildCollectionOutletsAsync(state.Tenant.Id, cancellationToken);
+        var hasEligibleCollectionOutlet = collectionOutlets.Any(outlet => outlet.Eligible);
+        var isLive = state.Channel.Status == Active && string.Equals(ReadString(state.Settings, "storeStatus"), Published, StringComparison.OrdinalIgnoreCase);
+        var tenantActive = string.Equals(state.Tenant.Status, Active, StringComparison.OrdinalIgnoreCase);
+        var readiness = new List<OnlineStoreActivationReadinessItemDto>
+        {
+            new(
+                "channel_entitlement",
+                "Channel Entitlement",
+                onlineStoreEnabled ? "READY" : "NOT_READY",
+                onlineStoreEnabled
+                    ? "Your tenant is entitled to Online Store."
+                    : "Online Store is not enabled for this tenant."),
+            new(
+                "authentication_ready",
+                "Authentication Ready",
+                onlineStoreEnabled && tenantActive ? "READY" : "NOT_READY",
+                onlineStoreEnabled && tenantActive
+                    ? "Registered customer authentication is available."
+                    : "Customer authentication requires an active tenant and Online Store entitlement."),
+            new(
+                "email_service_ready",
+                "Email Service Ready",
+                _emailSender.IsConfigured ? "READY" : "NOT_READY",
+                _emailSender.IsConfigured
+                    ? "Email service is configured and active."
+                    : "Email service must be configured before publishing."),
+            new(
+                "collection_outlet_requirement",
+                "Collection Outlet Requirement",
+                clickCollectEnabled && hasEligibleCollectionOutlet ? "READY" : "REQUIRED",
+                clickCollectEnabled && hasEligibleCollectionOutlet
+                    ? "At least one eligible collection outlet is ready."
+                    : "Configure at least one eligible collection outlet in Step 7.")
+        };
+
+        return new OnlineStoreActivationResponse(
+            ReadBool(state.Settings, "setupEnabled") ?? false,
+            ReadString(state.Settings, "storeStatus") ?? Draft,
+            state.Channel.Status,
+            isLive ? "LIVE" : "NOT_LIVE",
+            entitlements,
+            OnlineStoreReleaseOnePolicy.ActivationReleaseScope,
+            OnlineStoreReleaseOnePolicy.CustomerAccountMode,
+            OnlineStoreReleaseOnePolicy.EmailVerificationRequired,
+            OnlineStoreReleaseOnePolicy.PaymentMode,
+            _emailSender.IsConfigured ? "READY" : "NOT_READY",
+            !isLive,
+            readiness);
     }
 
     private OnlineStoreIdentityResponse BuildIdentity(OnlineStoreState state) =>
@@ -802,7 +1130,26 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     private async Task<OnlineStoreBrandingResponse> BuildBrandingAsync(OnlineStoreState state, CancellationToken cancellationToken)
     {
         var branding = ReadObject(state.Settings, "branding") ?? [];
-        return new OnlineStoreBrandingResponse(ReadGuid(branding, "logoMediaAssetId"), ReadGuid(branding, "faviconMediaAssetId"), ReadString(branding, "primaryColor") ?? "#FF6A00", ReadString(branding, "secondaryColor") ?? "#000000", await GetBannersAsync(state.Tenant.Id, state.Channel.Id, cancellationToken));
+        var logoMediaAssetId = ReadGuid(branding, "logoMediaAssetId");
+        var faviconMediaAssetId = ReadGuid(branding, "faviconMediaAssetId");
+        var mediaIds = new[] { logoMediaAssetId, faviconMediaAssetId }
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
+        var media = await _db.MediaAssets.AsNoTracking()
+            .Where(asset => asset.TenantId == state.Tenant.Id && mediaIds.Contains(asset.Id) &&
+                            (asset.Status == Active || asset.Status == "STAGED"))
+            .ToDictionaryAsync(asset => asset.Id, cancellationToken);
+
+        return new OnlineStoreBrandingResponse(
+            logoMediaAssetId,
+            faviconMediaAssetId,
+            ReadString(branding, "primaryColor") ?? "#FF6A00",
+            ReadString(branding, "secondaryColor") ?? "#000000",
+            await GetBannersAsync(state.Tenant.Id, state.Channel.Id, cancellationToken),
+            ResolveMediaUrl(logoMediaAssetId, media),
+            ResolveMediaUrl(faviconMediaAssetId, media));
     }
 
     private static OnlineStoreSupportResponse BuildSupport(JsonObject settings)
@@ -814,31 +1161,68 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     private async Task<IReadOnlyList<OnlineStoreDomainDto>> GetDomainsAsync(Guid channelId, Guid tenantId, CancellationToken cancellationToken) =>
         await _db.TenantDomains.AsNoTracking().Where(x => x.TenantId == tenantId && x.SalesChannelId == channelId && x.Status != Deleted).OrderByDescending(x => x.IsPrimary).ThenBy(x => x.DomainName).Select(x => ToDomainDto(x)).ToListAsync(cancellationToken);
 
-    private async Task<IReadOnlyList<OnlineStoreBannerDto>> GetBannersAsync(Guid tenantId, Guid channelId, CancellationToken cancellationToken) =>
-        await (from banner in _db.StorefrontBanners.AsNoTracking()
-               join media in _db.MediaAssets.AsNoTracking() on banner.ImageMediaAssetId equals media.Id into medias
-               from media in medias.DefaultIfEmpty()
-               where banner.TenantId == tenantId && banner.SalesChannelId == channelId && banner.Status != Deleted
-               orderby banner.SortOrder, banner.Title
-               select new OnlineStoreBannerDto(banner.Id, banner.BannerType, banner.Title, banner.Subtitle, banner.ImageMediaAssetId, media == null ? null : media.PublicUrl, banner.ActionText, banner.ActionUrl, banner.SortOrder, banner.Status)).ToListAsync(cancellationToken);
+    private async Task<IReadOnlyList<OnlineStoreBannerDto>> GetBannersAsync(Guid tenantId, Guid channelId, CancellationToken cancellationToken)
+    {
+        var rows = await (from banner in _db.StorefrontBanners.AsNoTracking()
+                          join media in _db.MediaAssets.AsNoTracking() on banner.ImageMediaAssetId equals media.Id into medias
+                          from media in medias.DefaultIfEmpty()
+                          where banner.TenantId == tenantId && banner.SalesChannelId == channelId && banner.Status != Deleted
+                          orderby banner.SortOrder, banner.Title
+                          select new
+                          {
+                              Banner = banner,
+                              MediaContainerName = media == null ? null : media.ContainerName,
+                              MediaStorageKey = media == null ? null : media.StorageKey,
+                              MediaPublicUrl = media == null ? null : media.PublicUrl,
+                              MediaStatus = media == null ? null : media.Status
+                          }).ToListAsync(cancellationToken);
+
+        return rows.Select(row => new OnlineStoreBannerDto(
+            row.Banner.Id,
+            row.Banner.BannerType,
+            row.Banner.Title,
+            row.Banner.Subtitle,
+            row.Banner.ImageMediaAssetId,
+            row.MediaStatus is Active or "STAGED"
+                ? _mediaReadUrlResolver?.ResolveReadUrl(row.MediaContainerName, row.MediaStorageKey, row.MediaPublicUrl) ?? row.MediaPublicUrl
+                : null,
+            row.Banner.ActionText,
+            row.Banner.ActionUrl,
+            row.Banner.SortOrder,
+            row.Banner.Status)).ToList();
+    }
 
     private async Task<IReadOnlyList<OnlineStoreCollectionOutletDto>> BuildCollectionOutletsAsync(Guid tenantId, CancellationToken cancellationToken)
     {
-        var method = await EnsurePickupMethodAsync(tenantId, cancellationToken);
-        return await (from outlet in _db.Outlets.AsNoTracking()
-                      join mapping in _db.FulfillmentMethodOutlets.AsNoTracking().Where(x => x.FulfillmentMethodId == method.Id) on outlet.Id equals mapping.OutletId into mappings
-                      from mapping in mappings.DefaultIfEmpty()
-                      where outlet.TenantId == tenantId && outlet.Status != Deleted
-                      orderby outlet.OutletName
-                      select new OnlineStoreCollectionOutletDto(
-                          outlet.Id,
-                          outlet.OutletName,
-                          outlet.Status,
-                          _db.OutletBusinessHours.Any(h => h.TenantId == tenantId && h.OutletId == outlet.Id),
-                          mapping == null ? null : mapping.PreparationLeadMinutes,
-                          mapping == null ? null : mapping.PickupWindowMinutes,
-                          mapping == null || mapping.CutoffTime == null ? null : mapping.CutoffTime.Value.ToString("HH:mm"),
-                          mapping == null ? Inactive : mapping.Status)).ToListAsync(cancellationToken);
+        var methodId = await _db.FulfillmentMethods.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.MethodType == PickupMethodType && x.Status != Deleted)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        var rows = await (from outlet in _db.Outlets.AsNoTracking()
+                          join mapping in _db.FulfillmentMethodOutlets.AsNoTracking().Where(x => methodId.HasValue && x.FulfillmentMethodId == methodId.Value) on outlet.Id equals mapping.OutletId into mappings
+                          from mapping in mappings.DefaultIfEmpty()
+                          where outlet.TenantId == tenantId && outlet.Status != Deleted
+                          orderby outlet.OutletName
+                          let hasHours = _db.OutletBusinessHours.Any(h => h.TenantId == tenantId && h.OutletId == outlet.Id && !h.IsClosed && h.OpeningTime != null && h.ClosingTime != null && h.ClosingTime > h.OpeningTime)
+                          select new
+                          {
+                              outlet.Id,
+                              outlet.OutletName,
+                              OutletStatus = outlet.Status,
+                              HasHours = hasHours,
+                              LeadMinutes = mapping == null ? null : mapping.PreparationLeadMinutes,
+                              WindowMinutes = mapping == null ? null : mapping.PickupWindowMinutes,
+                              CutoffTime = mapping == null ? null : mapping.CutoffTime,
+                              MappingStatus = mapping == null ? Inactive : mapping.Status
+                          }).ToListAsync(cancellationToken);
+        return rows.Select(row =>
+        {
+            var eligible = row.OutletStatus == Active && row.HasHours;
+            IReadOnlyList<string> reasons = row.OutletStatus != Active
+                ? ["OUTLET_NOT_ACTIVE"]
+                : !row.HasHours ? ["BUSINESS_HOURS_NOT_CONFIGURED"] : [];
+            return new OnlineStoreCollectionOutletDto(row.Id, row.OutletName, row.OutletStatus, row.HasHours, row.LeadMinutes, row.WindowMinutes, row.CutoffTime?.ToString("HH:mm"), row.MappingStatus, eligible, reasons);
+        }).ToList();
     }
 
     private async Task<FulfillmentMethod> EnsurePickupMethodAsync(Guid tenantId, CancellationToken cancellationToken)
@@ -870,18 +1254,31 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
 
     private async Task<ApplicationResult<T>?> RequireAsync<T>(TenantRequestContext context, string permission, string featureCode, CancellationToken cancellationToken, string? fallbackPermission = null)
     {
-        var hasPermission = context.HasPermission(permission) || (fallbackPermission is not null && context.HasPermission(fallbackPermission));
-        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty || !hasPermission)
+        if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
             return ApplicationResult<T>.Failure(new ApplicationError("online_store.permission_denied", "Permission denied."));
-        if (!await _entitlements.IsEnabledAsync(context.TenantId, featureCode, _clock.UtcNow, cancellationToken))
+        var tenantActive = await _db.Tenants.AsNoTracking().AnyAsync(x => x.Id == context.TenantId && x.Status == TenantStatusConstants.Active, cancellationToken);
+        if (!tenantActive)
+            return ApplicationResult<T>.Failure(new ApplicationError("online_store.tenant_inactive", "Tenant is not active."));
+        if (!await _entitlements.IsEnabledAsync(context.TenantId, PlatformTenantFeatureCodes.OnlineStore, _clock.UtcNow, cancellationToken))
+            return ApplicationResult<T>.Failure(new ApplicationError("online_store.entitlement_denied", "Online Store entitlement is not enabled."));
+        if (featureCode != PlatformTenantFeatureCodes.OnlineStore && !await _entitlements.IsEnabledAsync(context.TenantId, featureCode, _clock.UtcNow, cancellationToken))
             return ApplicationResult<T>.Failure(new ApplicationError("online_store.entitlement_denied", "Feature entitlement is not enabled."));
+        var hasPermission = context.HasPermission(permission) || (fallbackPermission is not null && context.HasPermission(fallbackPermission));
+        if (!hasPermission)
+            return ApplicationResult<T>.Failure(new ApplicationError("online_store.permission_denied", "Permission denied."));
         return null;
     }
 
-    private async Task ValidateMediaOwnershipAsync(Guid tenantId, Guid? mediaAssetId, CancellationToken cancellationToken)
+    private async Task<bool> MediaBelongsToTenantAsync(Guid tenantId, Guid? mediaAssetId, string expectedPurpose, CancellationToken cancellationToken) =>
+        !mediaAssetId.HasValue || await _db.MediaAssets.AnyAsync(
+            x => x.TenantId == tenantId && x.Id == mediaAssetId.Value && x.AssetPurpose == expectedPurpose &&
+                 (x.Status == Active || x.Status == "STAGED"),
+            cancellationToken);
+
+    private string? ResolveMediaUrl(Guid? mediaAssetId, IReadOnlyDictionary<Guid, MediaAsset> media)
     {
-        if (mediaAssetId.HasValue && !await _db.MediaAssets.AnyAsync(x => x.TenantId == tenantId && x.Id == mediaAssetId.Value && (x.Status == Active || x.Status == "STAGED"), cancellationToken))
-            throw new InvalidOperationException("Media asset does not belong to tenant or is not active.");
+        if (!mediaAssetId.HasValue || !media.TryGetValue(mediaAssetId.Value, out var asset)) return null;
+        return _mediaReadUrlResolver?.ResolveReadUrl(asset.ContainerName, asset.StorageKey, asset.PublicUrl) ?? asset.PublicUrl;
     }
 
     private void AddAudit(TenantRequestContext context, string action, string entityType, Guid? entityId, object payload) =>
@@ -903,14 +1300,21 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     private static bool? ReadBool(JsonObject root, string key) => root[key]?.GetValue<bool>();
     private static Guid? ReadGuid(JsonObject root, string key) => Guid.TryParse(ReadString(root, key), out var value) ? value : null;
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static string? BuildHostedUrl(string? slug) => string.IsNullOrWhiteSpace(slug) ? null : $"https://{slug}.oneverz.shop";
-    private static string? NormalizeSlug(string? slug) => string.IsNullOrWhiteSpace(slug) ? null : slug.Trim().ToLowerInvariant() is { } s && s.All(c => char.IsAsciiLetterOrDigit(c) || c == '-') ? s : null;
-    private static string? NormalizeDomain(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
+    private static bool IsSupportReady(JsonObject? support) =>
+        support is not null && OnlineStoreContractRules.IsSupportReady(
+            ReadString(support, "email"),
+            ReadString(support, "phone"),
+            ReadString(support, "businessAddress"),
+            ReadString(support, "supportHours"));
+    private string? BuildHostedUrl(string? slug) => string.IsNullOrWhiteSpace(slug) ? null : $"https://{slug}.{_options.HostedDomain.Trim().Trim('.').ToLowerInvariant()}";
     private static string NormalizeDomainType(string value) => string.IsNullOrWhiteSpace(value) ? "CUSTOM" : value.Trim().ToUpperInvariant();
     private static string NormalizeRecordStatus(string value) => value.Trim().ToUpperInvariant() is Active or Inactive or Deleted ? value.Trim().ToUpperInvariant() : Active;
     private static TimeOnly? ParseTime(string? value) => TimeOnly.TryParse(value, out var time) ? time : null;
     private static bool IsHexColor(string value) => value.Trim().Length == 7 && value[0] == '#' && value.Skip(1).All(Uri.IsHexDigit);
-    private static string? NormalizePolicyType(string value) => RequiredPolicyTypes.Contains(value.Trim().ToUpperInvariant()) ? value.Trim().ToUpperInvariant() : null;
+    private static string? NormalizePolicyType(string value) =>
+        value.Trim().ToUpperInvariant() is "TERMS" or "PRIVACY" or "CANCELLATION" or "COLLECTION" or "RETURN_REFUND"
+            ? value.Trim().ToUpperInvariant()
+            : null;
     private static OnlineStoreDomainDto ToDomainDto(TenantDomain domain) => new(domain.Id, domain.DomainType, domain.DomainName, domain.IsPrimary, domain.VerificationStatus, domain.VerifiedAt, domain.SslStatus, domain.SslIssuedAt, domain.SslExpiresAt, domain.Status);
     private static OnlineStorePolicyDto ToPolicyDto(StorefrontPolicy policy) => new(policy.Id, policy.PolicyType, policy.Title, policy.Content, policy.Version, policy.Status, policy.PublishedAt);
     private static ApplicationResult<T> NotFound<T>(string code, string message) => ApplicationResult<T>.Failure(new ApplicationError(code, message));
@@ -920,7 +1324,25 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
     {
         var errors = new List<ApplicationFieldError>();
         if (string.IsNullOrWhiteSpace(request.StoreName)) errors.Add(new("storeName", "Store name is required."));
+        if (request.StoreName?.Trim().Length > OnlineStoreContractRules.StoreNameMaxLength) errors.Add(new("storeName", "Store name is too long."));
         if (string.IsNullOrWhiteSpace(request.BusinessDisplayName)) errors.Add(new("businessDisplayName", "Business display name is required."));
+        if (request.BusinessDisplayName?.Trim().Length > OnlineStoreContractRules.BusinessDisplayNameMaxLength) errors.Add(new("businessDisplayName", "Business display name is too long."));
+        if (request.StoreDescription?.Trim().Length > OnlineStoreContractRules.StoreDescriptionMaxLength) errors.Add(new("storeDescription", "Store description is too long."));
+        if (!string.IsNullOrWhiteSpace(request.StoreEmail) && !OnlineStoreContractRules.IsValidEmail(request.StoreEmail)) errors.Add(new("storeEmail", "Enter a valid store email address."));
+        if (!string.IsNullOrWhiteSpace(request.StorePhone) && OnlineStoreContractRules.NormalizePhone(request.StorePhone) is null) errors.Add(new("storePhone", "Enter a valid store phone number."));
+        if (request.SupportTagline?.Trim().Length > OnlineStoreContractRules.SupportTaglineMaxLength) errors.Add(new("supportTagline", "Support tagline is too long."));
+        return errors;
+    }
+
+    private static IReadOnlyList<ApplicationFieldError> ValidateSupport(UpdateOnlineStoreSupportRequest request)
+    {
+        var errors = new List<ApplicationFieldError>();
+        if (!OnlineStoreContractRules.IsValidEmail(request.Email)) errors.Add(new("email", "Enter a valid support email address."));
+        if (!OnlineStoreContractRules.IsValidOptionalHttpsUrl(request.HelpUrl)) errors.Add(new("helpUrl", "Help URL must use HTTPS."));
+        if (OnlineStoreContractRules.NormalizePhone(request.Phone) is null) errors.Add(new("phone", "Enter a valid support phone number."));
+        if (request.Whatsapp?.Trim().Length > OnlineStoreContractRules.StorePhoneMaxLength) errors.Add(new("whatsapp", "WhatsApp number is too long."));
+        if (!OnlineStoreContractRules.IsValidSupportHours(request.SupportHours)) errors.Add(new("supportHours", "Enter valid support hours, for example Mon - Fri: 9:00 AM - 6:00 PM."));
+        if (string.IsNullOrWhiteSpace(request.BusinessAddress) || request.BusinessAddress.Trim().Length > OnlineStoreContractRules.BusinessAddressMaxLength) errors.Add(new("businessAddress", "Business address is required and must not exceed the maximum length."));
         return errors;
     }
 
@@ -929,6 +1351,16 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         var errors = new List<ApplicationFieldError>();
         if (request.BannerType.Trim().ToUpperInvariant() is not ("HERO" or "PROMO" or "ANNOUNCEMENT")) errors.Add(new("bannerType", "Banner type must be HERO, PROMO or ANNOUNCEMENT."));
         if (string.IsNullOrWhiteSpace(request.Title)) errors.Add(new("title", "Title is required."));
+        if (!OnlineStoreContractRules.IsValidOptionalHttpsUrl(request.ActionUrl)) errors.Add(new("actionUrl", "Banner action URL must use HTTPS."));
+        return errors;
+    }
+
+    private static IReadOnlyList<ApplicationFieldError> ValidateCollectionRules(int? leadMinutes, int? windowMinutes, string? cutoffTime)
+    {
+        var errors = new List<ApplicationFieldError>();
+        if (leadMinutes is < 0 or > 10080) errors.Add(new("preparationLeadMinutes", "Preparation lead time must be between 0 and 10080 minutes."));
+        if (windowMinutes is <= 0 or > 1440) errors.Add(new("pickupWindowMinutes", "Pickup window must be between 1 and 1440 minutes."));
+        if (!string.IsNullOrWhiteSpace(cutoffTime) && ParseTime(cutoffTime) is null) errors.Add(new("cutoffTime", "Cutoff time must be a valid time."));
         return errors;
     }
 
@@ -937,13 +1369,15 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         if (file.Length is <= 0 or > MaxMediaBytes) return PreparedImage.Invalid("Image file must be between 1 byte and 5 MB.");
         var fileName = Path.GetFileName(file.FileName).Trim();
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
-        var mime = file.ContentType.Trim().ToLowerInvariant() == "image/jpg" ? "image/jpeg" : file.ContentType.Trim().ToLowerInvariant();
-        if (!((mime == "image/jpeg" && extension is ".jpg" or ".jpeg") || (mime == "image/png" && extension == ".png") || (mime == "image/webp" && extension == ".webp")))
-            return PreparedImage.Invalid("Only JPG, JPEG, PNG and WEBP images are allowed.");
+        var mime = NormalizeImageMimeType(file.ContentType);
+        if (!OnlineStoreContractRules.IsSupportedBrandingMediaFormat(mime, extension))
+            return PreparedImage.Invalid("Only JPG, JPEG, PNG, WEBP, SVG and ICO images are allowed.");
         await using var memory = new MemoryStream();
         await file.Content.CopyToAsync(memory, cancellationToken);
         var bytes = memory.ToArray();
         if (!MagicMatches(bytes, mime)) return PreparedImage.Invalid("Image signature does not match MIME type.");
+        if (mime == "image/svg+xml") return PrepareSvg(fileName, extension, mime, bytes);
+        if (mime == "image/x-icon") return PrepareIcon(fileName, extension, mime, bytes);
         try
         {
             using var image = Image.Load(bytes);
@@ -961,8 +1395,94 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
         "image/jpeg" => bytes.Length > 2 && bytes[0] == 0xFF && bytes[1] == 0xD8,
         "image/png" => bytes.Length > 8 && bytes.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
         "image/webp" => bytes.Length > 12 && bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8) && bytes.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+        "image/svg+xml" => bytes.Length > 4 && Encoding.UTF8.GetString(bytes.AsSpan(0, Math.Min(bytes.Length, 512))).Contains("<svg", StringComparison.OrdinalIgnoreCase),
+        "image/x-icon" => bytes.Length > 8 && bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 1 && bytes[3] == 0,
         _ => false
     };
+
+    private static string NormalizeImageMimeType(string contentType) => contentType.Trim().ToLowerInvariant() switch
+    {
+        "image/jpg" => "image/jpeg",
+        "image/vnd.microsoft.icon" => "image/x-icon",
+        "image/ico" => "image/x-icon",
+        var mime => mime
+    };
+
+    private static PreparedImage PrepareIcon(string fileName, string extension, string mime, byte[] bytes)
+    {
+        if (bytes.Length < 22 || bytes[4] == 0 && bytes[5] == 0)
+            return PreparedImage.Invalid("ICO image does not contain an icon entry.");
+        var width = bytes[6] == 0 ? 256 : bytes[6];
+        var height = bytes[7] == 0 ? 256 : bytes[7];
+        return PreparedImage.Valid(fileName, extension, mime, bytes, width, height, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+    }
+
+    private static PreparedImage PrepareSvg(string fileName, string extension, string mime, byte[] bytes)
+    {
+        try
+        {
+            using var stream = new MemoryStream(bytes);
+            using var reader = XmlReader.Create(stream, new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null,
+                MaxCharactersInDocument = 5 * 1024 * 1024
+            });
+            var document = XDocument.Load(reader, LoadOptions.None);
+            var root = document.Root;
+            if (root is null || !string.Equals(root.Name.LocalName, "svg", StringComparison.OrdinalIgnoreCase) || ContainsUnsafeSvgContent(document))
+                return PreparedImage.Invalid("SVG image contains unsupported or unsafe content.");
+
+            var width = ParseSvgDimension(root.Attribute("width")?.Value);
+            var height = ParseSvgDimension(root.Attribute("height")?.Value);
+            if ((!width.HasValue || !height.HasValue) && root.Attribute("viewBox")?.Value is { } viewBox)
+            {
+                var values = viewBox.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
+                if (values.Length == 4 && double.TryParse(values[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var viewBoxWidth) &&
+                    double.TryParse(values[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var viewBoxHeight))
+                {
+                    width ??= (int)Math.Ceiling(viewBoxWidth);
+                    height ??= (int)Math.Ceiling(viewBoxHeight);
+                }
+            }
+            if (width.HasValue && height.HasValue && (long)width.Value * height.Value > MaxPixels)
+                return PreparedImage.Invalid("Image dimensions exceed the 16 MP limit.");
+            return PreparedImage.Valid(fileName, extension, mime, bytes, width, height, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+        }
+        catch
+        {
+            return PreparedImage.Invalid("SVG image is corrupted or cannot be decoded.");
+        }
+    }
+
+    private static bool ContainsUnsafeSvgContent(XDocument document)
+    {
+        string[] blockedElements = ["script", "foreignObject", "iframe", "object", "embed"];
+        foreach (var element in document.Descendants())
+        {
+            if (blockedElements.Contains(element.Name.LocalName, StringComparer.OrdinalIgnoreCase)) return true;
+            foreach (var attribute in element.Attributes())
+            {
+                var name = attribute.Name.LocalName;
+                var value = attribute.Value.Trim();
+                if (name.StartsWith("on", StringComparison.OrdinalIgnoreCase) ||
+                    (string.Equals(name, "href", StringComparison.OrdinalIgnoreCase) && !value.StartsWith('#')) ||
+                    value.Contains("javascript:", StringComparison.OrdinalIgnoreCase) ||
+                    value.Contains("data:text/html", StringComparison.OrdinalIgnoreCase) ||
+                    value.Contains("url(", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static int? ParseSvgDimension(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var numeric = new string(value.Trim().TakeWhile(character => char.IsDigit(character) || character is '.' or '-').ToArray());
+        return double.TryParse(numeric, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) && parsed > 0
+            ? (int)Math.Ceiling(parsed)
+            : null;
+    }
 
     private static string CreateRawToken()
     {
@@ -975,9 +1495,9 @@ public sealed class TenantAdminOnlineStoreService : ITenantAdminOnlineStoreServi
 
     private sealed record OnlineStoreState(E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant Tenant, SalesChannel Channel, JsonObject Settings);
 
-    private sealed record PreparedImage(string FileName, string Extension, string Mime, byte[] Bytes, int Width, int Height, string Hash, ApplicationError? Error)
+    private sealed record PreparedImage(string FileName, string Extension, string Mime, byte[] Bytes, int? Width, int? Height, string Hash, ApplicationError? Error)
     {
-        public static PreparedImage Valid(string fileName, string extension, string mime, byte[] bytes, int width, int height, string hash) => new(fileName, extension, mime, bytes, width, height, hash, null);
+        public static PreparedImage Valid(string fileName, string extension, string mime, byte[] bytes, int? width, int? height, string hash) => new(fileName, extension, mime, bytes, width, height, hash, null);
         public static PreparedImage Invalid(string message) => new(string.Empty, string.Empty, string.Empty, [], 0, 0, string.Empty, new ApplicationError("online_store.media_invalid", message, [new ApplicationFieldError("file", message)]));
     }
 }

@@ -6,7 +6,7 @@ public static class SalesPermissions
     {
         public const string Create = "sales.create";
         public const string View = "sales.view";
-        public const string Checkout = "sales.checkout";
+        public const string Checkout = "pos.sales.checkout.execute";
         public const string LegacyCreate = "pos.sale.create";
     }
 
@@ -42,6 +42,19 @@ public static class SalesPermissions
         public const string LegacyPark = "pos.sale.park";
         public const string LegacyRecall = "pos.sale.recall";
         public const string LegacyView = "pos.sale.park.view";
+    }
+
+    /// <summary>
+    /// Canonical held-sales action codes (Chunk 2 definitions).
+    /// Chunk 6 enforces these (with legacy Park.* accepted for create/view/recall).
+    /// Cancel requires <see cref="Cancel"/> and is not authorized by create alone.
+    /// </summary>
+    public static class HeldSales
+    {
+        public const string Create = "pos.sales.held_sales.create";
+        public const string View = "pos.sales.held_sales.view";
+        public const string Recall = "pos.sales.held_sales.recall";
+        public const string Cancel = "pos.sales.held_sales.cancel";
     }
 
     public static class Orders

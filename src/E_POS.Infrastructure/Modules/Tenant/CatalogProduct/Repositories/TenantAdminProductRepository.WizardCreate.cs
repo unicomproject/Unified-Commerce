@@ -1,9 +1,11 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
 using E_POS.Domain.Modules.Shared.Audit.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
@@ -176,22 +178,20 @@ public sealed partial class TenantAdminProductRepository
                         "A unit of measure is required for SIMPLE products."));
                 }
 
-                var simpleSku = request.BarcodeSkuConfiguration?.Assignments?
+                var simpleAssignment = request.BarcodeSkuConfiguration?.Assignments?
                     .FirstOrDefault(a =>
                         string.Equals(a.ClientCombinationKey, "SIMPLE_DEFAULT", StringComparison.OrdinalIgnoreCase) ||
-                        a.ProductVariantId == null)
-                    ?.Sku;
+                        a.ProductVariantId == null);
+
+                var simpleSku = simpleAssignment?.Sku;
 
                 if (string.IsNullOrWhiteSpace(simpleSku))
                 {
                     simpleSku = productCode;
                 }
 
-                var simpleBarcode = request.BarcodeSkuConfiguration?.Assignments?
-                    .FirstOrDefault(a =>
-                        string.Equals(a.ClientCombinationKey, "SIMPLE_DEFAULT", StringComparison.OrdinalIgnoreCase) ||
-                        a.ProductVariantId == null)
-                    ?.Barcode;
+                var simpleBarcode = simpleAssignment?.Barcode;
+                var simpleBarcodeType = ProductBarcodeFormatValidator.NormalizeType(simpleAssignment?.BarcodeType);
 
                 var defaultVariantId = Guid.NewGuid();
                 var defaultVariant = ProductVariant.Create(
@@ -213,6 +213,13 @@ public sealed partial class TenantAdminProductRepository
 
                 if (!string.IsNullOrWhiteSpace(simpleBarcode))
                 {
+                    if (simpleBarcodeType is null)
+                    {
+                        return SaveProductDraftResult.Failure(new ApplicationError(
+                            "product.validation_failed",
+                            "Barcode type is required when a barcode is provided."));
+                    }
+
                     await _dbContext.ProductBarcodes.AddAsync(
                         ProductBarcode.Create(
                             Guid.NewGuid(),
@@ -220,7 +227,7 @@ public sealed partial class TenantAdminProductRepository
                             productId,
                             defaultVariantId,
                             simpleBarcode.Trim(),
-                            barcodeType: "EAN13",
+                            barcodeType: simpleBarcodeType,
                             uomId: null,
                             quantityPerScan: 1m,
                             isPrimaryBarcode: true,
@@ -413,9 +420,19 @@ public sealed partial class TenantAdminProductRepository
 
             return SaveProductDraftResult.Success(MapSetupToDraftResponse(setup));
         }
-        catch (Exception)
+        catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            // Npgsql may already abort the ambient transaction on the original error;
+            // only roll back when still active so the root cause is not replaced.
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            catch (InvalidOperationException)
+            {
+                // Transaction already completed — preserve original exception.
+            }
+
             throw;
         }
     }
@@ -456,6 +473,8 @@ public sealed partial class TenantAdminProductRepository
             .Where(b => b.TenantId == tenantId && b.ProductId == productId)
             .ToListAsync(cancellationToken);
 
+        var variantLookupKeys = await BuildVariantLookupKeysAsync(tenantId, productId, variants, cancellationToken);
+
         var barcodeStatus = activateIdentifiers
             ? ProductConstants.ActiveStatus
             : ProductConstants.InactiveStatus;
@@ -474,7 +493,7 @@ public sealed partial class TenantAdminProductRepository
             {
                 var key = assignment.ClientCombinationKey.Trim();
                 target = variants.FirstOrDefault(v =>
-                    string.Equals(v.OptionCombinationHash?.Trim(), key, StringComparison.Ordinal));
+                    VariantLookupMatches(v, key, variantLookupKeys));
             }
 
             if (target is null)
@@ -497,6 +516,14 @@ public sealed partial class TenantAdminProductRepository
             var existingBarcode = existingBarcodes.FirstOrDefault(b => b.ProductVariantId == target.Id);
             if (!string.IsNullOrWhiteSpace(assignment.Barcode))
             {
+                var barcodeType = ProductBarcodeFormatValidator.NormalizeType(assignment.BarcodeType);
+                if (barcodeType is null)
+                {
+                    return new ApplicationError(
+                        "product.validation_failed",
+                        "Barcode type is required when a barcode is provided.");
+                }
+
                 if (existingBarcode is null)
                 {
                     await _dbContext.ProductBarcodes.AddAsync(
@@ -506,8 +533,8 @@ public sealed partial class TenantAdminProductRepository
                             productId,
                             target.Id,
                             assignment.Barcode.Trim(),
-                            "EAN13",
-                            null,
+                            barcodeType,
+                            target.SalesUomId,
                             1m,
                             true,
                             barcodeStatus,
@@ -517,7 +544,7 @@ public sealed partial class TenantAdminProductRepository
                 }
                 else
                 {
-                    existingBarcode.UpdateIdentifier(assignment.Barcode.Trim(), existingBarcode.BarcodeType, userId, now);
+                    existingBarcode.UpdateIdentifier(assignment.Barcode.Trim(), barcodeType, userId, now);
                 }
             }
         }
@@ -534,6 +561,111 @@ public sealed partial class TenantAdminProductRepository
         }
 
         return null;
+    }
+
+    private async Task<Dictionary<Guid, HashSet<string>>> BuildVariantLookupKeysAsync(
+        Guid tenantId,
+        Guid productId,
+        IReadOnlyList<ProductVariant> variants,
+        CancellationToken cancellationToken)
+    {
+        var variantIds = variants.Select(v => v.Id).ToList();
+        if (variantIds.Count == 0)
+        {
+            return new Dictionary<Guid, HashSet<string>>();
+        }
+
+        var mappings = _dbContext.ProductVariantOptionValues.Local
+            .Where(m => m.TenantId == tenantId &&
+                        m.ProductId == productId &&
+                        variantIds.Contains(m.ProductVariantId))
+            .ToList();
+        if (mappings.Count == 0)
+        {
+            mappings = await _dbContext.ProductVariantOptionValues
+                .AsNoTracking()
+                .Where(m => m.TenantId == tenantId &&
+                            m.ProductId == productId &&
+                            variantIds.Contains(m.ProductVariantId))
+                .ToListAsync(cancellationToken);
+        }
+
+        var optionIds = mappings.Select(m => m.ProductOptionId).Distinct().ToList();
+        var valueIds = mappings.Select(m => m.ProductOptionValueId).Distinct().ToList();
+
+        var options = _dbContext.ProductOptions.Local
+            .Where(o => o.TenantId == tenantId && optionIds.Contains(o.Id))
+            .ToDictionary(o => o.Id);
+        foreach (var option in await _dbContext.ProductOptions
+                     .AsNoTracking()
+                     .Where(o => o.TenantId == tenantId && optionIds.Contains(o.Id))
+                     .ToListAsync(cancellationToken))
+        {
+            options.TryAdd(option.Id, option);
+        }
+
+        var values = _dbContext.ProductOptionValues.Local
+            .Where(v => v.TenantId == tenantId && valueIds.Contains(v.Id))
+            .ToDictionary(v => v.Id);
+        foreach (var value in await _dbContext.ProductOptionValues
+                     .AsNoTracking()
+                     .Where(v => v.TenantId == tenantId && valueIds.Contains(v.Id))
+                     .ToListAsync(cancellationToken))
+        {
+            values.TryAdd(value.Id, value);
+        }
+
+        var lookup = new Dictionary<Guid, HashSet<string>>();
+        foreach (var variant in variants)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(variant.OptionCombinationHash))
+            {
+                keys.Add(variant.OptionCombinationHash.Trim());
+            }
+
+            var selected = mappings
+                .Where(m => m.ProductVariantId == variant.Id)
+                .Select(m =>
+                {
+                    options.TryGetValue(m.ProductOptionId, out var opt);
+                    values.TryGetValue(m.ProductOptionValueId, out var val);
+                    return (OptionName: opt?.OptionName ?? string.Empty, ValueName: val?.ValueName ?? string.Empty,
+                        TemplateId: opt?.SourceOptionTemplateId, TemplateValueId: val?.SourceOptionTemplateValueId);
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.OptionName) && !string.IsNullOrWhiteSpace(x.ValueName))
+                .ToList();
+
+            if (selected.Count > 0)
+            {
+                keys.Add(ProductVariantClientKeyHelper.BuildNameBasedClientCombinationKey(
+                    selected.Select(s => (s.OptionName, s.ValueName))));
+
+                if (selected.All(s => s.TemplateId.HasValue && s.TemplateValueId.HasValue))
+                {
+                    keys.Add(ProductVariantClientKeyHelper.GenerateClientCombinationKey(
+                        selected.Select(s => (s.TemplateId!.Value, s.TemplateValueId!.Value))));
+                }
+            }
+
+            lookup[variant.Id] = keys;
+        }
+
+        return lookup;
+    }
+
+    private static bool VariantLookupMatches(
+        ProductVariant variant,
+        string key,
+        IReadOnlyDictionary<Guid, HashSet<string>> variantLookupKeys)
+    {
+        if (string.Equals(variant.OptionCombinationHash?.Trim(), key, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return variantLookupKeys.TryGetValue(variant.Id, out var keys) &&
+               keys.Contains(key);
     }
 
     private static ProductDraftResponse MapSetupToDraftResponse(ProductSetupWizardDto setup)

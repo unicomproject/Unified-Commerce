@@ -35,6 +35,10 @@ public interface ITenantAdminOutletService
         Guid outletId,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>> GetManagerOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult> SetManagerAsync(
         TenantRequestContext context,
         Guid outletId,

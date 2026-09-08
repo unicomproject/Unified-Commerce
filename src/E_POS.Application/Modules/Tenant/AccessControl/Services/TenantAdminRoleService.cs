@@ -6,6 +6,7 @@ using E_POS.Application.Common.Idempotency;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
+using E_POS.Domain.Modules.Tenant.AccessControl.Catalog.CashierPos;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 
@@ -162,6 +163,12 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         {
             return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(
                 ValidationFailed("Select at least one permission before creating a role."));
+        }
+
+        var canonicalError = ValidateCanonicalAssignmentSet(permissionCodes, currentlyGrantedCodes: null);
+        if (canonicalError is not null)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(canonicalError);
         }
 
         var permissions = await _repository.GetAssignablePermissionsByCodeAsync(
@@ -378,6 +385,15 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
                 ValidationFailed("A role must retain at least one permission."));
         }
 
+        var currentPermissions = await _repository.GetPermissionsAsync(context.TenantId, roleId, cancellationToken);
+        var canonicalError = ValidateCanonicalAssignmentSet(
+            permissionCodes,
+            currentPermissions?.AssignedPermissionCodes);
+        if (canonicalError is not null)
+        {
+            return ApplicationResult<TenantRolePermissionsResponse>.Failure(canonicalError);
+        }
+
         var now = _dateTimeProvider.UtcNow;
         var permissions = await _repository.GetAssignablePermissionsByCodeAsync(
             context.TenantId,
@@ -515,6 +531,15 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         {
             return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(
                 ValidationFailed("A role must retain at least one permission."));
+        }
+
+        var currentPermissions = await _repository.GetPermissionsAsync(context.TenantId, roleId, cancellationToken);
+        var canonicalError = ValidateCanonicalAssignmentSet(
+            permissionCodes,
+            currentPermissions?.AssignedPermissionCodes);
+        if (canonicalError is not null)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(canonicalError);
         }
 
         var permissions = await _repository.GetAssignablePermissionsByCodeAsync(
@@ -664,6 +689,39 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
     private static ApplicationError ValidationFailed(string message) =>
         new("tenant_roles.validation_failed", message);
 
+    private static ApplicationError? ValidateCanonicalAssignmentSet(
+        IReadOnlyList<string> targetPermissionCodes,
+        IReadOnlyCollection<string>? currentlyGrantedCodes)
+    {
+        var result = CashierPosPermissionAssignmentRules.ValidateAssignmentSet(
+            targetPermissionCodes,
+            currentlyGrantedCodes,
+            availableParentCodes: targetPermissionCodes);
+
+        if (result.IsValid)
+        {
+            return null;
+        }
+
+        var failure = result.Failures[0];
+        return failure.Kind switch
+        {
+            CashierPosPermissionAssignmentRules.FailureKind.InvalidFormat => new ApplicationError(
+                "tenant_roles.invalid_permission_format",
+                $"Permission '{failure.PermissionCode}' is not a valid canonical four-tier code."),
+            CashierPosPermissionAssignmentRules.FailureKind.PreAuthNotAssignable => new ApplicationError(
+                "tenant_roles.pre_auth_permission_not_assignable",
+                $"Pre-auth permission '{failure.PermissionCode}' cannot be assigned to tenant roles."),
+            CashierPosPermissionAssignmentRules.FailureKind.UnknownCanonicalPermission => new ApplicationError(
+                "tenant_roles.unknown_permission",
+                $"Permission '{failure.PermissionCode}' is not an approved role-assignable canonical permission."),
+            CashierPosPermissionAssignmentRules.FailureKind.ParentPermissionRequired => new ApplicationError(
+                "tenant_roles.parent_permission_required",
+                $"Permission '{failure.PermissionCode}' requires parent '{failure.RequiredParentCode}' to be assigned in the same set."),
+            _ => ValidationFailed("Permission assignment request is invalid."),
+        };
+    }
+
     private static ApplicationError? ValidateRolePermissionCeiling(
         string roleCode,
         IEnumerable<string> permissionCodes)
@@ -755,5 +813,27 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         return string.IsNullOrWhiteSpace(code)
             ? "CUSTOM_ROLE"
             : code[..Math.Min(code.Length, 80)];
+    }
+    public async Task<ApplicationResult<TenantRoleAssignmentOptionsResponse>> GetAssignmentOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var canAssignUsers = (context.HasPermission(TenantAdminUserPermissions.RolesUsersAssign) || context.HasPermission(TenantAdminUserPermissions.RolesManage));
+        var canAssignOutlets = (context.HasPermission(TenantAdminUserPermissions.RolesOutletsAssign) || context.HasPermission(TenantAdminUserPermissions.RolesManage));
+        var canView = context.HasPermission(TenantAdminUserPermissions.RolesAssignmentsView) ||
+                      context.HasPermission(TenantAdminUserPermissions.RolesUpdate) ||
+                      context.HasPermission(TenantAdminUserPermissions.RolesManage);
+
+        if (!canView && !canAssignUsers && !canAssignOutlets)
+        {
+            return ApplicationResult<TenantRoleAssignmentOptionsResponse>.Failure(PermissionDenied);
+        }
+
+        var response = await _repository.GetAssignmentOptionsAsync(
+            context.TenantId,
+            canAssignUsers,
+            canAssignOutlets,
+            cancellationToken);
+        return ApplicationResult<TenantRoleAssignmentOptionsResponse>.Success(response);
     }
 }

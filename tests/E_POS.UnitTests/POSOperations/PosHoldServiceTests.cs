@@ -14,7 +14,7 @@ public sealed class PosHoldServiceTests
         new(2026, 7, 12, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task CancelHoldAsync_WithCreatePermission_ReturnsSuccess()
+    public async Task CancelHoldAsync_WithCancelPermission_ReturnsSuccess()
     {
         var repository = new FakeRepository
         {
@@ -24,7 +24,7 @@ public sealed class PosHoldServiceTests
 
         var result = await service.CancelHoldAsync(
             new TenantRequestContext(
-                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Park.Create]),
+                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.HeldSales.Cancel]),
             Guid.NewGuid(), "Customer left", CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -54,7 +54,7 @@ public sealed class PosHoldServiceTests
 
         var result = await service.CancelHoldAsync(
             new TenantRequestContext(
-                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Park.Create]),
+                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.HeldSales.Cancel]),
             Guid.NewGuid(), reason, CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -68,7 +68,7 @@ public sealed class PosHoldServiceTests
 
         var result = await service.CancelHoldAsync(
             new TenantRequestContext(
-                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Park.Create]),
+                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.HeldSales.Cancel]),
             Guid.NewGuid(), new string('a', 251), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -87,7 +87,7 @@ public sealed class PosHoldServiceTests
 
         var result = await service.CancelHoldAsync(
             new TenantRequestContext(
-                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Park.Create]),
+                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.HeldSales.Cancel]),
             Guid.NewGuid(), reason, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -105,7 +105,7 @@ public sealed class PosHoldServiceTests
 
         var result = await service.CancelHoldAsync(
             new TenantRequestContext(
-                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.Park.Create]),
+                Guid.NewGuid(), Guid.NewGuid(), [SalesPermissions.HeldSales.Cancel]),
             Guid.NewGuid(), "  Customer left  ", CancellationToken.None);
 
         Assert.True(result.IsSuccess);

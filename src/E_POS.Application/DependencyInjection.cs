@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformTenantOnboardingService, PlatformTenantOnboardingService>();
         services.AddScoped<IPlatformPermissionCatalogService, PlatformPermissionCatalogService>();
         services.AddScoped<IPlatformModulesCatalogService, PlatformModulesCatalogService>();
+        services.AddScoped<IBusinessCapabilityCatalogService, BusinessCapabilityCatalogService>();
         services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
         services.AddScoped<IDefaultTenantSettingsProvider, DefaultTenantSettingsProvider>();
         services.AddScoped<IPosLoginBrandingService, PosLoginBrandingService>();
@@ -91,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformPasswordResetService, PlatformPasswordResetService>();
         services.AddScoped<IPlatformPasswordPolicyValidator, PlatformPasswordPolicyValidator>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
+        services.AddScoped<IPlanBusinessCapabilityCatalogService, PlanBusinessCapabilityCatalogService>();
         services.AddScoped<ITenantUsageCounterService, TenantUsageCounterService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
         services.AddScoped<ITenantAdminInvitationAcceptanceService, TenantAdminInvitationAcceptanceService>();
@@ -131,6 +133,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminTillService, TenantAdminTillService>();
         services.AddScoped<ITenantAdminHardwareService, TenantAdminHardwareService>();
         services.AddScoped<ITenantAdminUserService, TenantAdminUserService>();
+        services.AddScoped<ITenantAdminUserProfileImageService, TenantAdminUserProfileImageService>();
         services.AddScoped<ITenantAdminRoleService, TenantAdminRoleService>();
         services.AddScoped<ITillService, TillService>();
         services.AddScoped<IPosDeviceService, PosDeviceService>();
@@ -150,6 +153,7 @@ public static class DependencyInjection
         services.AddScoped<IPosHomeDashboardService, PosHomeDashboardService>();
         services.AddScoped<IPosTillSessionService, PosTillSessionService>();
         services.AddScoped<IPosCheckoutService, PosCheckoutService>();
+        services.AddScoped<IPosNotificationService, PosNotificationService>();
         services.AddScoped<IPosReceiptService, PosReceiptService>();
         services.AddScoped<IPosReturnService, PosReturnService>();
         services.AddScoped<IPosHoldService, PosHoldService>();
@@ -162,9 +166,11 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<INotificationInboxService, NotificationInboxService>();
         services.AddScoped<INotificationChannelHandler, InAppNotificationChannelHandler>();
+        services.AddScoped<INotificationChannelHandler, RealtimeNotificationChannelHandler>();
 
         // ECommerce Storefront
 
+        services.AddScoped<IStorefrontBrandingService, StorefrontBrandingService>();
         services.AddScoped<IStorefrontBannerService, StorefrontBannerService>();
         services.AddScoped<IStorefrontCategoryService, StorefrontCategoryService>();
         services.AddScoped<IStorefrontProductService, StorefrontProductService>();
@@ -191,6 +197,9 @@ public static class DependencyInjection
         services.AddScoped<ICustomerWishlistService, CustomerWishlistService>();
         services.AddScoped<ICustomerOrderService, CustomerOrderService>();
         services.AddScoped<IClickCollectOrderStatusService, ClickCollectOrderStatusService>();
+        services.AddScoped<IPosOnlineOrderDetailService, PosOnlineOrderDetailService>();
+        services.AddScoped<IPosOnlineOrderStartFulfillmentService, PosOnlineOrderStartFulfillmentService>();
+        services.AddScoped<IPosOnlineOrderPickingService, PosOnlineOrderPickingService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;

@@ -8,11 +8,11 @@ public sealed record CurrentTillSessionDto(
     Guid OutletId,
     Guid TillId,
     Guid OpenedDeviceId,
-    decimal OpeningFloat,
+    decimal? OpeningFloat,
     string Status,
     DateTimeOffset OpenedAt,
     string? OpeningNote,
     string CurrencyCode = "",
-    decimal ExpectedCash = 0,
+    decimal? ExpectedCash = 0,
     string? TillName = null,
     string? OpenedByName = null);

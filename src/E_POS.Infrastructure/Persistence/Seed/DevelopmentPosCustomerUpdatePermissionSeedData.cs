@@ -3,8 +3,9 @@ using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 namespace E_POS.Infrastructure.Persistence.Seed;
 
 /// <summary>
-/// Idempotent seed SQL for <c>customers.update</c> only.
-/// Deterministic ID must not collide with sales.checkout (77777777-0316-...).
+/// Idempotent seed SQL for <c>pos.customers.management.update</c> only.
+/// Deterministic ID must not collide with
+/// <c>pos.sales.checkout.execute</c> (77777777-0316-...).
 /// </summary>
 public static class DevelopmentPosCustomerUpdatePermissionSeedData
 {
@@ -29,7 +30,7 @@ public static class DevelopmentPosCustomerUpdatePermissionSeedData
                   AND permission_code <> '{{PermissionCode}}'
             ) THEN
                 RAISE EXCEPTION
-                    'customers.update seed UUID {{PermissionId}} is already owned by another permission';
+                    'pos.customers.management.update seed UUID {{PermissionId}} is already owned by another permission';
             END IF;
         END $$;
 

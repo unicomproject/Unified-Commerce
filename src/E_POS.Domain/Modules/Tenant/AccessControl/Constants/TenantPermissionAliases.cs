@@ -2,6 +2,7 @@ using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.Orders.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
+using E_POS.Domain.Modules.Tenant.PricingTax.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 
@@ -9,6 +10,7 @@ namespace E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 /// Maps canonical seeded permission codes to legacy or Flutter alias codes
 /// returned in effective permission responses.
 /// Product Setup: one-way legacy → catalog so authorization checks catalog.* only.
+/// Tax Management: TARGET pricing.tax_* ↔ legacy tax.* compatibility.
 /// </summary>
 public static class TenantPermissionAliases
 {
@@ -19,8 +21,16 @@ public static class TenantPermissionAliases
             ["tenant.products.create"] = ProductConstants.CreatePermission,
             ["tenant.products.update"] = ProductConstants.UpdatePermission,
             ["tenant.products.delete"] = ProductConstants.DeletePermission,
-            ["tax.classes.view"] = ProductConstants.TaxClassesViewPermission,
-            ["tax.rates.view"] = ProductConstants.TaxRatesViewPermission,
+            [PricingTaxPermissions.TaxClasses.LegacyView] = PricingTaxPermissions.TaxClasses.View,
+            [PricingTaxPermissions.TaxClasses.LegacyCreate] = PricingTaxPermissions.TaxClasses.Create,
+            [PricingTaxPermissions.TaxClasses.LegacyUpdate] = PricingTaxPermissions.TaxClasses.Update,
+            [PricingTaxPermissions.TaxClasses.LegacyDelete] = PricingTaxPermissions.TaxClasses.StatusManage,
+            [PricingTaxPermissions.TaxClasses.LegacyManage] = PricingTaxPermissions.TaxClasses.StatusManage,
+            [PricingTaxPermissions.TaxRates.LegacyView] = PricingTaxPermissions.TaxRates.View,
+            [PricingTaxPermissions.TaxRates.LegacyCreate] = PricingTaxPermissions.TaxRates.ScheduleManage,
+            [PricingTaxPermissions.TaxRates.LegacyUpdate] = PricingTaxPermissions.TaxRates.ScheduleManage,
+            [PricingTaxPermissions.TaxRates.LegacyDelete] = PricingTaxPermissions.TaxRates.ScheduleManage,
+            [PricingTaxPermissions.TaxRates.LegacyManage] = PricingTaxPermissions.TaxRates.ScheduleManage,
         };
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> AliasesByCanonical =
@@ -44,8 +54,26 @@ public static class TenantPermissionAliases
             [ProductConstants.CreatePermission] = ["tenant.products.create"],
             [ProductConstants.UpdatePermission] = ["tenant.products.update"],
             [ProductConstants.DeletePermission] = ["tenant.products.delete"],
-            [ProductConstants.TaxClassesViewPermission] = ["tax.classes.view"],
-            [ProductConstants.TaxRatesViewPermission] = ["tax.rates.view"],
+            [PricingTaxPermissions.TaxClasses.View] =
+            [
+                PricingTaxPermissions.TaxClasses.LegacyView,
+                ProductConstants.TaxClassesViewPermission
+            ],
+            [PricingTaxPermissions.TaxClasses.Create] = [PricingTaxPermissions.TaxClasses.LegacyCreate],
+            [PricingTaxPermissions.TaxClasses.Update] = [PricingTaxPermissions.TaxClasses.LegacyUpdate],
+            [PricingTaxPermissions.TaxClasses.StatusManage] =
+            [
+                PricingTaxPermissions.TaxClasses.LegacyDelete,
+                PricingTaxPermissions.TaxClasses.LegacyManage
+            ],
+            [PricingTaxPermissions.TaxRates.View] = [PricingTaxPermissions.TaxRates.LegacyView],
+            [PricingTaxPermissions.TaxRates.ScheduleManage] =
+            [
+                PricingTaxPermissions.TaxRates.LegacyCreate,
+                PricingTaxPermissions.TaxRates.LegacyUpdate,
+                PricingTaxPermissions.TaxRates.LegacyDelete,
+                PricingTaxPermissions.TaxRates.LegacyManage
+            ],
         };
 
     public static IReadOnlyList<string> Expand(IReadOnlyList<string> grantedCodes)

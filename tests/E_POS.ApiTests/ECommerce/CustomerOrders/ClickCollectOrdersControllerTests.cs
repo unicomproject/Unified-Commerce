@@ -15,6 +15,41 @@ namespace E_POS.ApiTests.ECommerce.CustomerOrders;
 public sealed class ClickCollectOrdersControllerTests
 {
     [Fact]
+    public async Task List_WithTenantClaims_ForwardsCanonicalQueryAndReturnsQueueEnvelope()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var detailService = new FakePosOnlineOrderDetailService();
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), detailService);
+        SetTenantClaims(controller, tenantId, userId,
+            "commerce.online_order.orders.access commerce.online_order.orders.view");
+
+        var result = await controller.List(
+            outletId, "EC-1001", "NEW", "collectionTime", "asc", 1, 4,
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(tenantId, detailService.ListContext?.TenantId);
+        Assert.Equal(userId, detailService.ListContext?.UserId);
+        Assert.Equal(outletId, detailService.Query?.OutletId);
+        Assert.Equal(4, detailService.Query?.PageSize);
+    }
+
+    [Fact]
+    public async Task List_WithoutTenantClaims_ReturnsUnauthorizedWithoutCallingService()
+    {
+        var detailService = new FakePosOnlineOrderDetailService();
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), detailService);
+
+        var result = await controller.List(
+            Guid.NewGuid(), null, null, null, null, 1, 4, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Null(detailService.ListContext);
+    }
+
+    [Fact]
     public async Task UpdateStatus_WithTenantClaims_ForwardsContextOrderAndRequest()
     {
         var tenantId = Guid.NewGuid();
@@ -33,6 +68,152 @@ public sealed class ClickCollectOrdersControllerTests
         Assert.Contains("fulfillment.orders.manage", service.Context!.Permissions);
         Assert.Equal(orderId, service.OrderId);
         Assert.Same(request, service.Request);
+    }
+
+    [Fact]
+    public async Task GetDetail_WithTenantClaims_ForwardsCanonicalRouteArguments()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var detailService = new FakePosOnlineOrderDetailService();
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), detailService);
+        SetTenantClaims(controller, tenantId, userId, "commerce.online_order.orders.access commerce.online_order.orders.view");
+
+        var result = await controller.GetDetail(orderId, outletId, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(tenantId, detailService.Context?.TenantId);
+        Assert.Equal(userId, detailService.Context?.UserId);
+        Assert.Equal(outletId, detailService.OutletId);
+        Assert.Equal(orderId, detailService.OrderId);
+    }
+
+    [Fact]
+    public async Task GetDetail_OutletDenied_ReturnsForbidden()
+    {
+        var detailService = new FakePosOnlineOrderDetailService
+        {
+            Result = ApplicationResult<PosOnlineOrderDetailResponse>.Failure(
+                new ApplicationError("online_orders.outlet_access_denied", "Denied."))
+        };
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), detailService);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "commerce.online_order.orders.access commerce.online_order.orders.view");
+
+        var result = await controller.GetDetail(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task StartFulfillment_ForwardsExpectedVersionAndCanonicalArguments()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var startService = new FakePosOnlineOrderStartFulfillmentService();
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), startService: startService);
+        SetTenantClaims(controller, tenantId, userId, "commerce.online_order.fulfilment.start");
+        var request = new PosOnlineOrderStartFulfillmentRequest { ExpectedVersion = 5 };
+
+        var result = await controller.StartFulfillment(orderId, outletId, request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(tenantId, startService.Context?.TenantId);
+        Assert.Equal(userId, startService.Context?.UserId);
+        Assert.Equal(outletId, startService.OutletId);
+        Assert.Equal(orderId, startService.OrderId);
+        Assert.Same(request, startService.Request);
+    }
+
+    [Fact]
+    public async Task StartFulfillment_ConcurrencyConflict_Returns409()
+    {
+        var startService = new FakePosOnlineOrderStartFulfillmentService
+        {
+            Result = ApplicationResult<PosOnlineOrderStartFulfillmentResponse>.Failure(
+                new ApplicationError("online_orders.concurrency_conflict", "Conflict."))
+        };
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), startService: startService);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "commerce.online_order.fulfilment.start");
+
+        var result = await controller.StartFulfillment(
+            Guid.NewGuid(), Guid.NewGuid(),
+            new PosOnlineOrderStartFulfillmentRequest { ExpectedVersion = 5 }, CancellationToken.None);
+
+        var objectResult = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task PickLine_ForwardsExpectedVersionAndCanonicalArguments()
+    {
+        var picking = new FakePosOnlineOrderPickingService();
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), pickingService: picking);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(),
+            "commerce.online_order.orders.access commerce.online_order.picking.pick commerce.online_order.picking.scan");
+        var orderId = Guid.NewGuid();
+        var lineId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var request = new PosOnlineOrderPickLineRequest
+        {
+            Quantity = 1,
+            Barcode = "SKU-1",
+            InputMethod = "SCAN",
+            ExpectedVersion = 4
+        };
+
+        var result = await controller.PickLine(orderId, lineId, outletId, request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(orderId, picking.OrderId);
+        Assert.Equal(lineId, picking.LineId);
+        Assert.Equal(outletId, picking.OutletId);
+        Assert.Equal(4, picking.PickRequest?.ExpectedVersion);
+    }
+
+    [Fact]
+    public async Task PickLine_ConcurrencyConflict_Returns409()
+    {
+        var picking = new FakePosOnlineOrderPickingService
+        {
+            CommandResult = ApplicationResult<PosOnlineOrderPickingCommandResponse>.Failure(
+                new ApplicationError("online_orders.concurrency_conflict", "Conflict."))
+        };
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), pickingService: picking);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(),
+            "commerce.online_order.orders.access commerce.online_order.picking.pick commerce.online_order.picking.manual_entry");
+
+        var result = await controller.PickLine(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            new PosOnlineOrderPickLineRequest { Quantity = 1, InputMethod = "MANUAL", ExpectedVersion = 2 },
+            CancellationToken.None);
+
+        Assert.IsType<ConflictObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task AddPickingNote_ForwardsCanonicalArgumentsAndExpectedVersion()
+    {
+        var picking = new FakePosOnlineOrderPickingService();
+        var controller = CreateController(new FakeClickCollectOrderStatusService(), pickingService: picking);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(),
+            "commerce.online_order.orders.access commerce.online_order.picking.note");
+        var orderId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var request = new PosOnlineOrderPickingNoteRequest { Note = "Shelf checked", ExpectedVersion = 9 };
+
+        var result = await controller.AddPickingNote(
+            orderId, outletId, request, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(orderId, picking.OrderId);
+        Assert.Equal(outletId, picking.OutletId);
+        Assert.Equal("Shelf checked", picking.NoteRequest?.Note);
+        Assert.Equal(9, picking.NoteRequest?.ExpectedVersion);
     }
 
     [Fact]
@@ -124,10 +305,41 @@ public sealed class ClickCollectOrdersControllerTests
             Assert.Single(typeof(ClickCollectOrdersController)
                 .GetMethod(nameof(ClickCollectOrdersController.UpdateStatus))!
                 .GetCustomAttributes<HttpPatchAttribute>()).Template);
+        Assert.Null(Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.List))!
+            .GetCustomAttributes<HttpGetAttribute>()).Template);
+        Assert.Equal(
+            "{orderId:guid}",
+            Assert.Single(typeof(ClickCollectOrdersController)
+                .GetMethod(nameof(ClickCollectOrdersController.GetDetail))!
+                .GetCustomAttributes<HttpGetAttribute>()).Template);
+        Assert.Equal(
+            "{orderId:guid}/fulfilment/start",
+            Assert.Single(typeof(ClickCollectOrdersController)
+                .GetMethod(nameof(ClickCollectOrdersController.StartFulfillment))!
+                .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/picking", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.GetPicking))!
+            .GetCustomAttributes<HttpGetAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/picking/lines/{lineId:guid}/pick", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.PickLine))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/picking/lines/{lineId:guid}/issues", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.ReportPickingIssue))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/picking/notes", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.AddPickingNote))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
     }
 
-    private static ClickCollectOrdersController CreateController(FakeClickCollectOrderStatusService service) =>
-        new(service, new TenantRequestContextFactory())
+    private static ClickCollectOrdersController CreateController(
+        FakeClickCollectOrderStatusService service,
+        FakePosOnlineOrderDetailService? detailService = null,
+        FakePosOnlineOrderStartFulfillmentService? startService = null,
+        FakePosOnlineOrderPickingService? pickingService = null) =>
+        new(service, detailService ?? new FakePosOnlineOrderDetailService(),
+            startService ?? new FakePosOnlineOrderStartFulfillmentService(),
+            pickingService ?? new FakePosOnlineOrderPickingService(), new TenantRequestContextFactory())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -175,6 +387,122 @@ public sealed class ClickCollectOrdersControllerTests
             OrderId = orderId;
             Request = request;
             return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class FakePosOnlineOrderDetailService : IPosOnlineOrderDetailService
+    {
+        public TenantRequestContext? ListContext { get; private set; }
+        public PosOnlineOrderListQuery? Query { get; private set; }
+
+        public Task<ApplicationResult<PosOnlineOrderListResponse>> ListAsync(
+            TenantRequestContext context,
+            PosOnlineOrderListQuery query,
+            CancellationToken cancellationToken)
+        {
+            ListContext = context;
+            Query = query;
+            return Task.FromResult(ApplicationResult<PosOnlineOrderListResponse>.Success(
+                new PosOnlineOrderListResponse(
+                    [], new PosOnlineOrderSummaryResponse(0, 0, 0, 0, 0, 0),
+                    query.Page, query.PageSize, 0, 0, DateTimeOffset.UtcNow)));
+        }
+
+        public ApplicationResult<PosOnlineOrderDetailResponse> Result { get; init; } =
+            ApplicationResult<PosOnlineOrderDetailResponse>.Success(new PosOnlineOrderDetailResponse
+            {
+                Id = Guid.NewGuid(),
+                OrderNumber = "EC-1001",
+                CustomerName = "Customer",
+                OutletId = Guid.NewGuid(),
+                OutletName = "Main Store",
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        public TenantRequestContext? Context { get; private set; }
+        public Guid? OutletId { get; private set; }
+        public Guid? OrderId { get; private set; }
+
+        public Task<ApplicationResult<PosOnlineOrderDetailResponse>> GetAsync(
+            TenantRequestContext context,
+            Guid outletId,
+            Guid orderId,
+            CancellationToken cancellationToken)
+        {
+            Context = context;
+            OutletId = outletId;
+            OrderId = orderId;
+            return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class FakePosOnlineOrderStartFulfillmentService : IPosOnlineOrderStartFulfillmentService
+    {
+        public ApplicationResult<PosOnlineOrderStartFulfillmentResponse> Result { get; init; } =
+            ApplicationResult<PosOnlineOrderStartFulfillmentResponse>.Success(
+                new PosOnlineOrderStartFulfillmentResponse());
+        public TenantRequestContext? Context { get; private set; }
+        public Guid? OutletId { get; private set; }
+        public Guid? OrderId { get; private set; }
+        public PosOnlineOrderStartFulfillmentRequest? Request { get; private set; }
+
+        public Task<ApplicationResult<PosOnlineOrderStartFulfillmentResponse>> StartAsync(
+            TenantRequestContext context,
+            Guid outletId,
+            Guid orderId,
+            PosOnlineOrderStartFulfillmentRequest request,
+            CancellationToken cancellationToken)
+        {
+            Context = context;
+            OutletId = outletId;
+            OrderId = orderId;
+            Request = request;
+            return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class FakePosOnlineOrderPickingService : IPosOnlineOrderPickingService
+    {
+        public ApplicationResult<PosOnlineOrderPickingCommandResponse> CommandResult { get; init; } =
+            ApplicationResult<PosOnlineOrderPickingCommandResponse>.Success(
+                new PosOnlineOrderPickingCommandResponse());
+        public Guid? OutletId { get; private set; }
+        public Guid? OrderId { get; private set; }
+        public Guid? LineId { get; private set; }
+        public PosOnlineOrderPickLineRequest? PickRequest { get; private set; }
+        public PosOnlineOrderPickingNoteRequest? NoteRequest { get; private set; }
+        public ApplicationResult<PosOnlineOrderPickingNoteCommandResponse> NoteResult { get; init; } =
+            ApplicationResult<PosOnlineOrderPickingNoteCommandResponse>.Success(
+                new PosOnlineOrderPickingNoteCommandResponse());
+
+        public Task<ApplicationResult<PosOnlineOrderPickingResponse>> GetAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId, CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosOnlineOrderPickingResponse>.Success(
+                new PosOnlineOrderPickingResponse()));
+
+        public Task<ApplicationResult<PosOnlineOrderPickingCommandResponse>> PickLineAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId, Guid lineId,
+            PosOnlineOrderPickLineRequest request, CancellationToken cancellationToken)
+        {
+            OutletId = outletId;
+            OrderId = orderId;
+            LineId = lineId;
+            PickRequest = request;
+            return Task.FromResult(CommandResult);
+        }
+
+        public Task<ApplicationResult<PosOnlineOrderPickingCommandResponse>> ReportIssueAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId, Guid lineId,
+            PosOnlineOrderPickingIssueRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(CommandResult);
+
+        public Task<ApplicationResult<PosOnlineOrderPickingNoteCommandResponse>> AddNoteAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId,
+            PosOnlineOrderPickingNoteRequest request, CancellationToken cancellationToken)
+        {
+            OutletId = outletId;
+            OrderId = orderId;
+            NoteRequest = request;
+            return Task.FromResult(NoteResult);
         }
     }
 }

@@ -12,6 +12,7 @@ public interface ITenantAdminOnlineStoreService
     Task<ApplicationResult<OnlineStoreActivationResponse>> UpdateActivationAsync(TenantRequestContext context, UpdateOnlineStoreActivationRequest request, CancellationToken cancellationToken);
     Task<ApplicationResult<OnlineStoreIdentityResponse>> GetIdentityAsync(TenantRequestContext context, CancellationToken cancellationToken);
     Task<ApplicationResult<OnlineStoreIdentityResponse>> UpdateIdentityAsync(TenantRequestContext context, UpdateOnlineStoreIdentityRequest request, CancellationToken cancellationToken);
+    Task<ApplicationResult<OnlineStoreCheckoutRulesResponse>> GetCheckoutRulesAsync(TenantRequestContext context, CancellationToken cancellationToken);
     Task<ApplicationResult<OnlineStoreUrlDomainResponse>> GetUrlDomainAsync(TenantRequestContext context, CancellationToken cancellationToken);
     Task<ApplicationResult<OnlineStoreUrlDomainResponse>> UpdateUrlAsync(TenantRequestContext context, UpdateOnlineStoreUrlRequest request, CancellationToken cancellationToken);
     Task<ApplicationResult<IReadOnlyList<OnlineStoreDomainDto>>> ListDomainsAsync(TenantRequestContext context, CancellationToken cancellationToken);

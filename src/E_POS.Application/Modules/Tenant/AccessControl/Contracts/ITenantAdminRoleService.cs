@@ -22,6 +22,10 @@ public interface ITenantAdminRoleService
         TenantRequestContext context,
         CancellationToken cancellationToken);
 
+    Task<ApplicationResult<TenantRoleAssignmentOptionsResponse>> GetAssignmentOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<TenantAdminRoleDetailResponse>> CreateAsync(
         TenantRequestContext context,
         TenantAdminRoleCreateRequest request,

@@ -5,6 +5,7 @@ using E_POS.Api.Controllers;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -29,7 +30,7 @@ public sealed class CustomersControllerTests
                     "ACTIVE"))
         };
         var controller = CreateController(service);
-        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "customers.create");
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), CustomerPermissions.Create);
 
         var result = await controller.Create(
             deviceId,
@@ -66,7 +67,7 @@ public sealed class CustomersControllerTests
                     1))
         };
         var controller = CreateController(service);
-        SetTenantClaims(controller, tenantId, Guid.NewGuid(), "customers.view");
+        SetTenantClaims(controller, tenantId, Guid.NewGuid(), CustomerPermissions.View);
 
         var result = await controller.List(
             deviceId,
@@ -120,7 +121,7 @@ public sealed class CustomersControllerTests
                 new PosCustomerSummaryResponseDto(10, 8, 5, 2, "UTC"))
         };
         var controller = CreateController(service);
-        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "customers.view");
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), CustomerPermissions.View);
 
         var result = await controller.Summary(Guid.NewGuid(), CancellationToken.None);
 
@@ -145,7 +146,11 @@ public sealed class CustomersControllerTests
                     "POS"))
         };
         var controller = CreateController(service);
-        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "customers.update");
+        SetTenantClaims(
+            controller,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CustomerPermissions.Update);
 
         var result = await controller.Update(
             customerId,

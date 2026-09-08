@@ -161,6 +161,57 @@ public sealed class CustomerOrdersAuthPipelineTests : IClassFixture<CustomerOrde
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task OnlineOrdersRoot_WithoutToken_ResolvesAndReturnsUnauthorized()
+    {
+        var response = await _factory.CreateClient().GetAsync(
+            $"/api/v1/tenant/ecommerce/click-collect/orders?outletId={Guid.NewGuid()}&page=1&pageSize=4");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OnlineOrdersRoot_WithAuthorizedTenantJwt_ReturnsCanonicalEnvelope()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = Bearer(CreateTenantToken([
+            "commerce.online_order.orders.access",
+            "commerce.online_order.orders.view"
+        ]));
+
+        var response = await client.GetAsync(
+            $"/api/v1/tenant/ecommerce/click-collect/orders?outletId={Guid.NewGuid()}&page=1&pageSize=4");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, json.GetProperty("data").ValueKind);
+        Assert.Equal(4, json.GetProperty("pagination").GetProperty("pageSize").GetInt32());
+        Assert.True(json.TryGetProperty("summary", out _));
+        Assert.True(json.TryGetProperty("serverTime", out _));
+    }
+
+    [Fact]
+    public async Task OnlineOrderDetail_AndStartRoutes_RemainReachable()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = Bearer(CreateTenantToken([
+            "commerce.online_order.orders.access",
+            "commerce.online_order.orders.view",
+            "commerce.online_order.fulfilment.start"
+        ]));
+        var outletId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        var detail = await client.GetAsync(
+            $"/api/v1/tenant/ecommerce/click-collect/orders/{orderId}?outletId={outletId}");
+        var start = await client.PostAsJsonAsync(
+            $"/api/v1/tenant/ecommerce/click-collect/orders/{orderId}/fulfilment/start?outletId={outletId}",
+            new PosOnlineOrderStartFulfillmentRequest { ExpectedVersion = 1 });
+
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, start.StatusCode);
+    }
+
     private static AuthenticationHeaderValue Bearer(string token) =>
         new("Bearer", token);
 
@@ -257,10 +308,14 @@ public sealed class CustomerOrdersAuthPipelineTests : IClassFixture<CustomerOrde
                 services.RemoveAll<IAuthSessionValidator>();
                 services.RemoveAll<ICustomerOrderService>();
                 services.RemoveAll<IClickCollectOrderStatusService>();
+                services.RemoveAll<IPosOnlineOrderDetailService>();
+                services.RemoveAll<IPosOnlineOrderStartFulfillmentService>();
 
                 services.AddSingleton<IAuthSessionValidator, AlwaysActiveAuthSessionValidator>();
                 services.AddSingleton<ICustomerOrderService, FakeCustomerOrderService>();
                 services.AddSingleton<IClickCollectOrderStatusService, PermissionAwareStatusService>();
+                services.AddSingleton<IPosOnlineOrderDetailService, FakePosOnlineOrderDetailService>();
+                services.AddSingleton<IPosOnlineOrderStartFulfillmentService, FakePosOnlineOrderStartFulfillmentService>();
             });
         }
     }
@@ -344,5 +399,53 @@ public sealed class CustomerOrdersAuthPipelineTests : IClassFixture<CustomerOrde
                     CollectionQrAvailable = true
                 }));
         }
+    }
+
+    private sealed class FakePosOnlineOrderDetailService : IPosOnlineOrderDetailService
+    {
+        public Task<ApplicationResult<PosOnlineOrderListResponse>> ListAsync(
+            TenantRequestContext context,
+            PosOnlineOrderListQuery query,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosOnlineOrderListResponse>.Success(
+                new PosOnlineOrderListResponse(
+                    [], new PosOnlineOrderSummaryResponse(0, 0, 0, 0, 0, 0),
+                    query.Page, query.PageSize, 0, 0, DateTimeOffset.UtcNow)));
+
+        public Task<ApplicationResult<PosOnlineOrderDetailResponse>> GetAsync(
+            TenantRequestContext context,
+            Guid outletId,
+            Guid orderId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosOnlineOrderDetailResponse>.Success(
+                new PosOnlineOrderDetailResponse
+                {
+                    Id = orderId,
+                    OutletId = outletId,
+                    OrderNumber = "EC-1001",
+                    CustomerName = "Customer",
+                    ServerTime = DateTimeOffset.UtcNow
+                }));
+    }
+
+    private sealed class FakePosOnlineOrderStartFulfillmentService : IPosOnlineOrderStartFulfillmentService
+    {
+        public Task<ApplicationResult<PosOnlineOrderStartFulfillmentResponse>> StartAsync(
+            TenantRequestContext context,
+            Guid outletId,
+            Guid orderId,
+            PosOnlineOrderStartFulfillmentRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosOnlineOrderStartFulfillmentResponse>.Success(
+                new PosOnlineOrderStartFulfillmentResponse
+                {
+                    OrderId = orderId,
+                    FulfillmentOrderId = Guid.NewGuid(),
+                    FulfillmentNumber = "FUL-1001",
+                    FulfillmentStatus = "PICKING",
+                    AssignedToTenantUserId = context.UserId,
+                    StartedAt = DateTimeOffset.UtcNow,
+                    FulfillmentVersion = request.ExpectedVersion + 1
+                }));
     }
 }

@@ -34,6 +34,25 @@ public sealed record TenantAdminRoleDetailResponse(
 public sealed record TenantRoleSetupOptionsResponse(
     IReadOnlyList<TenantRoleSetupOptionResponse> Roles);
 
+public sealed record TenantRoleAssignmentOptionsResponse(
+    IReadOnlyList<TenantRoleAssignmentUserOptionResponse> Users,
+    IReadOnlyList<TenantRoleAssignmentOutletOptionResponse> Outlets,
+    bool CanAssignUsers,
+    bool CanAssignOutlets);
+
+public sealed record TenantRoleAssignmentUserOptionResponse(
+    Guid UserId,
+    string FullName,
+    string Email,
+    string? StaffCode,
+    string Status);
+
+public sealed record TenantRoleAssignmentOutletOptionResponse(
+    Guid OutletId,
+    string OutletName,
+    string OutletCode,
+    string Status);
+
 public sealed record TenantRoleSetupOptionResponse(
     Guid RoleId,
     string RoleCode,
@@ -101,7 +120,10 @@ public sealed record TenantPermissionCatalogPermissionResponse(
     bool IsActive,
     string Source,
     bool Assignable = true,
-    string? BlockedReason = null);
+    string? BlockedReason = null,
+    string? ParentCode = null,
+    bool IsSensitive = false,
+    string? SemanticType = null);
 
 public sealed record TenantRolePermissionsResponse(
     Guid RoleId,

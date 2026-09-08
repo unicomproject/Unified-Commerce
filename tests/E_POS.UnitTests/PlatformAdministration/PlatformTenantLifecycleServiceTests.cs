@@ -835,6 +835,32 @@ public sealed class PlatformTenantLifecycleServiceTests
             return Task.CompletedTask;
         }
 
+        public Task ReplaceTenantEntitlementsAsync(
+            Guid tenantId,
+            IReadOnlyList<Guid> enabledFeatureIds,
+            DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            string? revokedReason,
+            string sourceType,
+            string? overrideReason,
+            DateTimeOffset? effectiveFrom,
+            DateTimeOffset? effectiveUntil,
+            CancellationToken cancellationToken)
+        {
+            ReplaceEntitlementsCalled = true;
+            return Task.CompletedTask;
+        }
+
+        public Task RestoreTenantPlanEntitlementsAsync(
+            Guid tenantId,
+            Guid subscriptionPlanId,
+            DateTimeOffset now,
+            Guid? actorPlatformUserId,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task<IReadOnlySet<Guid>> GetIncludedFeatureIdsForPlanAsync(
             Guid planId,
             CancellationToken cancellationToken) =>
@@ -972,6 +998,10 @@ public sealed class PlatformTenantLifecycleServiceTests
             IReadOnlyCollection<Guid> featureIds,
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
+
+        public Task<IReadOnlyList<PlanTechnicalFeatureLookupDto>> GetActiveTenantFeaturesAsync(
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<PlanTechnicalFeatureLookupDto>>([]);
 
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) =>
             throw new NotImplementedException();

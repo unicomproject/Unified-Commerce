@@ -3,6 +3,7 @@ using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Shared.Audit.Entities;
+using E_POS.Domain.Modules.Tenant.AccessControl.Catalog.CashierPos;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
@@ -253,6 +254,8 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
                 row.Permission.IsActive &&
                 row.ModuleStatus == "ACTIVE" &&
                 row.FeatureStatus == "ACTIVE" &&
+                !CashierPosPermissionAssignmentRules.IsPreAuth(row.Permission.PermissionCode) &&
+                !row.Permission.PermissionCode.StartsWith("pre_auth.", StringComparison.OrdinalIgnoreCase) &&
                 !TenantAdminBootstrapPermissionCatalog.IsPlatformOnlyPermission(row.Permission.PermissionCode) &&
                 ActorHasPermission(actorPermissionCodes, row.Permission.PermissionCode) &&
                 HasRequiredEntitlement(
@@ -310,6 +313,8 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
         var enabledFeatureIds = await GetEnabledFeatureIdsAsync(tenantId, now, cancellationToken);
         rows = rows
             .Where(row =>
+                !CashierPosPermissionAssignmentRules.IsPreAuth(row.PermissionCode) &&
+                !row.PermissionCode.StartsWith("pre_auth.", StringComparison.OrdinalIgnoreCase) &&
                 ActorHasPermission(actorPermissionCodes, row.PermissionCode) &&
                 HasRequiredEntitlement(row.PermissionCode, row.FeatureId, row.FeatureCode, row.IsCoreFeature, enabledFeatureIds))
             .ToList();
@@ -350,18 +355,27 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
                         featureGroup.Key.FeatureCode,
                         featureGroup.Key.FeatureSortOrder,
                         IsActiveStatus(featureGroup.Key.FeatureStatus),
-                        featureGroup.Select(row => new TenantPermissionCatalogPermissionResponse(
-                            row.PermissionDefinitionId,
-                            row.PermissionCode,
-                            HumanizePermission(row.PermissionCode, row.ActionType),
-                            row.PermissionDescription,
-                            row.ActionType,
-                            "TENANT",
-                            0,
-                            row.PermissionIsActive,
-                            "TENANT",
-                            true,
-                            null)).ToArray()))
+                        featureGroup.Select(row =>
+                        {
+                            CashierPosPermissionAssignmentRules.TryGetRoleAssignable(
+                                row.PermissionCode,
+                                out var catalogDefinition);
+                            return new TenantPermissionCatalogPermissionResponse(
+                                row.PermissionDefinitionId,
+                                row.PermissionCode,
+                                HumanizePermission(row.PermissionCode, row.ActionType),
+                                row.PermissionDescription,
+                                row.ActionType,
+                                "TENANT",
+                                0,
+                                row.PermissionIsActive,
+                                "TENANT",
+                                true,
+                                null,
+                                catalogDefinition?.ParentCode,
+                                catalogDefinition?.IsSensitive ?? false,
+                                catalogDefinition?.SemanticType.ToString());
+                        }).ToArray()))
                     .ToArray()))
             .ToArray();
 
@@ -956,4 +970,42 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
         string ActionType,
         string? PermissionDescription,
         bool PermissionIsActive);
+    public async Task<TenantRoleAssignmentOptionsResponse> GetAssignmentOptionsAsync(
+        Guid tenantId,
+        bool includeUsers,
+        bool includeOutlets,
+        CancellationToken cancellationToken)
+    {
+        var users = includeUsers
+            ? await _dbContext.TenantUsers
+                .AsNoTracking()
+                .Where(user => user.TenantId == tenantId && user.AccountStatus != TenantUserConstants.StatusInactive)
+                .OrderBy(user => user.FullName)
+                .Select(user => new TenantRoleAssignmentUserOptionResponse(
+                    user.Id,
+                    user.FullName,
+                    user.Email,
+                    user.StaffCode,
+                    user.AccountStatus))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var outlets = includeOutlets
+            ? await _dbContext.Outlets
+                .AsNoTracking()
+                .Where(outlet =>
+                    outlet.TenantId == tenantId &&
+                    outlet.Status != OutletConstants.InactiveStatus &&
+                    outlet.Status != OutletConstants.DeletedStatus)
+                .OrderBy(outlet => outlet.OutletName)
+                .Select(outlet => new TenantRoleAssignmentOutletOptionResponse(
+                    outlet.Id,
+                    outlet.OutletName,
+                    outlet.OutletCode,
+                    outlet.Status))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        return new TenantRoleAssignmentOptionsResponse(users, outlets, includeUsers, includeOutlets);
+    }
 }

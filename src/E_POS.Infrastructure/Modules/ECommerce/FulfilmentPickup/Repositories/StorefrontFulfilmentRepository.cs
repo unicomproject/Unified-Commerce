@@ -144,9 +144,7 @@ public sealed class StorefrontFulfilmentRepository : IStorefrontFulfilmentReposi
 
                     store.IsAvailable = true;
                     store.IsOpen = todayHours != null && todayHours.OpeningTime <= localTimeOnly && todayHours.ClosingTime >= localTimeOnly;
-                    store.ClosingTime = todayHours is null
-                        ? null
-                        : todayHours.ClosingTime.Value.ToString("h:mm tt", CultureInfo.InvariantCulture);
+                    store.ClosingTime = todayHours?.ClosingTime?.ToString("h:mm tt", CultureInfo.InvariantCulture);
                 }
             }
 

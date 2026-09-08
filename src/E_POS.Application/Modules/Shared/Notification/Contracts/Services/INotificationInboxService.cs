@@ -31,4 +31,31 @@ public interface INotificationInboxService
         string? ipAddress,
         string? userAgent,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<NotificationInboxListResponse>> GetTenantUserInboxAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<NotificationUnreadCountResponse>> GetTenantUserUnreadCountAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<NotificationMarkReadResponse>> MarkTenantUserInboxItemReadAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        Guid inboxItemId,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<NotificationMarkAllReadResponse>> MarkAllTenantUserInboxItemsReadAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken);
 }

@@ -133,7 +133,7 @@ public sealed class TaxSetupService : ITaxSetupService
             Id = taxClass.Id,
             TaxClassCode = taxClass.TaxClassCode,
             TaxClassName = taxClass.TaxClassName,
-            TaxType = taxClass.TaxType,
+            TaxType = taxClass.TaxTreatment,
             Description = taxClass.Description,
             IsDefaultTaxClass = taxClass.IsDefaultTaxClass,
             Status = taxClass.Status
@@ -175,7 +175,7 @@ public sealed class TaxSetupService : ITaxSetupService
             Id = x.Id,
             TaxClassCode = x.TaxClassCode,
             TaxClassName = x.TaxClassName,
-            TaxType = x.TaxType,
+            TaxType = x.TaxTreatment,
             Description = x.Description,
             IsDefaultTaxClass = x.IsDefaultTaxClass,
             Status = x.Status
@@ -192,7 +192,7 @@ public sealed class TaxSetupService : ITaxSetupService
 
     public async Task<ApplicationResult<bool>> DeleteTaxClassAsync(TenantRequestContext context, Guid id, CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccess(context, PricingTaxPermissions.TaxClasses.Delete);
+        var accessError = ValidateAccess(context, PricingTaxPermissions.TaxClasses.StatusManage);
         if (accessError is not null) return ApplicationResult<bool>.Failure(accessError);
 
         var taxClass = await _repository.GetTaxClassByIdAsync(context.TenantId, id);
@@ -208,7 +208,7 @@ public sealed class TaxSetupService : ITaxSetupService
 
     public async Task<ApplicationResult<Guid>> CreateTaxRateAsync(TenantRequestContext context, TaxRateCreateRequest request, CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccess(context, PricingTaxPermissions.TaxRates.Create);
+        var accessError = ValidateAccess(context, PricingTaxPermissions.TaxRates.ScheduleManage);
         if (accessError is not null) return ApplicationResult<Guid>.Failure(accessError);
 
         var validationError = _validator.ValidateTaxRateCreate(request);
@@ -231,7 +231,7 @@ public sealed class TaxSetupService : ITaxSetupService
 
     public async Task<ApplicationResult<bool>> UpdateTaxRateAsync(TenantRequestContext context, Guid id, TaxRateUpdateRequest request, CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccess(context, PricingTaxPermissions.TaxRates.Update);
+        var accessError = ValidateAccess(context, PricingTaxPermissions.TaxRates.ScheduleManage);
         if (accessError is not null) return ApplicationResult<bool>.Failure(accessError);
 
         var validationError = _validator.ValidateTaxRateUpdate(request);
@@ -305,7 +305,7 @@ public sealed class TaxSetupService : ITaxSetupService
 
     public async Task<ApplicationResult<bool>> DeleteTaxRateAsync(TenantRequestContext context, Guid id, CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccess(context, PricingTaxPermissions.TaxRates.Delete);
+        var accessError = ValidateAccess(context, PricingTaxPermissions.TaxRates.ScheduleManage);
         if (accessError is not null) return ApplicationResult<bool>.Failure(accessError);
 
         var taxRate = await _repository.GetTaxRateByIdAsync(context.TenantId, id);

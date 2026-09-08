@@ -177,6 +177,7 @@ public sealed class TenantAdminProductServiceTests
             [],
             [],
             [],
+            [],
             []);
         var repository = new FakeTenantAdminProductRepository
         {
@@ -214,6 +215,7 @@ public sealed class TenantAdminProductServiceTests
         {
             CreateOptions = new TenantAdminProductCreateOptionsResponse(
                 [new TenantAdminProductCategoryOptionResponse(Guid.NewGuid(), "FOOD", "Food", null, 1, "Food", true, 1)],
+                [],
                 [],
                 [],
                 [],
@@ -884,6 +886,169 @@ public sealed class TenantAdminProductServiceTests
             Status = ProductConstants.ActiveStatus,
         };
 
+    [Fact]
+    public async Task UpdateDraftAsync_BarcodeSkuContinue_FailsWhenClientOmitsSellableTargets()
+    {
+        var productId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var v1 = Guid.NewGuid();
+        var v2 = Guid.NewGuid();
+        var v3 = Guid.NewGuid();
+        var v4 = Guid.NewGuid();
+        var v5 = Guid.NewGuid();
+        var v6 = Guid.NewGuid();
+
+        var repository = new FakeTenantAdminProductRepository
+        {
+            SetupDto = CreateSetup(productId, categoryId) with { ProductStructure = ProductStructureConstants.Variant },
+            Step5Targets =
+            [
+                new(v1, "V1", null, "k1"),
+                new(v2, "V2", null, "k2"),
+                new(v3, "V3", null, "k3"),
+                new(v4, "V4", null, "k4"),
+                new(v5, "V5", null, "k5"),
+                new(v6, "V6", null, "k6"),
+            ],
+        };
+
+        var result = await CreateService(repository).UpdateDraftAsync(
+            CreateContext([
+                ProductConstants.UpdatePermission,
+                ProductConstants.BarcodesManagePermission,
+                ProductConstants.VariantsManagePermission]),
+            productId,
+            new SaveProductDraftRequest
+            {
+                CurrentSetupStep = ProductWizardStage.BarcodeSku,
+                WizardAction = "SAVE_AND_CONTINUE",
+                AdvanceStep = true,
+                ProductStructure = ProductStructureConstants.Variant,
+                ExpectedRowVersion = 1,
+                BarcodeSkuConfiguration = new BarcodeSkuConfigurationDto(
+                    null,
+                    [
+                        new BarcodeSkuAssignmentDto(v1, "V1", "SKU-1", null, null, "k1"),
+                        new BarcodeSkuAssignmentDto(v2, "V2", "SKU-2", null, null, "k2"),
+                    ]),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.barcode_sku_validation_failed", result.Error.Code);
+        Assert.Contains(result.Error.FieldErrors!, e =>
+            e.Field == "barcodeSkuConfiguration.assignments" &&
+            e.Message.Contains("SKU is required", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task UpdateDraftAsync_BarcodeSku_RejectsForeignProductVariantId()
+    {
+        var productId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var owned = Guid.NewGuid();
+        var foreign = Guid.NewGuid();
+
+        var repository = new FakeTenantAdminProductRepository
+        {
+            SetupDto = CreateSetup(productId, categoryId) with { ProductStructure = ProductStructureConstants.Variant },
+            Step5Targets = [new(owned, "Owned", null, "k1")],
+        };
+
+        var result = await CreateService(repository).UpdateDraftAsync(
+            CreateContext([
+                ProductConstants.UpdatePermission,
+                ProductConstants.BarcodesManagePermission,
+                ProductConstants.VariantsManagePermission]),
+            productId,
+            new SaveProductDraftRequest
+            {
+                CurrentSetupStep = ProductWizardStage.BarcodeSku,
+                WizardAction = "SAVE_DRAFT",
+                ProductStructure = ProductStructureConstants.Variant,
+                ExpectedRowVersion = 1,
+                BarcodeSkuConfiguration = new BarcodeSkuConfigurationDto(
+                    null,
+                    [
+                        new BarcodeSkuAssignmentDto(foreign, "Injected", "SKU-X", null, null, "kx"),
+                    ]),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.barcode_sku_validation_failed", result.Error.Code);
+        Assert.Contains(result.Error.FieldErrors!, e =>
+            e.Field.EndsWith(".productVariantId", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task UpdateDraftAsync_BarcodeSku_DetectsBulkSkuConflicts_CaseSensitive()
+    {
+        var productId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+
+        var repository = new FakeTenantAdminProductRepository
+        {
+            SetupDto = CreateSetup(productId, categoryId) with { ProductStructure = ProductStructureConstants.Variant },
+            Step5Targets = [new(variantId, "Owned", null, "k1")],
+            SkuConflicts = new Dictionary<string, Guid>(StringComparer.Ordinal)
+            {
+                ["SKU-Exact"] = Guid.NewGuid(),
+            },
+        };
+
+        var conflictResult = await CreateService(repository).UpdateDraftAsync(
+            CreateContext([
+                ProductConstants.UpdatePermission,
+                ProductConstants.BarcodesManagePermission,
+                ProductConstants.VariantsManagePermission]),
+            productId,
+            new SaveProductDraftRequest
+            {
+                CurrentSetupStep = ProductWizardStage.BarcodeSku,
+                WizardAction = "SAVE_DRAFT",
+                ProductStructure = ProductStructureConstants.Variant,
+                ExpectedRowVersion = 1,
+                BarcodeSkuConfiguration = new BarcodeSkuConfigurationDto(
+                    null,
+                    [
+                        new BarcodeSkuAssignmentDto(variantId, "Owned", "SKU-Exact", null, null, "k1"),
+                    ]),
+            },
+            CancellationToken.None);
+
+        Assert.True(conflictResult.IsFailure);
+        Assert.Contains(conflictResult.Error.FieldErrors!, e => e.Field.EndsWith(".sku", StringComparison.Ordinal));
+
+        // Different case must not collide under Ordinal.
+        repository.SkuConflicts = new Dictionary<string, Guid>(StringComparer.Ordinal)
+        {
+            ["SKU-Exact"] = Guid.NewGuid(),
+        };
+        var okResult = await CreateService(repository).UpdateDraftAsync(
+            CreateContext([
+                ProductConstants.UpdatePermission,
+                ProductConstants.BarcodesManagePermission,
+                ProductConstants.VariantsManagePermission]),
+            productId,
+            new SaveProductDraftRequest
+            {
+                CurrentSetupStep = ProductWizardStage.BarcodeSku,
+                WizardAction = "SAVE_DRAFT",
+                ProductStructure = ProductStructureConstants.Variant,
+                ExpectedRowVersion = 1,
+                BarcodeSkuConfiguration = new BarcodeSkuConfigurationDto(
+                    null,
+                    [
+                        new BarcodeSkuAssignmentDto(variantId, "Owned", "sku-exact", null, null, "k1"),
+                    ]),
+            },
+            CancellationToken.None);
+
+        Assert.True(okResult.IsSuccess);
+    }
+
     private static ProductSetupWizardDto CreateSetup(Guid productId, Guid categoryId) =>
         new(
             productId,
@@ -911,6 +1076,7 @@ public sealed class TenantAdminProductServiceTests
         new(
             productId,
             "Sample Product",
+            "SKU-001",
             "SKU-001",
             null,
             Guid.NewGuid(),
@@ -971,7 +1137,7 @@ public sealed class TenantAdminProductServiceTests
             new(0, 0, 0, 0);
 
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
-            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], []);
+            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []);
 
         public IReadOnlyDictionary<Guid, string> PrimaryImageUrls { get; init; } =
             new Dictionary<Guid, string>();
@@ -1240,6 +1406,35 @@ public sealed class TenantAdminProductServiceTests
             return Task.FromResult(false);
         }
 
+        public IReadOnlyList<BarcodeSkuVariantTargetProjection> Step5Targets { get; set; } =
+            Array.Empty<BarcodeSkuVariantTargetProjection>();
+
+        public IReadOnlyDictionary<string, Guid> SkuConflicts { get; set; } =
+            new Dictionary<string, Guid>();
+
+        public IReadOnlyDictionary<string, Guid> BarcodeConflicts { get; set; } =
+            new Dictionary<string, Guid>();
+
+        public Task<IReadOnlyDictionary<string, Guid>> FindSkuConflictsAsync(
+            Guid tenantId,
+            IReadOnlyCollection<string> skus,
+            IReadOnlyCollection<Guid> excludeVariantIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(SkuConflicts);
+
+        public Task<IReadOnlyDictionary<string, Guid>> FindBarcodeConflictsAsync(
+            Guid tenantId,
+            IReadOnlyCollection<string> barcodes,
+            IReadOnlyCollection<Guid> excludeVariantIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(BarcodeConflicts);
+
+        public Task<IReadOnlyList<BarcodeSkuVariantTargetProjection>> GetStep5SellableVariantTargetsAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Step5Targets);
+
         public Task<bool> ProductSlugExistsAsync(string slug, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(false);
@@ -1300,6 +1495,13 @@ public sealed class TenantAdminProductServiceTests
         {
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<ApplicationFieldError>> ValidateVariantConfigurationCatalogAsync(
+            Guid tenantId,
+            Guid? productId,
+            VariantConfigurationDto configuration,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ApplicationFieldError>>([]);
 
         public Task<SaveProductDraftResult> CreateProductFromWizardAsync(
             Guid tenantId,

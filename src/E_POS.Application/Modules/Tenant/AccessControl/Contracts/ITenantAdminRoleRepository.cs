@@ -22,6 +22,12 @@ public interface ITenantAdminRoleRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
+    Task<TenantRoleAssignmentOptionsResponse> GetAssignmentOptionsAsync(
+        Guid tenantId,
+        bool includeUsers,
+        bool includeOutlets,
+        CancellationToken cancellationToken);
+
     Task<TenantRole?> GetEditableAsync(
         Guid tenantId,
         Guid roleId,

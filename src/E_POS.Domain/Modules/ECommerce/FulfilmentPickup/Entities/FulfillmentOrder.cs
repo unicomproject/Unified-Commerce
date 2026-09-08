@@ -21,7 +21,43 @@ public class FulfillmentOrder : AuditableEntity
     public string? CancellationReason { get; protected set; }
     public Guid? AssignedToTenantUserId { get; protected set; }
     public string? FulfillmentNote { get; protected set; }
+    public long RowVersion { get; protected set; } = 1;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+
+    protected FulfillmentOrder() { }
+
+    public void StartPicking(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
+    {
+        if (expectedVersion <= 0 || RowVersion != expectedVersion)
+            throw new InvalidOperationException("FULFILLMENT_VERSION_CONFLICT");
+
+        if (FulfillmentStatus is not ("PENDING" or "ALLOCATED"))
+            throw new InvalidOperationException("FULFILLMENT_NOT_STARTABLE");
+
+        FulfillmentStatus = "PICKING";
+        AssignedToTenantUserId = tenantUserId;
+        UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+        RowVersion++;
+    }
+
+    public void RecordPickingMutation(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
+    {
+        if (expectedVersion <= 0 || RowVersion != expectedVersion)
+            throw new InvalidOperationException("FULFILLMENT_VERSION_CONFLICT");
+
+        if (FulfillmentStatus != "PICKING")
+            throw new InvalidOperationException("FULFILLMENT_NOT_PICKABLE");
+
+        UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+        RowVersion++;
+    }
+
+    public void AddPickingNote(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
+    {
+        RecordPickingMutation(tenantUserId, expectedVersion, now);
+    }
 }
 
