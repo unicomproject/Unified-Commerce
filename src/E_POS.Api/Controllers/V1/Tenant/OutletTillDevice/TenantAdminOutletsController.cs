@@ -164,6 +164,23 @@ public sealed class TenantAdminOutletsController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpGet("manager-options")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetManagerOptions(CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "outlet.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminOutletService.GetManagerOptionsAsync(context, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpPut("{id:guid}/status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

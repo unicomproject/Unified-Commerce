@@ -58,6 +58,16 @@ public sealed class TenantAdminRolesController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpGet("roles/assignment-options")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAssignmentOptions(CancellationToken cancellationToken)
+    {
+        if (!TryCreateContext(out var context, out var unauthorized)) return unauthorized!;
+
+        var result = await _tenantAdminRoleService.GetAssignmentOptionsAsync(context, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpPost("roles")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     public async Task<IActionResult> Create([FromBody] TenantAdminRoleCreateRequest request, CancellationToken cancellationToken)
