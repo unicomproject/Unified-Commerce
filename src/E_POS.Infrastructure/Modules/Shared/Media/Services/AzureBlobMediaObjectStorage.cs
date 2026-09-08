@@ -15,9 +15,13 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
         _options = options.Value;
     }
 
-    public bool IsConfigured =>
+    private bool IsAzureConfigured =>
         !string.IsNullOrWhiteSpace(_options.ConnectionString) &&
         !string.IsNullOrWhiteSpace(_options.ContainerName);
+
+    public bool IsConfigured =>
+        IsAzureConfigured ||
+        (_options.AllowLocalFallback && !string.IsNullOrWhiteSpace(_options.ContainerName));
 
     public async Task<MediaObjectUploadResult> UploadAsync(
         MediaObjectUploadRequest request,
@@ -30,6 +34,15 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
 
         var containerName = _options.ContainerName.Trim();
         var storageKey = request.StorageKey.Trim().Replace('\\', '/');
+
+        if (_options.AllowLocalFallback || !IsAzureConfigured)
+        {
+            return await SaveToLocalStorageAsync(
+                containerName,
+                storageKey,
+                request.Content,
+                cancellationToken);
+        }
 
         try
         {
@@ -83,15 +96,24 @@ public sealed class AzureBlobMediaObjectStorage : IMediaObjectStorage
             return;
         }
 
-        try
+        if (_options.AllowLocalFallback)
         {
-            var containerClient = new BlobContainerClient(_options.ConnectionString, containerName.Trim());
-            var blobClient = containerClient.GetBlobClient(storageKey.Trim().Replace('\\', '/'));
-            await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            DeleteFromLocalStorage(containerName, storageKey);
+            return;
         }
-        catch
+
+        if (IsAzureConfigured)
         {
-            // Best-effort cleanup
+            try
+            {
+                var containerClient = new BlobContainerClient(_options.ConnectionString, containerName.Trim());
+                var blobClient = containerClient.GetBlobClient(storageKey.Trim().Replace('\\', '/'));
+                await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            }
+            catch
+            {
+                // Best-effort cleanup
+            }
         }
 
         DeleteFromLocalStorage(containerName, storageKey);

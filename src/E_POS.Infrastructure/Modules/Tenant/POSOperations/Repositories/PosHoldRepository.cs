@@ -373,8 +373,8 @@ public sealed class PosHoldRepository : IPosHoldRepository
             saleId, tenantId, orderNumber, reference, salesChannelId,
             request.CustomerId, customerName, session.TillId, session.SessionId,
             priceList.Id, summary.BillingSummary.Currency, priceList.PriceIncludesTax,
-            summary.BillingSummary.Subtotal, summary.BillingSummary.Discount,
-            summary.BillingSummary.Tax, summary.BillingSummary.TotalPayable,
+            summary.BillingSummary.Subtotal, summary.BillingSummary.Discount ?? 0,
+            summary.BillingSummary.Tax, summary.BillingSummary.TotalPayable ?? 0,
             request.Reason, tenantUserId, businessDate.Value, now);
         _dbContext.SalesOrders.Add(order);
 
@@ -411,7 +411,7 @@ public sealed class PosHoldRepository : IPosHoldRepository
             var unitPrice = lineSubtotal / requestedLine.Qty;
             var ratio = summary.BillingSummary.Subtotal == 0
                 ? 0m : lineSubtotal / summary.BillingSummary.Subtotal;
-            var lineDiscount = summary.BillingSummary.Discount * ratio;
+            var lineDiscount = (summary.BillingSummary.Discount ?? 0) * ratio;
             var lineTax = summary.BillingSummary.Tax * ratio;
             var line = SalesOrderLine.CreateForHeldPosSale(
                 Guid.NewGuid(), tenantId, saleId, lineNumber++, detail.Product.Id,

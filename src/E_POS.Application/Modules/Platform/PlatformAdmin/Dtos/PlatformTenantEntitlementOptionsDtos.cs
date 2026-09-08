@@ -28,5 +28,10 @@ public sealed record PlatformTenantEntitlementCatalogFeatureDto(
     Guid Id,
     string Code,
     string Name,
-    string? Description);
-
+    string? Description,
+    bool PlanIncluded = false,
+    bool IsOverridden = false,
+    string? SourceType = null,
+    string? OverrideReason = null,
+    DateTimeOffset? EffectiveFrom = null,
+    DateTimeOffset? EffectiveUntil = null);

@@ -8,6 +8,7 @@ using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.ECommerce.Storefront.Repositories;
 using E_POS.Infrastructure.Modules.ECommerce.FulfilmentPickup.Repositories;
 using E_POS.Infrastructure.Persistence;
@@ -20,6 +21,96 @@ namespace E_POS.IntegrationTests.ECommerce.Storefront;
 public sealed class StorefrontRepositoryTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 13, 8, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task GetBrandingAsync_ReturnsTenantSettingsAndResolvedTenantMedia()
+    {
+        var tenantId = Guid.NewGuid();
+        var logoId = Guid.NewGuid();
+        var faviconId = Guid.NewGuid();
+        var definitionId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        dbContext.Tenants.Add(TenantEntity.Create(
+            tenantId,
+            "ARENA",
+            "arena-store",
+            "Arena Tenant",
+            TenantStatusConstants.Active,
+            "LKR",
+            "Asia/Colombo",
+            null,
+            null,
+            Now));
+        dbContext.SettingDefinitions.Add(SettingDefinition.Create(
+            definitionId,
+            TenantSettingKeys.OnlineStoreDefaults,
+            "Online store defaults",
+            "object",
+            null,
+            null,
+            true,
+            "ACTIVE",
+            Now));
+        dbContext.TenantSettings.Add(TenantSetting.Create(
+            Guid.NewGuid(),
+            tenantId,
+            definitionId,
+            $$"""
+              {
+                "businessDisplayName": "Arena Store",
+                "storeDescription": "Performance apparel",
+                "branding": {
+                  "logoMediaAssetId": "{{logoId}}",
+                  "faviconMediaAssetId": "{{faviconId}}",
+                  "primaryColor": "#ff6a00",
+                  "secondaryColor": "#0d1b3d"
+                }
+              }
+              """,
+            null,
+            Now));
+        dbContext.MediaAssets.AddRange(
+            CreateMediaAsset(tenantId, logoId, "/uploads/logo.png", "ONLINE_STORE_LOGO"),
+            CreateMediaAsset(tenantId, faviconId, "/uploads/favicon.png", "ONLINE_STORE_FAVICON"));
+        await dbContext.SaveChangesAsync();
+        var resolver = new PrefixMediaReadUrlResolver("https://cdn.example.test");
+        var repository = new StorefrontBrandingRepository(dbContext, resolver);
+
+        var result = await repository.GetBrandingAsync(tenantId, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(tenantId, result.TenantId);
+        Assert.Equal("Arena Store", result.StoreName);
+        Assert.Equal("Performance apparel", result.StoreDescription);
+        Assert.Equal("https://cdn.example.test/uploads/logo.png", result.LogoImageUrl);
+        Assert.Equal("https://cdn.example.test/uploads/favicon.png", result.FaviconImageUrl);
+        Assert.Equal("#FF6A00", result.PrimaryColor);
+        Assert.Equal("#0D1B3D", result.SecondaryColor);
+    }
+
+    [Fact]
+    public async Task GetBrandingAsync_DoesNotExposeInactiveTenant()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        dbContext.Tenants.Add(TenantEntity.Create(
+            tenantId,
+            "CLOSED",
+            "closed-store",
+            "Closed Store",
+            TenantStatusConstants.Suspended,
+            "LKR",
+            "Asia/Colombo",
+            null,
+            null,
+            Now));
+        await dbContext.SaveChangesAsync();
+        var repository = new StorefrontBrandingRepository(dbContext);
+
+        var result = await repository.GetBrandingAsync(tenantId, CancellationToken.None);
+
+        Assert.Null(result);
+    }
 
     [Fact]
     public async Task GetActiveBannersAsync_NormalizesTypeAndReturnsActiveTenantBannersInSortOrder()

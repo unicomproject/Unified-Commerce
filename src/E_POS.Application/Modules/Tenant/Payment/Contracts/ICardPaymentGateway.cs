@@ -93,6 +93,10 @@ public sealed record CardPaymentReversalRequest(
 
 public interface ICardPaymentGateway
 {
+    Task<bool> IsExecutableAsync(
+        PaymentMethodCapabilityContext context,
+        CancellationToken cancellationToken) => Task.FromResult(false);
+
     Task<CardPaymentCaptureResult> CaptureAsync(
         CardPaymentCaptureRequest request,
         CancellationToken cancellationToken);

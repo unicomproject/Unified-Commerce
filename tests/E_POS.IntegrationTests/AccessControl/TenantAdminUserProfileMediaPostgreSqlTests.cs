@@ -3,6 +3,7 @@ using E_POS.Application.Common.Idempotency;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.AccessControl.Services;
@@ -10,6 +11,8 @@ using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
+using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.Shared.Idempotency.Services;
@@ -28,6 +31,110 @@ public sealed class TenantAdminUserProfileMediaPostgreSqlTests
     private const string BaseConnectionString =
         "Host=localhost;Port=5432;Database=UnifiedCommerceDb;Username=postgres;Password=admin";
     private static readonly DateTimeOffset Now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task CreateAndUpdate_ExplicitOutletTillScope_ReactivatesSoftRevokedRows_OnPostgreSql()
+    {
+        if (!await CanConnectAsync())
+        {
+            return;
+        }
+
+        await using var harness = await DisposablePostgresHarness.CreateAsync();
+        var fixture = await SeedFoundationAsync(harness.ConnectionString);
+        Guid createdUserId;
+
+        await using (var db = CreateDb(harness.ConnectionString))
+        {
+            var service = CreateService(db);
+            var createResult = await service.CreateAsync(
+                CreateContext(fixture, [TenantAdminUserPermissions.Create]),
+                CreateRequest(fixture.RoleId, null) with
+                {
+                    Email = $"scoped-{fixture.Suffix}@example.com",
+                    OutletAccessScope = TenantUserAccessScopes.SelectedOutlets,
+                    OutletIds = [fixture.OutletId],
+                    DefaultOutletId = fixture.OutletId,
+                    TillAccessScope = TenantUserAccessScopes.SelectedTills,
+                    TillIds = [fixture.TillId],
+                    DefaultTillId = fixture.TillId,
+                },
+                CancellationToken.None,
+                "explicit-scope-create");
+
+            Assert.True(createResult.IsSuccess);
+            createdUserId = createResult.Value!.UserId;
+        }
+
+        await using (var db = CreateDb(harness.ConnectionString))
+        {
+            var user = await db.TenantUsers.SingleAsync(x => x.Id == createdUserId);
+            Assert.Equal(TenantUserAccessScopes.SelectedOutlets, user.OutletAccessScope);
+            Assert.Equal(fixture.OutletId.ToString(), user.DefaultOutletId);
+            Assert.Equal(TenantUserAccessScopes.SelectedTills, user.TillAccessScope);
+            Assert.Equal(fixture.TillId, user.DefaultTillId);
+            Assert.Single(await db.OutletUserRoles.Where(x => x.TenantUserId == createdUserId && x.RevokedAt == null).ToListAsync());
+            Assert.Single(await db.TenantUserTillAccess.Where(x => x.TenantUserId == createdUserId && x.RevokedAt == null).ToListAsync());
+            Assert.Contains(await db.AuditLogs.ToListAsync(), x => x.Action == "user.outlet_access_assigned");
+            Assert.Contains(await db.AuditLogs.ToListAsync(), x => x.Action == "user.till_access_assigned");
+        }
+
+        await using (var db = CreateDb(harness.ConnectionString))
+        {
+            var service = CreateService(db);
+            var removeScope = await service.UpdateAsync(
+                CreateContext(fixture, [TenantAdminUserPermissions.Update]),
+                createdUserId,
+                UpdateRequest(fixture.RoleId) with
+                {
+                    Email = $"scoped-{fixture.Suffix}@example.com",
+                    OutletAccessScope = TenantUserAccessScopes.NoOutletAccess,
+                    TillAccessScope = TenantUserAccessScopes.NoTillAccess,
+                },
+                CancellationToken.None);
+
+            Assert.True(removeScope.IsSuccess);
+        }
+
+        await using (var db = CreateDb(harness.ConnectionString))
+        {
+            Assert.Empty(await db.OutletUserRoles.Where(x => x.TenantUserId == createdUserId && x.RevokedAt == null).ToListAsync());
+            Assert.Empty(await db.TenantUserTillAccess.Where(x => x.TenantUserId == createdUserId && x.RevokedAt == null).ToListAsync());
+            Assert.Single(await db.TenantUserRoles.Where(x => x.TenantUserId == createdUserId && x.RevokedAt == null).ToListAsync());
+        }
+
+        await using (var db = CreateDb(harness.ConnectionString))
+        {
+            var service = CreateService(db);
+            var restoreScope = await service.UpdateAsync(
+                CreateContext(fixture, [TenantAdminUserPermissions.Update]),
+                createdUserId,
+                UpdateRequest(fixture.RoleId) with
+                {
+                    Email = $"scoped-{fixture.Suffix}@example.com",
+                    OutletAccessScope = TenantUserAccessScopes.SelectedOutlets,
+                    OutletIds = [fixture.OutletId],
+                    DefaultOutletId = fixture.OutletId,
+                    TillAccessScope = TenantUserAccessScopes.SelectedTills,
+                    TillIds = [fixture.TillId],
+                    DefaultTillId = fixture.TillId,
+                },
+                CancellationToken.None);
+
+            Assert.True(restoreScope.IsSuccess);
+        }
+
+        await using (var db = CreateDb(harness.ConnectionString))
+        {
+            var outletRows = await db.OutletUserRoles.Where(x => x.TenantUserId == createdUserId).ToListAsync();
+            var tillRows = await db.TenantUserTillAccess.Where(x => x.TenantUserId == createdUserId).ToListAsync();
+            Assert.Single(outletRows);
+            Assert.Null(outletRows[0].RevokedAt);
+            Assert.Single(tillRows);
+            Assert.Null(tillRows[0].RevokedAt);
+            Assert.Empty(await db.TenantUserRoles.Where(x => x.TenantUserId == createdUserId && x.RevokedAt == null).ToListAsync());
+        }
+    }
 
     [Fact]
     public async Task CreateUpdateAndRemove_ProfileMedia_UsesMediaAssetLifecycleAndSafeAudits_OnPostgreSql()
@@ -152,6 +259,7 @@ public sealed class TenantAdminUserProfileMediaPostgreSqlTests
             new TenantAdminUserRepository(db),
             new FixedDateTimeProvider(Now),
             new ThrowingPasswordHashService(),
+            new PlatformPasswordPolicyValidator(),
             new AllowingTenantResourceLimitGuard(),
             new TenantUserStaffCodeService(db),
             new FakeInvitationTokenService(),
@@ -259,6 +367,34 @@ public sealed class TenantAdminUserProfileMediaPostgreSqlTests
             null,
             Now,
             staffCode: $"USR-{Now:yyyy}-99999"));
+        db.Outlets.Add(Outlet.Create(
+            fixture.OutletId,
+            fixture.TenantId,
+            "Scoped Outlet",
+            $"OUT-{fixture.Suffix}",
+            OutletConstants.ActiveStatus,
+            OutletConstants.StoreOutletType,
+            "UTC",
+            true,
+            null,
+            null,
+            null,
+            Now));
+        db.Tills.Add(Till.Create(
+            fixture.TillId,
+            fixture.TenantId,
+            fixture.OutletId,
+            "Scoped Till",
+            "Front Counter",
+            1,
+            $"TILL-{fixture.Suffix}",
+            TillConstants.StandardTillType,
+            0m,
+            "LKR",
+            true,
+            TillConstants.ActiveStatus,
+            fixture.ActorUserId,
+            Now));
 
         await db.SaveChangesAsync();
         return fixture;
@@ -345,12 +481,26 @@ public sealed class TenantAdminUserProfileMediaPostgreSqlTests
         }
     }
 
-    private sealed record FixtureIds(Guid TenantId, Guid OtherTenantId, Guid RoleId, Guid ActorUserId, string Suffix)
+    private sealed record FixtureIds(
+        Guid TenantId,
+        Guid OtherTenantId,
+        Guid RoleId,
+        Guid ActorUserId,
+        Guid OutletId,
+        Guid TillId,
+        string Suffix)
     {
         public static FixtureIds Create()
         {
             var suffix = Guid.NewGuid().ToString("N")[..10];
-            return new FixtureIds(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), suffix);
+            return new FixtureIds(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                suffix);
         }
     }
 

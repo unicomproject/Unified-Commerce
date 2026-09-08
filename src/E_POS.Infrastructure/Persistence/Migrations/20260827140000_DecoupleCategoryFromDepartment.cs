@@ -22,6 +22,10 @@ public partial class DecoupleCategoryFromDepartment : Migration
             name: "fk_categories_parent_category_id_categories",
             table: "categories");
 
+        migrationBuilder.DropForeignKey(
+            name: "fk_discount_policy_targets_category_id_categories",
+            table: "discount_policy_targets");
+
         migrationBuilder.Sql("""ALTER TABLE categories DROP CONSTRAINT IF EXISTS "AK_categories_tenant_id_id";""");
 
         migrationBuilder.DropIndex(
@@ -92,6 +96,14 @@ public partial class DecoupleCategoryFromDepartment : Migration
             name: "fk_categories_tenant_parent_category",
             table: "categories",
             columns: ["tenant_id", "parent_category_id"],
+            principalTable: "categories",
+            principalColumns: ["tenant_id", "id"],
+            onDelete: ReferentialAction.Restrict);
+
+        migrationBuilder.AddForeignKey(
+            name: "fk_discount_policy_targets_category_id_categories",
+            table: "discount_policy_targets",
+            columns: ["tenant_id", "category_id"],
             principalTable: "categories",
             principalColumns: ["tenant_id", "id"],
             onDelete: ReferentialAction.Restrict);

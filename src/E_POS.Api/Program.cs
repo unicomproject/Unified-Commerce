@@ -3,6 +3,7 @@ using System.Text;
 using E_POS.Api.Common;
 using E_POS.Api.Extensions;
 using E_POS.Api.Middleware;
+using E_POS.Api.Realtime;
 using E_POS.Application;
 using Microsoft.EntityFrameworkCore;
 using E_POS.Application.Common.Security;
@@ -43,7 +44,8 @@ builder.Services.AddCors(options =>
         }
         else if (builder.Environment.IsDevelopment())
         {
-            policy.SetIsOriginAllowed(IsDevelopmentOrigin);
+            var hostedStoreDomain = builder.Configuration["OnlineStoreSetup:HostedDomain"];
+            policy.SetIsOriginAllowed(origin => IsDevelopmentOrigin(origin, hostedStoreDomain));
         }
 
         policy.AllowAnyMethod()
@@ -100,6 +102,21 @@ builder.Services
 
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                // WebSocket handshakes cannot carry an Authorization header, so the notifications
+                // socket passes its access token via the query string instead.
+                if (NotificationWebSocketEndpoint.IsWebSocketNotificationsPath(context.HttpContext.Request.Path))
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(accessToken))
+                    {
+                        context.Token = accessToken;
+                    }
+                }
+
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 if (context.Principal is null)
@@ -202,11 +219,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseWebSockets();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapNotificationWebSocket();
 
 app.MapGet("/api/v1/health", () =>
 {
@@ -226,7 +245,7 @@ await DevelopmentTenantRoleAccessTestAccountSeedHost.RunIfDevelopmentAsync(app);
 
 app.Run();
 
-static bool IsDevelopmentOrigin(string origin)
+static bool IsDevelopmentOrigin(string origin, string? hostedStoreDomain)
 {
     if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
         return false;
@@ -234,6 +253,13 @@ static bool IsDevelopmentOrigin(string origin)
     var host = uri.Host;
     if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    var normalizedHostedDomain = hostedStoreDomain?.Trim().Trim('.');
+    if (!string.IsNullOrWhiteSpace(normalizedHostedDomain) &&
+        host.EndsWith($".{normalizedHostedDomain}", StringComparison.OrdinalIgnoreCase))
     {
         return true;
     }

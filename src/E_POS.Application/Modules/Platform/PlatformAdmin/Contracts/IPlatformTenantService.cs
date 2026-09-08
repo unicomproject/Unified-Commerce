@@ -52,6 +52,25 @@ public interface IPlatformTenantRepository
         string? revokedReason,
         CancellationToken cancellationToken);
 
+    Task ReplaceTenantEntitlementsAsync(
+        Guid tenantId,
+        IReadOnlyList<Guid> enabledFeatureIds,
+        DateTimeOffset now,
+        Guid? actorPlatformUserId,
+        string? revokedReason,
+        string sourceType,
+        string? overrideReason,
+        DateTimeOffset? effectiveFrom,
+        DateTimeOffset? effectiveUntil,
+        CancellationToken cancellationToken);
+
+    Task RestoreTenantPlanEntitlementsAsync(
+        Guid tenantId,
+        Guid subscriptionPlanId,
+        DateTimeOffset now,
+        Guid? actorPlatformUserId,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlySet<Guid>> GetIncludedFeatureIdsForPlanAsync(
         Guid planId,
         CancellationToken cancellationToken);
@@ -66,6 +85,8 @@ public interface IPlatformTenantRepository
     Task<bool> TenantUserEmailExistsAsync(string email, CancellationToken cancellationToken);
 
     Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken);
+
+    Task MarkTenantAdminInviteSentAsync(Guid inviteId, DateTimeOffset sentAt, CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>
     /// Returns active permission definition IDs keyed by permission code for the requested codes.
@@ -172,6 +193,11 @@ public interface IPlatformTenantService
     Task<ApplicationResult<PlatformTenantDetailResponse>> UpdateEntitlementsAsync(
         Guid tenantId,
         UpdatePlatformTenantEntitlementsRequest request,
+        Guid platformUserId,
+        CancellationToken cancellationToken);
+
+    Task<ApplicationResult<PlatformTenantDetailResponse>> RestoreEntitlementsToPlanAsync(
+        Guid tenantId,
         Guid platformUserId,
         CancellationToken cancellationToken);
 

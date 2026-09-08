@@ -14,7 +14,25 @@ public sealed record OnlineStoreOverviewResponse(
     int TotalSteps,
     int SetupProgressPercent,
     IReadOnlyList<OnlineStoreSetupStepDto> Steps,
-    OnlineStoreReadinessResponse Readiness);
+    OnlineStoreReadinessResponse Readiness,
+    OnlineStoreDomainSummary Domain,
+    OnlineStoreSectionSummary Branding,
+    OnlineStoreSectionSummary ContactSupport,
+    OnlineStoreClickCollectSummary ClickCollect,
+    OnlineStoreCatalogOverview Catalog,
+    OnlineStorePolicySummary Policies,
+    string CustomerAccountMode,
+    bool EmailVerificationRequired,
+    string PaymentMode,
+    string NotificationsStatus,
+    IReadOnlyList<OnlineStoreNextActionDto> NextActions);
+
+public sealed record OnlineStoreDomainSummary(bool Configured, string? Domain, string? DnsStatus, string? SslStatus, bool IsPrimary);
+public sealed record OnlineStoreSectionSummary(string Status);
+public sealed record OnlineStoreClickCollectSummary(bool Enabled, int EligibleOutletCount, string Status);
+public sealed record OnlineStoreCatalogOverview(int TotalProducts, int OnlineVisibleProducts);
+public sealed record OnlineStorePolicySummary(int RequiredCount, int PublishedRequiredCount, string Status);
+public sealed record OnlineStoreNextActionDto(string Code, int Step, bool Blocking);
 
 public sealed record OnlineStoreReadinessResponse(
     bool CanPublish,
@@ -26,9 +44,22 @@ public sealed record OnlineStoreActivationResponse(
     string StoreStatus,
     string ChannelStatus,
     string Visibility,
-    IReadOnlyList<OnlineStoreEntitlementDto> Entitlements);
+    IReadOnlyList<OnlineStoreEntitlementDto> Entitlements,
+    string ReleaseScope,
+    string CheckoutMode,
+    bool EmailVerificationRequired,
+    string PaymentMode,
+    string NotificationsStatus,
+    bool PrivateUntilPublished,
+    IReadOnlyList<OnlineStoreActivationReadinessItemDto> Readiness);
 
 public sealed record OnlineStoreEntitlementDto(string FeatureCode, string Status);
+
+public sealed record OnlineStoreActivationReadinessItemDto(
+    string Code,
+    string Label,
+    string Status,
+    string Message);
 
 public sealed record UpdateOnlineStoreActivationRequest(bool SetupEnabled);
 
@@ -50,6 +81,20 @@ public sealed record UpdateOnlineStoreIdentityRequest(
     string? StoreEmail,
     string? StorePhone,
     string? SupportTagline);
+
+public sealed record OnlineStoreCheckoutRulesResponse(
+    string Release,
+    OnlineStoreCustomerAccountRuleDto CustomerAccount,
+    OnlineStoreGuestCheckoutRuleDto GuestCheckout,
+    OnlineStoreEmailVerificationRuleDto EmailVerification,
+    OnlineStoreFulfilmentRuleDto Fulfilment,
+    OnlineStorePaymentRuleDto Payment);
+
+public sealed record OnlineStoreCustomerAccountRuleDto(bool RegistrationRequired, string Mode, string Label);
+public sealed record OnlineStoreGuestCheckoutRuleDto(bool Available, string Mode, string Label);
+public sealed record OnlineStoreEmailVerificationRuleDto(bool Required, string Mode, string Label);
+public sealed record OnlineStoreFulfilmentRuleDto(string Mode, string Label, bool FeatureEnabled, bool Configured);
+public sealed record OnlineStorePaymentRuleDto(string Mode, string Label);
 
 public sealed record OnlineStoreUrlDomainResponse(string? StoreSlug, string? HostedUrl, IReadOnlyList<OnlineStoreDomainDto> Domains);
 
@@ -78,7 +123,9 @@ public sealed record OnlineStoreBrandingResponse(
     Guid? FaviconMediaAssetId,
     string PrimaryColor,
     string SecondaryColor,
-    IReadOnlyList<OnlineStoreBannerDto> Banners);
+    IReadOnlyList<OnlineStoreBannerDto> Banners,
+    string? LogoImageUrl = null,
+    string? FaviconImageUrl = null);
 
 public sealed record UpdateOnlineStoreBrandingRequest(
     Guid? LogoMediaAssetId,
@@ -157,7 +204,9 @@ public sealed record OnlineStoreCollectionOutletDto(
     int? PreparationLeadMinutes,
     int? PickupWindowMinutes,
     string? CutoffTime,
-    string Status);
+    string Status,
+    bool Eligible,
+    IReadOnlyList<string> BlockingReasons);
 
 public sealed record UpsertCollectionOutletRequest(int? PreparationLeadMinutes, int? PickupWindowMinutes, string? CutoffTime, string Status);
 
@@ -219,4 +268,6 @@ public sealed record OnlineStorePublishResponse(
     string StoreStatus,
     string ChannelStatus,
     DateTimeOffset PublishedAt,
-    OnlineStoreReadinessResponse Readiness);
+    OnlineStoreReadinessResponse Readiness,
+    string? HostedUrl,
+    string? PrimaryDomain);

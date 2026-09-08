@@ -70,6 +70,35 @@ public interface INotificationRepository
         string? userAgent,
         CancellationToken cancellationToken);
 
+    Task<NotificationInboxQueryResult> GetTenantUserInboxAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    Task<int> GetTenantUserUnreadCountAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        CancellationToken cancellationToken);
+
+    Task<NotificationInboxItemProjection?> MarkTenantUserInboxItemReadAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        Guid inboxItemId,
+        DateTimeOffset now,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken);
+
+    Task<int> MarkAllTenantUserInboxItemsReadAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        DateTimeOffset now,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 

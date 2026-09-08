@@ -40,17 +40,20 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
     private readonly IPlatformPermissionRepository _permissionRepository;
     private readonly IPlatformPermissionChecker _permissionChecker;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IPlanBusinessCapabilityCatalogService _planCapabilityCatalogService;
 
     public PlatformSubscriptionPlanService(
         IPlatformSubscriptionPlanRepository repository,
         IPlatformPermissionRepository permissionRepository,
         IPlatformPermissionChecker permissionChecker,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IPlanBusinessCapabilityCatalogService planCapabilityCatalogService)
     {
         _repository = repository;
         _permissionRepository = permissionRepository;
         _permissionChecker = permissionChecker;
         _dateTimeProvider = dateTimeProvider;
+        _planCapabilityCatalogService = planCapabilityCatalogService;
     }
 
     public async Task<ApplicationResult<SubscriptionPlanListResponse>> GetPlansAsync(
@@ -78,7 +81,9 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
         }
 
         var catalog = await _repository.GetCatalogAsync(cancellationToken);
-        return ApplicationResult<SubscriptionPlanCatalogResponse>.Success(catalog);
+        var businessModules = await _planCapabilityCatalogService.GetPlanBusinessModulesAsync(null, cancellationToken);
+        var enrichedCatalog = catalog with { BusinessModules = businessModules };
+        return ApplicationResult<SubscriptionPlanCatalogResponse>.Success(enrichedCatalog);
     }
 
     public async Task<ApplicationResult<SubscriptionPlanDetailResponse>> GetPlanDetailAsync(
@@ -100,6 +105,14 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
         {
             return ApplicationResult<SubscriptionPlanDetailResponse>.Failure(NotFound);
         }
+
+        var selectedFeatureIds = response.Modules
+            .SelectMany(m => m.Features)
+            .Select(f => f.Id)
+            .ToList();
+
+        var businessModules = await _planCapabilityCatalogService.GetPlanBusinessModulesAsync(selectedFeatureIds, cancellationToken);
+        response = response with { BusinessModules = businessModules };
 
         return ApplicationResult<SubscriptionPlanDetailResponse>.Success(response);
     }
@@ -173,6 +186,16 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
             platformUserId);
 
         await _repository.AddPlanAsync(plan, cancellationToken);
+
+        var mandatoryCoreFeatureIds = await _planCapabilityCatalogService.GetMandatoryCoreFeatureIdsAsync(cancellationToken);
+        if (mandatoryCoreFeatureIds.Count > 0)
+        {
+            await _repository.ReplacePlanFeaturesAsync(
+                plan.Id,
+                mandatoryCoreFeatureIds.ToList(),
+                now,
+                cancellationToken);
+        }
 
         await _repository.UpsertLegacyPlanLimitsAsync(
             plan.Id,
@@ -323,9 +346,12 @@ public sealed class PlatformSubscriptionPlanService : IPlatformSubscriptionPlanS
                 });
         }
 
+        var mandatoryCoreFeatureIds = await _planCapabilityCatalogService.GetMandatoryCoreFeatureIdsAsync(cancellationToken);
+        var finalFeatureIds = activeFeatureIds.Union(mandatoryCoreFeatureIds).Distinct().ToList();
+
         await _repository.ReplacePlanFeaturesAsync(
             planId,
-            activeFeatureIds.ToList(),
+            finalFeatureIds,
             _dateTimeProvider.UtcNow,
             cancellationToken);
 

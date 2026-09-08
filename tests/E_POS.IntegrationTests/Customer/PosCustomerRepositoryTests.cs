@@ -91,6 +91,31 @@ public sealed class PosCustomerRepositoryTests
     }
 
     [Fact]
+    public async Task ListAsync_WhenSearchIsAValidPhone_ReturnsOnlyExactNormalizedPhone()
+    {
+        var tenantId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        dbContext.Customers.Add(CreateCustomer(
+            tenantId, "CUS-001", "Exact", "ACTIVE", phone: "+94 77-000-0001"));
+        dbContext.Customers.Add(CreateCustomer(
+            tenantId, "CUS-002", "Partial", "ACTIVE", phone: "+94 77-000-00010"));
+        await dbContext.SaveChangesAsync();
+
+        var result = await new PosCustomerRepository(dbContext).ListAsync(
+            tenantId,
+            "+94 (77) 000-0001",
+            "ACTIVE",
+            null,
+            1,
+            20,
+            CancellationToken.None);
+
+        var customer = Assert.Single(result.Items);
+        Assert.Equal("Exact", customer.FullName);
+        Assert.Equal("+94770000001", customer.Phone);
+    }
+
+    [Fact]
     public async Task GetOrdersAsync_ReturnsOutletAndTillNamesFromExistingRelationships()
     {
         var now = DateTimeOffset.UtcNow;
@@ -126,7 +151,8 @@ public sealed class PosCustomerRepositoryTests
         string customerCode,
         string name,
         string status,
-        DateTimeOffset? createdAt = null)
+        DateTimeOffset? createdAt = null,
+        string phone = "+94770000000")
     {
         var created = createdAt ?? DateTimeOffset.UtcNow;
         var customer = new CustomerEntity();
@@ -134,8 +160,8 @@ public sealed class PosCustomerRepositoryTests
         Set(customer, "TenantId", tenantId);
         Set(customer, "CustomerCode", customerCode);
         Set(customer, "Name", name);
-        Set(customer, "Phone", "+94770000000");
-        Set(customer, "NormalizedPhone", "+94770000000");
+        Set(customer, "Phone", CustomerEntity.NormalizePhone(phone));
+        Set(customer, "NormalizedPhone", CustomerEntity.NormalizePhone(phone));
         Set(customer, "SourceType", "POS");
         Set(customer, "Status", status);
         Set(customer, "CreatedAt", created);

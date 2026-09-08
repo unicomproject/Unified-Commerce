@@ -1,4 +1,6 @@
 using System.Reflection;
+using E_POS.Application.Modules.Tenant.OnlineStoreSetup;
+using E_POS.Application.Modules.Tenant.OnlineStoreSetup.Dtos;
 using E_POS.Api.Controllers.V1.Tenant.ECommerce;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -25,6 +27,7 @@ public sealed class TenantAdminOnlineStoreControllerSurfaceTests
     [InlineData(nameof(TenantAdminOnlineStoreController.UpdateActivation), "activation")]
     [InlineData(nameof(TenantAdminOnlineStoreController.GetIdentity), "identity")]
     [InlineData(nameof(TenantAdminOnlineStoreController.UpdateIdentity), "identity")]
+    [InlineData(nameof(TenantAdminOnlineStoreController.GetCheckoutRules), "checkout-rules")]
     [InlineData(nameof(TenantAdminOnlineStoreController.GetUrlDomain), "url-domain")]
     [InlineData(nameof(TenantAdminOnlineStoreController.UpdateUrl), "url")]
     [InlineData(nameof(TenantAdminOnlineStoreController.ListDomains), "domains")]
@@ -125,6 +128,66 @@ public sealed class TenantAdminOnlineStoreControllerSurfaceTests
         Assert.Contains("string.Equals(x.DomainType, \"CUSTOM\", StringComparison.OrdinalIgnoreCase)", source);
         Assert.Contains("primaryCustomDomain.VerificationStatus == \"VERIFIED\" && primaryCustomDomain.SslStatus == \"ACTIVE\"", source);
         Assert.Contains("Primary custom domain verification or SSL is incomplete.", source);
+    }
+
+    [Fact]
+    public void Activation_Response_ExposesReleaseConfigurationAndReadinessContract()
+    {
+        var properties = typeof(OnlineStoreActivationResponse)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains(nameof(OnlineStoreActivationResponse.ReleaseScope), properties);
+        Assert.Contains(nameof(OnlineStoreActivationResponse.CheckoutMode), properties);
+        Assert.Contains(nameof(OnlineStoreActivationResponse.EmailVerificationRequired), properties);
+        Assert.Contains(nameof(OnlineStoreActivationResponse.PaymentMode), properties);
+        Assert.Contains(nameof(OnlineStoreActivationResponse.NotificationsStatus), properties);
+        Assert.Contains(nameof(OnlineStoreActivationResponse.PrivateUntilPublished), properties);
+        Assert.Contains(nameof(OnlineStoreActivationResponse.Readiness), properties);
+
+        Assert.Equal("CLICK_COLLECT_ONLY", OnlineStoreReleaseOnePolicy.ActivationReleaseScope);
+        Assert.Equal("REGISTRATION_REQUIRED", OnlineStoreReleaseOnePolicy.CustomerAccountMode);
+        Assert.Equal("PAY_AT_PICKUP", OnlineStoreReleaseOnePolicy.PaymentMode);
+        var source = ReadOnlineStoreServiceSource();
+        Assert.Contains("\"collection_outlet_requirement\"", source);
+    }
+
+    [Fact]
+    public void CheckoutRules_Response_ExposesTypedReleaseOneContract()
+    {
+        var properties = typeof(OnlineStoreCheckoutRulesResponse)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains(nameof(OnlineStoreCheckoutRulesResponse.Release), properties);
+        Assert.Contains(nameof(OnlineStoreCheckoutRulesResponse.CustomerAccount), properties);
+        Assert.Contains(nameof(OnlineStoreCheckoutRulesResponse.GuestCheckout), properties);
+        Assert.Contains(nameof(OnlineStoreCheckoutRulesResponse.EmailVerification), properties);
+        Assert.Contains(nameof(OnlineStoreCheckoutRulesResponse.Fulfilment), properties);
+        Assert.Contains(nameof(OnlineStoreCheckoutRulesResponse.Payment), properties);
+    }
+
+    [Fact]
+    public void Overview_Response_ExposesEveryDashboardSectionContract()
+    {
+        var properties = typeof(OnlineStoreOverviewResponse)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.Domain), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.Branding), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.ContactSupport), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.ClickCollect), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.Catalog), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.Policies), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.CustomerAccountMode), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.EmailVerificationRequired), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.PaymentMode), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.NotificationsStatus), properties);
+        Assert.Contains(nameof(OnlineStoreOverviewResponse.NextActions), properties);
     }
 
     private static string ReadOnlineStoreServiceSource() => File.ReadAllText(

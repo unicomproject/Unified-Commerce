@@ -51,12 +51,12 @@ public sealed record PosCheckoutSummaryRequestDto(
 public sealed record PosCheckoutBillingSummaryDto(
     int ItemCount,
     int Subtotal,
-    int Discount,
+    int? Discount,
     int Tax,
-    int TotalPayable,
+    int? TotalPayable,
     string Currency,
-    int AutomaticDiscount = 0,
-    int ManualDiscount = 0);
+    int? AutomaticDiscount = 0,
+    int? ManualDiscount = 0);
 
 public sealed record PosCheckoutSaleDetailsDto(
     string SaleType,
@@ -101,10 +101,10 @@ public sealed record PosCheckoutStartPaymentLineResponseDto(
 
 public sealed record PosReceiptTenderLineDto(
     Guid PaymentId,
-    string MethodCode,
-    string MethodName,
+    string? MethodCode,
+    string? MethodName,
     string MethodType,
-    int Amount,
+    int? Amount,
     int? AmountTendered,
     int? ChangeAmount,
     string Currency,
@@ -146,12 +146,12 @@ public sealed record PosCheckoutStartPaymentResponseDto(
     string ReceiptNumber,
     string BarcodeValue,
     int Subtotal,
-    int DiscountTotal,
+    int? DiscountTotal,
     int TaxTotal,
-    int GrandTotal,
-    int CashReceived,
-    int ChangeDue,
-    string PaymentMethod,
+    int? GrandTotal,
+    int? CashReceived,
+    int? ChangeDue,
+    string? PaymentMethod,
     string Currency,
     string SaleStatus,
     string NextAction,

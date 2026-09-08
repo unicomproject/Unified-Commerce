@@ -21,7 +21,7 @@ public sealed record PosCustomerListItemResponseDto(
     string? SourceType = null,
     DateTimeOffset? JoinedAt = null,
     int TotalOrderCount = 0,
-    decimal TotalSpentAmount = 0,
+    decimal? TotalSpentAmount = 0,
     string? CurrencyCode = null,
     DateTimeOffset? LastPurchaseAt = null,
     bool IsMixedCurrencySpend = false);
@@ -44,7 +44,7 @@ public sealed record PosCustomerOrderItemDto(
     Guid OrderId,
     string OrderNumber,
     DateTimeOffset OrderDate,
-    decimal TotalAmount,
+    decimal? TotalAmount,
     string CurrencyCode,
     string Status,
     string? OutletDisplayName,

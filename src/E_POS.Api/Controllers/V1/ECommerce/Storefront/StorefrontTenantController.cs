@@ -17,14 +17,28 @@ public class StorefrontTenantController : ControllerBase
     [HttpGet("resolve")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ResolveTenant([FromQuery] string slug, CancellationToken cancellationToken)
+    public async Task<IActionResult> ResolveTenant(
+        [FromQuery] string? slug = null,
+        CancellationToken cancellationToken = default,
+        [FromQuery] string? host = null)
     {
-        if (string.IsNullOrWhiteSpace(slug))
+        if (string.IsNullOrWhiteSpace(slug) && string.IsNullOrWhiteSpace(host))
         {
-            return BadRequest(new { message = "Tenant slug is required." });
+            return BadRequest(new { message = "Tenant slug or host is required." });
         }
 
-        var result = await _storefrontTenantService.ResolveTenantAsync(slug, cancellationToken);
+        (Guid? TenantId, string? BaseCurrencyCode, string? StoreName, string? LogoUrl) result;
+        if (!string.IsNullOrWhiteSpace(host))
+        {
+            var hostResult = await _storefrontTenantService.ResolveTenantByHostAsync(
+                NormalizeHost(host),
+                cancellationToken);
+            result = (hostResult.TenantId, hostResult.BaseCurrencyCode, null, null);
+        }
+        else
+        {
+            result = await _storefrontTenantService.ResolveTenantAsync(slug!, cancellationToken);
+        }
 
         if (result.TenantId == null)
         {
@@ -32,5 +46,19 @@ public class StorefrontTenantController : ControllerBase
         }
 
         return Ok(new { tenantId = result.TenantId, currencyCode = result.BaseCurrencyCode, storeName = result.StoreName, logoUrl = result.LogoUrl });
+    }
+
+    private static string NormalizeHost(string host)
+    {
+        var normalized = host.Trim();
+        if (Uri.TryCreate(
+                normalized.Contains("://", StringComparison.Ordinal) ? normalized : $"https://{normalized}",
+                UriKind.Absolute,
+                out var uri))
+        {
+            return uri.IdnHost.TrimEnd('.').ToLowerInvariant();
+        }
+
+        return normalized.Split(':', 2)[0].TrimEnd('.').ToLowerInvariant();
     }
 }

@@ -8,4 +8,5 @@ public sealed class AzureBlobStorageOptions
     public string ContainerName { get; set; } = "tenant-media";
     public bool CreateContainerIfNotExists { get; set; } = true;
     public string? PublicBaseUrl { get; set; }
+    public bool AllowLocalFallback { get; set; }
 }

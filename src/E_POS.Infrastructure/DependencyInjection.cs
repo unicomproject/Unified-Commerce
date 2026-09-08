@@ -22,8 +22,11 @@ using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.Payment.Contracts;
+using E_POS.Application.Modules.Tenant.Payment.Services;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
+using E_POS.Infrastructure.Modules.Shared.Realtime;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Infrastructure.Common;
@@ -31,6 +34,7 @@ using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Integrations.Google;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
@@ -38,7 +42,6 @@ using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
-using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Application.Common.Email;
 using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
@@ -112,6 +115,18 @@ public static class DependencyInjection
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.AddOptions<AzureBlobStorageOptions>()
             .Bind(configuration.GetSection(AzureBlobStorageOptions.SectionName))
+            .Validate(options =>
+            {
+                if (options.AllowLocalFallback)
+                    return !string.IsNullOrWhiteSpace(options.ContainerName);
+                if (string.IsNullOrWhiteSpace(options.ConnectionString))
+                    return false;
+                if (!options.ConnectionString.Contains("AccountKey=") &&
+                    !options.ConnectionString.Contains("SharedAccessSignature=") &&
+                    !options.ConnectionString.Contains("UseDevelopmentStorage=true"))
+                    return false;
+                return true;
+            }, "AzureBlobStorage:ConnectionString is not configured or malformed. Configure it using .NET User Secrets or an environment variable.")
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<AzureBlobStorageOptions>, AzureBlobStorageOptionsValidator>();
         services.Configure<ManualPaymentEvidenceScannerOptions>(configuration.GetSection(ManualPaymentEvidenceScannerOptions.SectionName));
@@ -196,6 +211,7 @@ public static class DependencyInjection
                 section["ResetPath"] ?? "/reset-password");
         });
         services.AddScoped<IPlatformPasswordResetDeliveryService, AcsPlatformPasswordResetDeliveryService>();
+        services.AddScoped<ITenantAdminInvitationDeliveryService, TenantAdminInvitationDeliveryService>();
         services.AddScoped(static provider =>
         {
             var configuration = provider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
@@ -238,6 +254,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminHardwareRepository, TenantAdminHardwareRepository>();
         services.AddScoped<ITenantAdminHardwareAuditLogger, TenantAdminHardwareAuditLogger>();
         services.AddScoped<ITenantAdminUserRepository, TenantAdminUserRepository>();
+        services.AddScoped<ITenantAdminUserProfileImageRepository, TenantAdminUserProfileImageRepository>();
         services.AddScoped<ITenantAdminRoleRepository, TenantAdminRoleRepository>();
         services.AddScoped<ITenantUserStaffCodeService, TenantUserStaffCodeService>();
         services.AddScoped<ITillRepository, TillRepository>();
@@ -271,6 +288,11 @@ public static class DependencyInjection
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
         services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IPosNotificationRepository, NotificationRepository>();
+        services.AddScoped<ITenantStaffNotificationRecipientRepository, TenantStaffNotificationRecipientRepository>();
+        services.AddSingleton<TenantNotificationSocketRegistry>();
+        services.AddSingleton<ITenantNotificationSocketRegistry>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
+        services.AddSingleton<IRealtimeNotificationPublisher>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
@@ -305,9 +327,40 @@ public static class DependencyInjection
             provider.GetRequiredService<IStorefrontProductSearchRepository>(),
             provider.GetRequiredService<IStorefrontProductBestSellerRepository>()));
         services.AddScoped<IStorefrontFulfilmentRepository, StorefrontFulfilmentRepository>();
+        services.AddScoped<IStorefrontBrandingRepository, StorefrontBrandingRepository>();
         services.AddScoped<IStorefrontTenantRepository, StorefrontTenantRepository>();
         services.AddScoped<IStorefrontRepository, StorefrontRepository>();
         services.AddScoped<ITenantAdminOnlineStoreService, TenantAdminOnlineStoreService>();
+        services.AddOptions<OnlineStoreSetupOptions>()
+            .Bind(configuration.GetSection(OnlineStoreSetupOptions.SectionName));
+        services.AddOptions<DomainVerificationOptions>()
+            .Bind(configuration.GetSection(DomainVerificationOptions.SectionName))
+            .Validate(options => !options.Enabled ||
+                Uri.TryCreate(options.QueryEndpoint, UriKind.Absolute, out var endpoint) &&
+                endpoint.Scheme == Uri.UriSchemeHttps &&
+                !string.IsNullOrWhiteSpace(options.RecordNamePrefix) &&
+                options.TimeoutSeconds is >= 1 and <= 60,
+                "OnlineStoreDomainVerification requires an HTTPS query endpoint, record prefix and a timeout between 1 and 60 seconds when enabled.")
+            .ValidateOnStart();
+        services.AddOptions<CertificateProvisioningOptions>()
+            .Bind(configuration.GetSection(CertificateProvisioningOptions.SectionName))
+            .Validate(options => !options.Enabled ||
+                Uri.TryCreate(options.ProvisionEndpoint, UriKind.Absolute, out var provisionEndpoint) &&
+                provisionEndpoint.Scheme == Uri.UriSchemeHttps &&
+                Uri.TryCreate(options.StatusEndpoint, UriKind.Absolute, out var statusEndpoint) &&
+                statusEndpoint.Scheme == Uri.UriSchemeHttps &&
+                !string.IsNullOrWhiteSpace(options.BearerToken) &&
+                options.TimeoutSeconds is >= 1 and <= 120,
+                "OnlineStoreCertificateProvisioning requires HTTPS provision/status endpoints, a bearer token and a timeout between 1 and 120 seconds when enabled.")
+            .ValidateOnStart();
+        services.AddSingleton<IDomainVerificationProvider>(provider =>
+            new DnsOverHttpsDomainVerificationProvider(
+                new HttpClient(),
+                provider.GetRequiredService<IOptions<DomainVerificationOptions>>()));
+        services.AddSingleton<ICertificateProvisioningProvider>(provider =>
+            new HttpCertificateProvisioningProvider(
+                new HttpClient(),
+                provider.GetRequiredService<IOptions<CertificateProvisioningOptions>>()));
         services.AddScoped<IStorefrontCartRepository, StorefrontCartRepository>();
         services.AddScoped<IStorefrontCheckoutSessionRepository, StorefrontCheckoutSessionRepository>();
         services.AddScoped<IStorefrontCheckoutConfirmationRepository, StorefrontCheckoutConfirmationRepository>();
@@ -331,7 +384,13 @@ public static class DependencyInjection
             provider.GetRequiredService<ICustomerOrderReadRepository>(),
             provider.GetRequiredService<ICustomerOrderCancelRepository>()));
         services.AddScoped<IClickCollectOrderStatusRepository, ClickCollectOrderStatusRepository>();
+        services.AddScoped<IPosOnlineOrderDetailRepository, PosOnlineOrderDetailRepository>();
+        services.AddScoped<IPosOnlineOrderStartFulfillmentRepository, PosOnlineOrderStartFulfillmentRepository>();
+        services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
+        services.AddScoped<IPaymentMethodExecutionCapability, CashPaymentExecutionCapability>();
+        services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();
+        services.AddScoped<IPaymentMethodCapabilityResolver, PaymentMethodCapabilityResolver>();
 
         return services;
     }

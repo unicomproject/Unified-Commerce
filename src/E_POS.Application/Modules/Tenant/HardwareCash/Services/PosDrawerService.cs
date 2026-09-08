@@ -1,5 +1,6 @@
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.AccessControl.SensitiveData;
 using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
@@ -36,6 +37,15 @@ public sealed class PosDrawerService : IPosDrawerService
         RegisterDrawerOperationRequest request,
         CancellationToken cancellationToken)
     {
+        if (!context.HasAnyPermission(
+                CashDrawerPermissions.Manage,
+                CashDrawerPermissions.Canonical.PhysicalManage))
+        {
+            return ApplicationResult<CashDrawerOperationDto>.Failure(new ApplicationError(
+                "pos_drawer.permission_denied",
+                "You do not have permission to open the cash drawer."));
+        }
+
         if (request.RequestId == Guid.Empty || request.PosDeviceId == Guid.Empty)
             return ApplicationResult<CashDrawerOperationDto>.Failure(new ApplicationError("pos_drawer.invalid_request", "Request ID and Device ID are required."));
 
@@ -92,7 +102,9 @@ public sealed class PosDrawerService : IPosDrawerService
         ManualOpenDrawerRequest request,
         CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(CashDrawerPermissions.Manage))
+        if (!context.HasAnyPermission(
+                CashDrawerPermissions.Manage,
+                CashDrawerPermissions.Canonical.PhysicalManage))
             return ApplicationResult<CashDrawerOperationDto>.Failure(new ApplicationError("pos_drawer.permission_denied", "You do not have permission to manually open the cash drawer."));
 
         if (request.RequestId == Guid.Empty || request.PosDeviceId == Guid.Empty || string.IsNullOrWhiteSpace(request.Reason))
@@ -213,7 +225,9 @@ public sealed class PosDrawerService : IPosDrawerService
     public async Task<ApplicationResult<PosCashDrawerSummaryDto>> GetFinancialSummaryAsync(
         TenantRequestContext context, Guid deviceId, CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(CashDrawerPermissions.View))
+        if (!context.HasAnyPermission(
+                CashDrawerPermissions.View,
+                CashDrawerPermissions.Canonical.PositionView))
             return Failure<PosCashDrawerSummaryDto>("cash_drawer.permission_denied", "You do not have permission to view the cash drawer.");
         var session = await ResolveSession(context.TenantId, deviceId, cancellationToken);
         if (!session.IsSuccess || session.Snapshot is null)
@@ -221,13 +235,16 @@ public sealed class PosDrawerService : IPosDrawerService
         var summary = await _repository.GetFinancialSummaryAsync(context.TenantId, session.Snapshot.SessionId, cancellationToken);
         return summary is null
             ? Failure<PosCashDrawerSummaryDto>("cash_drawer.till_session_not_open", "No open till session was found for this device.")
-            : ApplicationResult<PosCashDrawerSummaryDto>.Success(summary);
+            : ApplicationResult<PosCashDrawerSummaryDto>.Success(
+                PosSensitiveResponseFilter.FilterDrawerSummary(context, summary));
     }
 
     public async Task<ApplicationResult<PosCashDrawerMovementPageDto>> GetFinancialMovementsAsync(
         TenantRequestContext context, Guid deviceId, int page, int pageSize, CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(CashDrawerPermissions.View))
+        if (!context.HasAnyPermission(
+                CashDrawerPermissions.View,
+                CashDrawerPermissions.Canonical.PositionView))
             return Failure<PosCashDrawerMovementPageDto>("cash_drawer.permission_denied", "You do not have permission to view cash movements.");
         if (page < 1 || pageSize is < 1 or > 100)
             return Failure<PosCashDrawerMovementPageDto>("cash_drawer.invalid_pagination", "Page must be positive and pageSize must be between 1 and 100.");
@@ -235,13 +252,17 @@ public sealed class PosDrawerService : IPosDrawerService
         if (!session.IsSuccess || session.Snapshot is null)
             return Failure<PosCashDrawerMovementPageDto>(session.ErrorCode!, SessionMessage(session.ErrorCode));
         return ApplicationResult<PosCashDrawerMovementPageDto>.Success(
-            await _repository.GetFinancialMovementsAsync(context.TenantId, session.Snapshot.SessionId, page, pageSize, cancellationToken));
+            PosSensitiveResponseFilter.FilterDrawerMovements(
+                context,
+                await _repository.GetFinancialMovementsAsync(context.TenantId, session.Snapshot.SessionId, page, pageSize, cancellationToken)));
     }
 
     public async Task<ApplicationResult<IReadOnlyList<PosCashMovementTypeDto>>> GetMovementTypesAsync(
         TenantRequestContext context, string direction, CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(CashDrawerPermissions.View))
+        if (!context.HasAnyPermission(
+                CashDrawerPermissions.View,
+                CashDrawerPermissions.Canonical.PositionView))
             return Failure<IReadOnlyList<PosCashMovementTypeDto>>("cash_drawer.permission_denied", "You do not have permission to view cash movement types.");
 
         var normalizedDirection = direction?.Trim().ToUpperInvariant();
@@ -257,8 +278,6 @@ public sealed class PosDrawerService : IPosDrawerService
     public async Task<ApplicationResult<PosCashDrawerMovementDto>> CreateFinancialMovementAsync(
         TenantRequestContext context, CreatePosCashMovementRequest request, CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(CashDrawerPermissions.CreateMovement))
-            return Failure<PosCashDrawerMovementDto>("cash_drawer.permission_denied", "You do not have permission to create cash movements.");
         if (request.RequestId == Guid.Empty || request.DeviceId == Guid.Empty || request.MovementTypeId == Guid.Empty)
             return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_request", "Request, device and movement type ids are required.");
         if (request.Amount <= 0)
@@ -266,14 +285,39 @@ public sealed class PosDrawerService : IPosDrawerService
         if (request.Note?.Trim().Length > 500)
             return Failure<PosCashDrawerMovementDto>("cash_drawer.invalid_note", "Note must not exceed 500 characters.");
 
+        var movementType = await _repository.GetMovementTypeByIdAsync(
+            context.TenantId, request.MovementTypeId, cancellationToken);
+        if (movementType is null)
+            return Failure<PosCashDrawerMovementDto>("cash_drawer.movement_type_not_found", "The selected cash movement type is not available.");
+
+        var requiredPermission = ResolveMovementPermission(movementType);
+        if (requiredPermission is null || !context.HasPermission(requiredPermission))
+            return Failure<PosCashDrawerMovementDto>("cash_drawer.permission_denied", "You do not have permission to create cash movements.");
+
         var session = await ResolveSession(context.TenantId, request.DeviceId, cancellationToken);
         if (!session.IsSuccess || session.Snapshot is null)
             return Failure<PosCashDrawerMovementDto>(session.ErrorCode!, SessionMessage(session.ErrorCode));
         var result = await _repository.CreateFinancialMovementAsync(
             context.TenantId, context.UserId, session.Snapshot.TillId, request, _clock.UtcNow, cancellationToken);
         return result.ErrorCode is null && result.Movement is not null
-            ? ApplicationResult<PosCashDrawerMovementDto>.Success(result.Movement)
+            ? ApplicationResult<PosCashDrawerMovementDto>.Success(
+                PosSensitiveResponseFilter.FilterDrawerMovement(context, result.Movement, movementType.Code))
             : Failure<PosCashDrawerMovementDto>(result.ErrorCode!, SessionMessage(result.ErrorCode));
+    }
+
+    private static string? ResolveMovementPermission(PosCashMovementTypeDto movementType)
+    {
+        if (string.Equals(movementType.Code, "CASH_DROP", StringComparison.OrdinalIgnoreCase))
+        {
+            return CashDrawerPermissions.Canonical.CashDrop;
+        }
+
+        return movementType.Direction.Trim().ToUpperInvariant() switch
+        {
+            "IN" => CashDrawerPermissions.Canonical.CashIn,
+            "OUT" => CashDrawerPermissions.Canonical.CashOut,
+            _ => null,
+        };
     }
 
     private Task<CurrentTillSessionResolveResult> ResolveSession(Guid tenantId, Guid deviceId, CancellationToken cancellationToken) =>

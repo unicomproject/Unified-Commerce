@@ -106,6 +106,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<TenantUserCodeSequence> TenantUserCodeSequences => Set<TenantUserCodeSequence>();
     public DbSet<TenantUserPermission> TenantUserPermissions => Set<TenantUserPermission>();
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
+    public DbSet<TenantUserTillAccess> TenantUserTillAccess => Set<TenantUserTillAccess>();
 
     // Authentication and Security
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
@@ -277,9 +278,9 @@ public sealed class EPosDbContext : DbContext
     public DbSet<CheckoutEvent> CheckoutEvents => Set<CheckoutEvent>();
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
     public DbSet<CheckoutSessionAddress> CheckoutSessionAddresses => Set<CheckoutSessionAddress>();
-    public DbSet<CheckoutSessionLine> CheckoutSessionLines => Set<CheckoutSessionLine>();    public DbSet<CheckoutSessionLineOption> CheckoutSessionLineOptions => Set<CheckoutSessionLineOption>();
+    public DbSet<CheckoutSessionLine> CheckoutSessionLines => Set<CheckoutSessionLine>(); public DbSet<CheckoutSessionLineOption> CheckoutSessionLineOptions => Set<CheckoutSessionLineOption>();
     public DbSet<ShoppingCart> ShoppingCarts => Set<ShoppingCart>();
-    public DbSet<ShoppingCartItem> ShoppingCartItems => Set<ShoppingCartItem>();    public DbSet<ShoppingCartItemOption> ShoppingCartItemOptions => Set<ShoppingCartItemOption>();
+    public DbSet<ShoppingCartItem> ShoppingCartItems => Set<ShoppingCartItem>(); public DbSet<ShoppingCartItemOption> ShoppingCartItemOptions => Set<ShoppingCartItemOption>();
 
     // Storefront
     public DbSet<StorefrontBanner> StorefrontBanners => Set<StorefrontBanner>();

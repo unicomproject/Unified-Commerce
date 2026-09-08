@@ -141,9 +141,131 @@ public sealed class NotificationInboxService : INotificationInboxService
         });
     }
 
+    public async Task<ApplicationResult<NotificationInboxListResponse>> GetTenantUserInboxAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var contextError = ValidateTenantUserContext(tenantId, tenantUserId);
+        if (contextError is not null)
+            return ApplicationResult<NotificationInboxListResponse>.Failure(contextError);
+
+        var safePage = page <= 0 ? DefaultPage : page;
+        var safePageSize = pageSize <= 0 ? DefaultPageSize : Math.Min(pageSize, MaxPageSize);
+        var result = await _repository.GetTenantUserInboxAsync(
+            tenantId,
+            tenantUserId,
+            safePage,
+            safePageSize,
+            cancellationToken);
+
+        return ApplicationResult<NotificationInboxListResponse>.Success(new NotificationInboxListResponse
+        {
+            Items = result.Items.Select(NotificationMapper.ToInboxItem).ToList(),
+            Page = safePage,
+            PageSize = safePageSize,
+            TotalCount = result.TotalCount,
+            TotalPages = result.TotalCount == 0 ? 0 : (int)Math.Ceiling(result.TotalCount / (double)safePageSize)
+        });
+    }
+
+    public async Task<ApplicationResult<NotificationUnreadCountResponse>> GetTenantUserUnreadCountAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        CancellationToken cancellationToken)
+    {
+        var contextError = ValidateTenantUserContext(tenantId, tenantUserId);
+        if (contextError is not null)
+            return ApplicationResult<NotificationUnreadCountResponse>.Failure(contextError);
+
+        var count = await _repository.GetTenantUserUnreadCountAsync(tenantId, tenantUserId, cancellationToken);
+        return ApplicationResult<NotificationUnreadCountResponse>.Success(new NotificationUnreadCountResponse
+        {
+            UnreadCount = count
+        });
+    }
+
+    public async Task<ApplicationResult<NotificationMarkReadResponse>> MarkTenantUserInboxItemReadAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        Guid inboxItemId,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken)
+    {
+        var contextError = ValidateTenantUserContext(tenantId, tenantUserId);
+        if (contextError is not null)
+            return ApplicationResult<NotificationMarkReadResponse>.Failure(contextError);
+
+        if (inboxItemId == Guid.Empty)
+        {
+            return ApplicationResult<NotificationMarkReadResponse>.Failure(
+                Error("notifications.invalid_inbox_item", "A valid notification id is required."));
+        }
+
+        var item = await _repository.MarkTenantUserInboxItemReadAsync(
+            tenantId,
+            tenantUserId,
+            inboxItemId,
+            _dateTimeProvider.UtcNow,
+            NormalizeIp(ipAddress),
+            NormalizeUserAgent(userAgent),
+            cancellationToken);
+
+        if (item is null)
+        {
+            return ApplicationResult<NotificationMarkReadResponse>.Failure(
+                Error("notifications.not_found", "Notification was not found."));
+        }
+
+        await _repository.SaveChangesAsync(cancellationToken);
+
+        return ApplicationResult<NotificationMarkReadResponse>.Success(new NotificationMarkReadResponse
+        {
+            Id = item.Id,
+            Status = item.InboxStatus,
+            ReadAt = item.ReadAt
+        });
+    }
+
+    public async Task<ApplicationResult<NotificationMarkAllReadResponse>> MarkAllTenantUserInboxItemsReadAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken)
+    {
+        var contextError = ValidateTenantUserContext(tenantId, tenantUserId);
+        if (contextError is not null)
+            return ApplicationResult<NotificationMarkAllReadResponse>.Failure(contextError);
+
+        var now = _dateTimeProvider.UtcNow;
+        var updatedCount = await _repository.MarkAllTenantUserInboxItemsReadAsync(
+            tenantId,
+            tenantUserId,
+            now,
+            NormalizeIp(ipAddress),
+            NormalizeUserAgent(userAgent),
+            cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+
+        return ApplicationResult<NotificationMarkAllReadResponse>.Success(new NotificationMarkAllReadResponse
+        {
+            UpdatedCount = updatedCount,
+            ReadAt = now
+        });
+    }
+
     private static ApplicationError? ValidateCustomerContext(Guid tenantId, Guid customerId) =>
         tenantId == Guid.Empty || customerId == Guid.Empty
             ? Error("notifications.invalid_customer_context", "A valid customer session is required.")
+            : null;
+
+    private static ApplicationError? ValidateTenantUserContext(Guid tenantId, Guid tenantUserId) =>
+        tenantId == Guid.Empty || tenantUserId == Guid.Empty
+            ? Error("notifications.invalid_tenant_user_context", "A valid staff session is required.")
             : null;
 
     private static string? NormalizeIp(string? value) =>

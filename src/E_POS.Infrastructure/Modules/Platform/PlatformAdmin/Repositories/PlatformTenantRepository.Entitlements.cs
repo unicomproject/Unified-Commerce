@@ -77,7 +77,7 @@ public sealed partial class PlatformTenantRepository
             .ToList();
 
         var plans = await BuildEntitlementPlanOptionsAsync(cancellationToken);
-        var catalogModules = await BuildEntitlementCatalogModulesAsync(cancellationToken);
+        var catalogModules = await BuildEntitlementCatalogModulesAsync(tenantId, currentSubscription?.SubscriptionPlanId, cancellationToken);
 
         return new PlatformTenantEntitlementOptionsResponse(
             tenantId,
@@ -147,32 +147,76 @@ public sealed partial class PlatformTenantRepository
     }
 
     private async Task<IReadOnlyList<PlatformTenantEntitlementCatalogModuleDto>> BuildEntitlementCatalogModulesAsync(
+        Guid tenantId,
+        Guid? currentPlanId,
         CancellationToken cancellationToken)
     {
-        var modules = await _dbContext.PlatformModules
+        var planIncludedFeatureIds = new HashSet<Guid>();
+        if (currentPlanId.HasValue && currentPlanId.Value != Guid.Empty)
+        {
+            var planFeatures = await _dbContext.SubscriptionPlanFeatures
+                .AsNoTracking()
+                .Where(pf => pf.SubscriptionPlanId == currentPlanId.Value &&
+                             pf.Status == SubscriptionPlanConstants.PlanFeatureStatus.Included)
+                .Select(pf => pf.PlatformFeatureId)
+                .ToListAsync(cancellationToken);
+            planIncludedFeatureIds = planFeatures.ToHashSet();
+        }
+
+        var tenantEntitlementRows = await _dbContext.TenantFeatureEntitlements
+            .AsNoTracking()
+            .Where(tfe => tfe.TenantId == tenantId)
+            .ToDictionaryAsync(tfe => tfe.PlatformFeatureId, cancellationToken);
+
+        var rawModules = await _dbContext.PlatformModules
             .AsNoTracking()
             .Where(module => module.Status == "ACTIVE")
             .OrderBy(module => module.SortOrder)
             .ThenBy(module => module.Name)
-            .Select(module => new PlatformTenantEntitlementCatalogModuleDto(
+            .Select(module => new
+            {
                 module.Id,
                 module.ModuleCode,
                 module.Name,
-                _dbContext.PlatformFeatures
-                    .Where(feature => feature.PlatformModuleId == module.Id && feature.Status == "ACTIVE")
+                Features = _dbContext.PlatformFeatures
+                    .Where(feature => feature.PlatformModuleId == module.Id && feature.Status == "ACTIVE" && feature.Scope == "TENANT")
                     .OrderBy(feature => feature.SortOrder)
                     .ThenBy(feature => feature.Name)
-                    .Select(feature => new PlatformTenantEntitlementCatalogFeatureDto(
+                    .Select(feature => new
+                    {
                         feature.Id,
                         feature.FeatureCode,
                         feature.Name,
-                        feature.Description))
-                    .ToList()))
+                        feature.Description
+                    })
+                    .ToList()
+            })
             .ToListAsync(cancellationToken);
 
-        return modules;
+        return rawModules.Select(m => new PlatformTenantEntitlementCatalogModuleDto(
+            m.Id,
+            m.ModuleCode,
+            m.Name,
+            m.Features.Select(f =>
+            {
+                var planIncluded = planIncludedFeatureIds.Contains(f.Id);
+                tenantEntitlementRows.TryGetValue(f.Id, out var row);
+
+                var isOverridden = row is not null &&
+                    string.Equals(row.SourceType, TenantEntitlementSourceTypeConstants.Override, StringComparison.OrdinalIgnoreCase);
+
+                return new PlatformTenantEntitlementCatalogFeatureDto(
+                    f.Id,
+                    f.FeatureCode,
+                    f.Name,
+                    f.Description,
+                    PlanIncluded: planIncluded,
+                    IsOverridden: isOverridden,
+                    SourceType: row?.SourceType,
+                    OverrideReason: row?.OverrideReason,
+                    EffectiveFrom: row?.EffectiveFrom,
+                    EffectiveUntil: row?.EffectiveUntil);
+            }).ToList()
+        )).ToList();
     }
 }
-
-
-
