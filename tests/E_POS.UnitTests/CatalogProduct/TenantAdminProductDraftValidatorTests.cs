@@ -176,6 +176,114 @@ public sealed class TenantAdminProductDraftValidatorTests
         Assert.Equal("product.batch_required_for_expiry", error!.Code);
     }
 
+    [Fact]
+    public void PricingTaxContinue_Simple_DoesNotRequireCostPrice()
+    {
+        var request = new SaveProductDraftRequest
+        {
+            CurrentSetupStep = 6,
+            AdvanceStep = true,
+            ProductStructure = "SIMPLE",
+            PricingTax = new PricingTaxConfigurationDto(
+                null,
+                750m,
+                null,
+                Guid.NewGuid(),
+                true)
+        };
+
+        Assert.Null(_validator.ValidateStepSaveAndContinue(request));
+    }
+
+    [Fact]
+    public void PricingTaxContinue_Variant_DoesNotRequireCostPrice_RequiresVariantPrices()
+    {
+        var request = new SaveProductDraftRequest
+        {
+            CurrentSetupStep = 6,
+            AdvanceStep = true,
+            ProductStructure = "VARIANT",
+            PricingTax = new PricingTaxConfigurationDto(
+                null,
+                null,
+                null,
+                Guid.NewGuid(),
+                true,
+                [
+                    new VariantPriceConfigurationDto(Guid.NewGuid(), null, 750m)
+                ])
+        };
+
+        Assert.Null(_validator.ValidateStepSaveAndContinue(request));
+    }
+
+    [Fact]
+    public void PricingTaxContinue_Variant_RejectsMissingVariantPrices()
+    {
+        var request = new SaveProductDraftRequest
+        {
+            CurrentSetupStep = 6,
+            AdvanceStep = true,
+            ProductStructure = "VARIANT",
+            PricingTax = new PricingTaxConfigurationDto(
+                null,
+                750m,
+                null,
+                Guid.NewGuid(),
+                true)
+        };
+
+        var error = _validator.ValidateStepSaveAndContinue(request);
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, e => e.Field == "pricingTax.variantPrices");
+    }
+
+    [Fact]
+    public void PricingTaxContinue_Simple_RequiresSellingPriceAndTaxClass()
+    {
+        var request = new SaveProductDraftRequest
+        {
+            CurrentSetupStep = 6,
+            AdvanceStep = true,
+            ProductStructure = "SIMPLE",
+            PricingTax = new PricingTaxConfigurationDto(null, null, null, null, true)
+        };
+
+        var error = _validator.ValidateStepSaveAndContinue(request);
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, e => e.Field == "pricingTax.standardSellingPrice");
+        Assert.Contains(error!.FieldErrors!, e => e.Field == "pricingTax.taxClassId");
+    }
+
+    [Fact]
+    public void PricingTaxDraft_Variant_RejectsNegativeAndDuplicateIdentities()
+    {
+        var variantId = Guid.NewGuid();
+        var request = new SaveProductDraftRequest
+        {
+            CurrentSetupStep = 6,
+            ProductStructure = "VARIANT",
+            PricingTax = new PricingTaxConfigurationDto(
+                null,
+                null,
+                null,
+                Guid.NewGuid(),
+                true,
+                [
+                    new VariantPriceConfigurationDto(variantId, "a:b", -1m),
+                    new VariantPriceConfigurationDto(variantId, "c:d", 10m)
+                ])
+        };
+
+        var error = _validator.ValidateStepSaveDraft(request);
+
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, e => e.Field.Contains("sellingPrice", StringComparison.Ordinal));
+        Assert.Contains(error!.FieldErrors!, e => e.Field.Contains("productVariantId", StringComparison.Ordinal));
+    }
+
     private static SaveProductDraftRequest CreateValidRequest() =>
         new()
         {

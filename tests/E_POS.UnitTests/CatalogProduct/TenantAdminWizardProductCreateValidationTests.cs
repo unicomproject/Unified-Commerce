@@ -24,9 +24,10 @@ public sealed class TenantAdminWizardProductCreateValidationTests
                         null,
                         "Simple",
                         "E2E-SIMPLE-1",
-                        "100000000001",
+                        "4006381333931",
                         null,
-                        "SIMPLE_DEFAULT")
+                        "SIMPLE_DEFAULT",
+                        "EAN13")
                 ]),
             PricingTax = new PricingTaxConfigurationDto(100, 150, 140, Guid.NewGuid(), true),
         };
@@ -69,12 +70,20 @@ public sealed class TenantAdminWizardProductCreateValidationTests
                 [
                     new BarcodeSkuAssignmentDto(null, "Red / Small", "SKU-R-S", null, null, key)
                 ]),
-            PricingTax = new PricingTaxConfigurationDto(10, 20, null, Guid.NewGuid(), true),
+            PricingTax = new PricingTaxConfigurationDto(
+                10,
+                null,
+                null,
+                Guid.NewGuid(),
+                true,
+                [new VariantPriceConfigurationDto(null, key, 20)]),
         };
 
         Assert.NotNull(request.VariantConfiguration?.Variants);
         Assert.Single(request.VariantConfiguration!.Variants);
         Assert.Equal(key, request.BarcodeSkuConfiguration!.Assignments![0].ClientCombinationKey);
         Assert.Null(request.BarcodeSkuConfiguration.Assignments![0].ProductVariantId);
+        Assert.NotNull(request.PricingTax.VariantPrices);
+        Assert.Equal(20, request.PricingTax.VariantPrices![0].SellingPrice);
     }
 }

@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -236,7 +237,16 @@ public sealed class WizardProductCreatePostgreSqlTests
             BarcodeSkuConfiguration = new BarcodeSkuConfigurationDto(
                 Array.Empty<Step5IdentifierTargetDto>(),
                 keys.Select(k => new BarcodeSkuAssignmentDto(null, k.Item1, k.Item2, null, null, k.Item1)).ToList()),
-            PricingTax = new PricingTaxConfigurationDto(100m, 150m, 140m, ctx.TaxId, true),
+            PricingTax = new PricingTaxConfigurationDto(
+                100m,
+                null,
+                null,
+                ctx.TaxId,
+                true,
+                keys.Select((k, i) => new VariantPriceConfigurationDto(
+                    null,
+                    k.Item1,
+                    150m + (i * 10m))).ToList()),
         };
 
         var repo = new TenantAdminProductRepository(db, new NoOpCodeSequenceRepository());
@@ -255,12 +265,22 @@ public sealed class WizardProductCreatePostgreSqlTests
             .ToListAsync();
         Assert.Equal(4, created.Count);
 
+        var priceItems = await db.PriceListItems.AsNoTracking()
+            .Where(p => p.TenantId == ctx.TenantId &&
+                        p.ProductId == productId &&
+                        p.Status == "ACTIVE" &&
+                        p.ProductVariantId != null)
+            .ToListAsync();
+        Assert.Equal(4, priceItems.Count);
+        Assert.Equal(4, priceItems.Select(p => p.SellingPrice).Distinct().Count());
+        Assert.DoesNotContain(priceItems, p => p.ProductVariantId is null);
+
         foreach (var (key, sku) in keys)
         {
-            var match = created.SingleOrDefault(v =>
-                string.Equals(v.OptionCombinationHash?.Trim(), key, StringComparison.Ordinal));
+            var match = created.SingleOrDefault(v => string.Equals(v.Sku, sku, StringComparison.Ordinal));
             Assert.NotNull(match);
-            Assert.Equal(sku, match!.Sku);
+            Assert.True(ProductVariantCombinationHashHelper.IsCanonicalSha256Hash(match!.OptionCombinationHash));
+            Assert.Contains(priceItems, p => p.ProductVariantId == match.Id && p.SellingPrice > 0);
         }
 
         // VARIANT wizard must not require Step 3 units — unit settings may be absent.
@@ -353,7 +373,14 @@ public sealed class WizardProductCreatePostgreSqlTests
             BarcodeSkuConfiguration = new BarcodeSkuConfigurationDto(
                 Array.Empty<Step5IdentifierTargetDto>(),
                 [
-                    new BarcodeSkuAssignmentDto(null, name, sku, barcode, null, "SIMPLE_DEFAULT")
+                    new BarcodeSkuAssignmentDto(
+                        null,
+                        name,
+                        sku,
+                        barcode,
+                        null,
+                        "SIMPLE_DEFAULT",
+                        string.IsNullOrWhiteSpace(barcode) ? null : "CODE128")
                 ]),
             PricingTax = new PricingTaxConfigurationDto(100m, 150m, 140m, ctx.TaxId, true),
         };

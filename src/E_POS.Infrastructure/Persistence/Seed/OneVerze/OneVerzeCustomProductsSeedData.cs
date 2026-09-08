@@ -1,6 +1,7 @@
 namespace E_POS.Infrastructure.Persistence.Seed.OneVerze;
 public static class OneVerzeCustomProductsSeedData {
-        public const string UpSql = @"
+        public const string UpSql = @"
+
 
 INSERT INTO media_assets (id, tenant_id, container_name, storage_key, original_file_name, mime_type, file_extension, file_size_bytes, width_px, height_px, checksum_hash, asset_type, asset_purpose, status, created_at, updated_at) VALUES
 ('77778888-0000-4000-8000-000000000100', '08b0c8b0-a5bf-44f0-8814-cb2fe0120000', 'images', 'tenants/08b0c8b0-a5bf-44f0-8814-cb2fe0120000/products/bat_lh_1787004432700.jpg', 'bat_lh_1787004432700.jpg', 'image/jpeg', '.jpg', 10240, 1024, 1024, '', 'IMAGE', 'PRODUCT_IMAGE', 'ACTIVE', now(), now()),

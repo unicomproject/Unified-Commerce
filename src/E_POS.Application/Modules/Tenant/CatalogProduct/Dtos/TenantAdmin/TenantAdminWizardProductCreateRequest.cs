@@ -16,7 +16,7 @@ public sealed class TenantAdminWizardProductCreateRequest
     public bool DesiredPublishActive { get; set; } = true;
     public bool PosSellable { get; set; } = true;
     public bool AllowOnlineSale { get; set; } = true;
-    public bool TrackInventory { get; set; } = true;
+    public bool TrackInventory { get; set; } = false;
     public bool BatchTracking { get; set; }
     public bool ExpiryTracking { get; set; }
     public bool SerialTracking { get; set; }

@@ -252,6 +252,123 @@ public static class DevelopmentMerchandiseCatalogSeedData
         );
         """;
 
+    public const string MerchandiseProductImageUrlUpSql = """
+        UPDATE product_images AS image
+        SET image_url = mapping.image_url,
+            mime_type = 'image/jpeg',
+            updated_at = now()
+        FROM (VALUES
+            ('cccc0008-0001-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1580087433295-ab2600c1030e?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-0002-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-0003-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1591195853828-0de695293be6?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-0008-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-0009-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-000a-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-000b-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-000c-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1519861531473-9209d0d24ea7?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-000d-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?q=80&w=1000&auto=format&fit=crop'),
+            ('cccc0008-000f-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop')
+        ) AS mapping(id, image_url)
+        WHERE image.id = mapping.id
+          AND image.tenant_id = '55555555-0000-4000-8000-000000000001';
+        """;
+
+    public const string MerchandiseProductImageUrlDownSql = """
+        UPDATE product_images
+        SET image_url = NULL,
+            mime_type = NULL,
+            updated_at = now()
+        WHERE tenant_id = '55555555-0000-4000-8000-000000000001'
+          AND id::text LIKE 'cccc0008-%';
+        """;
+
+    public const string MerchandiseProductImageMediaAssetsUpSql = """
+        WITH seed_images AS (
+            SELECT *
+            FROM (VALUES
+                ('cccc0008-0001-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1580087433295-ab2600c1030e?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-0002-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-0003-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1591195853828-0de695293be6?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-0008-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-0009-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-000a-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-000b-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-000c-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1519861531473-9209d0d24ea7?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-000d-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?q=80&w=1000&auto=format&fit=crop'),
+                ('cccc0008-000f-4000-8000-000000000001'::uuid, 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop')
+            ) AS mapping(product_image_id, public_url)
+        )
+        INSERT INTO media_assets (
+            id,
+            tenant_id,
+            container_name,
+            storage_key,
+            public_url,
+            original_file_name,
+            mime_type,
+            file_extension,
+            file_size_bytes,
+            checksum_hash,
+            asset_type,
+            asset_purpose,
+            status,
+            created_at,
+            updated_at
+        )
+        SELECT
+            md5('media_asset:product_images:' || seed_images.product_image_id::text)::uuid,
+            '55555555-0000-4000-8000-000000000001',
+            'legacy-media',
+            'legacy/product-images/' || seed_images.product_image_id::text,
+            left(seed_images.public_url, 1000),
+            left('seed-merchandise-product-image-' || seed_images.product_image_id::text || '.jpg', 255),
+            'image/jpeg',
+            '.jpg',
+            1,
+            md5('seed:merchandise:product_images:' || seed_images.product_image_id::text || ':' || seed_images.public_url),
+            'IMAGE',
+            'PRODUCT_IMAGE',
+            'ACTIVE',
+            now(),
+            now()
+        FROM seed_images
+        ON CONFLICT (tenant_id, container_name, storage_key) DO UPDATE
+        SET public_url = EXCLUDED.public_url,
+            original_file_name = EXCLUDED.original_file_name,
+            mime_type = EXCLUDED.mime_type,
+            file_extension = EXCLUDED.file_extension,
+            asset_type = EXCLUDED.asset_type,
+            asset_purpose = EXCLUDED.asset_purpose,
+            status = EXCLUDED.status,
+            updated_at = now();
+
+        UPDATE product_images pi
+        SET media_asset_id = md5('media_asset:product_images:' || pi.id::text)::uuid,
+            updated_at = now()
+        WHERE pi.tenant_id = '55555555-0000-4000-8000-000000000001'
+          AND pi.id::text LIKE 'cccc0008-%'
+          AND EXISTS (
+              SELECT 1
+              FROM media_assets ma
+              WHERE ma.tenant_id = pi.tenant_id
+                AND ma.id = md5('media_asset:product_images:' || pi.id::text)::uuid
+          );
+        """;
+
+    public const string MerchandiseProductImageMediaAssetsDownSql = """
+        UPDATE product_images
+        SET media_asset_id = NULL,
+            updated_at = now()
+        WHERE tenant_id = '55555555-0000-4000-8000-000000000001'
+          AND id::text LIKE 'cccc0008-%'
+          AND media_asset_id = md5('media_asset:product_images:' || id::text)::uuid;
+
+        DELETE FROM media_assets
+        WHERE tenant_id = '55555555-0000-4000-8000-000000000001'
+          AND container_name = 'legacy-media'
+          AND storage_key LIKE 'legacy/product-images/cccc0008-%';
+        """;
+
     public const string DownSql = """
         DELETE FROM product_images
         WHERE id IN (

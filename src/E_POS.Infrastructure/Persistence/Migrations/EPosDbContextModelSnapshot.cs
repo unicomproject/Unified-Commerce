@@ -20957,6 +20957,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(150)")
                         .HasColumnName("tax_name_snapshot");
 
+                    b.Property<string>("TaxTreatmentSnapshot")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("tax_treatment_snapshot");
+
                     b.Property<string>("TaxRateCodeSnapshot")
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)")
@@ -23910,6 +23915,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_default_tax_class");
 
+                    b.Property<bool>("IsSeeded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_seeded");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -23927,6 +23938,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
                         .HasColumnName("tax_class_name");
+
+                    b.Property<string>("TaxTreatment")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("tax_treatment");
 
                     b.Property<string>("TaxType")
                         .IsRequired()
@@ -23969,6 +23986,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_classes", null, t =>
                         {
                             t.HasCheckConstraint("ck_tax_classes_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+                            t.HasCheckConstraint("ck_tax_classes_tax_treatment", "tax_treatment IN ('TAXABLE', 'ZERO_RATED', 'EXEMPT')");
                         });
                 });
 
@@ -24162,6 +24180,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_compound");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
+
                     b.Property<decimal>("RatePercent")
                         .HasPrecision(8, 4)
                         .HasColumnType("numeric(8,4)")
@@ -24225,6 +24247,9 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "TaxRateCode")
                         .IsUnique()
                         .HasDatabaseName("uq_tax_rates_tenant_id_tax_rate_code");
+
+                    b.HasIndex("TenantId", "ValidFrom")
+                        .HasDatabaseName("ix_tax_rates_tenant_id_valid_from");
 
                     b.ToTable("tax_rates", null, t =>
                         {

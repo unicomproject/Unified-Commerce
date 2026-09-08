@@ -1,3 +1,4 @@
+using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
@@ -131,6 +132,32 @@ public interface ITenantAdminProductRepository
     Task<bool> ProductCodeExistsAsync(Guid tenantId, string productCode, Guid? excludeProductId, CancellationToken cancellationToken);
     Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductVariantId, CancellationToken cancellationToken);
     Task<bool> BarcodeExistsAsync(Guid tenantId, string barcodeValue, Guid? excludeProductVariantId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Bulk SKU conflict lookup. Returns conflicting SKU → existing variant id (case-sensitive after caller trim).
+    /// </summary>
+    Task<IReadOnlyDictionary<string, Guid>> FindSkuConflictsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> skus,
+        IReadOnlyCollection<Guid> excludeVariantIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Bulk barcode conflict lookup. Returns conflicting barcode → existing barcode row id.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, Guid>> FindBarcodeConflictsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> barcodes,
+        IReadOnlyCollection<Guid> excludeVariantIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authoritative Step 5 targets: sellable, non-archived/deleted variants for the product.
+    /// </summary>
+    Task<IReadOnlyList<BarcodeSkuVariantTargetProjection>> GetStep5SellableVariantTargetsAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken);
     Task<bool> ProductSlugExistsAsync(string slug, CancellationToken cancellationToken);
     Task<Guid?> GetDefaultInventoryUomIdAsync(Guid tenantId, CancellationToken cancellationToken);
 
@@ -221,6 +248,12 @@ public interface ITenantAdminProductRepository
         Guid tenantId,
         Guid productId,
         VariantConfigurationDto variantConfiguration,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<ApplicationFieldError>> ValidateVariantConfigurationCatalogAsync(
+        Guid tenantId,
+        Guid? productId,
+        VariantConfigurationDto configuration,
         CancellationToken cancellationToken);
 
     /// <summary>

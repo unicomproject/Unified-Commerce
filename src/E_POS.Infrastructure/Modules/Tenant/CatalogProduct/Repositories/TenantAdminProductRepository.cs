@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct;
@@ -236,16 +237,48 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 decimalUomTypes.Contains(x.UomType.ToUpper()) || decimalUomCodes.Contains(x.UomCode.ToUpper())))
             .ToListAsync(cancellationToken);
 
-        var taxes = await _dbContext.TaxClasses
+        var taxRows = await _dbContext.TaxClasses
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Status == "ACTIVE")
             .OrderByDescending(x => x.IsDefaultTaxClass)
             .ThenBy(x => x.TaxClassName)
-            .Select(x => new TenantAdminProductTaxOptionResponse(
-                x.Id,
-                x.TaxClassCode,
-                x.TaxClassName))
+            .Select(x => new { x.Id, x.TaxClassCode, x.TaxClassName, x.TaxTreatment })
             .ToListAsync(cancellationToken);
+
+        var taxIds = taxRows.Select(x => x.Id).ToList();
+        var rateLinks = await (
+            from classRate in _dbContext.TaxClassRates.AsNoTracking()
+            join rate in _dbContext.TaxRates.AsNoTracking()
+                on new { classRate.TenantId, Id = classRate.TaxRateId }
+                equals new { rate.TenantId, rate.Id }
+            where classRate.TenantId == tenantId &&
+                  taxIds.Contains(classRate.TaxClassId) &&
+                  classRate.Status != "DELETED" &&
+                  rate.Status != "DELETED"
+            select new { classRate.TaxClassId, rate.RatePercent, rate.ValidFrom, rate.ValidUntil }
+        ).ToListAsync(cancellationToken);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var currentRateByClass = rateLinks
+            .GroupBy(x => x.TaxClassId)
+            .ToDictionary(
+                g => g.Key,
+                g => g
+                    .Where(r =>
+                        (!r.ValidFrom.HasValue || r.ValidFrom.Value <= today) &&
+                        (!r.ValidUntil.HasValue || r.ValidUntil.Value >= today))
+                    .OrderByDescending(r => r.ValidFrom ?? DateOnly.MinValue)
+                    .Select(r => (decimal?)r.RatePercent)
+                    .FirstOrDefault());
+
+        var taxes = taxRows.Select(x => new TenantAdminProductTaxOptionResponse(
+            x.Id,
+            x.TaxClassCode,
+            x.TaxClassName,
+            x.TaxTreatment,
+            string.Equals(x.TaxTreatment, "EXEMPT", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : currentRateByClass.GetValueOrDefault(x.Id) ?? 0m)).ToList();
 
         var outlets = await _dbContext.Outlets
             .AsNoTracking()
@@ -293,6 +326,12 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 platform.ChannelType))
             .ToListAsync(cancellationToken);
 
+        var currencyCode = await _dbContext.Tenants
+            .AsNoTracking()
+            .Where(x => x.Id == tenantId)
+            .Select(x => x.BaseCurrencyCode)
+            .FirstOrDefaultAsync(cancellationToken);
+
         return new TenantAdminProductCreateOptionsResponse(
             categories,
             brands,
@@ -300,7 +339,11 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             taxes,
             outlets,
             variantOptionTemplates,
-            salesChannels);
+            salesChannels,
+            ProductBarcodeFormatValidator.CanonicalTypes
+                .Select(t => new TenantAdminProductBarcodeTypeOptionResponse(t.Code, t.Label))
+                .ToList(),
+            string.IsNullOrWhiteSpace(currencyCode) ? "LKR" : currencyCode.Trim().ToUpperInvariant());
     }
 
     public async Task<TenantAdminProductFilterOptionsResponse> GetFilterOptionsAsync(
@@ -706,7 +749,8 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         return new TenantAdminProductDetailResponse(
             product.Id,
             product.ProductName,
-            defaultVariant?.Sku ?? product.ProductCode,
+            product.ProductCode,
+            defaultVariant?.Sku ?? string.Empty,
             defaultBarcode,
             categoryId,
             categoryName,
@@ -784,7 +828,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             return null;
         }
 
-        var normalizedCode = ProductConstants.NormalizeCode(request.Sku);
+        var normalizedCode = ProductConstants.NormalizeCode(request.ResolveProductCode());
         var normalizedStatus = request.SaveAsDraft
             ? ProductConstants.InactiveStatus
             : ProductConstants.NormalizeStatus(request.Status);
@@ -1413,7 +1457,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         CancellationToken cancellationToken)
     {
         var productId = Guid.NewGuid();
-        var normalizedCode = ProductConstants.NormalizeCode(request.Sku);
+        var normalizedCode = ProductConstants.NormalizeCode(request.ResolveProductCode());
         var normalizedStatus = request.SaveAsDraft
             ? ProductConstants.InactiveStatus
             : ProductConstants.NormalizeStatus(request.Status);
@@ -2304,6 +2348,100 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                      x.Barcode == barcodeValue &&
                      (!excludeProductVariantId.HasValue || x.ProductVariantId != excludeProductVariantId.Value),
                 cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<string, Guid>> FindSkuConflictsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> skus,
+        IReadOnlyCollection<Guid> excludeVariantIds,
+        CancellationToken cancellationToken)
+    {
+        if (skus.Count == 0)
+        {
+            return new Dictionary<string, Guid>();
+        }
+
+        var skuList = skus.Distinct(StringComparer.Ordinal).ToList();
+        var exclude = excludeVariantIds.ToHashSet();
+
+        var rows = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.Sku != null &&
+                skuList.Contains(x.Sku) &&
+                x.Status != ProductConstants.ArchivedStatus &&
+                x.Status != ProductConstants.DeletedStatus &&
+                !exclude.Contains(x.Id))
+            .Select(x => new { x.Sku, x.Id })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Where(r => !string.IsNullOrEmpty(r.Sku))
+            .GroupBy(r => r.Sku!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.Ordinal);
+    }
+
+    public async Task<IReadOnlyDictionary<string, Guid>> FindBarcodeConflictsAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> barcodes,
+        IReadOnlyCollection<Guid> excludeVariantIds,
+        CancellationToken cancellationToken)
+    {
+        if (barcodes.Count == 0)
+        {
+            return new Dictionary<string, Guid>();
+        }
+
+        var barcodeList = barcodes.Distinct(StringComparer.Ordinal).ToList();
+        var exclude = excludeVariantIds.ToHashSet();
+
+        var rows = await _dbContext.ProductBarcodes
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                barcodeList.Contains(x.Barcode) &&
+                x.Status != ProductConstants.DeletedStatus &&
+                (x.ProductVariantId == null || !exclude.Contains(x.ProductVariantId.Value)))
+            .Select(x => new { x.Barcode, x.Id, x.ProductVariantId })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(r => r.Barcode, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.Ordinal);
+    }
+
+    public async Task<IReadOnlyList<BarcodeSkuVariantTargetProjection>> GetStep5SellableVariantTargetsAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(v =>
+                v.TenantId == tenantId &&
+                v.ProductId == productId &&
+                v.IsSellable &&
+                v.Status != ProductConstants.ArchivedStatus &&
+                v.Status != ProductConstants.DeletedStatus)
+            .OrderBy(v => v.Id)
+            .Select(v => new
+            {
+                v.Id,
+                v.VariantName,
+                v.VariantCode,
+                v.Sku,
+                v.OptionCombinationHash,
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(v => new BarcodeSkuVariantTargetProjection(
+                v.Id,
+                string.IsNullOrWhiteSpace(v.VariantName) ? v.VariantCode : v.VariantName,
+                v.Sku,
+                v.OptionCombinationHash))
+            .ToList();
     }
 
     public Task<bool> ProductSlugExistsAsync(string slug, CancellationToken cancellationToken)
