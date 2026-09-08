@@ -22,8 +22,11 @@ using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.Payment.Contracts;
+using E_POS.Application.Modules.Tenant.Payment.Services;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
+using E_POS.Infrastructure.Modules.Shared.Realtime;
 using E_POS.Infrastructure.Modules.Tenant.TenantFoundation.Repositories;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Infrastructure.Common;
@@ -31,6 +34,7 @@ using E_POS.Infrastructure.Common.Security;
 using E_POS.Infrastructure.Integrations.Google;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Options;
 using E_POS.Infrastructure.Modules.Tenant.TenantAuth.Repositories;
+using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Repositories;
@@ -38,7 +42,6 @@ using E_POS.Infrastructure.Modules.Tenant.OutletTillDevice.Services;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
-using E_POS.Infrastructure.Modules.Tenant.Payment;
 using E_POS.Application.Common.Email;
 using E_POS.Infrastructure.Integrations.Email;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Services;
@@ -208,6 +211,7 @@ public static class DependencyInjection
                 section["ResetPath"] ?? "/reset-password");
         });
         services.AddScoped<IPlatformPasswordResetDeliveryService, AcsPlatformPasswordResetDeliveryService>();
+        services.AddScoped<ITenantAdminInvitationDeliveryService, TenantAdminInvitationDeliveryService>();
         services.AddScoped(static provider =>
         {
             var configuration = provider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
@@ -284,6 +288,11 @@ public static class DependencyInjection
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
         services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IPosNotificationRepository, NotificationRepository>();
+        services.AddScoped<ITenantStaffNotificationRecipientRepository, TenantStaffNotificationRecipientRepository>();
+        services.AddSingleton<TenantNotificationSocketRegistry>();
+        services.AddSingleton<ITenantNotificationSocketRegistry>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
+        services.AddSingleton<IRealtimeNotificationPublisher>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
@@ -377,7 +386,11 @@ public static class DependencyInjection
         services.AddScoped<IClickCollectOrderStatusRepository, ClickCollectOrderStatusRepository>();
         services.AddScoped<IPosOnlineOrderDetailRepository, PosOnlineOrderDetailRepository>();
         services.AddScoped<IPosOnlineOrderStartFulfillmentRepository, PosOnlineOrderStartFulfillmentRepository>();
+        services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
+        services.AddScoped<IPaymentMethodExecutionCapability, CashPaymentExecutionCapability>();
+        services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();
+        services.AddScoped<IPaymentMethodCapabilityResolver, PaymentMethodCapabilityResolver>();
 
         return services;
     }

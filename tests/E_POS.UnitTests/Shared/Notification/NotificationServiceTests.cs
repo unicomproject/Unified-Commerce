@@ -211,6 +211,31 @@ public sealed class NotificationServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(0);
 
+        public Task<NotificationInboxQueryResult> GetTenantUserInboxAsync(Guid tenantId, Guid tenantUserId, int page, int pageSize, CancellationToken cancellationToken) =>
+            Task.FromResult(new NotificationInboxQueryResult([], 0));
+
+        public Task<int> GetTenantUserUnreadCountAsync(Guid tenantId, Guid tenantUserId, CancellationToken cancellationToken) =>
+            Task.FromResult(0);
+
+        public Task<NotificationInboxItemProjection?> MarkTenantUserInboxItemReadAsync(
+            Guid tenantId,
+            Guid tenantUserId,
+            Guid inboxItemId,
+            DateTimeOffset now,
+            string? ipAddress,
+            string? userAgent,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<NotificationInboxItemProjection?>(null);
+
+        public Task<int> MarkAllTenantUserInboxItemsReadAsync(
+            Guid tenantId,
+            Guid tenantUserId,
+            DateTimeOffset now,
+            string? ipAddress,
+            string? userAgent,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(0);
+
         public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
             SaveChangesCallCount++;

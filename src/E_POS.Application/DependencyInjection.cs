@@ -92,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformPasswordResetService, PlatformPasswordResetService>();
         services.AddScoped<IPlatformPasswordPolicyValidator, PlatformPasswordPolicyValidator>();
         services.AddScoped<IPlatformSubscriptionPlanService, PlatformSubscriptionPlanService>();
+        services.AddScoped<IPlanBusinessCapabilityCatalogService, PlanBusinessCapabilityCatalogService>();
         services.AddScoped<ITenantUsageCounterService, TenantUsageCounterService>();
         services.AddScoped<ITenantAuthService, TenantAuthService>();
         services.AddScoped<ITenantAdminInvitationAcceptanceService, TenantAdminInvitationAcceptanceService>();
@@ -152,6 +153,7 @@ public static class DependencyInjection
         services.AddScoped<IPosHomeDashboardService, PosHomeDashboardService>();
         services.AddScoped<IPosTillSessionService, PosTillSessionService>();
         services.AddScoped<IPosCheckoutService, PosCheckoutService>();
+        services.AddScoped<IPosNotificationService, PosNotificationService>();
         services.AddScoped<IPosReceiptService, PosReceiptService>();
         services.AddScoped<IPosReturnService, PosReturnService>();
         services.AddScoped<IPosHoldService, PosHoldService>();
@@ -164,6 +166,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<INotificationInboxService, NotificationInboxService>();
         services.AddScoped<INotificationChannelHandler, InAppNotificationChannelHandler>();
+        services.AddScoped<INotificationChannelHandler, RealtimeNotificationChannelHandler>();
 
         // ECommerce Storefront
 
@@ -196,6 +199,7 @@ public static class DependencyInjection
         services.AddScoped<IClickCollectOrderStatusService, ClickCollectOrderStatusService>();
         services.AddScoped<IPosOnlineOrderDetailService, PosOnlineOrderDetailService>();
         services.AddScoped<IPosOnlineOrderStartFulfillmentService, PosOnlineOrderStartFulfillmentService>();
+        services.AddScoped<IPosOnlineOrderPickingService, PosOnlineOrderPickingService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;

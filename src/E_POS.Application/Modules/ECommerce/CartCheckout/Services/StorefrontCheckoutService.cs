@@ -3,6 +3,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Notifications;
+using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
 using E_POS.Application.Modules.Shared.Notification.Services;
 
@@ -15,21 +16,28 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
     private const int MaximumIdempotencyKeyLength = 50;
     private readonly IStorefrontCheckoutRepository _repository;
     private readonly INotificationService _notificationService;
+    private readonly ITenantStaffNotificationRecipientRepository _staffNotificationRecipientRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public StorefrontCheckoutService(
         IStorefrontCheckoutRepository repository,
         IDateTimeProvider dateTimeProvider)
-        : this(repository, NoopNotificationService.Instance, dateTimeProvider)
+        : this(
+            repository,
+            NoopNotificationService.Instance,
+            NoopTenantStaffNotificationRecipientRepository.Instance,
+            dateTimeProvider)
     {
     }
     public StorefrontCheckoutService(
         IStorefrontCheckoutRepository repository,
         INotificationService notificationService,
+        ITenantStaffNotificationRecipientRepository staffNotificationRecipientRepository,
         IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
         _notificationService = notificationService;
+        _staffNotificationRecipientRepository = staffNotificationRecipientRepository;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -137,6 +145,21 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
                     result.Value.Order.Id,
                     result.Value.Order.OrderNumber),
                 cancellationToken);
+
+            var staffTenantUserIds = await _staffNotificationRecipientRepository.GetActiveStaffTenantUserIdsAsync(
+                tenantId,
+                cancellationToken);
+
+            foreach (var staffTenantUserId in staffTenantUserIds)
+            {
+                await _notificationService.CreateAsync(
+                    ECommerceOrderNotificationFactory.OrderPlacedForStaff(
+                        tenantId,
+                        staffTenantUserId,
+                        result.Value.Order.Id,
+                        result.Value.Order.OrderNumber),
+                    cancellationToken);
+            }
         }
 
         return result;

@@ -86,6 +86,8 @@ public interface IPlatformTenantRepository
 
     Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken);
 
+    Task MarkTenantAdminInviteSentAsync(Guid inviteId, DateTimeOffset sentAt, CancellationToken cancellationToken) => Task.CompletedTask;
+
     /// <summary>
     /// Returns active permission definition IDs keyed by permission code for the requested codes.
     /// Missing/inactive codes are omitted from the dictionary.

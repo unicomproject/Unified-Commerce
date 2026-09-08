@@ -351,13 +351,24 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 select media.PublicUrl)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var unreadNotificationCount = await _dbContext.NotificationInboxItems
-            .AsNoTracking()
-            .Where(x =>
-                x.TenantId == context.TenantId &&
-                x.TenantUserId == context.UserId &&
-                x.InboxStatus == "UNREAD")
-            .CountAsync(cancellationToken);
+        var allowedNotificationSources =
+            E_POS.Application.Modules.Tenant.POSOperations.Services.PosNotificationSourceAccess
+                .Resolve(context);
+        var unreadNotificationCount = context.HasPermission(
+                E_POS.Domain.Modules.Tenant.POSOperations.Constants.PosPermissions.Notifications.View)
+            ? await (from inbox in _dbContext.NotificationInboxItems.AsNoTracking()
+                     join message in _dbContext.NotificationMessages.AsNoTracking()
+                         on inbox.NotificationMessageId equals message.Id
+                     join notificationEvent in _dbContext.NotificationEvents.AsNoTracking()
+                         on message.NotificationEventId equals notificationEvent.Id
+                     where inbox.TenantId == context.TenantId &&
+                           inbox.TenantUserId == context.UserId &&
+                           inbox.RecipientType == "TENANT_USER" &&
+                           inbox.InboxStatus == "UNREAD" &&
+                           notificationEvent.SourceModule != null &&
+                           allowedNotificationSources.Contains(notificationEvent.SourceModule)
+                     select inbox.Id).CountAsync(cancellationToken)
+            : 0;
 
         // Mirrors the active-hold predicate used by PosHoldRepository.GetActiveHoldsAsync
         // (HELD, not released/cancelled, not past its expiry, same till + holding user)

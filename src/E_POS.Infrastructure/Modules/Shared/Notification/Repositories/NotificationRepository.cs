@@ -1,12 +1,13 @@
 using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
 using E_POS.Application.Modules.Shared.Notification.Dtos;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Domain.Modules.Shared.Notification.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Shared.Notification.Repositories;
 
-public sealed class NotificationRepository : INotificationRepository
+public sealed class NotificationRepository : INotificationRepository, IPosNotificationRepository
 {
     private readonly EPosDbContext _dbContext;
 
@@ -219,6 +220,39 @@ public sealed class NotificationRepository : INotificationRepository
                 x.InboxStatus == "UNREAD",
                 cancellationToken);
 
+    public async Task<NotificationInboxQueryResult> GetTenantUserInboxAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        IReadOnlyCollection<string> allowedSourceModules,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var query = TenantUserInboxQuery(tenantId, tenantUserId, allowedSourceModules)
+            .Where(x => x.InboxStatus != "DELETED");
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new NotificationInboxItemProjection(
+                x.Id, x.MessageId, x.EventCode, x.SourceModule,
+                x.SourceReferenceType, x.SourceReferenceId, x.TitleText,
+                x.BodyText, x.LinkUrl, x.InboxStatus, x.CreatedAt,
+                x.DeliveredAt, x.ReadAt))
+            .ToListAsync(cancellationToken);
+        return new NotificationInboxQueryResult(items, totalCount);
+    }
+
+    public Task<int> GetTenantUserUnreadCountAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        IReadOnlyCollection<string> allowedSourceModules,
+        CancellationToken cancellationToken) =>
+        TenantUserInboxQuery(tenantId, tenantUserId, allowedSourceModules)
+            .CountAsync(x => x.InboxStatus == "UNREAD", cancellationToken);
+
     public async Task<NotificationInboxItemProjection?> MarkCustomerInboxItemReadAsync(
         Guid tenantId,
         Guid customerId,
@@ -274,6 +308,109 @@ public sealed class NotificationRepository : INotificationRepository
         return items.Count;
     }
 
+    public async Task<NotificationInboxQueryResult> GetTenantUserInboxAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var query = TenantUserInboxQuery(tenantId, tenantUserId)
+            .Where(x => x.InboxStatus != "DELETED");
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new NotificationInboxItemProjection(
+                x.Id,
+                x.MessageId,
+                x.EventCode,
+                x.SourceModule,
+                x.SourceReferenceType,
+                x.SourceReferenceId,
+                x.TitleText,
+                x.BodyText,
+                x.LinkUrl,
+                x.InboxStatus,
+                x.CreatedAt,
+                x.DeliveredAt,
+                x.ReadAt))
+            .ToListAsync(cancellationToken);
+
+        return new NotificationInboxQueryResult(items, totalCount);
+    }
+
+    public Task<int> GetTenantUserUnreadCountAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        CancellationToken cancellationToken) =>
+        _dbContext.NotificationInboxItems
+            .AsNoTracking()
+            .CountAsync(x =>
+                x.TenantId == tenantId &&
+                x.TenantUserId == tenantUserId &&
+                x.RecipientType == "TENANT_USER" &&
+                x.InboxStatus == "UNREAD",
+                cancellationToken);
+
+    public async Task<NotificationInboxItemProjection?> MarkTenantUserInboxItemReadAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        Guid inboxItemId,
+        DateTimeOffset now,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken)
+    {
+        var item = await _dbContext.NotificationInboxItems
+            .FirstOrDefaultAsync(x =>
+                x.TenantId == tenantId &&
+                x.TenantUserId == tenantUserId &&
+                x.RecipientType == "TENANT_USER" &&
+                x.Id == inboxItemId &&
+                x.InboxStatus != "DELETED",
+                cancellationToken);
+
+        if (item is null)
+            return null;
+
+        if (!string.Equals(item.InboxStatus, "READ", StringComparison.OrdinalIgnoreCase))
+        {
+            item.MarkRead(now, ipAddress, userAgent);
+            await AddTenantUserReadReceiptIfMissingAsync(item, now, ipAddress, userAgent, cancellationToken);
+        }
+
+        return await ProjectInboxItemAsync(item, cancellationToken);
+    }
+
+    public async Task<int> MarkAllTenantUserInboxItemsReadAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        DateTimeOffset now,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken)
+    {
+        var items = await _dbContext.NotificationInboxItems
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.TenantUserId == tenantUserId &&
+                x.RecipientType == "TENANT_USER" &&
+                x.InboxStatus == "UNREAD")
+            .ToListAsync(cancellationToken);
+
+        foreach (var item in items)
+        {
+            item.MarkRead(now, ipAddress, userAgent);
+            await AddTenantUserReadReceiptIfMissingAsync(item, now, ipAddress, userAgent, cancellationToken);
+        }
+
+        return items.Count;
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -289,6 +426,36 @@ public sealed class NotificationRepository : INotificationRepository
                 x.TenantId == item.TenantId &&
                 x.NotificationInboxItemId == item.Id &&
                 x.CustomerId == item.CustomerId,
+                cancellationToken);
+
+        if (exists)
+            return;
+
+        _dbContext.NotificationReadReceipts.Add(NotificationReadReceipt.Create(
+            item.TenantId,
+            item.Id,
+            item.NotificationMessageId,
+            item.RecipientType,
+            item.PlatformUserId,
+            item.TenantUserId,
+            item.CustomerId,
+            now,
+            ipAddress,
+            userAgent));
+    }
+
+    private async Task AddTenantUserReadReceiptIfMissingAsync(
+        NotificationInboxItem item,
+        DateTimeOffset now,
+        string? ipAddress,
+        string? userAgent,
+        CancellationToken cancellationToken)
+    {
+        var exists = await _dbContext.NotificationReadReceipts
+            .AnyAsync(x =>
+                x.TenantId == item.TenantId &&
+                x.NotificationInboxItemId == item.Id &&
+                x.TenantUserId == item.TenantUserId,
                 cancellationToken);
 
         if (exists)
@@ -345,7 +512,7 @@ public sealed class NotificationRepository : INotificationRepository
             item.ReadAt);
     }
 
-    private IQueryable<CustomerInboxProjection> CustomerInboxQuery(Guid tenantId, Guid customerId) =>
+    private IQueryable<RecipientInboxProjection> CustomerInboxQuery(Guid tenantId, Guid customerId) =>
         from inbox in _dbContext.NotificationInboxItems.AsNoTracking()
         join message in _dbContext.NotificationMessages.AsNoTracking()
             on inbox.NotificationMessageId equals message.Id
@@ -354,7 +521,7 @@ public sealed class NotificationRepository : INotificationRepository
         where inbox.TenantId == tenantId &&
               inbox.CustomerId == customerId &&
               inbox.RecipientType == "CUSTOMER"
-        select new CustomerInboxProjection
+        select new RecipientInboxProjection
         {
             Id = inbox.Id,
             MessageId = message.Id,
@@ -371,7 +538,71 @@ public sealed class NotificationRepository : INotificationRepository
             ReadAt = inbox.ReadAt
         };
 
-    private sealed class CustomerInboxProjection
+    private IQueryable<RecipientInboxProjection> TenantUserInboxQuery(
+        Guid tenantId,
+        Guid tenantUserId,
+        IReadOnlyCollection<string> allowedSourceModules)
+    {
+        var normalizedModules = allowedSourceModules
+            .Select(x => x.Trim().ToUpperInvariant())
+            .Distinct()
+            .ToArray();
+        return
+            from inbox in _dbContext.NotificationInboxItems.AsNoTracking()
+            join message in _dbContext.NotificationMessages.AsNoTracking()
+                on inbox.NotificationMessageId equals message.Id
+            join notificationEvent in _dbContext.NotificationEvents.AsNoTracking()
+                on message.NotificationEventId equals notificationEvent.Id
+            where inbox.TenantId == tenantId &&
+                  inbox.TenantUserId == tenantUserId &&
+                  inbox.RecipientType == "TENANT_USER" &&
+                  notificationEvent.SourceModule != null &&
+                  normalizedModules.Contains(notificationEvent.SourceModule.ToUpper())
+            select new RecipientInboxProjection
+            {
+                Id = inbox.Id,
+                MessageId = message.Id,
+                EventCode = notificationEvent.EventCode,
+                SourceModule = notificationEvent.SourceModule,
+                SourceReferenceType = notificationEvent.SourceReferenceType,
+                SourceReferenceId = notificationEvent.SourceReferenceId,
+                TitleText = inbox.TitleText,
+                BodyText = inbox.BodyText,
+                LinkUrl = inbox.LinkUrl,
+                InboxStatus = inbox.InboxStatus,
+                CreatedAt = inbox.CreatedAt,
+                DeliveredAt = inbox.DeliveredAt,
+                ReadAt = inbox.ReadAt
+            };
+    }
+
+    private IQueryable<RecipientInboxProjection> TenantUserInboxQuery(Guid tenantId, Guid tenantUserId) =>
+        from inbox in _dbContext.NotificationInboxItems.AsNoTracking()
+        join message in _dbContext.NotificationMessages.AsNoTracking()
+            on inbox.NotificationMessageId equals message.Id
+        join notificationEvent in _dbContext.NotificationEvents.AsNoTracking()
+            on message.NotificationEventId equals notificationEvent.Id
+        where inbox.TenantId == tenantId &&
+              inbox.TenantUserId == tenantUserId &&
+              inbox.RecipientType == "TENANT_USER"
+        select new RecipientInboxProjection
+        {
+            Id = inbox.Id,
+            MessageId = message.Id,
+            EventCode = notificationEvent.EventCode,
+            SourceModule = notificationEvent.SourceModule,
+            SourceReferenceType = notificationEvent.SourceReferenceType,
+            SourceReferenceId = notificationEvent.SourceReferenceId,
+            TitleText = inbox.TitleText,
+            BodyText = inbox.BodyText,
+            LinkUrl = inbox.LinkUrl,
+            InboxStatus = inbox.InboxStatus,
+            CreatedAt = inbox.CreatedAt,
+            DeliveredAt = inbox.DeliveredAt,
+            ReadAt = inbox.ReadAt
+        };
+
+    private sealed class RecipientInboxProjection
     {
         public Guid Id { get; init; }
         public Guid MessageId { get; init; }

@@ -26,6 +26,39 @@ public static class ECommerceOrderNotificationFactory
             "PLACED");
     }
 
+    public static CreateNotificationEventRequest OrderPlacedForStaff(
+        Guid tenantId,
+        Guid tenantUserId,
+        Guid orderId,
+        string orderNumber)
+    {
+        return new CreateNotificationEventRequest
+        {
+            TenantId = tenantId,
+            EventCode = "ecommerce.order_placed.staff",
+            EventName = "E-commerce order placed (staff)",
+            SourceModule = SourceModule,
+            SourceReferenceType = SourceReferenceType,
+            SourceReferenceId = orderId,
+            // Unique per (order, staff recipient) - event numbers are deduplicated per tenant, and each staff
+            // member needs their own event/inbox row rather than sharing the customer's OrderPlaced event number.
+            // Kept under the 80-char event number limit: "ECOM-STF-" (9) + 2x32-char GUIDs + separator = 74.
+            EventNumber = $"ECOM-STF-{orderId:N}-{tenantUserId:N}",
+            Priority = NotificationPriorities.Normal,
+            Recipient = new NotificationRecipientDto
+            {
+                RecipientType = NotificationRecipientTypes.TenantUser,
+                TenantUserId = tenantUserId
+            },
+            Content = new NotificationContentDto
+            {
+                Title = "New order placed",
+                Body = $"Order {orderNumber} has been placed and is waiting for outlet acceptance.",
+                ActionUrl = $"/orders/{orderId:N}"
+            }
+        };
+    }
+
     public static CreateNotificationEventRequest OrderStatusChanged(
         Guid tenantId,
         Guid customerId,

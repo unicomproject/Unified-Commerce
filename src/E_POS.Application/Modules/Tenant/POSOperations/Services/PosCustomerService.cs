@@ -1,6 +1,7 @@
 using System.Net.Mail;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.AccessControl.SensitiveData;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
@@ -115,15 +116,17 @@ public sealed class PosCustomerService : IPosCustomerService
         }
 
         return ApplicationResult<PosCustomerListItemResponseDto>.Success(
-            new PosCustomerListItemResponseDto(
-                customer.Id,
-                customer.Name,
-                customer.Phone,
-                customer.Email,
-                customer.Status,
-                customer.CustomerCode,
-                customer.SourceType,
-                customer.CreatedAt));
+            PosSensitiveResponseFilter.FilterCustomer(
+                context,
+                new PosCustomerListItemResponseDto(
+                    customer.Id,
+                    customer.Name,
+                    customer.Phone,
+                    customer.Email,
+                    customer.Status,
+                    customer.CustomerCode,
+                    customer.SourceType,
+                    customer.CreatedAt)));
     }
 
     public async Task<ApplicationResult<PosCustomerListItemResponseDto>> UpdateAsync(
@@ -211,7 +214,8 @@ public sealed class PosCustomerService : IPosCustomerService
         var updated = await _repository.GetByIdAsync(context.TenantId, customerId, cancellationToken);
         return updated is null
             ? Failure("pos_customers.customer_not_found", "Customer could not be found.")
-            : ApplicationResult<PosCustomerListItemResponseDto>.Success(updated);
+            : ApplicationResult<PosCustomerListItemResponseDto>.Success(
+                PosSensitiveResponseFilter.FilterCustomer(context, updated));
     }
 
     public async Task<ApplicationResult<PosCustomerListResponseDto>> ListAsync(
@@ -249,7 +253,8 @@ public sealed class PosCustomerService : IPosCustomerService
             normalizedPageSize,
             cancellationToken);
 
-        return ApplicationResult<PosCustomerListResponseDto>.Success(response);
+        return ApplicationResult<PosCustomerListResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterCustomerList(context, response));
     }
 
     public async Task<ApplicationResult<PosCustomerSummaryResponseDto>> GetSummaryAsync(
@@ -313,7 +318,8 @@ public sealed class PosCustomerService : IPosCustomerService
             return Failure("pos_customers.customer_not_found", "Customer could not be found.");
         }
 
-        return ApplicationResult<PosCustomerListItemResponseDto>.Success(customer);
+        return ApplicationResult<PosCustomerListItemResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterCustomer(context, customer));
     }
 
     public async Task<ApplicationResult<PosCustomerOrdersResponseDto>> GetOrdersAsync(
@@ -366,7 +372,8 @@ public sealed class PosCustomerService : IPosCustomerService
             status,
             cancellationToken);
 
-        return ApplicationResult<PosCustomerOrdersResponseDto>.Success(response);
+        return ApplicationResult<PosCustomerOrdersResponseDto>.Success(
+            PosSensitiveResponseFilter.FilterCustomerOrders(context, response));
     }
 
     public async Task<ApplicationResult<PosCustomerAttachToSaleResponseDto>> AttachToSaleAsync(
@@ -376,8 +383,7 @@ public sealed class PosCustomerService : IPosCustomerService
         PosCustomerAttachToSaleRequestDto request,
         CancellationToken cancellationToken)
     {
-        if (!context.HasPermission(CustomerPermissions.View) ||
-            !context.HasPermission(SalesPermissions.Cart.Manage))
+        if (!context.HasPermission(CustomerPermissions.AttachSale))
         {
             return ApplicationResult<PosCustomerAttachToSaleResponseDto>.Failure(
                 new ApplicationError(
@@ -452,16 +458,18 @@ public sealed class PosCustomerService : IPosCustomerService
         }
 
         return ApplicationResult<PosCustomerAttachToSaleResponseDto>.Success(
-            new PosCustomerAttachToSaleResponseDto(
-                customer.CustomerId,
-                customer.FullName,
-                customer.Phone,
-                customer.Email,
-                customer.Status,
-                customer.CustomerCode,
-                attachedSaleId,
-                attachmentMode,
-                true));
+            PosSensitiveResponseFilter.FilterAttachedCustomer(
+                context,
+                new PosCustomerAttachToSaleResponseDto(
+                    customer.CustomerId,
+                    customer.FullName,
+                    customer.Phone,
+                    customer.Email,
+                    customer.Status,
+                    customer.CustomerCode,
+                    attachedSaleId,
+                    attachmentMode,
+                    true)));
     }
 
     public static (DateTimeOffset MonthStartUtc, DateTimeOffset MonthEndUtc, string TimeZoneId)

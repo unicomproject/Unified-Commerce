@@ -1,4 +1,5 @@
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Platform.PlatformAdmin.Contracts;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Dtos;
 using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
@@ -14,6 +15,7 @@ using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Entities;
 using E_POS.Domain.Modules.Shared.Integration.Entities;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace E_POS.Application.Modules.Platform.PlatformAdmin.Services;
@@ -479,13 +481,16 @@ public sealed partial class PlatformTenantService
                 });
         }
 
+        var adminFullName = string.IsNullOrWhiteSpace(tenantAdmin.LastName)
+            ? adminFirstName
+            : $"{adminFirstName} {tenantAdmin.LastName.Trim()}";
         var normalizedAdminPhone = NormalizeOptionalText(tenantAdmin.Phone);
         var tenantAdminUser = TenantUser.CreatePendingInvite(
             Guid.NewGuid(),
             tenantId,
             adminEmail,
-            adminFirstName,
-            tenantAdmin.LastName,
+            adminFullName,
+            normalizedAdminPhone,
             normalizedAdminPhone,
             now);
 
@@ -496,6 +501,30 @@ public sealed partial class PlatformTenantService
             roleId,
             null,
             now);
+
+        string? rawInvitationToken = null;
+        UserInvite? tenantAdminInvite = null;
+        DateTimeOffset? inviteExpiresAt = null;
+
+        var requiresPayment = request.OnboardingFinalizeContext?.RequiresPayment == true;
+        if (tenantAdmin.SendInvite && !requiresPayment && _invitationTokenService is not null)
+        {
+            rawInvitationToken = _invitationTokenService.GenerateToken();
+            var inviteTokenHash = _invitationTokenService.HashToken(rawInvitationToken);
+            inviteExpiresAt = now.AddHours(24);
+
+            tenantAdminInvite = UserInvite.CreatePending(
+                Guid.NewGuid(),
+                tenantId,
+                adminEmail,
+                adminEmail,
+                roleId,
+                platformUserId,
+                inviteTokenHash,
+                inviteExpiresAt.Value,
+                now,
+                tenantUserId: tenantAdminUser.Id);
+        }
 
         var shouldCreateDraftInvoice = subscriptionRequest?.CreateDraftInvoice == true ||
                                        string.Equals(billingStatus, TenantBillingStatusConstants.Pending, StringComparison.OrdinalIgnoreCase);
@@ -571,24 +600,25 @@ public sealed partial class PlatformTenantService
             onboardingContacts = onboardingContext.Contacts.Select(contact => TenantContact.Create(
                 Guid.NewGuid(), tenantId, contact.ContactType, contact.ContactName, contact.Email, contact.Phone,
                 onboardingContext.ActorPlatformUserId, now)).ToArray();
-            var eventType = onboardingContext.RequiresPayment
-                ? "manual_payment.access_notification_requested"
-                : "tenant_admin.invitation_requested";
-            onboardingMessages =
-            [
-                IntegrationOutboxMessage.Create(
-                    Guid.NewGuid(), eventType, "tenant_onboarding", onboardingContext.OperationId, 1,
-                    tenantId, onboardingContext.OperationId, null,
-                    JsonSerializer.Serialize(new
-                    {
-                        tenantId,
-                        operationId = onboardingContext.OperationId,
-                        paymentId = manualPayment?.Id,
-                        accessId = manualPaymentAccess?.Id,
-                        invoiceId = draftInvoice?.Id
-                    }),
-                    $"{eventType}:{tenantId:D}", now)
-            ];
+            
+            if (onboardingContext.RequiresPayment)
+            {
+                onboardingMessages =
+                [
+                    IntegrationOutboxMessage.Create(
+                        Guid.NewGuid(), "manual_payment.access_notification_requested", "tenant_onboarding", onboardingContext.OperationId, 1,
+                        tenantId, onboardingContext.OperationId, null,
+                        JsonSerializer.Serialize(new
+                        {
+                            tenantId,
+                            operationId = onboardingContext.OperationId,
+                            paymentId = manualPayment?.Id,
+                            accessId = manualPaymentAccess?.Id,
+                            invoiceId = draftInvoice?.Id
+                        }),
+                        $"manual_payment.access_notification_requested:{tenantId:D}", now)
+                ];
+            }
         }
 
         var writeModel = new PlatformTenantCreateWriteModel
@@ -606,7 +636,7 @@ public sealed partial class PlatformTenantService
             CashierRolePermissions = cashierRolePermissions,
             TenantAdminUser = tenantAdminUser,
             TenantAdminUserRole = tenantAdminUserRole,
-            TenantAdminInvite = null,
+            TenantAdminInvite = tenantAdminInvite,
             DraftInvoice = draftInvoice,
             DraftInvoiceLines = draftInvoiceLines,
             ManualPayment = manualPayment,
@@ -644,6 +674,35 @@ public sealed partial class PlatformTenantService
         if (onboardingContext is null)
         {
             await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.created", "Tenant created via platform wizard.", null, now, cancellationToken);
+        }
+
+        if (tenantAdmin.SendInvite && tenantAdminInvite is not null && !string.IsNullOrWhiteSpace(rawInvitationToken) && _invitationDeliveryService is not null)
+        {
+            var deliveryResult = await _invitationDeliveryService.DeliverAsync(
+                new TenantAdminInvitationDeliveryRequest(
+                    tenantId,
+                    name,
+                    code,
+                    adminEmail,
+                    adminFullName,
+                    rawInvitationToken,
+                    inviteExpiresAt!.Value,
+                    onboardingContext?.OperationId.ToString("D")),
+                cancellationToken);
+
+            if (deliveryResult.IsSuccess)
+            {
+                await _repository.MarkTenantAdminInviteSentAsync(tenantAdminInvite.Id, _dateTimeProvider.UtcNow, cancellationToken);
+                await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant_admin.invitation_sent",
+                    $"Tenant administrator invitation email sent to {adminEmail}.", null, _dateTimeProvider.UtcNow, cancellationToken);
+            }
+            else
+            {
+                _logger?.LogWarning("Tenant admin invitation delivery failed for tenant {TenantId} ({TenantCode}) to {Email}: Code={Code}, Message={Message}",
+                    tenantId, code, adminEmail, deliveryResult.ErrorCode, deliveryResult.ErrorMessage);
+                await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant_admin.invitation_delivery_failed",
+                    $"Tenant administrator invitation email delivery failed for {adminEmail}: {deliveryResult.ErrorMessage}", null, _dateTimeProvider.UtcNow, cancellationToken);
+            }
         }
 
         try

@@ -58,8 +58,8 @@ public sealed record PosHoldLineDto(
     string? VariantName,
     string? Sku,
     int Qty,
-    int UnitPrice,
-    int LineTotal,
+    int? UnitPrice,
+    int? LineTotal,
     string? LineNote = null,
     string? ImageUrl = null);
 
@@ -75,10 +75,10 @@ public sealed record PosHoldListItemDto(
     string? Reason,
     string Status,
     int ItemCount,
-    int Subtotal,
-    int Discount,
-    int Tax,
-    int Total,
+    int? Subtotal,
+    int? Discount,
+    int? Tax,
+    int? Total,
     string Currency,
     DateTimeOffset HeldAt,
     DateTimeOffset? ExpiresAt,
@@ -87,7 +87,7 @@ public sealed record PosHoldListItemDto(
 public sealed record PosHoldListResponseDto(
     IReadOnlyList<PosHoldListItemDto> Holds,
     int TotalCount,
-    int TotalValue,
+    int? TotalValue,
     string Currency,
     int Page,
     int PageSize);

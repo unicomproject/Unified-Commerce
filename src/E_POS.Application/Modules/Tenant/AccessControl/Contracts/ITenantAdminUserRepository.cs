@@ -242,7 +242,11 @@ public enum TenantAdminUserAccessValidationFailure
     TillNotFound,
     TillWrongTenant,
     TillInactive,
-    TillOutsideOutletScope
+    TillOutsideOutletScope,
+    InvalidPermissionFormat,
+    PreAuthPermissionNotAssignable,
+    UnknownCanonicalPermission,
+    ParentPermissionRequired
 }
 
 public sealed record TenantAdminUserProfileMediaValidationResult(

@@ -27,7 +27,8 @@ public class FulfillmentOrderEvent : AuditableEntity
         string? newStatus,
         DateTimeOffset eventAt,
         Guid actorTenantUserId,
-        string? eventNote = null)
+        string? eventNote = null,
+        string? eventPayloadJson = null)
     {
         return new FulfillmentOrderEvent
         {
@@ -39,6 +40,7 @@ public class FulfillmentOrderEvent : AuditableEntity
             OldStatus = oldStatus,
             NewStatus = newStatus,
             EventNote = eventNote,
+            EventPayloadJson = eventPayloadJson,
             EventAt = eventAt,
             EventByTenantUserId = actorTenantUserId,
             CreatedAt = eventAt,

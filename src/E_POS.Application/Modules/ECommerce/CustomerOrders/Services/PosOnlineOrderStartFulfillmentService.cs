@@ -3,6 +3,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using Microsoft.Extensions.Logging;
 
@@ -10,7 +11,7 @@ namespace E_POS.Application.Modules.ECommerce.CustomerOrders.Services;
 
 public sealed class PosOnlineOrderStartFulfillmentService : IPosOnlineOrderStartFulfillmentService
 {
-    public const string StartPermission = "commerce.online_order.fulfilment.start";
+    public const string StartPermission = OnlineOrderPickingPermissions.FulfilmentStart;
 
     private readonly IPosOnlineOrderStartFulfillmentRepository _repository;
     private readonly ITenantFeatureEntitlementEvaluator _entitlements;

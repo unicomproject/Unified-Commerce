@@ -391,6 +391,7 @@ public sealed class PlatformTenantEntitlementOverrideServiceTests
         public Task SaveChangesAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task ReplacePlanFeaturesAsync(Guid planId, IReadOnlyList<Guid> featureIds, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<IReadOnlySet<Guid>> GetActiveFeatureIdsAsync(IReadOnlyCollection<Guid> featureIds, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public Task<IReadOnlyList<PlanTechnicalFeatureLookupDto>> GetActiveTenantFeaturesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlanTechnicalFeatureLookupDto>>([]);
         public Task<int> GetFeatureCountAsync(Guid planId, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task UpsertLegacyPlanLimitsAsync(Guid planId, int? maxOutlets, int? maxUsers, int? maxTills, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotImplementedException();
         public Task<IReadOnlyDictionary<string, decimal?>> GetPlanLimitValuesByKeyAsync(Guid planId, CancellationToken cancellationToken) => throw new NotImplementedException();

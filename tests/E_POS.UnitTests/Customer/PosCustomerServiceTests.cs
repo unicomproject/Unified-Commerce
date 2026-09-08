@@ -102,13 +102,13 @@ public sealed class PosCustomerServiceTests
     }
 
     [Fact]
-    public async Task AttachToSaleAsync_WithoutCartManage_ReturnsPermissionDenied()
+    public async Task AttachToSaleAsync_WithoutAttachSalePermission_ReturnsPermissionDenied()
     {
         var service = CreateService(new FakeCustomerRepository(), new FakeTillSessionRepository());
         var context = new TenantRequestContext(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            [CustomerPermissions.View]);
+            [CustomerPermissions.View, SalesPermissions.Cart.Manage]);
 
         var result = await service.AttachToSaleAsync(
             context,
@@ -130,7 +130,7 @@ public sealed class PosCustomerServiceTests
         var context = new TenantRequestContext(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            [CustomerPermissions.View, SalesPermissions.Cart.Manage]);
+            [CustomerPermissions.AttachSale]);
 
         var result = await service.AttachToSaleAsync(
             context,
