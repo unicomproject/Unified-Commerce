@@ -91,7 +91,8 @@ public sealed class TenantAdminInvitationAcceptanceService : ITenantAdminInvitat
             return InvalidResponse(
                 token,
                 expired: reject.Code == ErrorInviteExpired,
-                reject.Message);
+                reject.Message,
+                reject.Code);
         }
 
         return new ValidateTenantAdminSetupTokenResponse(
@@ -247,11 +248,13 @@ public sealed class TenantAdminInvitationAcceptanceService : ITenantAdminInvitat
     private static ValidateTenantAdminSetupTokenResponse InvalidResponse(
         string token,
         bool expired,
-        string message) =>
+        string message,
+        string code = ErrorInviteInvalid) =>
         new(
             SetupToken: token,
             Valid: false,
             Expired: expired,
             Email: null,
-            Message: message);
+            Message: message,
+            Code: code);
 }
