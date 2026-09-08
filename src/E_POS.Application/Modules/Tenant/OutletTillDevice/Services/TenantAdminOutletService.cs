@@ -483,4 +483,17 @@ public sealed class TenantAdminOutletService : ITenantAdminOutletService
 
         return false;
     }
+    public async Task<ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>> GetManagerOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var accessError = (HasAnyPermission(context, TenantAdminOutletPermissions.ManagerAssign, TenantAdminOutletPermissions.Manage) ? null : PermissionDenied);
+        if (accessError is not null)
+        {
+            return ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Failure(accessError);
+        }
+
+        var options = await _repository.GetManagerOptionsAsync(context.TenantId, cancellationToken);
+        return ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Success(options);
+    }
 }

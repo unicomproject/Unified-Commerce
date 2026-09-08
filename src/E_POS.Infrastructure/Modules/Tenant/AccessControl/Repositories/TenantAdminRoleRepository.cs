@@ -970,4 +970,42 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
         string ActionType,
         string? PermissionDescription,
         bool PermissionIsActive);
+    public async Task<TenantRoleAssignmentOptionsResponse> GetAssignmentOptionsAsync(
+        Guid tenantId,
+        bool includeUsers,
+        bool includeOutlets,
+        CancellationToken cancellationToken)
+    {
+        var users = includeUsers
+            ? await _dbContext.TenantUsers
+                .AsNoTracking()
+                .Where(user => user.TenantId == tenantId && user.AccountStatus != TenantUserConstants.StatusInactive)
+                .OrderBy(user => user.FullName)
+                .Select(user => new TenantRoleAssignmentUserOptionResponse(
+                    user.Id,
+                    user.FullName,
+                    user.Email,
+                    user.StaffCode,
+                    user.AccountStatus))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var outlets = includeOutlets
+            ? await _dbContext.Outlets
+                .AsNoTracking()
+                .Where(outlet =>
+                    outlet.TenantId == tenantId &&
+                    outlet.Status != OutletConstants.InactiveStatus &&
+                    outlet.Status != OutletConstants.DeletedStatus)
+                .OrderBy(outlet => outlet.OutletName)
+                .Select(outlet => new TenantRoleAssignmentOutletOptionResponse(
+                    outlet.Id,
+                    outlet.OutletName,
+                    outlet.OutletCode,
+                    outlet.Status))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        return new TenantRoleAssignmentOptionsResponse(users, outlets, includeUsers, includeOutlets);
+    }
 }

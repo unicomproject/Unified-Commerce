@@ -814,4 +814,26 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
             ? "CUSTOM_ROLE"
             : code[..Math.Min(code.Length, 80)];
     }
+    public async Task<ApplicationResult<TenantRoleAssignmentOptionsResponse>> GetAssignmentOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var canAssignUsers = (context.HasPermission(TenantAdminUserPermissions.RolesUsersAssign) || context.HasPermission(TenantAdminUserPermissions.RolesManage));
+        var canAssignOutlets = (context.HasPermission(TenantAdminUserPermissions.RolesOutletsAssign) || context.HasPermission(TenantAdminUserPermissions.RolesManage));
+        var canView = context.HasPermission(TenantAdminUserPermissions.RolesAssignmentsView) ||
+                      context.HasPermission(TenantAdminUserPermissions.RolesUpdate) ||
+                      context.HasPermission(TenantAdminUserPermissions.RolesManage);
+
+        if (!canView && !canAssignUsers && !canAssignOutlets)
+        {
+            return ApplicationResult<TenantRoleAssignmentOptionsResponse>.Failure(PermissionDenied);
+        }
+
+        var response = await _repository.GetAssignmentOptionsAsync(
+            context.TenantId,
+            canAssignUsers,
+            canAssignOutlets,
+            cancellationToken);
+        return ApplicationResult<TenantRoleAssignmentOptionsResponse>.Success(response);
+    }
 }

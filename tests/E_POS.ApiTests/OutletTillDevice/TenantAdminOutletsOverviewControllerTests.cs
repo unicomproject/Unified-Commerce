@@ -170,6 +170,8 @@ public sealed class TenantAdminOutletsOverviewControllerTests
 
     private sealed class FakeTenantAdminOutletService : ITenantAdminOutletService
     {
+        public Task<ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>> GetManagerOptionsAsync(TenantRequestContext context, CancellationToken cancellationToken)
+            => Task.FromResult(ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Success([]));
         public ApplicationResult<TenantAdminOutletOverviewResponse> OverviewResult { get; set; } = ApplicationResult<TenantAdminOutletOverviewResponse>.Failure(new ApplicationError("outlet.not_found", "Not found"));
         public ApplicationResult CommandResult { get; set; } = ApplicationResult.Success();
 

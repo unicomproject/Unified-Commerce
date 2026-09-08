@@ -111,13 +111,7 @@ public partial class DecoupleCategoryFromDepartment : Migration
             principalColumns: ["tenant_id", "id"],
             onDelete: ReferentialAction.Restrict);
 
-        migrationBuilder.AddForeignKey(
-            name: "fk_discount_policy_targets_category_id_categories",
-            table: "discount_policy_targets",
-            columns: ["tenant_id", "category_id"],
-            principalTable: "categories",
-            principalColumns: ["tenant_id", "id"],
-            onDelete: ReferentialAction.Restrict);
+
     }
 
     /// <inheritdoc />

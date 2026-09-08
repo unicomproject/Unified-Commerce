@@ -84,6 +84,10 @@ public interface ITenantAdminOutletRepository
         Guid tenantUserId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<TenantAdminOutletManagerOptionResponse>> GetManagerOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken);
+
     Task<bool> MediaAssetExistsAndActiveAsync(
         Guid tenantId,
         Guid mediaAssetId,
