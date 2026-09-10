@@ -195,7 +195,7 @@ public sealed class CashierPosChunk6AuthorizationTests
     [Fact]
     public void CatalogCodeFreeze_RoleAssignableCountUnchanged()
     {
-        Assert.Equal(344, CashierPosPermissionAssignmentRules.RoleAssignablePermissionCodes.Count);
+        Assert.Equal(346, CashierPosPermissionAssignmentRules.RoleAssignablePermissionCodes.Count);
         Assert.Contains(SalesPermissions.HeldSales.Cancel, CashierPosPermissionAssignmentRules.RoleAssignablePermissionCodes);
         Assert.Contains(CashDrawerPermissions.Canonical.CashIn, CashierPosPermissionAssignmentRules.RoleAssignablePermissionCodes);
         Assert.Contains(PosPermissions.Till.SessionOpen, CashierPosPermissionAssignmentRules.RoleAssignablePermissionCodes);
