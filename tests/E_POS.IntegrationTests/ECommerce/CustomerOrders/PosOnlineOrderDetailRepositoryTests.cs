@@ -348,7 +348,7 @@ public sealed class PosOnlineOrderDetailRepositoryTests
     private static SalesOrderLine CreateLine(Guid tenantId, Guid orderId) =>
         SalesOrderLine.CreateForClickAndCollect(
             Guid.NewGuid(), tenantId, orderId, 1, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            "SKU-1", "Product One", "Blue / M", "EA", "Each", "STANDARD", "VARIANT",
+            "SKU-1", "SKU-1", "Product One", "Blue / M", "EA", "Each", "STANDARD", "VARIANT",
             2m, 1000m, 2000m, 0m, 0m, false, Now);
 
     private static FulfillmentOrder CreateFulfillment(

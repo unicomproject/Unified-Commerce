@@ -35,5 +35,26 @@ public class FulfillmentOrderLine : AuditableEntity
             : "PARTIALLY_PICKED";
         UpdatedAt = now;
     }
+
+    public void Pack(Guid tenantUserId, DateTimeOffset now)
+    {
+        var effectiveRequired = RequestedQuantity - CancelledQuantity;
+        if (effectiveRequired < 0)
+            throw new InvalidOperationException("FULFILLMENT_PACK_QUANTITY_INVALID");
+
+        if (PickedQuantity < effectiveRequired)
+            throw new InvalidOperationException("FULFILLMENT_PACK_NOT_READY");
+
+        if (PackedQuantity > 0 && PackedQuantity >= PickedQuantity)
+            throw new InvalidOperationException("FULFILLMENT_ALREADY_PACKED");
+
+        PackedQuantity = PickedQuantity;
+        if (PackedQuantity > effectiveRequired)
+            throw new InvalidOperationException("FULFILLMENT_PACK_QUANTITY_EXCEEDED");
+
+        PackedByTenantUserId = tenantUserId;
+        LineStatus = "PACKED";
+        UpdatedAt = now;
+    }
 }
 

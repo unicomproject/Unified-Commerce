@@ -303,6 +303,7 @@ public sealed class CustomerOrderRepositoryTests
             null,
             Guid.NewGuid(),
             "SKU-001",
+            "2000000000001",
             "Arena Jersey",
             null,
             "EA",

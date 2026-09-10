@@ -189,4 +189,29 @@ public sealed class CashierPosCanonicalPermissionCatalogTests
                 Assert.DoesNotContain("1000", code, StringComparison.Ordinal);
             });
     }
+
+    [Fact]
+    public void CatalogCounts_MatchTotalAndRoleAssignableCounts()
+    {
+        var all = CashierPosCanonicalPermissionCatalog.All;
+        Assert.Equal(353, all.Count);
+        Assert.Equal(353, all.Select(d => d.Code).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(346, CashierPosCanonicalPermissionCatalog.RoleAssignable.Count());
+        Assert.Equal(295, CashierPosCanonicalPermissionCatalog.FineGrained.Count());
+    }
+
+    [Fact]
+    public void EveryDefinition_HasValidProperties()
+    {
+        foreach (var definition in CashierPosCanonicalPermissionCatalog.All)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(definition.Code));
+            Assert.False(string.IsNullOrWhiteSpace(definition.Module));
+            Assert.False(string.IsNullOrWhiteSpace(definition.Reason));
+            if (definition.ParentCode is not null)
+            {
+                Assert.False(string.IsNullOrWhiteSpace(definition.ParentCode));
+            }
+        }
+    }
 }

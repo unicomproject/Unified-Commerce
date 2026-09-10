@@ -74,6 +74,43 @@ public sealed class PosOnlineOrderPickingRepositoryTests
     }
 
     [Fact]
+    public async Task PickLine_TwoCashiersWithSameVersion_ExactlyOnePickIsPersisted()
+    {
+        await using var db = CreateDbContext();
+        var fixture = SeedPickingAggregate(db, requested: 1, picked: 0, version: 10);
+        var secondUserId = Guid.NewGuid();
+        db.TenantUsers.Add(TenantUser.Create(
+            secondUserId, fixture.TenantId, $"{secondUserId:N}@example.com", "Second Picker",
+            null, null, "hash", "salt", "ACTIVE", "cashier", "cashier", null, Now,
+            staffCode: $"STAFF-{secondUserId:N}"));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var repository = new PosOnlineOrderPickingRepository(db);
+        var request = new PosOnlineOrderPickLineRequest
+        {
+            Quantity = 1, Barcode = "SKU-1", InputMethod = "SCAN", ExpectedVersion = 10
+        };
+
+        var cashierA = await repository.PickLineAsync(
+            fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.Order.Id,
+            fixture.FulfillmentLine.Id, request, Now.AddMinutes(1), CancellationToken.None);
+        db.ChangeTracker.Clear();
+        var cashierB = await repository.PickLineAsync(
+            fixture.TenantId, secondUserId, fixture.OutletId, fixture.Order.Id,
+            fixture.FulfillmentLine.Id, request, Now.AddMinutes(1), CancellationToken.None);
+
+        Assert.True(cashierA.IsSuccess);
+        Assert.False(cashierB.IsSuccess);
+        Assert.Equal("online_orders.concurrency_conflict", cashierB.ErrorCode);
+        db.ChangeTracker.Clear();
+        Assert.Equal(1, (await db.FulfillmentOrderLines.SingleAsync()).PickedQuantity);
+        Assert.Equal(11, (await db.FulfillmentOrders.SingleAsync()).RowVersion);
+        var events = await db.FulfillmentOrderEvents.ToListAsync();
+        Assert.Single(events, x => x.EventType == PosOnlineOrderPickingRepository.LinePickedEvent);
+        Assert.Single(events, x => x.EventType == PosOnlineOrderPickingRepository.PickingCompletedEvent);
+    }
+
+    [Fact]
     public async Task PickLine_InvalidBarcode_LeavesQuantityVersionAndEventsUnchanged()
     {
         await using var db = CreateDbContext();
@@ -92,6 +129,119 @@ public sealed class PosOnlineOrderPickingRepositoryTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("online_orders.invalid_barcode", result.ErrorCode);
+        db.ChangeTracker.Clear();
+        Assert.Equal(0, (await db.FulfillmentOrderLines.SingleAsync()).PickedQuantity);
+        Assert.Equal(5, (await db.FulfillmentOrders.SingleAsync()).RowVersion);
+        Assert.Empty(await db.FulfillmentOrderEvents.ToListAsync());
+    }
+
+    [Fact]
+    public async Task PickLine_NullBarcodeSnapshot_ReturnsUnavailableWithoutMutation()
+    {
+        await using var db = CreateDbContext();
+        var fixture = SeedPickingAggregate(db, requested: 2, picked: 0, version: 5, barcodeSnapshot: null);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var repository = new PosOnlineOrderPickingRepository(db);
+
+        var result = await repository.PickLineAsync(
+            fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.Order.Id,
+            fixture.FulfillmentLine.Id,
+            new PosOnlineOrderPickLineRequest
+            {
+                Quantity = 1, Barcode = "ANY-CODE", InputMethod = "MANUAL", ExpectedVersion = 5
+            }, Now.AddMinutes(1), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("online_orders.barcode_snapshot_unavailable", result.ErrorCode);
+        db.ChangeTracker.Clear();
+        Assert.Equal(0, (await db.FulfillmentOrderLines.SingleAsync()).PickedQuantity);
+        Assert.Equal(5, (await db.FulfillmentOrders.SingleAsync()).RowVersion);
+        Assert.Empty(await db.FulfillmentOrderEvents.ToListAsync());
+    }
+
+    [Fact]
+    public async Task PickLine_CurrentCatalogueBarcodeDifferentFromSnapshot_DoesNotOverrideHistoricalSnapshot()
+    {
+        await using var db = CreateDbContext();
+        var fixture = SeedPickingAggregate(db, requested: 2, picked: 0, version: 5, barcodeSnapshot: "SNAP-A");
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var repository = new PosOnlineOrderPickingRepository(db);
+
+        var rejected = await repository.PickLineAsync(
+            fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.Order.Id,
+            fixture.FulfillmentLine.Id,
+            new PosOnlineOrderPickLineRequest
+            {
+                Quantity = 1, Barcode = "CATALOGUE-B", InputMethod = "SCAN", ExpectedVersion = 5
+            }, Now.AddMinutes(1), CancellationToken.None);
+        Assert.False(rejected.IsSuccess);
+        Assert.Equal("online_orders.invalid_barcode", rejected.ErrorCode);
+
+        var accepted = await repository.PickLineAsync(
+            fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.Order.Id,
+            fixture.FulfillmentLine.Id,
+            new PosOnlineOrderPickLineRequest
+            {
+                Quantity = 1, Barcode = "SNAP-A", InputMethod = "SCAN", ExpectedVersion = 5
+            }, Now.AddMinutes(2), CancellationToken.None);
+        Assert.True(accepted.IsSuccess);
+        Assert.Equal(6, accepted.Command!.FulfillmentVersion);
+        db.ChangeTracker.Clear();
+        Assert.Equal(1, (await db.FulfillmentOrderLines.SingleAsync()).PickedQuantity);
+    }
+
+    [Fact]
+    public async Task PickLine_ManualBarcodeForDifferentItem_LeavesQuantityVersionAndEventsUnchanged()
+    {
+        await using var db = CreateDbContext();
+        var fixture = SeedPickingAggregate(db, requested: 2, picked: 0, version: 5);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var repository = new PosOnlineOrderPickingRepository(db);
+
+        var result = await repository.PickLineAsync(
+            fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.Order.Id,
+            fixture.FulfillmentLine.Id,
+            new PosOnlineOrderPickLineRequest
+            {
+                Quantity = 1,
+                Barcode = "OTHER-ITEM-BARCODE",
+                InputMethod = "MANUAL",
+                ExpectedVersion = 5
+            }, Now.AddMinutes(1), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("online_orders.invalid_barcode", result.ErrorCode);
+        db.ChangeTracker.Clear();
+        Assert.Equal(0, (await db.FulfillmentOrderLines.SingleAsync()).PickedQuantity);
+        Assert.Equal(5, (await db.FulfillmentOrders.SingleAsync()).RowVersion);
+        Assert.Empty(await db.FulfillmentOrderEvents.ToListAsync());
+    }
+
+    [Fact]
+    public async Task PickLine_LineOutsideCurrentOrder_IsRejectedWithoutMutation()
+    {
+        await using var db = CreateDbContext();
+        var fixture = SeedPickingAggregate(db, requested: 2, picked: 0, version: 5);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var repository = new PosOnlineOrderPickingRepository(db);
+
+        var result = await repository.PickLineAsync(
+            fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.Order.Id,
+            Guid.NewGuid(),
+            new PosOnlineOrderPickLineRequest
+            {
+                Quantity = 1,
+                Barcode = "SKU-1",
+                InputMethod = "SCAN",
+                ExpectedVersion = 5
+            }, Now.AddMinutes(1), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("online_orders.invalid_line", result.ErrorCode);
         db.ChangeTracker.Clear();
         Assert.Equal(0, (await db.FulfillmentOrderLines.SingleAsync()).PickedQuantity);
         Assert.Equal(5, (await db.FulfillmentOrders.SingleAsync()).RowVersion);
@@ -235,7 +385,11 @@ public sealed class PosOnlineOrderPickingRepositoryTests
     }
 
     private static PickingFixture SeedPickingAggregate(
-        EPosDbContext db, decimal requested, decimal picked, long version)
+        EPosDbContext db,
+        decimal requested,
+        decimal picked,
+        long version,
+        string? barcodeSnapshot = "SKU-1")
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -258,9 +412,8 @@ public sealed class PosOnlineOrderPickingRepositoryTests
             Now.AddHours(2), Now.AddHours(3), "Asia/Colombo", Now);
         var salesLine = SalesOrderLine.CreateForClickAndCollect(
             Guid.NewGuid(), tenantId, order.Id, 1, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            "SKU-1", "Product One", "Blue / M", "EA", "Each", "STANDARD", "VARIANT",
+            "SKU-1", barcodeSnapshot, "Product One", "Blue / M", "EA", "Each", "STANDARD", "VARIANT",
             requested, 1000m, requested * 1000m, 0m, 0m, false, Now);
-        Set(salesLine, nameof(salesLine.BarcodeSnapshot), "SKU-1");
         var methodOutlet = FulfillmentMethodOutlet.Create(
             Guid.NewGuid(), tenantId, Guid.NewGuid(), outletId, null, null, null, "ACTIVE", Now);
         var location = InventoryLocation.Create(
