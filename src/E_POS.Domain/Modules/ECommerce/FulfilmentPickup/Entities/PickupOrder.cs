@@ -22,5 +22,17 @@ public class PickupOrder : AuditableEntity
     public Guid? VerifiedByTenantUserId { get; protected set; }
     public DateTimeOffset? VerifiedAt { get; protected set; }
     public DateTimeOffset? CollectedAt { get; protected set; }
+
+    public void MarkReady(DateTimeOffset now)
+    {
+        if (PickupStatus is "COLLECTED" or "CANCELLED" or "COMPLETED")
+            throw new InvalidOperationException("PICKUP_NOT_READYABLE");
+
+        if (PickupStatus == "READY")
+            throw new InvalidOperationException("PICKUP_ALREADY_READY");
+
+        PickupStatus = "READY";
+        UpdatedAt = now;
+    }
 }
 

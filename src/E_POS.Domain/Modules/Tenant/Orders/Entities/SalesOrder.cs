@@ -410,6 +410,30 @@ public class SalesOrder : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void ApplyPosReadyForCollection(Guid updatedByTenantUserId, DateTimeOffset now)
+    {
+        if (!string.Equals(OrderType, "CLICK_AND_COLLECT", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Only click and collect orders can be marked ready from POS.");
+
+        if (string.Equals(Status, "CANCELLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "CANCELLED", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot mark a cancelled order ready for collection.");
+
+        if (string.Equals(Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "FULFILLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "COLLECTED", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot mark a collected order ready for collection.");
+
+        if (string.Equals(FulfillmentStatus, "READY_FOR_COLLECTION", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "READY", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Order is already ready for collection.");
+
+        Status = "ACCEPTED";
+        FulfillmentStatus = "READY_FOR_COLLECTION";
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
     public void CancelClickAndCollectByCustomer(
         string? reason,
         DateTimeOffset now)

@@ -14,5 +14,36 @@ public class PickupOrderEvent : AuditableEntity
     public string? EventPayloadJson { get; protected set; }
     public DateTimeOffset EventAt { get; protected set; }
     public Guid? EventByTenantUserId { get; protected set; }
+
+    public static PickupOrderEvent Create(
+        Guid id,
+        Guid tenantId,
+        Guid pickupOrderId,
+        int sequenceNumber,
+        string eventType,
+        string? oldStatus,
+        string? newStatus,
+        DateTimeOffset eventAt,
+        Guid actorTenantUserId,
+        string? eventNote = null,
+        string? eventPayloadJson = null)
+    {
+        return new PickupOrderEvent
+        {
+            Id = id,
+            TenantId = tenantId,
+            PickupOrderId = pickupOrderId,
+            SequenceNumber = sequenceNumber,
+            EventType = eventType,
+            OldStatus = oldStatus,
+            NewStatus = newStatus,
+            EventNote = eventNote,
+            EventPayloadJson = eventPayloadJson,
+            EventAt = eventAt,
+            EventByTenantUserId = actorTenantUserId,
+            CreatedAt = eventAt,
+            UpdatedAt = eventAt
+        };
+    }
 }
 
