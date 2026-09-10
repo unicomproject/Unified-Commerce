@@ -330,19 +330,73 @@ public sealed class ClickCollectOrdersControllerTests
         Assert.Equal("{orderId:guid}/picking/notes", Assert.Single(typeof(ClickCollectOrdersController)
             .GetMethod(nameof(ClickCollectOrdersController.AddPickingNote))!
             .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/pack", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.Pack))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/ready", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.MarkReady))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
     }
 
     private static ClickCollectOrdersController CreateController(
         FakeClickCollectOrderStatusService service,
         FakePosOnlineOrderDetailService? detailService = null,
         FakePosOnlineOrderStartFulfillmentService? startService = null,
-        FakePosOnlineOrderPickingService? pickingService = null) =>
+        FakePosOnlineOrderPickingService? pickingService = null,
+        FakePosOnlineOrderPackingService? packingService = null,
+        FakeReadyService? readyService = null) =>
         new(service, detailService ?? new FakePosOnlineOrderDetailService(),
             startService ?? new FakePosOnlineOrderStartFulfillmentService(),
-            pickingService ?? new FakePosOnlineOrderPickingService(), new TenantRequestContextFactory())
+            pickingService ?? new FakePosOnlineOrderPickingService(),
+            packingService ?? new FakePosOnlineOrderPackingService(),
+            new TenantRequestContextFactory(), readyService ?? new FakeReadyService())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
+
+    [Theory]
+    [InlineData("online_orders.permission_denied", 403)]
+    [InlineData("online_orders.outlet_access_denied", 403)]
+    [InlineData("online_orders.not_found", 404)]
+    [InlineData("online_orders.invalid_state", 409)]
+    [InlineData("online_orders.concurrency_conflict", 409)]
+    [InlineData("online_orders.notification_recipient_unavailable", 400)]
+    [InlineData("online_orders.notification_failed", 503)]
+    public async Task NotifyReady_UsesCanonicalErrorEnvelope(string code, int status)
+    {
+        var controller = CreateController(new FakeClickCollectOrderStatusService(),
+            readyService: new FakeReadyService(code));
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "commerce.online_order.collection.notify_customer");
+        var result = Assert.IsAssignableFrom<ObjectResult>(
+            await controller.NotifyReady(Guid.NewGuid(), Guid.NewGuid()));
+        Assert.Equal(status, result.StatusCode);
+        Assert.Contains(code, System.Text.Json.JsonSerializer.Serialize(result.Value));
+        Assert.Contains("traceId", System.Text.Json.JsonSerializer.Serialize(result.Value));
+    }
+
+    [Fact]
+    public async Task NotifyReady_WithoutContext_IsUnauthorized()
+    {
+        var controller = CreateController(new FakeClickCollectOrderStatusService());
+        Assert.IsType<UnauthorizedObjectResult>(await controller.NotifyReady(Guid.NewGuid(), Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task NotifyReady_Success_ReturnsPersistedResult()
+    {
+        var controller = CreateController(new FakeClickCollectOrderStatusService());
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "commerce.online_order.collection.notify_customer");
+        Assert.IsType<OkObjectResult>(await controller.NotifyReady(Guid.NewGuid(), Guid.NewGuid()));
+    }
+
+    private sealed class FakeReadyService(string? code = null) : IPosOnlineOrderReadyService
+    {
+        public Task<ApplicationResult<E_POS.Application.Modules.Shared.Notification.Dtos.NotificationCreateResult>> NotifyAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId, CancellationToken cancellationToken) =>
+            Task.FromResult(code is null
+                ? ApplicationResult<E_POS.Application.Modules.Shared.Notification.Dtos.NotificationCreateResult>.Success(new())
+                : ApplicationResult<E_POS.Application.Modules.Shared.Notification.Dtos.NotificationCreateResult>.Failure(new(code, "Safe error")));
+    }
 
     private static void SetTenantClaims(
         ClickCollectOrdersController controller,
@@ -504,5 +558,22 @@ public sealed class ClickCollectOrdersControllerTests
             NoteRequest = request;
             return Task.FromResult(NoteResult);
         }
+    }
+
+    private sealed class FakePosOnlineOrderPackingService : IPosOnlineOrderPackingService
+    {
+        public ApplicationResult<PosOnlineOrderPackReadyCommandResponse> Result { get; init; } =
+            ApplicationResult<PosOnlineOrderPackReadyCommandResponse>.Success(
+                new PosOnlineOrderPackReadyCommandResponse());
+
+        public Task<ApplicationResult<PosOnlineOrderPackReadyCommandResponse>> PackAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId,
+            PosOnlineOrderPackRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(Result);
+
+        public Task<ApplicationResult<PosOnlineOrderPackReadyCommandResponse>> MarkReadyAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId,
+            PosOnlineOrderReadyRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(Result);
     }
 }

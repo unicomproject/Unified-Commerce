@@ -122,6 +122,82 @@ public sealed class StorefrontCheckoutRepositoryTests
         Assert.Equal(CollectionAt.ToUniversalTime(), order.RequestedCollectionAt);
         Assert.Equal(CollectionAt.AddMinutes(30).ToUniversalTime(), order.RequestedCollectionEndAt);
         Assert.Equal("Asia/Colombo", order.CollectionTimezoneSnapshot);
+        var salesLine = await dbContext.SalesOrderLines.SingleAsync();
+        Assert.Equal(scenario.PrimaryBarcode, salesLine.BarcodeSnapshot);
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_MissingPrimaryBarcode_RejectsWithoutCreatingOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var scenario = await SeedScenarioAsync(dbContext, selectedOutletStock: 5m, seedPrimaryBarcode: false);
+        await AddCartItemAsync(dbContext, scenario, 1m);
+        var repository = new StorefrontCheckoutRepository(dbContext);
+        var created = await CreateCheckoutAsync(repository, scenario);
+        var selected = await repository.UpdateCollectionAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            new UpdateStorefrontCheckoutCollectionRequest
+            {
+                SelectedOutletId = scenario.OutletId,
+                RequestedCollectionAt = CollectionAt
+            },
+            Now,
+            CancellationToken.None);
+        Assert.True(selected.IsSuccess);
+
+        var result = await repository.ConfirmAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            "confirm-missing-barcode",
+            Now.AddMinutes(1),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("storefront_checkout.barcode_unavailable", result.ErrorCode);
+        Assert.Empty(await dbContext.SalesOrders.ToListAsync());
+        Assert.Empty(await dbContext.SalesOrderLines.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_CapturedBarcodeSnapshot_SurvivesLaterCatalogueBarcodeChange()
+    {
+        await using var dbContext = CreateDbContext();
+        var scenario = await SeedScenarioAsync(dbContext, selectedOutletStock: 5m);
+        await AddCartItemAsync(dbContext, scenario, 1m);
+        var repository = new StorefrontCheckoutRepository(dbContext);
+        var created = await CreateCheckoutAsync(repository, scenario);
+        Assert.True((await repository.UpdateCollectionAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            new UpdateStorefrontCheckoutCollectionRequest
+            {
+                SelectedOutletId = scenario.OutletId,
+                RequestedCollectionAt = CollectionAt
+            },
+            Now,
+            CancellationToken.None)).IsSuccess);
+
+        var confirmed = await repository.ConfirmAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            "confirm-immutable-barcode",
+            Now.AddMinutes(1),
+            CancellationToken.None);
+        Assert.True(confirmed.IsSuccess);
+
+        var catalogueBarcode = await dbContext.ProductBarcodes.SingleAsync();
+        catalogueBarcode.UpdateIdentifier("9999999999999", "EAN13", null, Now.AddMinutes(5));
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+
+        var salesLine = await dbContext.SalesOrderLines.SingleAsync();
+        Assert.Equal(scenario.PrimaryBarcode, salesLine.BarcodeSnapshot);
+        Assert.NotEqual("9999999999999", salesLine.BarcodeSnapshot);
     }
 
     [Fact]
@@ -478,7 +554,8 @@ public sealed class StorefrontCheckoutRepositoryTests
         string timezone = "Asia/Colombo",
         short businessDay = 5,
         TimeOnly? openingTime = null,
-        TimeOnly? closingTime = null)
+        TimeOnly? closingTime = null,
+        bool seedPrimaryBarcode = true)
     {
         var tenantId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
@@ -490,6 +567,7 @@ public sealed class StorefrontCheckoutRepositoryTests
         var selectedLocationId = Guid.NewGuid();
         var selectedBalanceId = Guid.NewGuid();
         var fulfillmentMethodId = Guid.NewGuid();
+        const string primaryBarcode = "2000000000001";
 
         dbContext.Tenants.Add(TenantEntity.Create(
             tenantId,
@@ -590,6 +668,22 @@ public sealed class StorefrontCheckoutRepositoryTests
             "ACTIVE",
             null,
             Now));
+        if (seedPrimaryBarcode)
+        {
+            dbContext.ProductBarcodes.Add(ProductBarcode.Create(
+                Guid.NewGuid(),
+                tenantId,
+                productId,
+                null,
+                primaryBarcode,
+                "EAN13",
+                uomId,
+                1m,
+                true,
+                "ACTIVE",
+                null,
+                Now));
+        }
         var priceListId = Guid.NewGuid();
         dbContext.PriceLists.Add(PriceList.Create(
             priceListId,
@@ -650,7 +744,8 @@ public sealed class StorefrontCheckoutRepositoryTests
             selectedBalanceId,
             otherOutletId,
             otherBalanceId,
-            $"cart-{Guid.NewGuid():N}");
+            $"cart-{Guid.NewGuid():N}",
+            primaryBarcode);
     }
 
     private static EPosDbContext CreateDbContext()
@@ -669,5 +764,6 @@ public sealed class StorefrontCheckoutRepositoryTests
         Guid SelectedBalanceId,
         Guid? OtherOutletId,
         Guid? OtherBalanceId,
-        string CartSessionId);
+        string CartSessionId,
+        string PrimaryBarcode);
 }

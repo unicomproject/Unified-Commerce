@@ -11,6 +11,7 @@ namespace E_POS.Application.Modules.ECommerce.CustomerOrders.Services;
 public sealed class PosOnlineOrderPickingService : IPosOnlineOrderPickingService
 {
     public const string AccessPermission = OnlineOrderPickingPermissions.OrdersAccess;
+    public const string OrdersViewPermission = OnlineOrderPickingPermissions.OrdersView;
     public const string ViewPermission = OnlineOrderPickingPermissions.PickingView;
     public const string PickPermission = OnlineOrderPickingPermissions.PickingPick;
     public const string ScanPermission = OnlineOrderPickingPermissions.PickingScan;
@@ -37,7 +38,9 @@ public sealed class PosOnlineOrderPickingService : IPosOnlineOrderPickingService
         TenantRequestContext context, Guid outletId, Guid orderId,
         CancellationToken cancellationToken)
     {
-        var accessError = await ValidateBaseAsync(context, outletId, ViewPermission, cancellationToken);
+        var operationPermission = context.HasPermission(ViewPermission)
+            ? ViewPermission : OnlineOrderPickingPermissions.CollectionViewReady;
+        var accessError = await ValidateBaseAsync(context, outletId, operationPermission, cancellationToken);
         if (accessError is not null)
             return QueryFailure(accessError);
         if (orderId == Guid.Empty)
@@ -45,6 +48,10 @@ public sealed class PosOnlineOrderPickingService : IPosOnlineOrderPickingService
 
         var result = await _repository.GetAsync(
             context.TenantId, context.UserId, outletId, orderId, _clock.UtcNow, cancellationToken);
+        if (result.IsSuccess && result.Picking is not null &&
+            !context.HasPermission(result.Picking.Status == "READY"
+                ? OnlineOrderPickingPermissions.CollectionViewReady : ViewPermission))
+            return QueryFailure(new("online_orders.permission_denied", "Permission denied for this order state."));
         return result.IsSuccess && result.Picking is not null
             ? ApplicationResult<PosOnlineOrderPickingResponse>.Success(result.Picking)
             : QueryFailure(MapRepositoryError(result.ErrorCode));
@@ -75,8 +82,8 @@ public sealed class PosOnlineOrderPickingService : IPosOnlineOrderPickingService
             return CommandFailure(new("online_orders.invalid_quantity", "Pick quantity must be greater than zero."));
         if (request.ExpectedVersion <= 0)
             return CommandFailure(new("online_orders.invalid_expected_version", "A positive expectedVersion is required."));
-        if (inputMethod == "SCAN" && string.IsNullOrWhiteSpace(request.Barcode))
-            return CommandFailure(new("online_orders.invalid_barcode", "A barcode is required for scanned picking."));
+        if (string.IsNullOrWhiteSpace(request.Barcode))
+            return CommandFailure(new("online_orders.invalid_barcode", "A barcode is required for picking."));
 
         var normalized = new PosOnlineOrderPickLineRequest
         {
@@ -160,7 +167,9 @@ public sealed class PosOnlineOrderPickingService : IPosOnlineOrderPickingService
     {
         if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
             return new("online_orders.invalid_tenant_context", "Invalid tenant context.");
-        if (!context.HasPermission(AccessPermission) || !context.HasPermission(operationPermission))
+        if (!context.HasPermission(AccessPermission) ||
+            !context.HasPermission(OrdersViewPermission) ||
+            !context.HasPermission(operationPermission))
             return new("online_orders.permission_denied", "Permission denied for online-order picking.");
         if (outletId == Guid.Empty)
             return new("online_orders.invalid_outlet", "A valid outlet id is required.");
@@ -181,6 +190,9 @@ public sealed class PosOnlineOrderPickingService : IPosOnlineOrderPickingService
         "online_orders.concurrency_conflict" => new(code, "The order changed. Refresh before trying again."),
         "online_orders.invalid_line" => new(code, "The fulfilment line is not available."),
         "online_orders.invalid_barcode" => new(code, "The barcode does not match this fulfilment line."),
+        "online_orders.barcode_snapshot_unavailable" => new(
+            code,
+            "This order item does not contain the barcode snapshot required for barcode verification."),
         "online_orders.invalid_quantity" => new(code, "The requested pick quantity is not available."),
         _ => new(code ?? "online_orders.picking_failed", "Online-order picking could not be completed.")
     };

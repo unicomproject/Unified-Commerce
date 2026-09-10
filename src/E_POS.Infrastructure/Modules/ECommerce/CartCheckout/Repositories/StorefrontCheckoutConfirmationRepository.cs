@@ -135,6 +135,31 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
             .OrderByDescending(x => x.TenantId == tenantId)
             .FirstOrDefault();
 
+        var primaryBarcodes = await DbContext.ProductBarcodes
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId &&
+                        x.IsPrimaryBarcode &&
+                        x.Status == Active &&
+                        ((x.ProductVariantId.HasValue &&
+                          variantIds.Contains(x.ProductVariantId.Value)) ||
+                         (!x.ProductVariantId.HasValue &&
+                          productIds.Contains(x.ProductId))))
+            .Select(x => new { x.ProductId, x.ProductVariantId, x.Barcode })
+            .ToListAsync(cancellationToken);
+
+        var barcodeByVariantId = primaryBarcodes
+            .Where(x => x.ProductVariantId.HasValue)
+            .GroupBy(x => x.ProductVariantId!.Value)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.Barcode).Distinct(StringComparer.Ordinal).ToList());
+        var barcodeByProductId = primaryBarcodes
+            .Where(x => !x.ProductVariantId.HasValue)
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.Barcode).Distinct(StringComparer.Ordinal).ToList());
+
         foreach (var line in lines)
         {
             if (!products.ContainsKey(line.ProductId))
@@ -146,6 +171,13 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
                 : defaultUom?.Id;
             if (!uomId.HasValue || uoms.All(x => x.Id != uomId.Value))
                 return Failure("storefront_checkout.uom_not_configured");
+            if (!TryResolvePrimaryBarcodeSnapshot(
+                    line.ProductId,
+                    line.ProductVariantId,
+                    barcodeByVariantId,
+                    barcodeByProductId,
+                    out _))
+                return Failure("storefront_checkout.barcode_unavailable");
         }
 
         var orderId = Guid.NewGuid();
@@ -185,10 +217,17 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
             if (line.ProductVariantId.HasValue)
                 variants.TryGetValue(line.ProductVariantId.Value, out variant);
             var uom = variant is null ? defaultUom! : uoms.First(x => x.Id == variant.SalesUomId);
+            if (!TryResolvePrimaryBarcodeSnapshot(
+                    line.ProductId,
+                    line.ProductVariantId,
+                    barcodeByVariantId,
+                    barcodeByProductId,
+                    out var barcodeSnapshot))
+                return Failure("storefront_checkout.barcode_unavailable");
             DbContext.SalesOrderLines.Add(SalesOrderLine.CreateForClickAndCollect(
                 Guid.NewGuid(), tenantId, orderId, line.LineNumber, line.ProductId,
-                line.ProductVariantId, uom.Id, line.SkuSnapshot, line.ProductNameSnapshot,
-                variant?.VariantName, uom.UomCode, uom.UomName,
+                line.ProductVariantId, uom.Id, line.SkuSnapshot, barcodeSnapshot,
+                line.ProductNameSnapshot, variant?.VariantName, uom.UomCode, uom.UomName,
                 product.ProductType, product.ProductStructure,
                 line.Quantity, line.UnitPrice, line.LineSubtotalAmount,
                 line.LineDiscountAmount, line.LineTaxAmount, checkout.IsTaxInclusive, now));
@@ -208,6 +247,32 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
         await DbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return Success(await BuildReadModelAsync(checkout, cancellationToken));
+    }
+
+    private static bool TryResolvePrimaryBarcodeSnapshot(
+        Guid productId,
+        Guid? productVariantId,
+        IReadOnlyDictionary<Guid, List<string>> barcodeByVariantId,
+        IReadOnlyDictionary<Guid, List<string>> barcodeByProductId,
+        out string? barcodeSnapshot)
+    {
+        barcodeSnapshot = null;
+        List<string>? candidates;
+        if (productVariantId.HasValue)
+        {
+            if (!barcodeByVariantId.TryGetValue(productVariantId.Value, out candidates))
+                return false;
+        }
+        else if (!barcodeByProductId.TryGetValue(productId, out candidates))
+        {
+            return false;
+        }
+
+        if (candidates.Count != 1 || string.IsNullOrWhiteSpace(candidates[0]))
+            return false;
+
+        barcodeSnapshot = candidates[0].Trim();
+        return true;
     }
 
 }

@@ -59,5 +59,35 @@ public class FulfillmentOrder : AuditableEntity
     {
         RecordPickingMutation(tenantUserId, expectedVersion, now);
     }
+
+    public void Pack(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
+    {
+        if (expectedVersion <= 0 || RowVersion != expectedVersion)
+            throw new InvalidOperationException("FULFILLMENT_VERSION_CONFLICT");
+
+        if (FulfillmentStatus != "PICKING")
+            throw new InvalidOperationException("FULFILLMENT_NOT_PACKABLE");
+
+        FulfillmentStatus = "PACKED";
+        PackedAt = now;
+        UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+        RowVersion++;
+    }
+
+    public void MarkReady(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
+    {
+        if (expectedVersion <= 0 || RowVersion != expectedVersion)
+            throw new InvalidOperationException("FULFILLMENT_VERSION_CONFLICT");
+
+        if (FulfillmentStatus != "PACKED")
+            throw new InvalidOperationException("FULFILLMENT_NOT_READYABLE");
+
+        FulfillmentStatus = "READY";
+        ReadyAt = now;
+        UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+        RowVersion++;
+    }
 }
 

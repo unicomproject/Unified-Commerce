@@ -200,6 +200,8 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderDetailService, PosOnlineOrderDetailService>();
         services.AddScoped<IPosOnlineOrderStartFulfillmentService, PosOnlineOrderStartFulfillmentService>();
         services.AddScoped<IPosOnlineOrderPickingService, PosOnlineOrderPickingService>();
+        services.AddScoped<IPosOnlineOrderReadyService, PosOnlineOrderReadyService>();
+        services.AddScoped<IPosOnlineOrderPackingService, PosOnlineOrderPackingService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;

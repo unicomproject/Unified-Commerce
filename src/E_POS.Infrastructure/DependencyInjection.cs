@@ -388,6 +388,8 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderDetailRepository, PosOnlineOrderDetailRepository>();
         services.AddScoped<IPosOnlineOrderStartFulfillmentRepository, PosOnlineOrderStartFulfillmentRepository>();
         services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
+        services.AddScoped<IPosOnlineOrderReadyRepository, PosOnlineOrderPickingRepository>();
+        services.AddScoped<IPosOnlineOrderPackingRepository, PosOnlineOrderPackingRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
         services.AddScoped<IPaymentMethodExecutionCapability, CashPaymentExecutionCapability>();
         services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();
