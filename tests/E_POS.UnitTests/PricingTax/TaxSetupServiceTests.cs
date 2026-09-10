@@ -89,7 +89,7 @@ public sealed class TaxSetupServiceTests
     public async Task CreateTaxRate_ReturnsFailure_WhenJurisdictionNotFound()
     {
         // Arrange
-        var context = new TenantRequestContext(TenantId, UserId, [PricingTaxPermissions.TaxRates.Create]);
+        var context = new TenantRequestContext(TenantId, UserId, [PricingTaxPermissions.TaxRates.ScheduleManage]);
         var repository = new FakeTaxSetupRepository { JurisdictionExists = false };
         var service = CreateService(repository);
         var request = new TaxRateCreateRequest
@@ -112,7 +112,7 @@ public sealed class TaxSetupServiceTests
     public async Task CreateTaxRate_ReturnsSuccess_WhenValid()
     {
         // Arrange
-        var context = new TenantRequestContext(TenantId, UserId, [PricingTaxPermissions.TaxRates.Create]);
+        var context = new TenantRequestContext(TenantId, UserId, [PricingTaxPermissions.TaxRates.ScheduleManage]);
         var repository = new FakeTaxSetupRepository { JurisdictionExists = true };
         var service = CreateService(repository);
         var request = new TaxRateCreateRequest
@@ -156,6 +156,40 @@ public sealed class TaxSetupServiceTests
         public Task<TaxClass?> GetTaxClassByCodeAsync(Guid tenantId, string taxClassCode) => Task.FromResult<TaxClass?>(null);
         public Task<(IEnumerable<TaxClass> Items, int TotalCount)> GetTaxClassesAsync(Guid tenantId, int page, int pageSize) => Task.FromResult((Enumerable.Empty<TaxClass>(), 0));
         
+        public Task<(IReadOnlyList<TaxClass> Items, int TotalCount)> GetTaxClassesFilteredAsync(
+            Guid tenantId, string? search, string? status, int page, int pageSize, CancellationToken cancellationToken) =>
+            Task.FromResult(((IReadOnlyList<TaxClass>)Array.Empty<TaxClass>(), 0));
+
+        public Task<IReadOnlyDictionary<Guid, List<TaxRate>>> GetRatesForClassesAsync(
+            Guid tenantId, IReadOnlyCollection<Guid> taxClassIds, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, List<TaxRate>>>(new Dictionary<Guid, List<TaxRate>>());
+
+        public Task<IReadOnlyDictionary<Guid, int>> GetProductCountsAsync(
+            Guid tenantId, IReadOnlyCollection<Guid> taxClassIds, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, int>>(new Dictionary<Guid, int>());
+
+        public Task<(IReadOnlyList<TaxProductUsingResponse> Items, int TotalCount)> GetProductsUsingTaxAsync(
+            Guid tenantId, Guid taxClassId, string? search, int page, int pageSize, CancellationToken cancellationToken) =>
+            Task.FromResult(((IReadOnlyList<TaxProductUsingResponse>)Array.Empty<TaxProductUsingResponse>(), 0));
+
+        public Task<bool> HasProductAssignmentsAsync(Guid tenantId, Guid taxClassId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<bool> HasTransactionalUsageAsync(Guid tenantId, Guid taxClassId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<bool> RateReferencedByTransactionsAsync(Guid tenantId, Guid taxRateId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<string?> GetTenantTimezoneAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>("UTC");
+
+        public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken)
+        {
+            await action(cancellationToken);
+            await SaveChangesAsync();
+        }
+
         public Task AddTaxClassAsync(TaxClass taxClass)
         {
             AddedTaxClass = taxClass;
@@ -171,7 +205,7 @@ public sealed class TaxSetupServiceTests
 
         public Task<TaxJurisdiction> ResolveDefaultJurisdictionAsync(Guid tenantId, Guid? userId, DateTimeOffset now)
         {
-            return Task.FromResult(TaxJurisdiction.Create(tenantId, "DEFAULT", "DEFAULT", "Default", "US", null, null, null, Guid.Empty, DateTimeOffset.UtcNow));
+            return Task.FromResult(TaxJurisdiction.Create(tenantId, "DEFAULT-US", "Default", "COUNTRY", "US", null, null, null, userId, now));
         }
 
         public Task ClearDefaultTaxClassAsync(Guid tenantId, Guid? excludeTaxClassId)

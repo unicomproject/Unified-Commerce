@@ -37,6 +37,7 @@ public sealed class TaxRateConfiguration : IEntityTypeConfiguration<TaxRate>
         builder.Property(x => x.IsCompound).HasColumnName("is_compound").IsRequired();
         builder.Property(x => x.ValidFrom).HasColumnName("valid_from").HasColumnType("date").IsRequired(false);
         builder.Property(x => x.ValidUntil).HasColumnName("valid_until").HasColumnType("date").IsRequired(false);
+        builder.Property(x => x.Notes).HasColumnName("notes").HasColumnType("text").IsRequired(false);
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(30)").HasMaxLength(30).IsRequired();
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_rates_tenant_id_tenants");
@@ -48,6 +49,7 @@ public sealed class TaxRateConfiguration : IEntityTypeConfiguration<TaxRate>
 
         builder.HasIndex(x => new { x.TenantId, x.TaxRateCode }).IsUnique().HasDatabaseName("uq_tax_rates_tenant_id_tax_rate_code");
         builder.HasIndex(x => new { x.TenantId, x.Id }).IsUnique().HasDatabaseName("uq_tax_rates_tenant_id_id");
+        builder.HasIndex(x => new { x.TenantId, x.ValidFrom }).HasDatabaseName("ix_tax_rates_tenant_id_valid_from");
 
         builder.ToTable(t =>
         {

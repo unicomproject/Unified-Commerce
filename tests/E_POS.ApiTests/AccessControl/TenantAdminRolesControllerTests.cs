@@ -180,6 +180,11 @@ public sealed class TenantAdminRolesControllerTests
 
     private sealed class FakeTenantAdminRoleService : ITenantAdminRoleService
     {
+        public Task<ApplicationResult<TenantRoleAssignmentOptionsResponse>> GetAssignmentOptionsAsync(
+            TenantRequestContext context,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<TenantRoleAssignmentOptionsResponse>.Success(
+                new TenantRoleAssignmentOptionsResponse([], [], true, true)));
         private readonly TenantAdminRoleDetailResponse _detail;
 
         public FakeTenantAdminRoleService(TenantAdminRoleDetailResponse detail)

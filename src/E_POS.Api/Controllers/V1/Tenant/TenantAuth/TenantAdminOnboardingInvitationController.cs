@@ -38,7 +38,8 @@ public sealed class TenantAdminOnboardingInvitationController : ControllerBase
             valid = response.Valid,
             expired = response.Expired,
             email = response.Email,
-            message = response.Message
+            message = response.Message,
+            code = response.Code
         });
     }
 

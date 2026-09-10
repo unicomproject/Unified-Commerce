@@ -72,6 +72,7 @@ public sealed class TenantAdminProductsControllerTests
             [],
             [],
             [],
+            [],
             []);
         var service = new FakeTenantAdminProductService
         {
@@ -554,6 +555,7 @@ public sealed class TenantAdminProductsControllerTests
         new(
             productId,
             "Sample Product",
+            "PROD-001",
             "SKU-001",
             null,
             Guid.NewGuid(),
@@ -670,7 +672,7 @@ public sealed class TenantAdminProductsControllerTests
 
         public ApplicationResult<TenantAdminProductCreateOptionsResponse> CreateOptionsResult { get; init; } =
             ApplicationResult<TenantAdminProductCreateOptionsResponse>.Success(
-                new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], []));
+                new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []));
 
         public ApplicationResult<TenantAdminProductCreateResponse> CreateResult { get; init; } =
             ApplicationResult<TenantAdminProductCreateResponse>.Success(
@@ -681,6 +683,7 @@ public sealed class TenantAdminProductsControllerTests
                 new TenantAdminProductDetailResponse(
                     Guid.NewGuid(),
                     "Sample Product",
+                    "PC-001",
                     "SKU-001",
                     null,
                     Guid.NewGuid(),
@@ -711,6 +714,7 @@ public sealed class TenantAdminProductsControllerTests
                 new TenantAdminProductDetailResponse(
                     Guid.NewGuid(),
                     "Updated Product",
+                    "PC-001",
                     "SKU-001",
                     null,
                     Guid.NewGuid(),

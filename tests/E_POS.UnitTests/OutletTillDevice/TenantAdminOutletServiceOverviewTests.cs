@@ -9,6 +9,18 @@ namespace E_POS.UnitTests.OutletTillDevice;
 
 public sealed class TenantAdminOutletServiceOverviewTests
 {
+    [Theory]
+    [InlineData(TenantAdminOutletPermissions.ManagerAssign, true)]
+    [InlineData(TenantAdminOutletPermissions.Manage, true)]
+    [InlineData("unrelated.permission", false)]
+    public async Task ManagerOptions_RequiresAssignmentAccess(string permission, bool allowed)
+    {
+        var service = new TenantAdminOutletService(new FakeTenantAdminOutletRepository());
+        var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), new HashSet<string> { permission });
+        var result = await service.GetManagerOptionsAsync(context, CancellationToken.None);
+        Assert.Equal(allowed, result.IsSuccess);
+    }
+
     [Fact]
     public async Task GetOverviewAsync_MissingCorePermission_ReturnsPermissionDenied()
     {
@@ -176,6 +188,8 @@ public sealed class TenantAdminOutletServiceOverviewTests
 
     private sealed class FakeTenantAdminOutletRepository : ITenantAdminOutletRepository
     {
+        public Task<IReadOnlyList<TenantAdminOutletManagerOptionResponse>> GetManagerOptionsAsync(Guid tenantId, CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>([]);
         public bool Exists { get; set; } = true;
         public bool TenantUserActive { get; set; } = true;
         public bool MediaAssetActive { get; set; } = true;

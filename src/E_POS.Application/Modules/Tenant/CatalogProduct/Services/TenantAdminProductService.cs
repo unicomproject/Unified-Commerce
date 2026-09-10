@@ -4,7 +4,9 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Domain.Modules.Tenant.Inventory.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 
@@ -191,7 +193,16 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 [new ApplicationFieldError("taxId", "Tax is required.")]));
         }
 
-        if (request.PricingTax.StandardSellingPrice is null or <= 0)
+        var wizardStructure = (request.ProductStructure ?? string.Empty).Trim().ToUpperInvariant();
+        if (string.Equals(wizardStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
+        {
+            var variantPriceError = ValidateWizardCreateVariantPrices(request);
+            if (variantPriceError is not null)
+            {
+                return ApplicationResult<TenantAdminProductCreateResponse>.Failure(variantPriceError);
+            }
+        }
+        else if (request.PricingTax.StandardSellingPrice is null or <= 0)
         {
             return ApplicationResult<TenantAdminProductCreateResponse>.Failure(new ApplicationError(
                 "product.validation_failed",
@@ -234,6 +245,24 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 return ApplicationResult<TenantAdminProductCreateResponse>.Failure(new ApplicationError(
                     "product.duplicate_barcode",
                     $"Barcode '{barcode}' already exists."));
+            }
+        }
+
+        if (string.Equals(request.ProductStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase) &&
+            request.VariantConfiguration is not null)
+        {
+            var catalogErrors = await _tenantAdminProductRepository.ValidateVariantConfigurationCatalogAsync(
+                context.TenantId,
+                null,
+                request.VariantConfiguration,
+                cancellationToken);
+
+            if (catalogErrors.Count > 0)
+            {
+                return ApplicationResult<TenantAdminProductCreateResponse>.Failure(new ApplicationError(
+                    "product.validation_failed",
+                    "Variant configuration catalog validation failed.",
+                    catalogErrors));
             }
         }
 
@@ -311,6 +340,43 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         }
         else if (structure == "VARIANT")
         {
+            var limitErrors = VariantConfigurationValidationHelper.ValidateCombinationLimits(
+                request.VariantConfiguration,
+                requireCompleteConfiguration: true);
+            if (limitErrors.Count > 0)
+            {
+                return new ApplicationError(
+                    "product.validation_failed",
+                    "Variant configuration validation failed.",
+                    limitErrors);
+            }
+
+            if (request.VariantConfiguration?.Options is { Count: > 0 })
+            {
+                var valueCounts = request.VariantConfiguration.Options
+                    .Select(o => o.Values?.Count ?? 0)
+                    .ToList();
+                if (VariantCombinationCalculator.TryCalculateCombinationCount(
+                        valueCounts,
+                        out var expectedCount,
+                        out _))
+                {
+                    var submittedCount = request.VariantConfiguration.Variants?.Count(v => v.Included) ?? 0;
+                    if (submittedCount != expectedCount)
+                    {
+                        return new ApplicationError(
+                            "product.validation_failed",
+                            "Submitted included variant count does not match the server-derived Cartesian product.",
+                            [
+                                new ApplicationFieldError(
+                                    "variantConfiguration.variants",
+                                    $"Expected {expectedCount} included variants from selected attributes and values.",
+                                    "product.variant_generation_mismatch"),
+                            ]);
+                    }
+                }
+            }
+
             var included = request.VariantConfiguration?.Variants?.Where(v => v.Included).ToList()
                            ?? [];
             if (included.Count == 0)
@@ -859,7 +925,13 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                     existing.PricingTax.StandardSellingPrice,
                     existing.PricingTax.DiscountPrice,
                     existing.PricingTax.TaxClassId,
-                    existing.PricingTax.TaxExclusive)
+                    existing.PricingTax.TaxExclusive,
+                    existing.PricingTax.VariantPrices?
+                        .Select(v => new VariantPriceConfigurationDto(
+                            v.ProductVariantId,
+                            v.ClientCombinationKey,
+                            v.SellingPrice))
+                        .ToList())
         };
 
         var accessError = await _accessPolicy.ValidatePublishAccessAsync(
@@ -1056,7 +1128,30 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             string.Equals(resolvedStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase) && 
             request.VariantConfiguration != null)
         {
-            request.VariantConfiguration = GenerateAndReconcileVariants(request.VariantConfiguration);
+            var catalogErrors = await _tenantAdminProductRepository.ValidateVariantConfigurationCatalogAsync(
+                context.TenantId,
+                productId,
+                request.VariantConfiguration,
+                cancellationToken);
+
+            if (catalogErrors.Count > 0)
+            {
+                return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                    "product.validation_failed",
+                    "Variant configuration catalog validation failed.",
+                    catalogErrors));
+            }
+
+            var generationResult = VariantConfigurationCombinationGenerator.GenerateAndReconcile(
+                request.VariantConfiguration);
+            if (!generationResult.Succeeded || generationResult.Configuration is null)
+            {
+                return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                    generationResult.ErrorCode ?? "product.variant_generation_failed",
+                    generationResult.ErrorMessage ?? "Variant combination generation failed."));
+            }
+
+            request.VariantConfiguration = generationResult.Configuration;
         }
 
         if (currentStage == ProductWizardStage.BarcodeSku && request.BarcodeSkuConfiguration != null)
@@ -1065,6 +1160,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 context.TenantId,
                 productId,
                 request.BarcodeSkuConfiguration,
+                resolvedStructure,
+                isSaveAndContinue,
                 cancellationToken);
 
             if (skuBarcodeErrors.Count > 0)
@@ -1076,7 +1173,24 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             }
         }
 
-        var trackInventory = isSkip ? (resolvedStructure != ProductStructureConstants.Bundle) : request.TrackInventory;
+        if (currentStage == ProductWizardStage.PricingTax &&
+            isSaveAndContinue &&
+            string.Equals(resolvedStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase) &&
+            productId.HasValue &&
+            productId.Value != Guid.Empty)
+        {
+            var pricingCoverageError = await ValidateVariantPricingContinueCoverageAsync(
+                context.TenantId,
+                productId.Value,
+                request.PricingTax,
+                cancellationToken);
+            if (pricingCoverageError is not null)
+            {
+                return ApplicationResult<ProductDraftResponse>.Failure(pricingCoverageError);
+            }
+        }
+
+        var trackInventory = isSkip ? false : request.TrackInventory;
         var batchTracking = isSkip ? false : request.BatchTracking;
         var expiryTracking = isSkip ? false : request.ExpiryTracking;
         var serialTracking = isSkip ? false : request.SerialTracking;
@@ -1925,44 +2039,188 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         Guid tenantId,
         Guid? productId,
         BarcodeSkuConfigurationDto configuration,
+        string? productStructure,
+        bool isSaveAndContinue,
         CancellationToken cancellationToken)
     {
         var errors = new List<ApplicationFieldError>();
 
+        ProductStructureConstants.TryNormalize(productStructure, out var normalizedStructure);
+        var isVariant = string.Equals(
+            normalizedStructure,
+            ProductStructureConstants.Variant,
+            StringComparison.OrdinalIgnoreCase);
+
+        IReadOnlyList<BarcodeSkuVariantTargetProjection> authoritativeTargets = [];
+        if (productId.HasValue && productId.Value != Guid.Empty)
+        {
+            authoritativeTargets = await _tenantAdminProductRepository.GetStep5SellableVariantTargetsAsync(
+                tenantId,
+                productId.Value,
+                cancellationToken);
+        }
+
+        var targetById = authoritativeTargets.ToDictionary(t => t.ProductVariantId);
+        var targetByKey = new Dictionary<string, BarcodeSkuVariantTargetProjection>(StringComparer.Ordinal);
+        foreach (var target in authoritativeTargets)
+        {
+            if (!string.IsNullOrWhiteSpace(target.OptionCombinationHash))
+            {
+                targetByKey.TryAdd(target.OptionCombinationHash.Trim(), target);
+            }
+
+            targetByKey.TryAdd(target.ProductVariantId.ToString(), target);
+        }
+
         if (configuration.Assignments == null || configuration.Assignments.Count == 0)
         {
+            if (isSaveAndContinue && isVariant && authoritativeTargets.Count > 0)
+            {
+                errors.Add(new ApplicationFieldError(
+                    "barcodeSkuConfiguration.assignments",
+                    "SKU is required for every included variant."));
+            }
+
             return errors;
         }
 
-        for (int i = 0; i < configuration.Assignments.Count; i++)
+        var coveredTargetIds = new HashSet<Guid>();
+        var skuCandidates = new List<(int Index, string Sku, Guid? ExcludeVariantId)>();
+        var barcodeCandidates = new List<(int Index, string Barcode, Guid? ExcludeVariantId)>();
+
+        for (var i = 0; i < configuration.Assignments.Count; i++)
         {
             var assignment = configuration.Assignments[i];
             var prefix = $"barcodeSkuConfiguration.assignments[{i}]";
+            Guid? matchedVariantId = null;
+
+            if (assignment.ProductVariantId.HasValue && assignment.ProductVariantId.Value != Guid.Empty)
+            {
+                if (productId.HasValue &&
+                    productId.Value != Guid.Empty &&
+                    !targetById.ContainsKey(assignment.ProductVariantId.Value))
+                {
+                    errors.Add(new ApplicationFieldError(
+                        $"{prefix}.productVariantId",
+                        "Variant does not belong to this product or is not an applicable Step 5 target."));
+                }
+                else
+                {
+                    matchedVariantId = assignment.ProductVariantId.Value;
+                    coveredTargetIds.Add(assignment.ProductVariantId.Value);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(assignment.ClientCombinationKey) &&
+                     targetByKey.TryGetValue(assignment.ClientCombinationKey.Trim(), out var byKey))
+            {
+                matchedVariantId = byKey.ProductVariantId;
+                coveredTargetIds.Add(byKey.ProductVariantId);
+            }
+            else if (isVariant && productId.HasValue && productId.Value != Guid.Empty)
+            {
+                errors.Add(new ApplicationFieldError(
+                    $"{prefix}.productVariantId",
+                    "Product variant identifier is required for VARIANT Step 5 assignments."));
+            }
 
             if (!string.IsNullOrWhiteSpace(assignment.Sku))
             {
-                if (await _tenantAdminProductRepository.SkuExistsAsync(
-                        tenantId,
-                        assignment.Sku,
-                        assignment.ProductVariantId ?? Guid.Empty,
-                        cancellationToken))
-                {
-                    errors.Add(new ApplicationFieldError(
-                        $"{prefix}.sku",
-                        "SKU already exists in the system."));
-                }
+                skuCandidates.Add((i, assignment.Sku.Trim(), matchedVariantId ?? assignment.ProductVariantId));
             }
 
             if (!string.IsNullOrWhiteSpace(assignment.Barcode))
             {
-                if (await _tenantAdminProductRepository.BarcodeExistsAsync(
-                        tenantId,
-                        assignment.Barcode,
-                        assignment.ProductVariantId ?? Guid.Empty,
-                        cancellationToken))
+                var formatError = ProductBarcodeFormatValidator.Validate(
+                    assignment.Barcode,
+                    assignment.BarcodeType);
+                if (formatError is not null)
+                {
+                    var field = formatError.Contains("type", StringComparison.OrdinalIgnoreCase)
+                        ? $"{prefix}.barcodeType"
+                        : $"{prefix}.barcode";
+                    errors.Add(new ApplicationFieldError(field, formatError));
+                }
+
+                barcodeCandidates.Add((i, assignment.Barcode.Trim(), matchedVariantId ?? assignment.ProductVariantId));
+            }
+        }
+
+        if (isSaveAndContinue && isVariant && authoritativeTargets.Count > 0)
+        {
+            var assignmentByVariant = new Dictionary<Guid, BarcodeSkuAssignmentDto>();
+            foreach (var assignment in configuration.Assignments)
+            {
+                if (assignment.ProductVariantId.HasValue &&
+                    assignment.ProductVariantId.Value != Guid.Empty &&
+                    !assignmentByVariant.ContainsKey(assignment.ProductVariantId.Value))
+                {
+                    assignmentByVariant[assignment.ProductVariantId.Value] = assignment;
+                }
+                else if (!string.IsNullOrWhiteSpace(assignment.ClientCombinationKey) &&
+                         targetByKey.TryGetValue(assignment.ClientCombinationKey.Trim(), out var keyed) &&
+                         !assignmentByVariant.ContainsKey(keyed.ProductVariantId))
+                {
+                    assignmentByVariant[keyed.ProductVariantId] = assignment;
+                }
+            }
+
+            foreach (var target in authoritativeTargets)
+            {
+                if (!assignmentByVariant.TryGetValue(target.ProductVariantId, out var assignment) ||
+                    string.IsNullOrWhiteSpace(assignment.Sku))
                 {
                     errors.Add(new ApplicationFieldError(
-                        $"{prefix}.barcode",
+                        "barcodeSkuConfiguration.assignments",
+                        $"SKU is required for variant '{target.DisplayName}'."));
+                }
+            }
+        }
+
+        if (skuCandidates.Count > 0)
+        {
+            var excludeIds = skuCandidates
+                .Where(c => c.ExcludeVariantId.HasValue)
+                .Select(c => c.ExcludeVariantId!.Value)
+                .Distinct()
+                .ToList();
+
+            var conflicts = await _tenantAdminProductRepository.FindSkuConflictsAsync(
+                tenantId,
+                skuCandidates.Select(c => c.Sku).Distinct(StringComparer.Ordinal).ToList(),
+                excludeIds,
+                cancellationToken);
+
+            foreach (var candidate in skuCandidates)
+            {
+                if (conflicts.ContainsKey(candidate.Sku))
+                {
+                    errors.Add(new ApplicationFieldError(
+                        $"barcodeSkuConfiguration.assignments[{candidate.Index}].sku",
+                        "SKU already exists in the system."));
+                }
+            }
+        }
+
+        if (barcodeCandidates.Count > 0)
+        {
+            var excludeIds = barcodeCandidates
+                .Where(c => c.ExcludeVariantId.HasValue)
+                .Select(c => c.ExcludeVariantId!.Value)
+                .Distinct()
+                .ToList();
+
+            var conflicts = await _tenantAdminProductRepository.FindBarcodeConflictsAsync(
+                tenantId,
+                barcodeCandidates.Select(c => c.Barcode).Distinct(StringComparer.Ordinal).ToList(),
+                excludeIds,
+                cancellationToken);
+
+            foreach (var candidate in barcodeCandidates)
+            {
+                if (conflicts.ContainsKey(candidate.Barcode))
+                {
+                    errors.Add(new ApplicationFieldError(
+                        $"barcodeSkuConfiguration.assignments[{candidate.Index}].barcode",
                         "Barcode already exists in the system."));
                 }
             }
@@ -1971,74 +2229,153 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         return errors;
     }
 
-    private static VariantConfigurationDto GenerateAndReconcileVariants(VariantConfigurationDto input)
+    private static ApplicationError? ValidateWizardCreateVariantPrices(TenantAdminWizardProductCreateRequest request)
     {
-        if (input.Options == null || input.Options.Count == 0) return input;
-        var validOptions = input.Options.Where(o => o.Values != null && o.Values.Count > 0).OrderBy(o => o.SortOrder).ToList();
-        if (validOptions.Count == 0) return input;
-
-        IEnumerable<List<VariantConfigurationSelectedValueDto>> currentCombinations = new List<List<VariantConfigurationSelectedValueDto>> { new List<VariantConfigurationSelectedValueDto>() };
-
-        foreach (var option in validOptions)
+        var pricing = request.PricingTax;
+        if (pricing?.VariantPrices is null || pricing.VariantPrices.Count == 0)
         {
-            currentCombinations = currentCombinations.SelectMany(combo =>
-                option.Values.OrderBy(v => v.SortOrder).Select(val =>
-                {
-                    var newCombo = new List<VariantConfigurationSelectedValueDto>(combo);
-                    newCombo.Add(new VariantConfigurationSelectedValueDto(
-                        option.SourceOptionTemplateId,
-                        val.SourceOptionTemplateValueId,
-                        option.OptionName,
-                        val.ValueName
-                    ));
-                    return newCombo;
-                })
-            );
+            return new ApplicationError(
+                "product.validation_failed",
+                "Variant selling prices are required.",
+                [new ApplicationFieldError(
+                    "pricingTax.variantPrices",
+                    "Provide sellingPrice for each included variant via variantPrices.")]);
         }
 
-        var generatedVariants = new List<VariantConfigurationVariantDto>();
-        var existingVariants = input.Variants ?? Array.Empty<VariantConfigurationVariantDto>();
-        var deletedVariants = input.ExcludedCombinationHashes ?? Array.Empty<VariantConfigurationDeletedCombinationDto>();
+        var included = request.VariantConfiguration?.Variants?
+            .Where(v => v.Included)
+            .ToList() ?? [];
 
-        foreach (var combo in currentCombinations)
+        if (included.Count == 0)
         {
-            var ordered = combo.OrderBy(x => x.SourceOptionTemplateId?.ToString() ?? x.OptionName).ToList();
-            var hashInput = string.Join("|", ordered.Select(x => $"{x.SourceOptionTemplateId?.ToString() ?? x.OptionName}:{x.SourceOptionTemplateValueId?.ToString() ?? x.ValueName}"));
-            var hashBytes = System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(hashInput));
-            var hash = Convert.ToHexString(hashBytes).ToLowerInvariant();
-            
-            if (deletedVariants.Any(d => d.OptionCombinationHash == hash))
+            return new ApplicationError(
+                "product.validation_failed",
+                "At least one included variant is required.",
+                [new ApplicationFieldError("variantConfiguration", "At least one included variant is required.")]);
+        }
+
+        var fieldErrors = new List<ApplicationFieldError>();
+        for (var i = 0; i < pricing.VariantPrices.Count; i++)
+        {
+            var row = pricing.VariantPrices[i];
+            if (!row.SellingPrice.HasValue || row.SellingPrice.Value <= 0)
             {
+                fieldErrors.Add(new ApplicationFieldError(
+                    $"pricingTax.variantPrices[{i}].sellingPrice",
+                    "Selling price must be greater than zero."));
+            }
+        }
+
+        // Ensure every included variant is addressed by ProductVariantId or ClientCombinationKey.
+        foreach (var variant in included)
+        {
+            var matched = pricing.VariantPrices.Any(p =>
+                (variant.ProductVariantId.HasValue &&
+                 p.ProductVariantId.HasValue &&
+                 p.ProductVariantId == variant.ProductVariantId) ||
+                (!string.IsNullOrWhiteSpace(p.ClientCombinationKey) &&
+                 !string.IsNullOrWhiteSpace(variant.ClientCombinationKey) &&
+                 string.Equals(p.ClientCombinationKey.Trim(), variant.ClientCombinationKey.Trim(), StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(p.ClientCombinationKey) &&
+                 !string.IsNullOrWhiteSpace(variant.OptionCombinationHash) &&
+                 string.Equals(p.ClientCombinationKey.Trim(), variant.OptionCombinationHash.Trim(), StringComparison.OrdinalIgnoreCase)));
+
+            if (!matched)
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    "pricingTax.variantPrices",
+                    $"Missing selling price for included variant '{variant.DisplayLabel ?? variant.CombinationLabel ?? variant.ClientCombinationKey}'."));
+            }
+        }
+
+        if (fieldErrors.Count == 0)
+        {
+            return null;
+        }
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Variant pricing validation failed.",
+            fieldErrors);
+    }
+
+    private async Task<ApplicationError?> ValidateVariantPricingContinueCoverageAsync(
+        Guid tenantId,
+        Guid productId,
+        PricingTaxConfigurationDto? pricingTax,
+        CancellationToken cancellationToken)
+    {
+        if (pricingTax?.VariantPrices is null)
+        {
+            return new ApplicationError(
+                "product.validation_failed",
+                "Variant selling prices are required.",
+                [new ApplicationFieldError("pricingTax.variantPrices", "Variant selling prices are required.")]);
+        }
+
+        var targets = await _tenantAdminProductRepository.GetStep5SellableVariantTargetsAsync(
+            tenantId,
+            productId,
+            cancellationToken);
+
+        if (targets.Count == 0)
+        {
+            return new ApplicationError(
+                "product.validation_failed",
+                "No included sellable variants found for pricing.",
+                [new ApplicationFieldError("pricingTax.variantPrices", "Include at least one sellable variant before Pricing & Tax.")]);
+        }
+
+        var fieldErrors = new List<ApplicationFieldError>();
+        var prices = pricingTax.VariantPrices;
+
+        for (var t = 0; t < targets.Count; t++)
+        {
+            var target = targets[t];
+            var matchIndex = -1;
+            for (var i = 0; i < prices.Count; i++)
+            {
+                var row = prices[i];
+                if (row.ProductVariantId.HasValue && row.ProductVariantId.Value == target.ProductVariantId)
+                {
+                    matchIndex = i;
+                    break;
+                }
+
+                if (!string.IsNullOrWhiteSpace(row.ClientCombinationKey) &&
+                    !string.IsNullOrWhiteSpace(target.OptionCombinationHash) &&
+                    string.Equals(row.ClientCombinationKey.Trim(), target.OptionCombinationHash.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    matchIndex = i;
+                    break;
+                }
+            }
+
+            if (matchIndex < 0)
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    "pricingTax.variantPrices",
+                    $"Missing selling price for included variant '{target.DisplayName}'."));
                 continue;
             }
 
-            var existing = existingVariants.FirstOrDefault(v => v.OptionCombinationHash == hash || 
-                (v.SelectedValues.Count == ordered.Count && v.SelectedValues.All(sv => ordered.Any(o => 
-                    (o.SourceOptionTemplateId != null && o.SourceOptionTemplateId == sv.SourceOptionTemplateId && o.SourceOptionTemplateValueId == sv.SourceOptionTemplateValueId) ||
-                    (o.SourceOptionTemplateId == null && o.OptionName == sv.OptionName && o.ValueName == sv.ValueName)))));
-            
-            if (existing != null)
+            var matched = prices[matchIndex];
+            if (!matched.SellingPrice.HasValue || matched.SellingPrice.Value <= 0)
             {
-                generatedVariants.Add(existing with { OptionCombinationHash = hash, SelectedValues = ordered });
-            }
-            else
-            {
-                var label = string.Join(" / ", ordered.Select(x => x.ValueName));
-                generatedVariants.Add(new VariantConfigurationVariantDto(
-                    Guid.NewGuid().ToString("N"),
-                    null,
-                    null,
-                    hash,
-                    label,
-                    label,
-                    true,
-                    null,
-                    null,
-                    ordered
-                ));
+                fieldErrors.Add(new ApplicationFieldError(
+                    $"pricingTax.variantPrices[{matchIndex}].sellingPrice",
+                    "Selling price must be greater than zero for Save & Continue."));
             }
         }
 
-        return new VariantConfigurationDto(input.Options, generatedVariants, deletedVariants);
+        if (fieldErrors.Count == 0)
+        {
+            return null;
+        }
+
+        return new ApplicationError(
+            "product.validation_failed",
+            "Variant pricing validation failed.",
+            fieldErrors);
     }
 }

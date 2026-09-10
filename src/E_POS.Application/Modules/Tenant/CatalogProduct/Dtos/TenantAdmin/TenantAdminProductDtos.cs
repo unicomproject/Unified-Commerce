@@ -38,7 +38,9 @@ public sealed record TenantAdminProductUnitOptionResponse(
 public sealed record TenantAdminProductTaxOptionResponse(
     Guid TaxId,
     string TaxCode,
-    string TaxName);
+    string TaxName,
+    string TaxTreatment,
+    decimal? CurrentRate);
 
 public sealed record TenantAdminProductOutletOptionResponse(
     Guid OutletId,
@@ -51,6 +53,10 @@ public sealed record TenantAdminProductVariantOptionTemplateResponse(
     string TemplateName,
     string OptionType);
 
+public sealed record TenantAdminProductBarcodeTypeOptionResponse(
+    string Code,
+    string Label);
+
 public sealed record TenantAdminProductCreateOptionsResponse(
     IReadOnlyList<TenantAdminProductCategoryOptionResponse> Categories,
     IReadOnlyList<TenantAdminProductBrandOptionResponse> Brands,
@@ -58,7 +64,9 @@ public sealed record TenantAdminProductCreateOptionsResponse(
     IReadOnlyList<TenantAdminProductTaxOptionResponse> Taxes,
     IReadOnlyList<TenantAdminProductOutletOptionResponse> Outlets,
     IReadOnlyList<TenantAdminProductVariantOptionTemplateResponse> VariantOptionTemplates,
-    IReadOnlyList<TenantAdminProductSalesChannelOptionResponse> SalesChannels);
+    IReadOnlyList<TenantAdminProductSalesChannelOptionResponse> SalesChannels,
+    IReadOnlyList<TenantAdminProductBarcodeTypeOptionResponse> BarcodeTypes,
+    string CurrencyCode = "LKR");
 
 public sealed class TenantAdminProductVariantCreateRequest
 {
@@ -101,6 +109,7 @@ public sealed record TenantAdminProductDeleteResponse(
 public sealed class TenantAdminProductCreateRequest
 {
     public string ProductName { get; set; } = string.Empty;
+    public string? ProductCode { get; set; }
     public string Sku { get; set; } = string.Empty;
     public string? Barcode { get; set; }
     public Guid CategoryId { get; set; }
@@ -113,6 +122,9 @@ public sealed class TenantAdminProductCreateRequest
     public Guid? SubCategoryId { get; set; }
 
     public Guid ResolveSelectedCategoryId() => SubCategoryId ?? CategoryId;
+
+    public string ResolveProductCode() =>
+        !string.IsNullOrWhiteSpace(ProductCode) ? ProductCode.Trim() : Sku.Trim();
     public Guid? BrandId { get; set; }
     public string UnitType { get; set; } = string.Empty;
     public string? ShortDescription { get; set; }
@@ -188,6 +200,7 @@ public sealed record TenantAdminProductBatchDetailResponse(
 public sealed record TenantAdminProductDetailResponse(
     Guid ProductId,
     string ProductName,
+    string ProductCode,
     string Sku,
     string? Barcode,
     Guid CategoryId,

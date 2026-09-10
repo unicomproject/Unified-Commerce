@@ -12,4 +12,5 @@ public static class TenantAdminOutletPermissions
     public const string TenantUsersView = "tenant.users.view";
     public const string TenantTillsView = "tenant.tills.view";
     public const string ReportsSalesView = "tenant.reports.sales.view";
+    public const string ManagerAssign = "tenant.outlets.manager.assign";
 }

@@ -62,6 +62,12 @@ public sealed class SalesOrderTaxConfiguration : IEntityTypeConfiguration<SalesO
             .HasMaxLength(150)
             .IsRequired();
 
+        builder.Property(x => x.TaxTreatmentSnapshot)
+            .HasColumnName("tax_treatment_snapshot")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired(false);
+
         builder.Property(x => x.JurisdictionNameSnapshot)
             .HasColumnName("jurisdiction_name_snapshot")
             .HasColumnType("varchar(150)")

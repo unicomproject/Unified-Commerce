@@ -16,6 +16,29 @@ public sealed class TenantAdminRoleServiceTests
     private static readonly Guid ActorUserId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private static readonly DateTimeOffset Now = new(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(TenantAdminUserPermissions.RolesUsersAssign, true, false)]
+    [InlineData(TenantAdminUserPermissions.RolesOutletsAssign, false, true)]
+    [InlineData(TenantAdminUserPermissions.RolesManage, true, true)]
+    [InlineData(TenantAdminUserPermissions.RolesAssignmentsView, false, false)]
+    public async Task AssignmentOptions_OnlyIncludesAuthorizedScopes(string permission, bool users, bool outlets)
+    {
+        var service = CreateService(new FakeTenantAdminRoleRepository(), new FakeIdempotencyService());
+        var result = await service.GetAssignmentOptionsAsync(Context(permission), CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(users, result.Value.CanAssignUsers);
+        Assert.Equal(outlets, result.Value.CanAssignOutlets);
+    }
+
+    [Fact]
+    public async Task AssignmentOptions_DeniesUnrelatedPermission()
+    {
+        var service = CreateService(new FakeTenantAdminRoleRepository(), new FakeIdempotencyService());
+        var result = await service.GetAssignmentOptionsAsync(Context(TenantAdminUserPermissions.RolesView), CancellationToken.None);
+        Assert.True(result.IsFailure);
+    }
+
     [Fact]
     public async Task Create_IgnoresClientRoleCode_AndGeneratesBackendControlledCode()
     {
@@ -242,6 +265,7 @@ public sealed class TenantAdminRoleServiceTests
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
     {
+
         public DateTimeOffset UtcNow => Now;
     }
 
@@ -265,6 +289,8 @@ public sealed class TenantAdminRoleServiceTests
 
     private sealed class FakeTenantAdminRoleRepository : ITenantAdminRoleRepository
     {
+        public Task<TenantRoleAssignmentOptionsResponse> GetAssignmentOptionsAsync(Guid tenantId, bool includeUsers, bool includeOutlets, CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantRoleAssignmentOptionsResponse([], [], includeUsers, includeOutlets));
         public TenantRole? EditableRole { get; init; }
         public TenantRole? CreatedRole { get; private set; }
         public bool AssignmentReplacementRemovesLastAdmin { get; init; }

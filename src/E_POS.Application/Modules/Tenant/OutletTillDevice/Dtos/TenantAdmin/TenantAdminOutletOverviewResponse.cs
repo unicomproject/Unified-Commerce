@@ -70,5 +70,10 @@ public sealed record OutletOverviewSectionAccessResponse(
 public sealed record TenantAdminOutletManagerUpdateRequest(
     Guid TenantUserId);
 
+public sealed record TenantAdminOutletManagerOptionResponse(
+    Guid TenantUserId,
+    string DisplayName,
+    string Email);
+
 public sealed record TenantAdminOutletImageUpdateRequest(
     Guid MediaAssetId);

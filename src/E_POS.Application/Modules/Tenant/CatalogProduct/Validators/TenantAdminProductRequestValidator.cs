@@ -870,6 +870,16 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                     }
                 }
             }
+
+            fieldErrors.AddRange(VariantConfigurationValidationHelper.ValidateCombinationLimits(
+                request.VariantConfiguration,
+                requireCompleteConfiguration: false));
+
+            if (request.VariantConfiguration.Variants != null)
+            {
+                fieldErrors.AddRange(VariantConfigurationValidationHelper.ValidateSelectedValuesBelongToOptions(
+                    request.VariantConfiguration));
+            }
         }
 
         if (fieldErrors.Count == 0) return null;
@@ -887,47 +897,16 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
 
         var fieldErrors = new List<ApplicationFieldError>();
 
-        if (request.VariantConfiguration == null || 
-            request.VariantConfiguration.Options == null || 
-            request.VariantConfiguration.Options.Count == 0)
-        {
-            fieldErrors.Add(new ApplicationFieldError(
-                "variantConfiguration.options",
-                "At least one attribute must be defined for a Variant product.",
-                "product.variant_options_required"));
-        }
-        else
-        {
-            long cartesianCount = 1;
-            for (int i = 0; i < request.VariantConfiguration.Options.Count; i++)
-            {
-                var option = request.VariantConfiguration.Options[i];
-                if (option.Values == null || option.Values.Count == 0)
-                {
-                    fieldErrors.Add(new ApplicationFieldError(
-                        $"options[{i}].values",
-                        $"Attribute '{option.OptionCode}' must contain at least one selected value.",
-                        "product.option_values_required"));
-                    cartesianCount = 0; 
-                }
-                else
-                {
-                    cartesianCount *= option.Values.Count;
-                }
-            }
-
-            if (cartesianCount > ProductConstants.MaxVariants)
-            {
-                fieldErrors.Add(new ApplicationFieldError(
-                    "variantConfiguration",
-                    $"Cartesian matrix produces {cartesianCount} variants, exceeding maximum allowed limit of {ProductConstants.MaxVariants}.",
-                    "product.max_variants_exceeded"));
-            }
-        }
+        fieldErrors.AddRange(VariantConfigurationValidationHelper.ValidateCombinationLimits(
+            request.VariantConfiguration,
+            requireCompleteConfiguration: true));
 
         if (request.VariantConfiguration != null && request.VariantConfiguration.Variants != null)
         {
-            bool hasIncluded = request.VariantConfiguration.Variants.Any(v => v.Included);
+            fieldErrors.AddRange(VariantConfigurationValidationHelper.ValidateSelectedValuesBelongToOptions(
+                request.VariantConfiguration));
+
+            var hasIncluded = request.VariantConfiguration.Variants.Any(v => v.Included);
             if (!hasIncluded)
             {
                 fieldErrors.Add(new ApplicationFieldError(
@@ -935,13 +914,13 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                     "At least one variant must be included in the product setup.",
                     "product.included_variant_required"));
             }
-            
-            for (int i = 0; i < request.VariantConfiguration.Variants.Count; i++)
+
+            for (var i = 0; i < request.VariantConfiguration.Variants.Count; i++)
             {
                 var variant = request.VariantConfiguration.Variants[i];
                 if (variant.SelectedValues == null || variant.SelectedValues.Count == 0)
                 {
-                     fieldErrors.Add(new ApplicationFieldError(
+                    fieldErrors.Add(new ApplicationFieldError(
                         $"variants[{i}].selectedValues",
                         "Variant must have selected option value identities."));
                 }
@@ -1000,9 +979,19 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                 }
                 else if (!string.IsNullOrWhiteSpace(assignment.Barcode))
                 {
-                    if (!barcodeSet.Add(assignment.Barcode.Trim()))
+                    var trimmedBarcode = assignment.Barcode.Trim();
+                    if (!barcodeSet.Add(trimmedBarcode))
                     {
                         fieldErrors.Add(new ApplicationFieldError($"{prefix}.barcode", "Duplicate barcode in request."));
+                    }
+
+                    var formatError = ProductBarcodeFormatValidator.Validate(trimmedBarcode, assignment.BarcodeType);
+                    if (formatError is not null)
+                    {
+                        var field = formatError.Contains("type", StringComparison.OrdinalIgnoreCase)
+                            ? $"{prefix}.barcodeType"
+                            : $"{prefix}.barcode";
+                        fieldErrors.Add(new ApplicationFieldError(field, formatError));
                     }
                 }
             }
@@ -1024,8 +1013,6 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         var fieldErrors = new List<ApplicationFieldError>();
         ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);
 
-        bool isVariant = string.Equals(normalizedStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase);
-
         if (request.BarcodeSkuConfiguration?.Assignments == null || request.BarcodeSkuConfiguration.Assignments.Count == 0)
         {
             fieldErrors.Add(new ApplicationFieldError("barcodeSkuConfiguration.assignments", "At least one SKU assignment is required."));
@@ -1041,6 +1028,9 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                 }
             }
         }
+
+        // Authoritative VARIANT coverage (every Step 4 sellable target) is enforced in
+        // TenantAdminProductService.ValidateBarcodeSkuConfigurationAsync — not only submitted rows.
 
         if (fieldErrors.Count == 0) return null;
 
@@ -1071,13 +1061,14 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                 fieldErrors.Add(new ApplicationFieldError("pricingTax.discountPrice", "Discount price cannot be negative."));
             }
 
-            if (request.PricingTax.DiscountPrice.HasValue && 
-                request.PricingTax.StandardSellingPrice.HasValue && 
+            if (request.PricingTax.DiscountPrice.HasValue &&
+                request.PricingTax.StandardSellingPrice.HasValue &&
                 request.PricingTax.DiscountPrice.Value >= request.PricingTax.StandardSellingPrice.Value)
             {
                 fieldErrors.Add(new ApplicationFieldError("pricingTax.discountPrice", "Discount price must be less than standard selling price."));
             }
 
+            AppendVariantPriceDraftFieldErrors(request.PricingTax.VariantPrices, fieldErrors);
         }
 
         if (fieldErrors.Count == 0) return null;
@@ -1101,19 +1092,53 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         }
         else
         {
-            if (!request.PricingTax.CostPrice.HasValue)
-            {
-                fieldErrors.Add(new ApplicationFieldError("pricingTax.costPrice", "Cost price is required."));
-            }
+            var structure = (request.ProductStructure ?? string.Empty).Trim().ToUpperInvariant();
+            var isVariant = structure == "VARIANT";
 
-            if (!request.PricingTax.StandardSellingPrice.HasValue)
+            // Cost is optional for all structures (product-level architecture).
+            if (isVariant)
             {
-                fieldErrors.Add(new ApplicationFieldError("pricingTax.standardSellingPrice", "Standard selling price is required."));
+                // Authoritative included-variant completeness is enforced in the service/repository.
+                // Client Continue must not rely on scalar StandardSellingPrice fan-out.
+                if (request.PricingTax.VariantPrices is null)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        "pricingTax.variantPrices",
+                        "Variant selling prices are required for VARIANT products."));
+                }
+                else
+                {
+                    for (var i = 0; i < request.PricingTax.VariantPrices.Count; i++)
+                    {
+                        var row = request.PricingTax.VariantPrices[i];
+                        if (!row.SellingPrice.HasValue || row.SellingPrice.Value <= 0)
+                        {
+                            fieldErrors.Add(new ApplicationFieldError(
+                                $"pricingTax.variantPrices[{i}].sellingPrice",
+                                "Selling price must be greater than zero for Save & Continue."));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (!request.PricingTax.StandardSellingPrice.HasValue ||
+                    request.PricingTax.StandardSellingPrice.Value <= 0)
+                {
+                    fieldErrors.Add(new ApplicationFieldError(
+                        "pricingTax.standardSellingPrice",
+                        "Standard selling price is required."));
+                }
             }
 
             if (!request.PricingTax.TaxClassId.HasValue || request.PricingTax.TaxClassId.Value == Guid.Empty)
             {
                 fieldErrors.Add(new ApplicationFieldError("pricingTax.taxClassId", "Tax class is required."));
+            }
+
+            if (!request.PricingTax.TaxExclusive.HasValue)
+            {
+                fieldErrors.Add(new ApplicationFieldError("pricingTax.taxExclusive", "Tax presentation is required."));
             }
         }
 
@@ -1123,6 +1148,55 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             "product.validation_failed",
             "Product validation failed.",
             fieldErrors);
+    }
+
+    private static void AppendVariantPriceDraftFieldErrors(
+        IReadOnlyList<VariantPriceConfigurationDto>? variantPrices,
+        List<ApplicationFieldError> fieldErrors)
+    {
+        if (variantPrices is null || variantPrices.Count == 0)
+        {
+            return;
+        }
+
+        var seenVariantIds = new HashSet<Guid>();
+        var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < variantPrices.Count; i++)
+        {
+            var row = variantPrices[i];
+            var hasId = row.ProductVariantId.HasValue && row.ProductVariantId.Value != Guid.Empty;
+            var key = row.ClientCombinationKey?.Trim();
+            var hasKey = !string.IsNullOrWhiteSpace(key);
+
+            if (!hasId && !hasKey)
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    $"pricingTax.variantPrices[{i}]",
+                    "Each variant price must include productVariantId or clientCombinationKey."));
+            }
+
+            if (hasId && !seenVariantIds.Add(row.ProductVariantId!.Value))
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    $"pricingTax.variantPrices[{i}].productVariantId",
+                    "Duplicate productVariantId in variantPrices."));
+            }
+
+            if (hasKey && !seenKeys.Add(key!))
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    $"pricingTax.variantPrices[{i}].clientCombinationKey",
+                    "Duplicate clientCombinationKey in variantPrices."));
+            }
+
+            if (row.SellingPrice.HasValue && row.SellingPrice.Value < 0)
+            {
+                fieldErrors.Add(new ApplicationFieldError(
+                    $"pricingTax.variantPrices[{i}].sellingPrice",
+                    "Selling price cannot be negative."));
+            }
+        }
     }
 }
 

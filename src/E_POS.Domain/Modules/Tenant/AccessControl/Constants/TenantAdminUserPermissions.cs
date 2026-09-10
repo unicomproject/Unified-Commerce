@@ -22,4 +22,6 @@ public static class TenantAdminUserPermissions
     public const string RolesManage = "tenant.roles.manage";
     public const string OutletsView = "tenant.outlets.view";
     public const string PermissionsView = "tenant.permissions.view";
+    public const string RolesUsersAssign = "tenant.roles.users.assign";
+    public const string RolesOutletsAssign = "tenant.roles.outlets.assign";
 }

@@ -58,7 +58,7 @@ public class TenantAdminProductDraftServiceTests
         public ProductSetupWizardDto? SetupDto { get; init; }
 
         public TenantAdminProductCreateOptionsResponse CreateOptions { get; init; } =
-            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], []);
+            new TenantAdminProductCreateOptionsResponse([], [], [], [], [], [], [], []);
 
         public Task<string?> GetTenantStatusAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult<string?>(TenantStatus);
@@ -79,6 +79,35 @@ public class TenantAdminProductDraftServiceTests
             return Task.FromResult(false);
         }
 
+        public IReadOnlyList<BarcodeSkuVariantTargetProjection> Step5Targets { get; set; } =
+            Array.Empty<BarcodeSkuVariantTargetProjection>();
+
+        public IReadOnlyDictionary<string, Guid> SkuConflicts { get; set; } =
+            new Dictionary<string, Guid>();
+
+        public IReadOnlyDictionary<string, Guid> BarcodeConflicts { get; set; } =
+            new Dictionary<string, Guid>();
+
+        public Task<IReadOnlyDictionary<string, Guid>> FindSkuConflictsAsync(
+            Guid tenantId,
+            IReadOnlyCollection<string> skus,
+            IReadOnlyCollection<Guid> excludeVariantIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(SkuConflicts);
+
+        public Task<IReadOnlyDictionary<string, Guid>> FindBarcodeConflictsAsync(
+            Guid tenantId,
+            IReadOnlyCollection<string> barcodes,
+            IReadOnlyCollection<Guid> excludeVariantIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(BarcodeConflicts);
+
+        public Task<IReadOnlyList<BarcodeSkuVariantTargetProjection>> GetStep5SellableVariantTargetsAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Step5Targets);
+
         public Task<bool> ProductSlugExistsAsync(string slug, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(false);
@@ -98,6 +127,13 @@ public class TenantAdminProductDraftServiceTests
         {
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<ApplicationFieldError>> ValidateVariantConfigurationCatalogAsync(
+            Guid tenantId,
+            Guid? productId,
+            VariantConfigurationDto configuration,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ApplicationFieldError>>([]);
 
         public Task<SaveProductDraftResult> CreateProductFromWizardAsync(
             Guid tenantId,

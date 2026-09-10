@@ -32,9 +32,11 @@ public sealed class TaxClassConfiguration : IEntityTypeConfiguration<TaxClass>
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.TaxClassCode).HasColumnName("tax_class_code").HasColumnType("varchar(80)").HasMaxLength(80).IsRequired();
         builder.Property(x => x.TaxClassName).HasColumnName("tax_class_name").HasColumnType("varchar(150)").HasMaxLength(150).IsRequired();
+        builder.Property(x => x.TaxTreatment).HasColumnName("tax_treatment").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
         builder.Property(x => x.TaxType).HasColumnName("tax_type").HasColumnType("varchar(40)").HasMaxLength(40).IsRequired();
         builder.Property(x => x.Description).HasColumnName("description").HasColumnType("text").IsRequired(false);
         builder.Property(x => x.IsDefaultTaxClass).HasColumnName("is_default_tax_class").IsRequired();
+        builder.Property(x => x.IsSeeded).HasColumnName("is_seeded").IsRequired().HasDefaultValue(false);
         builder.Property(x => x.Status).HasColumnName("status").HasColumnType("varchar(30)").HasMaxLength(30).IsRequired();
 
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_tax_classes_tenant_id_tenants");
@@ -46,7 +48,11 @@ public sealed class TaxClassConfiguration : IEntityTypeConfiguration<TaxClass>
         builder.HasIndex(x => new { x.TenantId, x.Id }).IsUnique().HasDatabaseName("uq_tax_classes_tenant_id_id");
         builder.HasIndex(x => x.TenantId).IsUnique().HasDatabaseName("uq_tax_classes_active_default_per_tenant").HasFilter("is_default_tax_class = true AND status = 'ACTIVE'");
 
-        builder.ToTable(t => t.HasCheckConstraint("ck_tax_classes_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_tax_classes_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+            t.HasCheckConstraint("ck_tax_classes_tax_treatment", "tax_treatment IN ('TAXABLE', 'ZERO_RATED', 'EXEMPT')");
+        });
     }
 }
 

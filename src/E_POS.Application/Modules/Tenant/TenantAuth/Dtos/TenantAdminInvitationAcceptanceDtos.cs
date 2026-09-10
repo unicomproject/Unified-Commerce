@@ -5,7 +5,8 @@ public sealed record ValidateTenantAdminSetupTokenResponse(
     bool Valid,
     bool Expired,
     string? Email,
-    string? Message);
+    string? Message,
+    string? Code = null);
 
 public sealed record SetupTenantAdminPasswordRequest(
     string SetupToken,
