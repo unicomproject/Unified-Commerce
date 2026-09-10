@@ -9,10 +9,12 @@ public class Brand : AuditableEntity
     public string BrandName { get; protected set; } = string.Empty;
     public string BrandSlug { get; protected set; } = string.Empty;
     public string? Description { get; protected set; }
+    public int SortOrder { get; protected set; }
     public Guid? LogoMediaAssetId { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+    public long RowVersion { get; protected set; } = 1;
 
     public static Brand Create(
         Guid id,
@@ -23,7 +25,8 @@ public class Brand : AuditableEntity
         string? description,
         string status,
         Guid? createdByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        int sortOrder = 0)
     {
         return new Brand
         {
@@ -33,6 +36,7 @@ public class Brand : AuditableEntity
             BrandName = brandName.Trim(),
             BrandSlug = brandSlug.Trim().ToLowerInvariant(),
             Description = description?.Trim(),
+            SortOrder = sortOrder,
             Status = status.Trim().ToUpperInvariant(),
             CreatedByTenantUserId = createdByTenantUserId,
             UpdatedByTenantUserId = createdByTenantUserId,
@@ -48,15 +52,18 @@ public class Brand : AuditableEntity
         string? description,
         string status,
         Guid? updatedByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        int sortOrder = 0)
     {
         BrandCode = brandCode.Trim().ToUpperInvariant();
         BrandName = brandName.Trim();
         BrandSlug = brandSlug.Trim().ToLowerInvariant();
         Description = description?.Trim();
+        SortOrder = sortOrder;
         Status = status.Trim().ToUpperInvariant();
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
+        RowVersion++;
     }
 
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
@@ -64,6 +71,7 @@ public class Brand : AuditableEntity
         Status = "DELETED";
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
+        RowVersion++;
     }
 
     public void UpdateLogo(
@@ -75,6 +83,8 @@ public class Brand : AuditableEntity
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
+
+    public void IncrementRowVersion() => RowVersion++;
     public static Brand Create(
         Guid id,
         Guid tenantId,
@@ -85,9 +95,10 @@ public class Brand : AuditableEntity
         string? logoUrl,
         string status,
         Guid? createdByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        int sortOrder = 0)
     {
-        return Create(id, tenantId, brandCode, brandName, brandSlug, description, status, createdByTenantUserId, now);
+        return Create(id, tenantId, brandCode, brandName, brandSlug, description, status, createdByTenantUserId, now, sortOrder);
     }
 
     public void UpdateLogo(

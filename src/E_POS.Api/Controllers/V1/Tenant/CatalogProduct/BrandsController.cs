@@ -89,7 +89,8 @@ public sealed class BrandsController : ControllerBase
         {
             "brand.permission_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
             "brand.not_found" => NotFound(CreateError(error)),
-            "brand.duplicate_code" => Conflict(CreateError(error)),
+            "brand.duplicate_code" or "brand.code_conflict" or "brand.slug_conflict" or
+                "brand.concurrency_conflict" or "brand.delete_conflict" => Conflict(CreateError(error)),
             "brand.invalid_tenant_context" => Unauthorized(CreateError(error)),
             _ => BadRequest(CreateError(error))
         };
@@ -97,7 +98,10 @@ public sealed class BrandsController : ControllerBase
 
     private object CreateError(ApplicationError error)
     {
-        return new { code = error.Code, message = error.Message, details = Array.Empty<string>(), traceId = HttpContext.TraceIdentifier, timestamp = DateTimeOffset.UtcNow };
+        var details = error.FieldErrors?
+            .Select(item => new { field = item.Field, message = item.Message })
+            .ToArray<object>() ?? Array.Empty<object>();
+        return new { code = error.Code, message = error.Message, details, traceId = HttpContext.TraceIdentifier, timestamp = DateTimeOffset.UtcNow };
     }
 }
 
