@@ -436,6 +436,11 @@ public sealed partial class PlatformTenantRepository
                 _dbContext.TenantFeatureEntitlements.AddRange(model.Entitlements);
             }
 
+            if (model.TenantDefaultReturnPolicy is not null)
+            {
+                _dbContext.ReturnPolicies.Add(model.TenantDefaultReturnPolicy);
+            }
+
             if (model.SubscriptionAddons.Count > 0)
             {
                 _dbContext.TenantSubscriptionAddons.AddRange(model.SubscriptionAddons);
@@ -609,6 +614,52 @@ public sealed partial class PlatformTenantRepository
             invite.MarkSent(sentAt);
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    public async Task<E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicyTemplate?> GetDefaultPublishedReturnPolicyTemplateAsync(CancellationToken cancellationToken)
+    {
+        return await _dbContext.ReturnPolicyTemplates
+            .AsNoTracking()
+            .Where(x => x.IsPlatformDefault &&
+                        x.LifecycleStatus == E_POS.Domain.Modules.Tenant.CatalogProduct.Constants.ReturnPolicyTemplateConstants.LifecycleStatusPublished &&
+                        x.Status == E_POS.Domain.Modules.Tenant.CatalogProduct.Constants.ReturnPolicyTemplateConstants.ActiveStatus)
+            .OrderByDescending(x => x.VersionNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task EnsureTenantReturnPolicySeededAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var hasExistingPolicy = await _dbContext.ReturnPolicies
+            .AnyAsync(p => p.TenantId == tenantId && p.Status != E_POS.Domain.Modules.Tenant.CatalogProduct.Constants.ReturnPolicyConstants.DeletedStatus, cancellationToken);
+
+        if (hasExistingPolicy)
+        {
+            return;
+        }
+
+        var defaultTemplate = await GetDefaultPublishedReturnPolicyTemplateAsync(cancellationToken);
+        if (defaultTemplate is null)
+        {
+            return;
+        }
+
+        var seededPolicy = E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicy.CreateSeededFromPlatformTemplate(
+            id: Guid.NewGuid(),
+            tenantId: tenantId,
+            platformTemplateId: defaultTemplate.Id,
+            platformTemplateVersion: defaultTemplate.VersionNumber,
+            policyCode: defaultTemplate.TemplateCode,
+            policyName: defaultTemplate.Name,
+            description: defaultTemplate.Description,
+            returnWindowDays: defaultTemplate.ReturnWindowDays ?? 14,
+            exchangeWindowDays: defaultTemplate.ExchangeWindowDays ?? defaultTemplate.ReturnWindowDays ?? 14,
+            requiresReceipt: defaultTemplate.RequiresReceipt,
+            allowDefectiveReturn: defaultTemplate.AllowDefectiveReturn,
+            requiresManagerApproval: defaultTemplate.RequiresManagerApproval,
+            seededAt: now);
+
+        _dbContext.ReturnPolicies.Add(seededPolicy);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static string ToLookupLabel(string value)

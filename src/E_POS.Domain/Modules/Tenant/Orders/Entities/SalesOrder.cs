@@ -49,6 +49,8 @@ public class SalesOrder : AuditableEntity
     public string? CancellationReason { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+    public Guid? TermsVersionId { get; protected set; }
+    public string? TermsSnapshot { get; protected set; }
 
     public static SalesOrder CreateCompletedPosSale(
         Guid id,
