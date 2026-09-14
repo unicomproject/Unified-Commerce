@@ -9,6 +9,7 @@ using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
+using E_POS.Domain.Modules.Tenant.Payment.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
@@ -424,6 +425,38 @@ public abstract class StorefrontCheckoutRepositoryBase
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
+    protected async Task<Guid> ResolveOrEnsureOnlinePaymentMethodAsync(
+        Guid tenantId,
+        string methodCode,
+        string methodName,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var normalizedCode = methodCode.Trim().ToUpperInvariant();
+        var existingId = await DbContext.PaymentMethods.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.MethodCode == normalizedCode && x.Status == Active)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existingId.HasValue) return existingId.Value;
+
+        // No tenant-admin UI manages online PaymentMethod rows yet, so lazily provision one on first use.
+        var paymentMethod = PaymentMethod.Create(
+            Guid.NewGuid(),
+            tenantId,
+            normalizedCode,
+            methodName,
+            "CARD",
+            false,
+            false,
+            0,
+            Active,
+            null,
+            now);
+        paymentMethod.MarkActiveForOnline(now);
+        DbContext.PaymentMethods.Add(paymentMethod);
+        return paymentMethod.Id;
+    }
+
     protected async Task<string> ResolveCurrencyAsync(Guid tenantId, CancellationToken cancellationToken) =>
         await DbContext.Tenants.AsNoTracking()
             .Where(x => x.Id == tenantId)
@@ -445,6 +478,23 @@ public abstract class StorefrontCheckoutRepositoryBase
         sequence.Increment(DateTimeOffset.UtcNow);
 
         return $"{sequence.Prefix}{sequence.CurrentValue.ToString().PadLeft(sequence.PaddingLength, '0')}";
+    }
+
+    protected async Task<string> GeneratePaymentNumberAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        const string prefix = "PAY-";
+        var existingNumbers = await DbContext.SalesPayments
+            .Where(x => x.TenantId == tenantId && x.PaymentNumber.StartsWith(prefix))
+            .Select(x => x.PaymentNumber)
+            .ToListAsync(cancellationToken);
+
+        var max = 0;
+        foreach (var number in existingNumbers)
+        {
+            if (int.TryParse(number[prefix.Length..], out var value) && value > max) max = value;
+        }
+
+        return $"{prefix}{(max + 1).ToString().PadLeft(6, '0')}";
     }
 
     protected async Task<StorefrontCheckoutReadModel> BuildReadModelAsync(
@@ -513,6 +563,15 @@ public abstract class StorefrontCheckoutRepositoryBase
                     CollectionTimezone = x.CollectionTimezoneSnapshot
                 })
                 .FirstOrDefaultAsync(cancellationToken);
+
+            if (orderModel is not null)
+            {
+                orderModel.PaymentId = await DbContext.SalesPayments.AsNoTracking()
+                    .Where(x => x.TenantId == checkout.TenantId && x.SalesOrderId == orderModel.Id)
+                    .OrderByDescending(x => x.InitiatedAt)
+                    .Select(x => (Guid?)x.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
         }
 
         return new StorefrontCheckoutReadModel

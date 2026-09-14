@@ -76,5 +76,59 @@ public class SalesPaymentTransaction : AuditableEntity
             CreatedAt = now,
             UpdatedAt = now
         };
+
+    public static SalesPaymentTransaction CreatePendingProviderCharge(
+        Guid id,
+        Guid tenantId,
+        Guid salesPaymentId,
+        decimal amount,
+        string currencyCode,
+        string providerName,
+        string? externalTransactionReference,
+        string? idempotencyKey,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesPaymentId = salesPaymentId,
+            TransactionType = "CAPTURE",
+            TransactionStatus = "PENDING",
+            Amount = amount,
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            ExternalTransactionReference = string.IsNullOrWhiteSpace(externalTransactionReference)
+                ? null
+                : externalTransactionReference.Trim(),
+            ProviderName = string.IsNullOrWhiteSpace(providerName) ? null : providerName.Trim(),
+            IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim(),
+            ProcessedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+    public void MarkSucceeded(string? externalTransactionReference, string? providerResponseJson, DateTimeOffset now)
+    {
+        TransactionStatus = "SUCCEEDED";
+        if (!string.IsNullOrWhiteSpace(externalTransactionReference))
+        {
+            ExternalTransactionReference = externalTransactionReference.Trim();
+        }
+        if (providerResponseJson is not null)
+        {
+            ProviderResponseJson = providerResponseJson;
+        }
+        ProcessedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void MarkFailed(string? providerResponseJson, DateTimeOffset now)
+    {
+        TransactionStatus = "FAILED";
+        if (providerResponseJson is not null)
+        {
+            ProviderResponseJson = providerResponseJson;
+        }
+        ProcessedAt = now;
+        UpdatedAt = now;
+    }
 }
 

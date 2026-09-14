@@ -98,6 +98,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "confirm-1",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(1),
             CancellationToken.None);
         var retry = await repository.ConfirmAsync(
@@ -105,6 +106,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout.Id,
             "confirm-1",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(2),
             CancellationToken.None);
 
@@ -152,6 +154,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "confirm-missing-barcode",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(1),
             CancellationToken.None);
 
@@ -186,6 +189,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "confirm-immutable-barcode",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(1),
             CancellationToken.None);
         Assert.True(confirmed.IsSuccess);
@@ -404,6 +408,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout.Id,
             "timezone-change",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(2),
             CancellationToken.None);
 
@@ -503,6 +508,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "expired-confirm",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(16),
             CancellationToken.None);
 
