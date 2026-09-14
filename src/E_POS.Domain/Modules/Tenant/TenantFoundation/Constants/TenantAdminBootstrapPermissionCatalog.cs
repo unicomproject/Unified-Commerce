@@ -128,7 +128,8 @@ public static class TenantAdminBootstrapPermissionCatalog
             [PlatformTenantFeatureCodes.PosCheckout] = TenantRoleSetupCatalog.CashierAllowedPermissionCodes
                 .OrderBy(permissionCode => permissionCode, StringComparer.Ordinal)
                 .ToArray(),
-            [PlatformTenantFeatureCodes.OfflineOperationSync] = []
+            [PlatformTenantFeatureCodes.OfflineOperationSync] = [],
+            [PlatformTenantFeatureCodes.CommerceReturnsRefunds] = []
         };
 
     public static bool IsPlatformOnlyPermission(string? permissionCode) =>

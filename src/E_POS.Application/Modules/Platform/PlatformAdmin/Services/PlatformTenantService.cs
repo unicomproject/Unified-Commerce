@@ -557,7 +557,15 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
 
         await _repository.AddAuditLogAsync(tenantId, platformUserId, "tenant.entitlements_updated", auditDetail, null, now, cancellationToken);
 
-        return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+        var tenantDetailResult = await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+        if (tenantDetailResult.IsSuccess && tenantDetailResult.Value is not null &&
+            tenantDetailResult.Value.EnabledFeatureCodes.Any(code =>
+                string.Equals(code, PlatformTenantFeatureCodes.CommerceReturnsRefunds, StringComparison.OrdinalIgnoreCase)))
+        {
+            await _repository.EnsureTenantReturnPolicySeededAsync(tenantId, now, cancellationToken);
+        }
+
+        return tenantDetailResult;
     }
 
     public async Task<ApplicationResult<PlatformTenantDetailResponse>> RestoreEntitlementsToPlanAsync(
@@ -604,7 +612,15 @@ public sealed partial class PlatformTenantService : IPlatformTenantService
             now,
             cancellationToken);
 
-        return await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+        var restoredDetailResult = await LoadTenantDetailAsync(tenantId, platformUserId, cancellationToken);
+        if (restoredDetailResult.IsSuccess && restoredDetailResult.Value is not null &&
+            restoredDetailResult.Value.EnabledFeatureCodes.Any(code =>
+                string.Equals(code, PlatformTenantFeatureCodes.CommerceReturnsRefunds, StringComparison.OrdinalIgnoreCase)))
+        {
+            await _repository.EnsureTenantReturnPolicySeededAsync(tenantId, now, cancellationToken);
+        }
+
+        return restoredDetailResult;
     }
 
     public async Task<ApplicationResult<PlatformTenantAuditLogListResponse>> GetTenantAuditLogsAsync(

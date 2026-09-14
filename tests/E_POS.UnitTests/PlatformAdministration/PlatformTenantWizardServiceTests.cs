@@ -14,6 +14,7 @@ using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using Xunit;
 
 namespace E_POS.UnitTests.PlatformAdministration;
@@ -101,6 +102,106 @@ public sealed class PlatformTenantWizardServiceTests
         Assert.Equal("LKR", repository.LastWriteModel.Tenant.BaseCurrencyCode);
         Assert.Equal("Asia/Colombo", repository.LastWriteModel.Tenant.DefaultTimezone);
         Assert.Equal("en-LK", repository.LastWriteModel.Tenant.DefaultLocale);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WithCommerceReturnsRefunds_SafelySeedsDefaultReturnPolicy()
+    {
+        var tenantId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var defaultTemplate = ReturnPolicyTemplate.Create(
+            templateId,
+            "DEF_7DAYS",
+            "Default 7 Days Policy",
+            "Platform standard return policy",
+            7,
+            7,
+            requiresReceipt: true,
+            allowDefectiveReturn: true,
+            requiresManagerApproval: false,
+            isPlatformDefault: true,
+            status: "ACTIVE",
+            now: Now);
+        defaultTemplate.Publish(Now);
+
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId),
+            DefaultPublishedTemplate = defaultTemplate,
+            ResolvedFeatures =
+            [
+                new ResolvedTenantFeature(FeatureId, "online_store"),
+                new ResolvedTenantFeature(Guid.NewGuid(), PlatformTenantFeatureCodes.CommerceReturnsRefunds)
+            ]
+        };
+
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-RET-001",
+                Name = "Return Policy Tenant",
+                SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada.ret@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(repository.LastWriteModel?.TenantDefaultReturnPolicy);
+        var seeded = repository.LastWriteModel!.TenantDefaultReturnPolicy!;
+        Assert.Equal(templateId, seeded.SourceTemplateId);
+        Assert.Equal(1, seeded.SourceTemplateVersion);
+        Assert.Equal("DEF_7DAYS", seeded.ReturnPolicyCode);
+        Assert.Equal("Default 7 Days Policy", seeded.ReturnPolicyName);
+        Assert.Equal(7, seeded.ReturnWindowDays);
+        Assert.True(seeded.RequiresReceipt);
+    }
+
+    [Fact]
+    public async Task CreateTenantAsync_WithoutCommerceReturnsRefunds_DoesNotSeedReturnPolicy()
+    {
+        var tenantId = Guid.NewGuid();
+        var repository = new FakeWizardTenantRepository
+        {
+            DetailResponse = CreateDetail(tenantId),
+            ResolvedFeatures = [new ResolvedTenantFeature(FeatureId, "online_store")]
+        };
+
+        var service = CreateService(
+            repository,
+            permissions: new HashSet<string>(StringComparer.Ordinal) { PlatformPermissionCodes.TenantsCreate });
+
+        var result = await service.CreateTenantAsync(
+            new CreatePlatformTenantRequest
+            {
+                Code = "TEN-NORET-001",
+                Name = "No Return Tenant",
+                SubscriptionPlanId = PlanId,
+                Subscription = DefaultWizardSubscription(),
+                TenantAdmin = new CreatePlatformTenantAdminRequest
+                {
+                    FirstName = "Ada",
+                    LastName = "Lovelace",
+                    Email = "ada.noret@tenant.com",
+                    SendInvite = true
+                }
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(repository.LastWriteModel?.TenantDefaultReturnPolicy);
     }
 
     [Fact]
@@ -1088,16 +1189,16 @@ public sealed class PlatformTenantWizardServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid> { FeatureId });
 
+        public ReturnPolicyTemplate? DefaultPublishedTemplate { get; set; }
+        public Task<ReturnPolicyTemplate?> GetDefaultPublishedReturnPolicyTemplateAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(DefaultPublishedTemplate);
+
+        public List<ResolvedTenantFeature> ResolvedFeatures { get; set; } = [new ResolvedTenantFeature(FeatureId, "online_store")];
         public Task<IReadOnlyList<ResolvedTenantFeature>> ResolveActiveFeaturesAsync(
             IReadOnlyList<Guid>? featureIds,
             IReadOnlyList<string>? featureCodes,
-            CancellationToken cancellationToken)
-        {
-            return Task.FromResult<IReadOnlyList<ResolvedTenantFeature>>(
-            [
-                new ResolvedTenantFeature(FeatureId, "online_store")
-            ]);
-        }
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResolvedTenantFeature>>(ResolvedFeatures);
 
         public Task<PlatformTenantCreateOptionsResponse> GetCreateOptionsAsync(CancellationToken cancellationToken)
         {

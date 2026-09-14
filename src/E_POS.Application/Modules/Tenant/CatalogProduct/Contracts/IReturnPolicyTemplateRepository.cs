@@ -9,6 +9,10 @@ public interface IReturnPolicyTemplateRepository
     Task<ReturnPolicyTemplateListResponse> ListAsync(int pageNumber, int pageSize, string? search, CancellationToken cancellationToken);
     Task<ReturnPolicyTemplateResponse?> GetByIdAsync(Guid templateId, bool includeDeleted, CancellationToken cancellationToken);
     Task<ReturnPolicyTemplate?> GetEditableAsync(Guid templateId, CancellationToken cancellationToken);
+    Task<ReturnPolicyTemplate?> GetDefaultPublishedTemplateAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<ReturnPolicyTemplate?>(null);
+    Task ClearPlatformDefaultsAsync(Guid? excludeTemplateId, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
     Task AddAsync(ReturnPolicyTemplate template, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
