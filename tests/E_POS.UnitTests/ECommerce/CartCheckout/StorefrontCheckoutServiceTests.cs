@@ -59,7 +59,7 @@ public sealed class StorefrontCheckoutServiceTests
         var service = new StorefrontCheckoutService(repository, new FakeClock());
 
         var result = await service.ConfirmAsync(
-            TenantId, CustomerId, Guid.NewGuid(), " ", CancellationToken.None);
+            TenantId, CustomerId, Guid.NewGuid(), " ", null, CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("storefront_checkout.invalid_idempotency_key", result.Error.Code);
@@ -73,7 +73,7 @@ public sealed class StorefrontCheckoutServiceTests
         var service = new StorefrontCheckoutService(repository, new FakeClock());
 
         var result = await service.ConfirmAsync(
-            TenantId, CustomerId, Guid.NewGuid(), new string('x', 51), CancellationToken.None);
+            TenantId, CustomerId, Guid.NewGuid(), new string('x', 51), null, CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("storefront_checkout.invalid_idempotency_key", result.Error.Code);
@@ -87,7 +87,7 @@ public sealed class StorefrontCheckoutServiceTests
         var service = new StorefrontCheckoutService(repository, new FakeClock());
 
         var result = await service.ConfirmAsync(
-            TenantId, CustomerId, Guid.NewGuid(), "confirm-1", CancellationToken.None);
+            TenantId, CustomerId, Guid.NewGuid(), "confirm-1", null, CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("storefront_checkout.session_expired", result.Error.Code);
@@ -177,6 +177,7 @@ public sealed class StorefrontCheckoutServiceTests
             Guid customerId,
             Guid checkoutSessionId,
             string idempotencyKey,
+            string paymentMethodCode,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
@@ -186,6 +187,14 @@ public sealed class StorefrontCheckoutServiceTests
             Now = now;
             return Result();
         }
+
+        public Task<bool> CancelAwaitingOnlinePaymentAsync(
+            Guid tenantId,
+            Guid salesOrderId,
+            Guid salesPaymentId,
+            string reason,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) => Task.FromResult(true);
 
         private Task<StorefrontCheckoutRepositoryResult> Result() =>
             Task.FromResult(ErrorCode is null

@@ -9,6 +9,7 @@ using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
+using E_POS.Domain.Modules.Tenant.Payment.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
@@ -30,6 +31,7 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
         Guid customerId,
         Guid checkoutSessionId,
         string idempotencyKey,
+        string paymentMethodCode,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -210,6 +212,39 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
             now);
         DbContext.SalesOrders.Add(order);
 
+        if (string.Equals(paymentMethodCode, StorefrontPaymentMethodCodes.Stripe, StringComparison.OrdinalIgnoreCase))
+        {
+            // Order stays "UNPAID" (its PaymentStatus column only allows a fixed set of values) —
+            // the pending SalesPayment row below is the actual signal that online payment is in flight.
+            var paymentMethodId = await ResolveOrEnsureOnlinePaymentMethodAsync(
+                tenantId, StorefrontPaymentMethodCodes.Stripe, "Pay online with card", now, cancellationToken);
+
+            var paymentId = Guid.NewGuid();
+            var paymentNumber = await GeneratePaymentNumberAsync(tenantId, cancellationToken);
+            var payment = SalesPayment.CreatePendingOnlinePayment(
+                paymentId,
+                tenantId,
+                orderId,
+                paymentNumber,
+                paymentMethodId,
+                checkout.CurrencyCode,
+                checkout.TotalAmount,
+                idempotencyKey,
+                now);
+            DbContext.SalesPayments.Add(payment);
+
+            DbContext.SalesPaymentTransactions.Add(SalesPaymentTransaction.CreatePendingProviderCharge(
+                Guid.NewGuid(),
+                tenantId,
+                paymentId,
+                checkout.TotalAmount,
+                checkout.CurrencyCode,
+                "STRIPE",
+                null,
+                idempotencyKey,
+                now));
+        }
+
         foreach (var line in lines)
         {
             var product = products[line.ProductId];
@@ -247,6 +282,27 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
         await DbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return Success(await BuildReadModelAsync(checkout, cancellationToken));
+    }
+
+    public async Task<bool> CancelAwaitingOnlinePaymentAsync(
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid salesPaymentId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var order = await DbContext.SalesOrders.FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.Id == salesOrderId, cancellationToken);
+        var payment = await DbContext.SalesPayments.FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.Id == salesPaymentId, cancellationToken);
+        if (order is null || payment is null) return false;
+        if (!string.Equals(payment.PaymentStatus, "PENDING", StringComparison.OrdinalIgnoreCase)) return false;
+
+        order.CancelForFailedOnlinePayment(reason, now);
+        payment.MarkFailedOrCancelled("FAILED", reason, now);
+        await DbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private static bool TryResolvePrimaryBarcodeSnapshot(

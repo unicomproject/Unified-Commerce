@@ -59,6 +59,54 @@ public static class ECommerceOrderNotificationFactory
         };
     }
 
+    public static CreateNotificationEventRequest OrderPaymentSucceeded(
+        Guid tenantId,
+        Guid customerId,
+        Guid orderId,
+        string orderNumber)
+    {
+        return Create(
+            tenantId,
+            customerId,
+            orderId,
+            orderNumber,
+            "ecommerce.order_payment_succeeded",
+            "E-commerce order payment succeeded",
+            "Payment received",
+            $"Your payment for order {orderNumber} was successful.",
+            "PAID");
+    }
+
+    public static CreateNotificationEventRequest OrderPaymentSucceededForStaff(
+        Guid tenantId,
+        Guid tenantUserId,
+        Guid orderId,
+        string orderNumber)
+    {
+        return new CreateNotificationEventRequest
+        {
+            TenantId = tenantId,
+            EventCode = "ecommerce.order_payment_succeeded.staff",
+            EventName = "E-commerce order payment succeeded (staff)",
+            SourceModule = SourceModule,
+            SourceReferenceType = SourceReferenceType,
+            SourceReferenceId = orderId,
+            EventNumber = $"ECOM-STF-PAID-{orderId:N}-{tenantUserId:N}",
+            Priority = NotificationPriorities.Normal,
+            Recipient = new NotificationRecipientDto
+            {
+                RecipientType = NotificationRecipientTypes.TenantUser,
+                TenantUserId = tenantUserId
+            },
+            Content = new NotificationContentDto
+            {
+                Title = "Order payment received",
+                Body = $"Payment for order {orderNumber} was received online.",
+                ActionUrl = $"/orders/{orderId:N}"
+            }
+        };
+    }
+
     public static CreateNotificationEventRequest OrderStatusChanged(
         Guid tenantId,
         Guid customerId,

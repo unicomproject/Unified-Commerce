@@ -6,6 +6,13 @@ public sealed class AzureBlobStorageOptionsValidator : IValidateOptions<AzureBlo
 {
     public ValidateOptionsResult Validate(string? name, AzureBlobStorageOptions options)
     {
+        if (options.AllowLocalFallback)
+        {
+            return string.IsNullOrWhiteSpace(options.ContainerName)
+                ? ValidateOptionsResult.Fail("AzureBlobStorage:ContainerName is required.")
+                : ValidateOptionsResult.Success;
+        }
+
         if (string.IsNullOrWhiteSpace(options.ConnectionString))
         {
             return ValidateOptionsResult.Fail("AzureBlobStorage:ConnectionString is required.");

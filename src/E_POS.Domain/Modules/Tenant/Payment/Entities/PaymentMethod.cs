@@ -53,5 +53,11 @@ public class PaymentMethod : AuditableEntity
             UpdatedAt = now
         };
     }
+
+    public void MarkActiveForOnline(DateTimeOffset now)
+    {
+        IsActiveForOnline = true;
+        UpdatedAt = now;
+    }
 }
 

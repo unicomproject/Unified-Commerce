@@ -13,6 +13,7 @@
     <InternalsVisibleTo Include="E_POS.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Stripe.net" Version="47.4.0" />
     <PackageReference Include="Azure.Communication.Email" Version="1.1.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.1" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />

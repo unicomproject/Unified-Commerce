@@ -2,6 +2,8 @@ using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Payment.Contracts;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Payment.Services;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Notifications;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Repositories;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
@@ -17,6 +19,7 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
     private readonly IStorefrontCheckoutRepository _repository;
     private readonly INotificationService _notificationService;
     private readonly ITenantStaffNotificationRecipientRepository _staffNotificationRecipientRepository;
+    private readonly IOnlineCheckoutPaymentGateway _onlineCheckoutPaymentGateway;
     private readonly IDateTimeProvider _dateTimeProvider;
 
     public StorefrontCheckoutService(
@@ -26,6 +29,7 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
             repository,
             NoopNotificationService.Instance,
             NoopTenantStaffNotificationRecipientRepository.Instance,
+            UnavailableOnlineCheckoutPaymentGateway.Instance,
             dateTimeProvider)
     {
     }
@@ -33,11 +37,13 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
         IStorefrontCheckoutRepository repository,
         INotificationService notificationService,
         ITenantStaffNotificationRecipientRepository staffNotificationRecipientRepository,
+        IOnlineCheckoutPaymentGateway onlineCheckoutPaymentGateway,
         IDateTimeProvider dateTimeProvider)
     {
         _repository = repository;
         _notificationService = notificationService;
         _staffNotificationRecipientRepository = staffNotificationRecipientRepository;
+        _onlineCheckoutPaymentGateway = onlineCheckoutPaymentGateway;
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -117,6 +123,7 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
         Guid customerId,
         Guid checkoutSessionId,
         string? idempotencyKey,
+        string? paymentMethodCode,
         CancellationToken cancellationToken)
     {
         var contextError = ValidateCustomerContext(tenantId, customerId);
@@ -128,38 +135,76 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
         if (string.IsNullOrWhiteSpace(normalizedKey) || normalizedKey.Length > MaximumIdempotencyKeyLength)
             return Failure(Error("storefront_checkout.invalid_idempotency_key", "A valid Idempotency-Key header is required."));
 
+        var normalizedPaymentMethod = string.Equals(
+            paymentMethodCode?.Trim(), StorefrontPaymentMethodCodes.Stripe, StringComparison.OrdinalIgnoreCase)
+            ? StorefrontPaymentMethodCodes.Stripe
+            : StorefrontPaymentMethodCodes.PayAtPickup;
+
         var result = Map(await _repository.ConfirmAsync(
             tenantId,
             customerId,
             checkoutSessionId,
             normalizedKey,
+            normalizedPaymentMethod,
             _dateTimeProvider.UtcNow,
             cancellationToken));
 
-        if (result.IsSuccess && result.Value?.Order is not null)
+        if (!result.IsSuccess || result.Value?.Order is null) return result;
+
+        if (normalizedPaymentMethod == StorefrontPaymentMethodCodes.Stripe &&
+            result.Value.Order.PaymentId.HasValue)
+        {
+            var sessionResult = await _onlineCheckoutPaymentGateway.CreateCheckoutSessionAsync(
+                new OnlineCheckoutSessionRequest(
+                    tenantId,
+                    checkoutSessionId,
+                    result.Value.Order.Id,
+                    result.Value.Order.PaymentId.Value,
+                    result.Value.Order.OrderNumber,
+                    result.Value.GrandTotal,
+                    result.Value.CurrencyCode,
+                    null),
+                cancellationToken);
+
+            if (!sessionResult.Success)
+            {
+                await _repository.CancelAwaitingOnlinePaymentAsync(
+                    tenantId,
+                    result.Value.Order.Id,
+                    result.Value.Order.PaymentId.Value,
+                    sessionResult.ErrorMessage ?? "Failed to create Stripe checkout session.",
+                    _dateTimeProvider.UtcNow,
+                    cancellationToken);
+                return Failure(Error(
+                    "storefront_checkout.online_payment_unavailable",
+                    "Online payment could not be started. Please try again."));
+            }
+
+            result.Value.PaymentRedirectUrl = sessionResult.CheckoutUrl;
+            return result;
+        }
+
+        await _notificationService.CreateAsync(
+            ECommerceOrderNotificationFactory.OrderPlaced(
+                tenantId,
+                customerId,
+                result.Value.Order.Id,
+                result.Value.Order.OrderNumber),
+            cancellationToken);
+
+        var staffTenantUserIds = await _staffNotificationRecipientRepository.GetActiveStaffTenantUserIdsAsync(
+            tenantId,
+            cancellationToken);
+
+        foreach (var staffTenantUserId in staffTenantUserIds)
         {
             await _notificationService.CreateAsync(
-                ECommerceOrderNotificationFactory.OrderPlaced(
+                ECommerceOrderNotificationFactory.OrderPlacedForStaff(
                     tenantId,
-                    customerId,
+                    staffTenantUserId,
                     result.Value.Order.Id,
                     result.Value.Order.OrderNumber),
                 cancellationToken);
-
-            var staffTenantUserIds = await _staffNotificationRecipientRepository.GetActiveStaffTenantUserIdsAsync(
-                tenantId,
-                cancellationToken);
-
-            foreach (var staffTenantUserId in staffTenantUserIds)
-            {
-                await _notificationService.CreateAsync(
-                    ECommerceOrderNotificationFactory.OrderPlacedForStaff(
-                        tenantId,
-                        staffTenantUserId,
-                        result.Value.Order.Id,
-                        result.Value.Order.OrderNumber),
-                    cancellationToken);
-            }
         }
 
         return result;
