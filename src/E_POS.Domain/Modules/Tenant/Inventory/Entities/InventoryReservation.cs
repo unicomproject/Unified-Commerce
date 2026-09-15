@@ -72,4 +72,20 @@ public class InventoryReservation : AuditableEntity
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
+
+    // A CHECKOUT-sourced reservation is created before the SalesOrder exists, so it
+    // initially points at the checkout session. Once checkout confirmation creates the
+    // order, the reservation must be re-pointed here or downstream consumers that key off
+    // SourceReferenceId == salesOrderId (e.g. POS "start fulfillment") can never find it.
+    // ExpiresAt is also cleared: it only guards an in-flight checkout hold, and a
+    // reservation permanently attached to a confirmed order must never lapse.
+    public void AttachOrder(Guid salesOrderId, string? salesOrderNumber, DateTimeOffset now)
+    {
+        SourceReferenceId = salesOrderId;
+        SourceReferenceNumber = string.IsNullOrWhiteSpace(salesOrderNumber)
+            ? SourceReferenceNumber
+            : salesOrderNumber.Trim();
+        ExpiresAt = null;
+        UpdatedAt = now;
+    }
 }

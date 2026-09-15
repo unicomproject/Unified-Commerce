@@ -23,6 +23,42 @@ public class PickupOrder : AuditableEntity
     public DateTimeOffset? VerifiedAt { get; protected set; }
     public DateTimeOffset? CollectedAt { get; protected set; }
 
+    protected PickupOrder() { }
+
+    public static PickupOrder Create(
+        Guid id,
+        Guid tenantId,
+        Guid fulfillmentOrderId,
+        Guid? pickupSlotReservationId,
+        string pickupNumber,
+        string pickupContactName,
+        string? pickupContactPhone,
+        string? pickupContactEmail,
+        string? pickupContactChannel,
+        DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(pickupNumber))
+            throw new ArgumentException("Pickup number is required.", nameof(pickupNumber));
+        if (string.IsNullOrWhiteSpace(pickupContactName))
+            throw new ArgumentException("Pickup contact name is required.", nameof(pickupContactName));
+
+        return new PickupOrder
+        {
+            Id = id,
+            TenantId = tenantId,
+            FulfillmentOrderId = fulfillmentOrderId,
+            PickupSlotReservationId = pickupSlotReservationId,
+            PickupNumber = pickupNumber.Trim(),
+            PickupContactName = pickupContactName.Trim(),
+            PickupContactPhone = string.IsNullOrWhiteSpace(pickupContactPhone) ? null : pickupContactPhone.Trim(),
+            PickupContactEmail = string.IsNullOrWhiteSpace(pickupContactEmail) ? null : pickupContactEmail.Trim(),
+            PickupContactChannel = string.IsNullOrWhiteSpace(pickupContactChannel) ? null : pickupContactChannel.Trim(),
+            PickupStatus = "PENDING",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
     public void MarkReady(DateTimeOffset now)
     {
         if (PickupStatus is "COLLECTED" or "CANCELLED" or "COMPLETED")
