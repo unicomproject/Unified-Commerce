@@ -19,6 +19,35 @@ public class FulfillmentOrderLine : AuditableEntity
 
     protected FulfillmentOrderLine() { }
 
+    public static FulfillmentOrderLine Create(
+        Guid id,
+        Guid tenantId,
+        Guid fulfillmentOrderId,
+        Guid salesOrderLineId,
+        decimal requestedQuantity,
+        decimal cancelledQuantity,
+        DateTimeOffset now)
+    {
+        if (requestedQuantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(requestedQuantity));
+
+        return new FulfillmentOrderLine
+        {
+            Id = id,
+            TenantId = tenantId,
+            FulfillmentOrderId = fulfillmentOrderId,
+            SalesOrderLineId = salesOrderLineId,
+            RequestedQuantity = requestedQuantity,
+            PickedQuantity = 0,
+            PackedQuantity = 0,
+            FulfilledQuantity = 0,
+            CancelledQuantity = cancelledQuantity,
+            LineStatus = "PENDING",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
     public void Pick(decimal quantity, Guid tenantUserId, DateTimeOffset now)
     {
         if (quantity <= 0)

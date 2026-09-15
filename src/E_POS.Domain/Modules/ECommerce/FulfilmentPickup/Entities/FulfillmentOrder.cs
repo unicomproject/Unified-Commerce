@@ -27,6 +27,37 @@ public class FulfillmentOrder : AuditableEntity
 
     protected FulfillmentOrder() { }
 
+    public static FulfillmentOrder Create(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        string fulfillmentNumber,
+        Guid fulfillmentMethodOutletId,
+        Guid? sourceInventoryLocationId,
+        DateOnly? requestedFulfillmentDate,
+        DateTimeOffset? scheduledAt,
+        DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(fulfillmentNumber))
+            throw new ArgumentException("Fulfillment number is required.", nameof(fulfillmentNumber));
+
+        return new FulfillmentOrder
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            FulfillmentNumber = fulfillmentNumber.Trim(),
+            FulfillmentMethodOutletId = fulfillmentMethodOutletId,
+            SourceInventoryLocationId = sourceInventoryLocationId,
+            FulfillmentStatus = "PENDING",
+            RequestedFulfillmentDate = requestedFulfillmentDate,
+            ScheduledAt = scheduledAt,
+            RowVersion = 1,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
     public void StartPicking(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
     {
         if (expectedVersion <= 0 || RowVersion != expectedVersion)
