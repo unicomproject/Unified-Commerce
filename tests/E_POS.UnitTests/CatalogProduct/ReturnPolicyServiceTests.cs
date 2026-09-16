@@ -23,7 +23,10 @@ public sealed class ReturnPolicyServiceTests
     {
         var service = new ReturnPolicyTemplateService(new FakeTemplateRepository(), new ReturnPolicyTemplateRequestValidator(), new FakePlatformPermissionChecker([]), new FakeDateTimeProvider());
 
-        var result = await service.CreateAsync(Guid.NewGuid(), new ReturnPolicyTemplateCreateRequest("7days", "7 Days", 7, ReturnPolicyTemplateConstants.ActiveStatus), CancellationToken.None);
+        var result = await service.CreateAsync(
+            Guid.NewGuid(),
+            new ReturnPolicyTemplateCreateRequest("7days", "7 Days", null, 7, 7, true, true, false, false, ReturnPolicyTemplateConstants.ActiveStatus),
+            CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("return_policy_templates.access_denied", result.Error.Code);
@@ -35,11 +38,118 @@ public sealed class ReturnPolicyServiceTests
         var repository = new FakeTemplateRepository();
         var service = new ReturnPolicyTemplateService(repository, new ReturnPolicyTemplateRequestValidator(), new FakePlatformPermissionChecker([PlatformPermissionCodes.ReturnPolicyTemplatesCreate]), new FakeDateTimeProvider());
 
-        var result = await service.CreateAsync(Guid.NewGuid(), new ReturnPolicyTemplateCreateRequest(" 7days ", "7 Days", 7, ReturnPolicyTemplateConstants.ActiveStatus), CancellationToken.None);
+        var result = await service.CreateAsync(
+            Guid.NewGuid(),
+            new ReturnPolicyTemplateCreateRequest(" 7days ", "7 Days", null, 7, 7, true, true, false, false, ReturnPolicyTemplateConstants.ActiveStatus),
+            CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("7DAYS", repository.AddedTemplate?.TemplateCode);
     }
+
+    [Fact]
+    public async Task TemplatePublish_PreventsDirectEditing_EnforcesImmutability()
+    {
+        var repository = new FakeTemplateRepository();
+        var service = new ReturnPolicyTemplateService(repository, new ReturnPolicyTemplateRequestValidator(), new FakePlatformPermissionChecker([PlatformPermissionCodes.ReturnPolicyTemplatesCreate, PlatformPermissionCodes.ReturnPolicyTemplatesUpdate]), new FakeDateTimeProvider());
+
+        var createResult = await service.CreateAsync(
+            Guid.NewGuid(),
+            new ReturnPolicyTemplateCreateRequest("14DAYS", "14 Days", null, 14, 14, true, true, false, false, ReturnPolicyTemplateConstants.ActiveStatus),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+        var templateId = createResult.Value!.Id;
+
+        // Publish template
+        var publishResult = await service.PublishAsync(Guid.NewGuid(), templateId, CancellationToken.None);
+        Assert.True(publishResult.IsSuccess);
+        Assert.Equal(ReturnPolicyTemplateConstants.LifecycleStatusPublished, publishResult.Value!.LifecycleStatus);
+
+        // Attempt in-place update on published template must fail with immutable error
+        var updateResult = await service.UpdateAsync(
+            Guid.NewGuid(),
+            templateId,
+            new ReturnPolicyTemplateUpdateRequest("14DAYS", "14 Days Modified", null, 21, 21, true, true, false, false, ReturnPolicyTemplateConstants.ActiveStatus),
+            CancellationToken.None);
+
+        Assert.True(updateResult.IsFailure);
+        Assert.Equal("return_policy_templates.immutable", updateResult.Error.Code);
+    }
+
+    [Fact]
+    public async Task TemplateDuplicate_CreatesNewDraftWithIncrementedVersion()
+    {
+        var repository = new FakeTemplateRepository();
+        var service = new ReturnPolicyTemplateService(repository, new ReturnPolicyTemplateRequestValidator(), new FakePlatformPermissionChecker([PlatformPermissionCodes.ReturnPolicyTemplatesCreate, PlatformPermissionCodes.ReturnPolicyTemplatesUpdate]), new FakeDateTimeProvider());
+
+        var createResult = await service.CreateAsync(
+            Guid.NewGuid(),
+            new ReturnPolicyTemplateCreateRequest("30DAYS", "30 Days", null, 30, 30, true, true, false, false, ReturnPolicyTemplateConstants.ActiveStatus),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+        var templateId = createResult.Value!.Id;
+
+        await service.PublishAsync(Guid.NewGuid(), templateId, CancellationToken.None);
+
+        var duplicateResult = await service.DuplicateAsync(
+            Guid.NewGuid(),
+            templateId,
+            "30DAYS_V2",
+            "30 Days v2",
+            CancellationToken.None);
+
+        Assert.True(duplicateResult.IsSuccess);
+        Assert.Equal("30DAYS_V2", duplicateResult.Value!.TemplateCode);
+        Assert.Equal("30 Days v2", duplicateResult.Value.Name);
+        Assert.Equal(2, duplicateResult.Value.VersionNumber);
+        Assert.Equal(ReturnPolicyTemplateConstants.LifecycleStatusDraft, duplicateResult.Value.LifecycleStatus);
+    }
+
+    [Fact]
+    public async Task TemplateSetDefault_WhenPublished_EnforcesSingleDefaultInvariant()
+    {
+        var repository = new FakeTemplateRepository();
+        var service = new ReturnPolicyTemplateService(repository, new ReturnPolicyTemplateRequestValidator(), new FakePlatformPermissionChecker([PlatformPermissionCodes.ReturnPolicyTemplatesCreate, PlatformPermissionCodes.ReturnPolicyTemplatesUpdate]), new FakeDateTimeProvider());
+
+        var createResult = await service.CreateAsync(
+            Guid.NewGuid(),
+            new ReturnPolicyTemplateCreateRequest("DEFAULT_TEST", "Default Test", null, 14, 14, true, true, false, false, ReturnPolicyTemplateConstants.ActiveStatus),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+        var templateId = createResult.Value!.Id;
+
+        await service.PublishAsync(Guid.NewGuid(), templateId, CancellationToken.None);
+
+        var setDefaultResult = await service.SetDefaultAsync(Guid.NewGuid(), templateId, CancellationToken.None);
+        Assert.True(setDefaultResult.IsSuccess);
+        Assert.True(setDefaultResult.Value!.IsPlatformDefault);
+        Assert.True(repository.ClearDefaultsCalled);
+    }
+
+    [Fact]
+    public async Task TemplateArchive_TransitionsToArchivedLifecycleStatus()
+    {
+        var repository = new FakeTemplateRepository();
+        var service = new ReturnPolicyTemplateService(repository, new ReturnPolicyTemplateRequestValidator(), new FakePlatformPermissionChecker([PlatformPermissionCodes.ReturnPolicyTemplatesCreate, PlatformPermissionCodes.ReturnPolicyTemplatesUpdate]), new FakeDateTimeProvider());
+
+        var createResult = await service.CreateAsync(
+            Guid.NewGuid(),
+            new ReturnPolicyTemplateCreateRequest("ARCHIVE_TEST", "Archive Test", null, 7, 7, true, true, false, false, ReturnPolicyTemplateConstants.ActiveStatus),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+        var templateId = createResult.Value!.Id;
+
+        await service.PublishAsync(Guid.NewGuid(), templateId, CancellationToken.None);
+
+        var archiveResult = await service.ArchiveAsync(Guid.NewGuid(), templateId, CancellationToken.None);
+        Assert.True(archiveResult.IsSuccess);
+        Assert.Equal(ReturnPolicyTemplateConstants.LifecycleStatusArchived, archiveResult.Value!.LifecycleStatus);
+    }
+
 
     [Fact]
     public async Task ReturnPolicyCreateAsync_WithPermission_NormalizesCodeAndPersists()
@@ -71,9 +181,32 @@ public sealed class ReturnPolicyServiceTests
     private sealed class FakeTemplateRepository : IReturnPolicyTemplateRepository
     {
         public ReturnPolicyTemplate? AddedTemplate { get; private set; }
+        public bool ClearDefaultsCalled { get; private set; }
+        public Task ClearPlatformDefaultsAsync(Guid? excludeTemplateId, CancellationToken cancellationToken)
+        {
+            ClearDefaultsCalled = true;
+            return Task.CompletedTask;
+        }
         public Task<bool> TemplateCodeExistsAsync(string templateCode, Guid? excludeTemplateId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<ReturnPolicyTemplateListResponse> ListAsync(int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => Task.FromResult(new ReturnPolicyTemplateListResponse([], pageNumber, pageSize, 0));
-        public Task<ReturnPolicyTemplateResponse?> GetByIdAsync(Guid templateId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<ReturnPolicyTemplateResponse?>(new ReturnPolicyTemplateResponse(templateId, AddedTemplate!.TemplateCode, AddedTemplate.Name, AddedTemplate.ReturnWindowDays, AddedTemplate.Status, AddedTemplate.CreatedAt, AddedTemplate.UpdatedAt));
+        public Task<ReturnPolicyTemplateResponse?> GetByIdAsync(Guid templateId, bool includeDeleted, CancellationToken cancellationToken) =>
+            Task.FromResult<ReturnPolicyTemplateResponse?>(new ReturnPolicyTemplateResponse(
+                templateId,
+                AddedTemplate!.TemplateCode,
+                AddedTemplate.Name,
+                AddedTemplate.Description,
+                AddedTemplate.ReturnWindowDays,
+                AddedTemplate.ExchangeWindowDays,
+                AddedTemplate.RequiresReceipt,
+                AddedTemplate.AllowDefectiveReturn,
+                AddedTemplate.RequiresManagerApproval,
+                AddedTemplate.IsPlatformDefault,
+                AddedTemplate.VersionNumber,
+                AddedTemplate.LifecycleStatus,
+                AddedTemplate.ConcurrencyToken,
+                AddedTemplate.Status,
+                AddedTemplate.CreatedAt,
+                AddedTemplate.UpdatedAt));
         public Task<ReturnPolicyTemplate?> GetEditableAsync(Guid templateId, CancellationToken cancellationToken) => Task.FromResult<ReturnPolicyTemplate?>(AddedTemplate);
         public Task AddAsync(ReturnPolicyTemplate template, CancellationToken cancellationToken) { AddedTemplate = template; return Task.CompletedTask; }
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;

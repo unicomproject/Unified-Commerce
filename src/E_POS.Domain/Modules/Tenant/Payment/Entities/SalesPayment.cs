@@ -90,5 +90,60 @@ public class SalesPayment : AuditableEntity
         UpdatedByTenantUserId = tenantUserId;
         UpdatedAt = now;
     }
+
+    public static SalesPayment CreatePendingOnlinePayment(
+        Guid id,
+        Guid tenantId,
+        Guid salesOrderId,
+        string paymentNumber,
+        Guid paymentMethodId,
+        string currencyCode,
+        decimal requestedAmount,
+        string? idempotencyKey,
+        DateTimeOffset now,
+        string? externalReference = null)
+    {
+        return new SalesPayment
+        {
+            Id = id,
+            TenantId = tenantId,
+            SalesOrderId = salesOrderId,
+            PaymentNumber = paymentNumber.Trim(),
+            PaymentMethodId = paymentMethodId,
+            PaymentStatus = "PENDING",
+            CurrencyCode = currencyCode.Trim().ToUpperInvariant(),
+            RequestedAmount = requestedAmount,
+            PaidAmount = 0,
+            ChangeAmount = 0,
+            RefundedAmount = 0,
+            ExternalReference = string.IsNullOrWhiteSpace(externalReference)
+                ? null
+                : externalReference.Trim(),
+            IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim(),
+            InitiatedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    public void MarkPaid(decimal paidAmount, string? externalReference, DateTimeOffset now)
+    {
+        PaidAmount = paidAmount;
+        PaymentStatus = "PAID";
+        PaidAt = now;
+        if (!string.IsNullOrWhiteSpace(externalReference))
+        {
+            ExternalReference = externalReference.Trim();
+        }
+        UpdatedAt = now;
+    }
+
+    public void MarkFailedOrCancelled(string status, string? reason, DateTimeOffset now)
+    {
+        PaymentStatus = status;
+        CancelledAt = now;
+        CancellationReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        UpdatedAt = now;
+    }
 }
 

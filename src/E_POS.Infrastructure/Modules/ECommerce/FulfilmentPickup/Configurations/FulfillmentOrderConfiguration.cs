@@ -126,6 +126,12 @@ public sealed class FulfillmentOrderConfiguration : IEntityTypeConfiguration<Ful
             .IsUnique()
             .HasDatabaseName("ux_fulfillment_orders_e767fb12");
 
+        // Guarantees a SalesOrder can only ever own one fulfilment graph, so neither the
+        // live checkout-confirmation path nor a historical-data repair can double-create it.
+        builder.HasIndex(x => new { x.TenantId, x.SalesOrderId })
+            .IsUnique()
+            .HasDatabaseName("ux_fulfillment_orders_sales_order");
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)

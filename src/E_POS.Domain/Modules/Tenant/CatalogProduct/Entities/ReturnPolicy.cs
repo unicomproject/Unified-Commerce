@@ -15,6 +15,13 @@ public class ReturnPolicy : AuditableEntity
     public bool RequiresManagerApproval { get; protected set; }
     public bool IsDefaultPolicy { get; protected set; }
     public string Status { get; protected set; } = string.Empty;
+    public Guid? SourceTemplateId { get; protected set; }
+    public int? SourceTemplateVersion { get; protected set; }
+    public int VersionNumber { get; protected set; } = 1;
+    public string LifecycleStatus { get; protected set; } = "PUBLISHED";
+    public bool ReviewRequired { get; protected set; } = false;
+    public DateTimeOffset? SeededAt { get; protected set; }
+    public Guid ConcurrencyToken { get; protected set; } = Guid.NewGuid();
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
 
@@ -48,10 +55,57 @@ public class ReturnPolicy : AuditableEntity
             RequiresManagerApproval = requiresManagerApproval,
             IsDefaultPolicy = isDefaultPolicy,
             Status = status.Trim().ToUpperInvariant(),
+            VersionNumber = 1,
+            LifecycleStatus = "PUBLISHED",
+            ReviewRequired = false,
+            ConcurrencyToken = Guid.NewGuid(),
             CreatedByTenantUserId = createdByTenantUserId,
             UpdatedByTenantUserId = createdByTenantUserId,
             CreatedAt = now,
             UpdatedAt = now
+        };
+    }
+
+    public static ReturnPolicy CreateSeededFromPlatformTemplate(
+        Guid id,
+        Guid tenantId,
+        Guid platformTemplateId,
+        int platformTemplateVersion,
+        string policyCode,
+        string policyName,
+        string? description,
+        int returnWindowDays,
+        int exchangeWindowDays,
+        bool requiresReceipt,
+        bool allowDefectiveReturn,
+        bool requiresManagerApproval,
+        DateTimeOffset seededAt)
+    {
+        return new ReturnPolicy
+        {
+            Id = id,
+            TenantId = tenantId,
+            ReturnPolicyCode = policyCode.Trim().ToUpperInvariant(),
+            ReturnPolicyName = policyName.Trim(),
+            Description = description?.Trim(),
+            ReturnWindowDays = returnWindowDays,
+            ExchangeWindowDays = exchangeWindowDays,
+            RequiresReceipt = requiresReceipt,
+            AllowDefectiveReturn = allowDefectiveReturn,
+            RequiresManagerApproval = requiresManagerApproval,
+            IsDefaultPolicy = true,
+            Status = "ACTIVE",
+            SourceTemplateId = platformTemplateId,
+            SourceTemplateVersion = platformTemplateVersion,
+            VersionNumber = 1,
+            LifecycleStatus = "PUBLISHED",
+            ReviewRequired = true,
+            SeededAt = seededAt,
+            ConcurrencyToken = Guid.NewGuid(),
+            CreatedByTenantUserId = null,
+            UpdatedByTenantUserId = null,
+            CreatedAt = seededAt,
+            UpdatedAt = seededAt
         };
     }
 
@@ -79,6 +133,15 @@ public class ReturnPolicy : AuditableEntity
         RequiresManagerApproval = requiresManagerApproval;
         IsDefaultPolicy = isDefaultPolicy;
         Status = status.Trim().ToUpperInvariant();
+        ConcurrencyToken = Guid.NewGuid();
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    public void MarkReviewCompleted(Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        ReviewRequired = false;
+        ConcurrencyToken = Guid.NewGuid();
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
@@ -86,6 +149,8 @@ public class ReturnPolicy : AuditableEntity
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)
     {
         Status = "DELETED";
+        LifecycleStatus = "ARCHIVED";
+        ConcurrencyToken = Guid.NewGuid();
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }

@@ -85,6 +85,41 @@ public sealed class ReturnPolicyConfiguration : IEntityTypeConfiguration<ReturnP
             .HasMaxLength(40)
             .IsRequired();
 
+        builder.Property(x => x.SourceTemplateId)
+            .HasColumnName("source_template_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.SourceTemplateVersion)
+            .HasColumnName("source_template_version")
+            .IsRequired(false);
+
+        builder.Property(x => x.VersionNumber)
+            .HasColumnName("version_number")
+            .HasDefaultValue(1)
+            .IsRequired();
+
+        builder.Property(x => x.LifecycleStatus)
+            .HasColumnName("lifecycle_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .HasDefaultValue("PUBLISHED")
+            .IsRequired();
+
+        builder.Property(x => x.ReviewRequired)
+            .HasColumnName("review_required")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(x => x.SeededAt)
+            .HasColumnName("seeded_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired(false);
+
+        builder.Property(x => x.ConcurrencyToken)
+            .HasColumnName("concurrency_token")
+            .IsConcurrencyToken()
+            .IsRequired();
+
         builder.Property(x => x.CreatedByTenantUserId)
             .HasColumnName("created_by_tenant_user_id")
             .IsRequired(false);
@@ -111,6 +146,12 @@ public sealed class ReturnPolicyConfiguration : IEntityTypeConfiguration<ReturnP
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_return_policies_updated_by_tenant_user_id_tenant_users");
 
+        builder.HasOne<ReturnPolicyTemplate>()
+            .WithMany()
+            .HasForeignKey(x => x.SourceTemplateId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_return_policies_source_template");
+
         builder.HasIndex(x => new { x.TenantId, x.ReturnPolicyCode })
             .IsUnique()
             .HasDatabaseName("uq_return_policies_tenant_id_return_policy_code");
@@ -118,6 +159,11 @@ public sealed class ReturnPolicyConfiguration : IEntityTypeConfiguration<ReturnP
         builder.HasIndex(x => new { x.TenantId, x.Id })
             .IsUnique()
             .HasDatabaseName("uq_return_policies_tenant_id_id");
+
+        builder.HasIndex(x => new { x.TenantId, x.IsDefaultPolicy })
+            .IsUnique()
+            .HasFilter("is_default_policy = true AND status != 'DELETED'")
+            .HasDatabaseName("uq_return_policies_tenant_default");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_return_policies_return_window_days", "return_window_days >= 0")); 
         builder.ToTable(t => t.HasCheckConstraint("ck_return_policies_exchange_window_days", "exchange_window_days >= 0")); 

@@ -4,11 +4,13 @@ using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using E_POS.Domain.Modules.ECommerce.CartCheckout.Entities;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
+using E_POS.Domain.Modules.Tenant.Payment.Entities;
 using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Infrastructure.Modules.Platform.Subscription.Entitlements;
@@ -30,6 +32,7 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
         Guid customerId,
         Guid checkoutSessionId,
         string idempotencyKey,
+        string paymentMethodCode,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -210,6 +213,40 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
             now);
         DbContext.SalesOrders.Add(order);
 
+        if (string.Equals(paymentMethodCode, StorefrontPaymentMethodCodes.Stripe, StringComparison.OrdinalIgnoreCase))
+        {
+            // Order stays "UNPAID" (its PaymentStatus column only allows a fixed set of values) —
+            // the pending SalesPayment row below is the actual signal that online payment is in flight.
+            var paymentMethodId = await ResolveOrEnsureOnlinePaymentMethodAsync(
+                tenantId, StorefrontPaymentMethodCodes.Stripe, "Pay online with card", now, cancellationToken);
+
+            var paymentId = Guid.NewGuid();
+            var paymentNumber = await GeneratePaymentNumberAsync(tenantId, cancellationToken);
+            var payment = SalesPayment.CreatePendingOnlinePayment(
+                paymentId,
+                tenantId,
+                orderId,
+                paymentNumber,
+                paymentMethodId,
+                checkout.CurrencyCode,
+                checkout.TotalAmount,
+                idempotencyKey,
+                now);
+            DbContext.SalesPayments.Add(payment);
+
+            DbContext.SalesPaymentTransactions.Add(SalesPaymentTransaction.CreatePendingProviderCharge(
+                Guid.NewGuid(),
+                tenantId,
+                paymentId,
+                checkout.TotalAmount,
+                checkout.CurrencyCode,
+                "STRIPE",
+                null,
+                idempotencyKey,
+                now));
+        }
+
+        var orderLines = new List<SalesOrderLine>(lines.Count);
         foreach (var line in lines)
         {
             var product = products[line.ProductId];
@@ -224,16 +261,36 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
                     barcodeByProductId,
                     out var barcodeSnapshot))
                 return Failure("storefront_checkout.barcode_unavailable");
-            DbContext.SalesOrderLines.Add(SalesOrderLine.CreateForClickAndCollect(
+            var orderLine = SalesOrderLine.CreateForClickAndCollect(
                 Guid.NewGuid(), tenantId, orderId, line.LineNumber, line.ProductId,
                 line.ProductVariantId, uom.Id, line.SkuSnapshot, barcodeSnapshot,
                 line.ProductNameSnapshot, variant?.VariantName, uom.UomCode, uom.UomName,
                 product.ProductType, product.ProductStructure,
                 line.Quantity, line.UnitPrice, line.LineSubtotalAmount,
-                line.LineDiscountAmount, line.LineTaxAmount, checkout.IsTaxInclusive, now));
+                line.LineDiscountAmount, line.LineTaxAmount, checkout.IsTaxInclusive, now);
+            DbContext.SalesOrderLines.Add(orderLine);
+            orderLines.Add(orderLine);
         }
 
+        await CreateFulfillmentGraphAsync(
+            tenantId,
+            orderId,
+            orderNumber,
+            collection.FulfillmentMethodOutletId!.Value,
+            reservation,
+            orderLines,
+            checkout.RequestedCollectionAt!.Value,
+            checkout.RequestedCollectionEndAt!.Value,
+            collectionTimezone,
+            checkout.PickupContactName ?? customer.Name,
+            checkout.PickupContactPhone ?? customer.Phone,
+            checkout.PickupContactEmail ?? customer.Email,
+            checkoutSessionId,
+            now,
+            cancellationToken);
+
         reservation.UpdateStatus("CONFIRMED", null, now);
+        reservation.AttachOrder(orderId, orderNumber, now);
         checkout.Complete(orderId, now);
         var cart = await DbContext.ShoppingCarts.FirstAsync(x =>
             x.TenantId == tenantId && x.Id == checkout.CartId,
@@ -247,6 +304,121 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
         await DbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null) await transaction.CommitAsync(cancellationToken);
         return Success(await BuildReadModelAsync(checkout, cancellationToken));
+    }
+
+    public async Task<bool> CancelAwaitingOnlinePaymentAsync(
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid salesPaymentId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var order = await DbContext.SalesOrders.FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.Id == salesOrderId, cancellationToken);
+        var payment = await DbContext.SalesPayments.FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.Id == salesPaymentId, cancellationToken);
+        if (order is null || payment is null) return false;
+        if (!string.Equals(payment.PaymentStatus, "PENDING", StringComparison.OrdinalIgnoreCase)) return false;
+
+        order.CancelForFailedOnlinePayment(reason, now);
+        payment.MarkFailedOrCancelled("FAILED", reason, now);
+        await DbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    // Builds the full POS fulfilment graph (FulfillmentOrder -> FulfillmentOrderLines ->
+    // PickupOrder -> PickupSlot/PickupSlotReservation) for a confirmed e-commerce order in
+    // the same transaction as SalesOrder/SalesOrderLine creation, so an order can never be
+    // committed without the operational graph the POS fulfilment workflow depends on.
+    private async Task CreateFulfillmentGraphAsync(
+        Guid tenantId,
+        Guid orderId,
+        string orderNumber,
+        Guid fulfillmentMethodOutletId,
+        InventoryReservation reservation,
+        IReadOnlyList<SalesOrderLine> orderLines,
+        DateTimeOffset requestedCollectionAt,
+        DateTimeOffset requestedCollectionEndAt,
+        string collectionTimezone,
+        string pickupContactName,
+        string? pickupContactPhone,
+        string? pickupContactEmail,
+        Guid checkoutSessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var reservationLineIds = await DbContext.InventoryReservationLines
+            .Where(x => x.TenantId == tenantId && x.InventoryReservationId == reservation.Id)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        var allocatedLocationIds = await (
+                from allocation in DbContext.InventoryReservationAllocations
+                join balance in DbContext.InventoryBalances
+                    on new { allocation.TenantId, allocation.InventoryBalanceId }
+                    equals new { balance.TenantId, InventoryBalanceId = balance.Id }
+                where allocation.TenantId == tenantId &&
+                      reservationLineIds.Contains(allocation.InventoryReservationLineId)
+                select balance.InventoryLocationId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var sourceInventoryLocationId = allocatedLocationIds.Count == 1 ? allocatedLocationIds[0] : (Guid?)null;
+
+        var timezone = TimeZoneInfo.FindSystemTimeZoneById(collectionTimezone);
+        var localStart = TimeZoneInfo.ConvertTime(requestedCollectionAt, timezone);
+        var localEnd = TimeZoneInfo.ConvertTime(requestedCollectionEndAt, timezone);
+
+        var fulfillmentOrderId = Guid.NewGuid();
+        var fulfillmentOrder = FulfillmentOrder.Create(
+            fulfillmentOrderId,
+            tenantId,
+            orderId,
+            $"FUL-{orderNumber}",
+            fulfillmentMethodOutletId,
+            sourceInventoryLocationId,
+            DateOnly.FromDateTime(localStart.DateTime),
+            requestedCollectionAt,
+            now);
+        DbContext.FulfillmentOrders.Add(fulfillmentOrder);
+
+        foreach (var orderLine in orderLines)
+            DbContext.FulfillmentOrderLines.Add(FulfillmentOrderLine.Create(
+                Guid.NewGuid(), tenantId, fulfillmentOrderId, orderLine.Id,
+                orderLine.Quantity, orderLine.CancelledQuantity, now));
+
+        var pickupSlotId = Guid.NewGuid();
+        var pickupSlot = PickupSlot.CreateOpen(
+            pickupSlotId,
+            tenantId,
+            fulfillmentMethodOutletId,
+            $"ECOMM-{orderNumber}",
+            DateOnly.FromDateTime(localStart.DateTime),
+            TimeOnly.FromDateTime(localStart.DateTime),
+            TimeOnly.FromDateTime(localEnd.DateTime),
+            1,
+            now);
+        DbContext.PickupSlots.Add(pickupSlot);
+        pickupSlot.Reserve(1, now);
+
+        var pickupSlotReservationId = Guid.NewGuid();
+        var pickupSlotReservation = PickupSlotReservation.CreatePending(
+            pickupSlotReservationId, tenantId, pickupSlotId, checkoutSessionId, 1, now, now);
+        pickupSlotReservation.Confirm(orderId, now);
+        DbContext.PickupSlotReservations.Add(pickupSlotReservation);
+
+        var hasEmail = !string.IsNullOrWhiteSpace(pickupContactEmail);
+        var hasPhone = !string.IsNullOrWhiteSpace(pickupContactPhone);
+        DbContext.PickupOrders.Add(PickupOrder.Create(
+            Guid.NewGuid(),
+            tenantId,
+            fulfillmentOrderId,
+            pickupSlotReservationId,
+            $"PU-{orderNumber}",
+            pickupContactName,
+            pickupContactPhone,
+            pickupContactEmail,
+            hasEmail ? "EMAIL" : hasPhone ? "PHONE" : null,
+            now));
     }
 
     private static bool TryResolvePrimaryBarcodeSnapshot(

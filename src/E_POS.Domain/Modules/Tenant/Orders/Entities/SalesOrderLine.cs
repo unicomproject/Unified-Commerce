@@ -35,6 +35,8 @@ public class SalesOrderLine : AuditableEntity
     public decimal LineDiscountAmount { get; protected set; }
     public decimal LineTaxAmount { get; protected set; }
     public string LineStatus { get; protected set; } = string.Empty;
+    public Guid? ReturnPolicyVersionIdSnapshot { get; protected set; }
+    public string? ReturnPolicySnapshot { get; protected set; }
 
     public static SalesOrderLine CreateForPosSale(
         Guid id,

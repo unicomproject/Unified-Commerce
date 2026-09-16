@@ -19,7 +19,8 @@ public static class TenantAdminBootstrapPermissionCatalog
     public static readonly IReadOnlyList<string> BasePermissionCodes =
     [
         "tenant.dashboard.view", // Basic home / account landing
-        "tenant.settings.manage" // Basic tenant settings required for initial setup
+        "tenant.settings.manage", // Basic tenant settings required for initial setup
+        WorkspacePermissions.TenantAdminAccess // Gate to land in the Tenant Admin workspace
     ];
 
     /// <summary>
@@ -128,7 +129,8 @@ public static class TenantAdminBootstrapPermissionCatalog
             [PlatformTenantFeatureCodes.PosCheckout] = TenantRoleSetupCatalog.CashierAllowedPermissionCodes
                 .OrderBy(permissionCode => permissionCode, StringComparer.Ordinal)
                 .ToArray(),
-            [PlatformTenantFeatureCodes.OfflineOperationSync] = []
+            [PlatformTenantFeatureCodes.OfflineOperationSync] = [],
+            [PlatformTenantFeatureCodes.CommerceReturnsRefunds] = []
         };
 
     public static bool IsPlatformOnlyPermission(string? permissionCode) =>

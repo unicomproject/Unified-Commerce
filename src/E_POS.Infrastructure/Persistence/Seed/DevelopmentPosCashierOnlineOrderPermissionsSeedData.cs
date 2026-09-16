@@ -42,6 +42,12 @@ public static class DevelopmentPosCashierOnlineOrderPermissionsSeedData
     public static readonly Guid PickingNoteId =
         Guid.Parse("77777777-0367-4000-8000-000000000001");
 
+    public static readonly Guid CollectionVerifyId =
+        Guid.Parse("77777777-0368-4000-8000-000000000001");
+
+    public static readonly Guid CollectionCompleteId =
+        Guid.Parse("77777777-0369-4000-8000-000000000001");
+
     public static IReadOnlyList<TenantPermissionSeedDefinition> Definitions { get; } =
     [
         new(OrdersAccessId, OnlineOrderPickingPermissions.OrdersAccess, CoreCommerceModuleId, SalesOrdersFeatureId, "access", "Access online orders module and queue."),
@@ -51,7 +57,9 @@ public static class DevelopmentPosCashierOnlineOrderPermissionsSeedData
         new(PickingScanId, OnlineOrderPickingPermissions.PickingScan, CoreCommerceModuleId, ClickCollectFeatureId, "scan", "Scan barcodes during online order picking."),
         new(PickingManualEntryId, OnlineOrderPickingPermissions.PickingManualEntry, CoreCommerceModuleId, ClickCollectFeatureId, "manual_entry", "Manually enter items or quantities during picking."),
         new(PickingReportIssueId, OnlineOrderPickingPermissions.PickingReportIssue, CoreCommerceModuleId, ClickCollectFeatureId, "report_issue", "Report issues during online order picking."),
-        new(PickingNoteId, OnlineOrderPickingPermissions.PickingNote, CoreCommerceModuleId, ClickCollectFeatureId, "note", "Add notes to online order picking fulfillment.")
+        new(PickingNoteId, OnlineOrderPickingPermissions.PickingNote, CoreCommerceModuleId, ClickCollectFeatureId, "note", "Add notes to online order picking fulfillment."),
+        new(CollectionVerifyId, OnlineOrderPickingPermissions.CollectionVerify, CoreCommerceModuleId, ClickCollectFeatureId, "verify", "Verify a customer pickup code at collection."),
+        new(CollectionCompleteId, OnlineOrderPickingPermissions.CollectionComplete, CoreCommerceModuleId, ClickCollectFeatureId, "complete", "Mark a verified online order as collected by the customer.")
     ];
 
     public static IReadOnlyList<string> CashierPermissionCodes { get; } =

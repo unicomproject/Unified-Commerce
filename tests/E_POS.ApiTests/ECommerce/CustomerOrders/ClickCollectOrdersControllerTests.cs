@@ -344,12 +344,14 @@ public sealed class ClickCollectOrdersControllerTests
         FakePosOnlineOrderStartFulfillmentService? startService = null,
         FakePosOnlineOrderPickingService? pickingService = null,
         FakePosOnlineOrderPackingService? packingService = null,
-        FakeReadyService? readyService = null) =>
+        FakeReadyService? readyService = null,
+        FakePosOnlineOrderPickupVerificationService? pickupVerificationService = null) =>
         new(service, detailService ?? new FakePosOnlineOrderDetailService(),
             startService ?? new FakePosOnlineOrderStartFulfillmentService(),
             pickingService ?? new FakePosOnlineOrderPickingService(),
             packingService ?? new FakePosOnlineOrderPackingService(),
-            new TenantRequestContextFactory(), readyService ?? new FakeReadyService())
+            new TenantRequestContextFactory(), readyService ?? new FakeReadyService(),
+            pickupVerificationService ?? new FakePosOnlineOrderPickupVerificationService())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -396,6 +398,24 @@ public sealed class ClickCollectOrdersControllerTests
             Task.FromResult(code is null
                 ? ApplicationResult<E_POS.Application.Modules.Shared.Notification.Dtos.NotificationCreateResult>.Success(new())
                 : ApplicationResult<E_POS.Application.Modules.Shared.Notification.Dtos.NotificationCreateResult>.Failure(new(code, "Safe error")));
+    }
+
+    private sealed class FakePosOnlineOrderPickupVerificationService(string? code = null)
+        : IPosOnlineOrderPickupVerificationService
+    {
+        public Task<ApplicationResult<PosOnlineOrderPickupVerifyResponse>> VerifyAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId,
+            PosOnlineOrderPickupVerifyRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(code is null
+                ? ApplicationResult<PosOnlineOrderPickupVerifyResponse>.Success(new())
+                : ApplicationResult<PosOnlineOrderPickupVerifyResponse>.Failure(new(code, "Safe error")));
+
+        public Task<ApplicationResult<PosOnlineOrderPickupCollectResponse>> CollectAsync(
+            TenantRequestContext context, Guid outletId, Guid orderId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(code is null
+                ? ApplicationResult<PosOnlineOrderPickupCollectResponse>.Success(new())
+                : ApplicationResult<PosOnlineOrderPickupCollectResponse>.Failure(new(code, "Safe error")));
     }
 
     private static void SetTenantClaims(

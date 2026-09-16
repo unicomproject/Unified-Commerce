@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
@@ -141,6 +142,18 @@ public sealed class CustomerOrderRepositoryTests
         order.UpdateClickAndCollectStatus("ACCEPTED", Guid.NewGuid(), Now.AddMinutes(1));
         order.UpdateClickAndCollectStatus("PREPARING", Guid.NewGuid(), Now.AddMinutes(2));
         order.UpdateClickAndCollectStatus("READY_FOR_COLLECTION", Guid.NewGuid(), Now.AddMinutes(3));
+        var fulfillment = FulfillmentOrder.Create(
+            Guid.NewGuid(), tenantId, order.Id, "FUL-SO-WEB-READY",
+            order.FulfillmentMethodOutletId!.Value, null, null, null, Now);
+        var pickup = PickupOrder.Create(
+            Guid.NewGuid(), tenantId, fulfillment.Id, null, "PU-SO-WEB-READY",
+            "Test Customer", null, null, null, Now);
+        pickup.MarkReady(Now.AddMinutes(3));
+        // GetDetailAsync checks expiry against real wall-clock time (not the fixture's
+        // fixed Now), so the expiry here must be relative to DateTimeOffset.UtcNow.
+        pickup.IssuePickupCode(
+            "test-pickup-code-123", 1, DateTimeOffset.UtcNow.AddHours(24), Now.AddMinutes(3));
+        dbContext.AddRange(fulfillment, pickup);
         await dbContext.SaveChangesAsync();
         var repository = new CustomerOrderRepository(dbContext);
 
@@ -154,6 +167,7 @@ public sealed class CustomerOrderRepositoryTests
         Assert.Equal("READY_FOR_COLLECTION", detail!.Status);
         Assert.True(detail.CanShowCollectionQr);
         Assert.Contains(order.Id.ToString("N"), detail.CollectionQr);
+        Assert.Contains("test-pickup-code-123", detail.CollectionQr);
         Assert.Contains(detail.TimelineSteps, x => x.Code == "READY_FOR_COLLECTION" && x.State == "CURRENT");
         Assert.Contains("TRACK", detail.AvailableActions);
         Assert.DoesNotContain("CANCEL", detail.AvailableActions);

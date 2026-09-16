@@ -53,6 +53,48 @@ public sealed class PlatformReturnPolicyTemplatesController : ControllerBase
         return result.IsSuccess && result.Value is not null ? Ok(LegacyApiResponse<ReturnPolicyTemplateResponse>.Ok("Return policy template updated successfully.", result.Value)) : MapError(result.Error);
     }
 
+    [HttpPost("{id:guid}/publish")]
+    public async Task<IActionResult> Publish(Guid id, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId)) return Unauthorized(CreateLegacyError("platform_auth.invalid_session", "Invalid platform session."));
+        var result = await _service.PublishAsync(platformUserId, id, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(LegacyApiResponse<ReturnPolicyTemplateResponse>.Ok("Return policy template published successfully.", result.Value))
+            : MapError(result.Error);
+    }
+
+    [HttpPost("{id:guid}/archive")]
+    public async Task<IActionResult> Archive(Guid id, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId)) return Unauthorized(CreateLegacyError("platform_auth.invalid_session", "Invalid platform session."));
+        var result = await _service.ArchiveAsync(platformUserId, id, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(LegacyApiResponse<ReturnPolicyTemplateResponse>.Ok("Return policy template archived successfully.", result.Value))
+            : MapError(result.Error);
+    }
+
+    [HttpPost("{id:guid}/set-default")]
+    public async Task<IActionResult> SetDefault(Guid id, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId)) return Unauthorized(CreateLegacyError("platform_auth.invalid_session", "Invalid platform session."));
+        var result = await _service.SetDefaultAsync(platformUserId, id, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(LegacyApiResponse<ReturnPolicyTemplateResponse>.Ok("Platform default return policy template set successfully.", result.Value))
+            : MapError(result.Error);
+    }
+
+    public sealed record DuplicateReturnPolicyTemplateRequest(string? NewCode, string? NewName);
+
+    [HttpPost("{id:guid}/duplicate")]
+    public async Task<IActionResult> Duplicate(Guid id, [FromBody] DuplicateReturnPolicyTemplateRequest? request, CancellationToken cancellationToken)
+    {
+        if (!TryGetPlatformUserId(out var platformUserId)) return Unauthorized(CreateLegacyError("platform_auth.invalid_session", "Invalid platform session."));
+        var result = await _service.DuplicateAsync(platformUserId, id, request?.NewCode, request?.NewName, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? StatusCode(StatusCodes.Status201Created, LegacyApiResponse<ReturnPolicyTemplateResponse>.Ok("Return policy template duplicated successfully.", result.Value))
+            : MapError(result.Error);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
@@ -68,6 +110,8 @@ public sealed class PlatformReturnPolicyTemplatesController : ControllerBase
             "return_policy_templates.not_found" => NotFound(CreateLegacyError(error.Code, error.Message)),
             "return_policy_templates.validation_failed" => BadRequest(CreateLegacyError(error.Code, error.Message)),
             "return_policy_templates.conflict" => Conflict(CreateLegacyError(error.Code, error.Message)),
+            "return_policy_templates.immutable" => BadRequest(CreateLegacyError(error.Code, error.Message)),
+            "return_policy_templates.invalid_state" => BadRequest(CreateLegacyError(error.Code, error.Message)),
             _ => StatusCode(StatusCodes.Status403Forbidden, CreateLegacyError(error.Code, error.Message))
         };
     }

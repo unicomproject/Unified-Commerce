@@ -1,5 +1,11 @@
 namespace E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
 
+public static class StorefrontPaymentMethodCodes
+{
+    public const string PayAtPickup = "PAY_AT_PICKUP";
+    public const string Stripe = "STRIPE";
+}
+
 public sealed class CreateStorefrontCheckoutFromCartRequest
 {
     public Guid SelectedOutletId { get; set; }
@@ -7,6 +13,11 @@ public sealed class CreateStorefrontCheckoutFromCartRequest
     public string? PickupContactPhone { get; set; }
     public string? PickupContactEmail { get; set; }
     public DateTimeOffset? RequestedCollectionAt { get; set; }
+}
+
+public sealed class ConfirmStorefrontCheckoutRequest
+{
+    public string? PaymentMethodCode { get; set; }
 }
 
 public sealed class UpdateStorefrontCheckoutCollectionRequest
@@ -41,6 +52,7 @@ public sealed class StorefrontCheckoutReadModel
     public DateTimeOffset? ExpiresAt { get; set; }
     public IReadOnlyList<StorefrontCheckoutLineReadModel> Items { get; set; } = [];
     public StorefrontCheckoutOrderReadModel? Order { get; set; }
+    public string? PaymentRedirectUrl { get; set; }
 }
 
 public sealed class StorefrontCheckoutLineReadModel
@@ -70,4 +82,5 @@ public sealed class StorefrontCheckoutOrderReadModel
     public DateTimeOffset? RequestedCollectionAt { get; set; }
     public DateTimeOffset? RequestedCollectionEndAt { get; set; }
     public string? CollectionTimezone { get; set; }
+    public Guid? PaymentId { get; set; }
 }

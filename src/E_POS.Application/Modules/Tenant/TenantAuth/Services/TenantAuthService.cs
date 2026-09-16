@@ -241,6 +241,26 @@ public sealed class TenantAuthService : ITenantAuthService
 
         return ApplicationResult.Success();
     }
+    public JwtTokenResult CreateNotificationSocketToken(Guid tenantUserId, Guid tenantId, Guid sessionId)
+    {
+        const int socketTokenMinutes = 2;
+
+        return _jwtTokenFactory.CreateAccessToken(new JwtTokenDescriptor(
+            _jwtSettings.Issuer,
+            _jwtSettings.Audience,
+            _jwtSettings.SigningKey,
+            socketTokenMinutes,
+            new Dictionary<string, object>
+            {
+                ["sub"] = tenantUserId.ToString(),
+                ["tenant_id"] = tenantId.ToString(),
+                ["identity_type"] = TenantAuthConstants.IdentityType,
+                ["session_id"] = sessionId.ToString(),
+                ["jti"] = Guid.NewGuid().ToString(),
+                ["token_use"] = "notifications_socket"
+            }));
+    }
+
     private JwtTokenDescriptor CreateTokenDescriptor(
         TenantLoginAccount account,
         Guid sessionId,

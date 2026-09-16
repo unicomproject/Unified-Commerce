@@ -73,6 +73,7 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
         Guid customerId,
         Guid checkoutSessionId,
         string idempotencyKey,
+        string paymentMethodCode,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         _confirmationRepository.ConfirmAsync(
@@ -80,6 +81,22 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             customerId,
             checkoutSessionId,
             idempotencyKey,
+            paymentMethodCode,
+            now,
+            cancellationToken);
+
+    public Task<bool> CancelAwaitingOnlinePaymentAsync(
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid salesPaymentId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        _confirmationRepository.CancelAwaitingOnlinePaymentAsync(
+            tenantId,
+            salesOrderId,
+            salesPaymentId,
+            reason,
             now,
             cancellationToken);
 }

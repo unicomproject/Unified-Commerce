@@ -2,6 +2,7 @@ using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Application.Modules.Shared.Media;
 using E_POS.Application.Modules.Shared.Media.Contracts;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.Orders.Entities;
@@ -150,10 +151,19 @@ public abstract class CustomerOrderRepositoryBase
         SalesOrder order,
         IReadOnlyList<SalesOrderLine> lines,
         IReadOnlyDictionary<Guid, string?> imageLookup,
-        IReadOnlyList<SalesOrderStatusHistory> statusHistory)
+        IReadOnlyList<SalesOrderStatusHistory> statusHistory,
+        PickupOrder? pickup = null,
+        DateTimeOffset? now = null)
     {
         var status = MapUiStatus(order);
-        var canShowQr = CanShowCollectionQr(status);
+        // A pickup code is only live once the outlet has issued one (at "ready for
+        // collection") and only until it is spent (verified) or expires — never derived
+        // from order fields, which anyone who knows the order number could reconstruct.
+        var hasLiveCode = pickup is not null &&
+            !string.IsNullOrEmpty(pickup.PickupQrTokenHash) &&
+            pickup.PickupStatus == "READY" &&
+            (!pickup.PickupQrExpiresAt.HasValue || pickup.PickupQrExpiresAt.Value > (now ?? DateTimeOffset.UtcNow));
+        var canShowQr = CanShowCollectionQr(status) && hasLiveCode;
 
         return new CustomerOrderDetailReadModel
         {
@@ -164,7 +174,7 @@ public abstract class CustomerOrderRepositoryBase
             StatusLabel = MapStatusLabel(status),
             StatusMessage = MapStatusMessage(status),
             CanShowCollectionQr = canShowQr,
-            CollectionQr = canShowQr ? BuildCollectionQr(order) : null,
+            CollectionQr = canShowQr ? BuildCollectionQr(order, pickup!.PickupQrTokenHash!) : null,
             PlacedAt = order.PlacedAt,
             RequestedCollectionAt = order.RequestedCollectionAt,
             RequestedCollectionEndAt = order.RequestedCollectionEndAt,
@@ -430,8 +440,11 @@ public abstract class CustomerOrderRepositoryBase
     protected static bool CanShowCollectionQr(string status) =>
         status is "READY_FOR_COLLECTION";
 
-    protected static string BuildCollectionQr(SalesOrder order) =>
-        $"CLICK_COLLECT:{order.TenantId:N}:{order.Id:N}:{order.OrderNumber}";
+    // The pickup code is a large random secret issued server-side when the order is
+    // marked ready (PosOnlineOrderPackingRepository.MarkReadyAsync); tenantId/orderId
+    // are included only so the cashier app can locate the order, never as the secret.
+    protected static string BuildCollectionQr(SalesOrder order, string pickupCode) =>
+        $"CLICK_COLLECT:{order.TenantId:N}:{order.Id:N}:{pickupCode}";
 
     protected static bool Is(string value, string expected) =>
         string.Equals(value, expected, StringComparison.OrdinalIgnoreCase);

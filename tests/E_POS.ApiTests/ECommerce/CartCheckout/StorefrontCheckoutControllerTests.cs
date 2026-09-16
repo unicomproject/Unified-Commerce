@@ -58,7 +58,7 @@ public sealed class StorefrontCheckoutControllerTests
         var controller = CreateController(service, Guid.NewGuid(), Guid.NewGuid(), "cart-session");
 
         var result = await controller.Confirm(
-            Guid.NewGuid(), "confirm-key", CancellationToken.None);
+            Guid.NewGuid(), "confirm-key", null, CancellationToken.None);
 
         Assert.IsType<ConflictObjectResult>(result);
         Assert.Equal("confirm-key", service.IdempotencyKey);
@@ -162,6 +162,7 @@ public sealed class StorefrontCheckoutControllerTests
             Guid customerId,
             Guid checkoutSessionId,
             string? idempotencyKey,
+            string? paymentMethodCode,
             CancellationToken cancellationToken)
         {
             Capture(tenantId, customerId);

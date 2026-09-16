@@ -1,6 +1,7 @@
 using E_POS.Api.Common;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Shared.Notification.Contracts.Services;
+using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,13 +14,37 @@ public sealed class TenantNotificationsController : ControllerBase
 {
     private readonly INotificationInboxService _service;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
+    private readonly ITenantAuthService _authService;
 
     public TenantNotificationsController(
         INotificationInboxService service,
-        ITenantRequestContextFactory tenantRequestContextFactory)
+        ITenantRequestContextFactory tenantRequestContextFactory,
+        ITenantAuthService authService)
     {
         _service = service;
         _tenantRequestContextFactory = tenantRequestContextFactory;
+        _authService = authService;
+    }
+
+    [HttpGet("socket-token")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public IActionResult GetSocketToken()
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return InvalidSession();
+
+        var sessionIdValue = User.FindFirst("session_id")?.Value;
+        if (!Guid.TryParse(sessionIdValue, out var sessionId))
+            return InvalidSession();
+
+        var token = _authService.CreateNotificationSocketToken(context.UserId, context.TenantId, sessionId);
+        return Ok(new
+        {
+            success = true,
+            message = "Notification socket token issued.",
+            data = new { accessToken = token.AccessToken, expiresAt = token.ExpiresAt }
+        });
     }
 
     [HttpGet]

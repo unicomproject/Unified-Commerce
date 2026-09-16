@@ -98,6 +98,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "confirm-1",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(1),
             CancellationToken.None);
         var retry = await repository.ConfirmAsync(
@@ -105,6 +106,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout.Id,
             "confirm-1",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(2),
             CancellationToken.None);
 
@@ -124,6 +126,107 @@ public sealed class StorefrontCheckoutRepositoryTests
         Assert.Equal("Asia/Colombo", order.CollectionTimezoneSnapshot);
         var salesLine = await dbContext.SalesOrderLines.SingleAsync();
         Assert.Equal(scenario.PrimaryBarcode, salesLine.BarcodeSnapshot);
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_CreatesCompleteFulfillmentGraphWithNonNullVersion()
+    {
+        await using var dbContext = CreateDbContext();
+        var scenario = await SeedScenarioAsync(dbContext, selectedOutletStock: 5m);
+        await AddCartItemAsync(dbContext, scenario, 2m);
+        var repository = new StorefrontCheckoutRepository(dbContext);
+        var created = await CreateCheckoutAsync(repository, scenario);
+        Assert.True((await repository.UpdateCollectionAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            new UpdateStorefrontCheckoutCollectionRequest
+            {
+                SelectedOutletId = scenario.OutletId,
+                RequestedCollectionAt = CollectionAt
+            },
+            Now,
+            CancellationToken.None)).IsSuccess);
+
+        var confirmed = await repository.ConfirmAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            "confirm-graph",
+            StorefrontPaymentMethodCodes.PayAtPickup,
+            Now.AddMinutes(1),
+            CancellationToken.None);
+        Assert.True(confirmed.IsSuccess);
+
+        var order = await dbContext.SalesOrders.SingleAsync();
+        var salesLine = await dbContext.SalesOrderLines.SingleAsync();
+
+        var fulfillmentOrder = await dbContext.FulfillmentOrders.SingleAsync();
+        Assert.Equal(order.Id, fulfillmentOrder.SalesOrderId);
+        Assert.Equal("PENDING", fulfillmentOrder.FulfillmentStatus);
+        Assert.True(fulfillmentOrder.RowVersion > 0);
+
+        var fulfillmentLine = await dbContext.FulfillmentOrderLines.SingleAsync();
+        Assert.Equal(fulfillmentOrder.Id, fulfillmentLine.FulfillmentOrderId);
+        Assert.Equal(salesLine.Id, fulfillmentLine.SalesOrderLineId);
+        Assert.Equal(salesLine.Quantity, fulfillmentLine.RequestedQuantity);
+
+        var pickupOrder = await dbContext.PickupOrders.SingleAsync();
+        Assert.Equal(fulfillmentOrder.Id, pickupOrder.FulfillmentOrderId);
+        Assert.Equal("PENDING", pickupOrder.PickupStatus);
+        Assert.NotNull(pickupOrder.PickupSlotReservationId);
+
+        var slotReservation = await dbContext.PickupSlotReservations.SingleAsync();
+        Assert.Equal(pickupOrder.PickupSlotReservationId, slotReservation.Id);
+        Assert.Equal("CONFIRMED", slotReservation.ReservationStatus);
+        Assert.Equal(order.Id, slotReservation.SalesOrderId);
+
+        var pickupSlot = await dbContext.PickupSlots.SingleAsync();
+        Assert.Equal(slotReservation.PickupSlotId, pickupSlot.Id);
+        Assert.Equal(1, pickupSlot.ReservedCount);
+
+        var reservation = await dbContext.InventoryReservations.SingleAsync();
+        Assert.Equal("CONFIRMED", reservation.ReservationStatus);
+        Assert.Equal(order.Id, reservation.SourceReferenceId);
+        Assert.Null(reservation.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_CalledTwice_DoesNotDuplicateFulfillmentGraph()
+    {
+        await using var dbContext = CreateDbContext();
+        var scenario = await SeedScenarioAsync(dbContext, selectedOutletStock: 5m);
+        await AddCartItemAsync(dbContext, scenario, 1m);
+        var repository = new StorefrontCheckoutRepository(dbContext);
+        var created = await CreateCheckoutAsync(repository, scenario);
+        Assert.True((await repository.UpdateCollectionAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            new UpdateStorefrontCheckoutCollectionRequest
+            {
+                SelectedOutletId = scenario.OutletId,
+                RequestedCollectionAt = CollectionAt
+            },
+            Now,
+            CancellationToken.None)).IsSuccess);
+
+        var first = await repository.ConfirmAsync(
+            scenario.TenantId, scenario.CustomerId, created.Checkout!.Id,
+            "confirm-graph-retry", StorefrontPaymentMethodCodes.PayAtPickup,
+            Now.AddMinutes(1), CancellationToken.None);
+        var retry = await repository.ConfirmAsync(
+            scenario.TenantId, scenario.CustomerId, created.Checkout.Id,
+            "confirm-graph-retry", StorefrontPaymentMethodCodes.PayAtPickup,
+            Now.AddMinutes(2), CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(retry.IsSuccess);
+        Assert.Single(await dbContext.FulfillmentOrders.ToListAsync());
+        Assert.Single(await dbContext.FulfillmentOrderLines.ToListAsync());
+        Assert.Single(await dbContext.PickupOrders.ToListAsync());
+        Assert.Single(await dbContext.PickupSlots.ToListAsync());
+        Assert.Single(await dbContext.PickupSlotReservations.ToListAsync());
     }
 
     [Fact]
@@ -152,6 +255,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "confirm-missing-barcode",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(1),
             CancellationToken.None);
 
@@ -159,6 +263,11 @@ public sealed class StorefrontCheckoutRepositoryTests
         Assert.Equal("storefront_checkout.barcode_unavailable", result.ErrorCode);
         Assert.Empty(await dbContext.SalesOrders.ToListAsync());
         Assert.Empty(await dbContext.SalesOrderLines.ToListAsync());
+        Assert.Empty(await dbContext.FulfillmentOrders.ToListAsync());
+        Assert.Empty(await dbContext.FulfillmentOrderLines.ToListAsync());
+        Assert.Empty(await dbContext.PickupOrders.ToListAsync());
+        Assert.Empty(await dbContext.PickupSlots.ToListAsync());
+        Assert.Empty(await dbContext.PickupSlotReservations.ToListAsync());
     }
 
     [Fact]
@@ -186,6 +295,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "confirm-immutable-barcode",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(1),
             CancellationToken.None);
         Assert.True(confirmed.IsSuccess);
@@ -404,6 +514,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout.Id,
             "timezone-change",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(2),
             CancellationToken.None);
 
@@ -503,6 +614,7 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "expired-confirm",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(16),
             CancellationToken.None);
 

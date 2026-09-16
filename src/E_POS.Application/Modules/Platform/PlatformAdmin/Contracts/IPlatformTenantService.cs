@@ -86,6 +86,12 @@ public interface IPlatformTenantRepository
 
     Task CreateTenantWizardAsync(PlatformTenantCreateWriteModel model, CancellationToken cancellationToken);
 
+    Task<E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicyTemplate?> GetDefaultPublishedReturnPolicyTemplateAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicyTemplate?>(null);
+
+    Task EnsureTenantReturnPolicySeededAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+
     Task MarkTenantAdminInviteSentAsync(Guid inviteId, DateTimeOffset sentAt, CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>

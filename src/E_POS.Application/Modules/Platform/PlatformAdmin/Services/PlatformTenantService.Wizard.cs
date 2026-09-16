@@ -621,6 +621,32 @@ public sealed partial class PlatformTenantService
             }
         }
 
+        E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicy? tenantDefaultReturnPolicy = null;
+        var hasReturnsRefundsEntitlement = effectiveFeatureCodes.Any(code =>
+            string.Equals(code, PlatformTenantFeatureCodes.CommerceReturnsRefunds, StringComparison.OrdinalIgnoreCase));
+
+        if (hasReturnsRefundsEntitlement)
+        {
+            var defaultTemplate = await _repository.GetDefaultPublishedReturnPolicyTemplateAsync(cancellationToken);
+            if (defaultTemplate is not null)
+            {
+                tenantDefaultReturnPolicy = E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicy.CreateSeededFromPlatformTemplate(
+                    id: Guid.NewGuid(),
+                    tenantId: tenantId,
+                    platformTemplateId: defaultTemplate.Id,
+                    platformTemplateVersion: defaultTemplate.VersionNumber,
+                    policyCode: defaultTemplate.TemplateCode,
+                    policyName: defaultTemplate.Name,
+                    description: defaultTemplate.Description,
+                    returnWindowDays: defaultTemplate.ReturnWindowDays ?? 14,
+                    exchangeWindowDays: defaultTemplate.ExchangeWindowDays ?? defaultTemplate.ReturnWindowDays ?? 14,
+                    requiresReceipt: defaultTemplate.RequiresReceipt,
+                    allowDefectiveReturn: defaultTemplate.AllowDefectiveReturn,
+                    requiresManagerApproval: defaultTemplate.RequiresManagerApproval,
+                    seededAt: now);
+            }
+        }
+
         var writeModel = new PlatformTenantCreateWriteModel
         {
             Tenant = tenant,
@@ -646,7 +672,8 @@ public sealed partial class PlatformTenantService
             OnboardingOperation = onboardingOperation,
             OnboardingContacts = onboardingContacts,
             OnboardingOutboxMessages = onboardingMessages,
-            TenantSettings = settingsProvision.SettingsToInsert
+            TenantSettings = settingsProvision.SettingsToInsert,
+            TenantDefaultReturnPolicy = tenantDefaultReturnPolicy
         };
 
         try
