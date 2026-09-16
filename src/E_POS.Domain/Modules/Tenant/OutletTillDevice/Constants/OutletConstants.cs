@@ -13,6 +13,9 @@ public static class OutletConstants
     public const string PickupMethodType = "PICKUP";
     public const string DefaultTimezone = "UTC";
     public const string ViewPermission = "tenant.outlets.view";
+    public const string CreatePermission = "tenant.outlets.create";
+    public const string UpdatePermission = "tenant.outlets.update";
+    public const string DeletePermission = "tenant.outlets.delete";
     public const string ManagePermission = "tenant.outlets.manage";
 
     /// <summary>

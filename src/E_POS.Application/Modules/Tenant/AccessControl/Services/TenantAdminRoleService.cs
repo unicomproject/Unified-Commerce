@@ -62,7 +62,18 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         int pageSize,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccessAny(context, TenantAdminUserPermissions.RolesView, TenantAdminUserPermissions.RolesManage);
+        var accessError = ValidateAccessAny(
+            context,
+            TenantAdminUserPermissions.RolesView,
+            TenantAdminUserPermissions.RolesUpdate,
+            TenantAdminUserPermissions.RolesStatusUpdate,
+            TenantAdminUserPermissions.RolesDelete,
+            TenantAdminUserPermissions.RolesPermissionsView,
+            TenantAdminUserPermissions.RolesPermissionsUpdate,
+            TenantAdminUserPermissions.RolesAssignmentsView,
+            TenantAdminUserPermissions.RolesUsersAssign,
+            TenantAdminUserPermissions.RolesOutletsAssign,
+            TenantAdminUserPermissions.RolesManage);
         if (accessError is not null) return ApplicationResult<TenantAdminRoleListResponse>.Failure(accessError);
 
         var response = await _repository.ListAsync(
@@ -81,7 +92,18 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         Guid roleId,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccessAny(context, TenantAdminUserPermissions.RolesView, TenantAdminUserPermissions.RolesManage);
+        var accessError = ValidateAccessAny(
+            context,
+            TenantAdminUserPermissions.RolesView,
+            TenantAdminUserPermissions.RolesUpdate,
+            TenantAdminUserPermissions.RolesStatusUpdate,
+            TenantAdminUserPermissions.RolesDelete,
+            TenantAdminUserPermissions.RolesPermissionsView,
+            TenantAdminUserPermissions.RolesPermissionsUpdate,
+            TenantAdminUserPermissions.RolesAssignmentsView,
+            TenantAdminUserPermissions.RolesUsersAssign,
+            TenantAdminUserPermissions.RolesOutletsAssign,
+            TenantAdminUserPermissions.RolesManage);
         if (accessError is not null) return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(accessError);
 
         var response = await _repository.GetDetailAsync(context.TenantId, roleId, cancellationToken);
@@ -111,6 +133,33 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
 
         return ApplicationResult<TenantRoleSetupOptionsResponse>.Success(
             new TenantRoleSetupOptionsResponse(filtered));
+    }
+
+    public async Task<ApplicationResult<TenantRoleAssignmentOptionsResponse>> GetAssignmentOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var canAssignUsers = HasAssignmentPermission(
+            context,
+            TenantAdminUserPermissions.RolesUsersAssign);
+        var canAssignOutlets = HasAssignmentPermission(
+            context,
+            TenantAdminUserPermissions.RolesOutletsAssign);
+        var canView = context.HasPermission(TenantAdminUserPermissions.RolesAssignmentsView) ||
+                      context.HasPermission(TenantAdminUserPermissions.RolesUpdate) ||
+                      context.HasPermission(TenantAdminUserPermissions.RolesManage);
+
+        if (!canView && !canAssignUsers && !canAssignOutlets)
+        {
+            return ApplicationResult<TenantRoleAssignmentOptionsResponse>.Failure(PermissionDenied);
+        }
+
+        var response = await _repository.GetAssignmentOptionsAsync(
+            context.TenantId,
+            canAssignUsers,
+            canAssignOutlets,
+            cancellationToken);
+        return ApplicationResult<TenantRoleAssignmentOptionsResponse>.Success(response);
     }
 
     public async Task<ApplicationResult<TenantAdminRoleDetailResponse>> CreateAsync(
@@ -192,6 +241,11 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         }
 
         var assignments = NormalizeAssignments(request.Assignments);
+        var assignmentAccessError = ValidateAssignmentMutationAccess(context, [], assignments);
+        if (assignmentAccessError is not null)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(assignmentAccessError);
+        }
         var assignmentValidation = await _repository.ValidateAssignmentsAsync(context.TenantId, assignments, cancellationToken);
         if (!assignmentValidation.IsValid)
         {
@@ -277,7 +331,7 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         TenantAdminRoleStatusRequest request,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccessAny(context, TenantAdminUserPermissions.RolesUpdate, TenantAdminUserPermissions.RolesManage);
+        var accessError = ValidateAccessAny(context, TenantAdminUserPermissions.RolesStatusUpdate, TenantAdminUserPermissions.RolesManage);
         if (accessError is not null) return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(accessError);
 
         var role = await _repository.GetEditableAsync(context.TenantId, roleId, cancellationToken);
@@ -331,7 +385,11 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
     {
         var accessError = ValidateAccessAny(
             context,
+            TenantAdminUserPermissions.RolesUpdate,
             TenantAdminUserPermissions.RolesPermissionsView,
+            TenantAdminUserPermissions.RolesPermissionsUpdate,
+            TenantAdminUserPermissions.RolesUsersAssign,
+            TenantAdminUserPermissions.RolesOutletsAssign,
             TenantAdminUserPermissions.PermissionsView,
             TenantAdminUserPermissions.RolesManage);
         if (accessError is not null) return ApplicationResult<TenantPermissionCatalogResponse>.Failure(accessError);
@@ -351,7 +409,11 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
     {
         var accessError = ValidateAccessAny(
             context,
+            TenantAdminUserPermissions.RolesUpdate,
             TenantAdminUserPermissions.RolesPermissionsView,
+            TenantAdminUserPermissions.RolesPermissionsUpdate,
+            TenantAdminUserPermissions.RolesUsersAssign,
+            TenantAdminUserPermissions.RolesOutletsAssign,
             TenantAdminUserPermissions.PermissionsView,
             TenantAdminUserPermissions.RolesManage);
         if (accessError is not null) return ApplicationResult<TenantRolePermissionsResponse>.Failure(accessError);
@@ -395,10 +457,17 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         }
 
         var now = _dateTimeProvider.UtcNow;
+        if (currentPermissions is null)
+        {
+            return ApplicationResult<TenantRolePermissionsResponse>.Failure(NotFound);
+        }
+        var delegationPermissionCodes = BuildDelegationPermissionCodes(
+            context.Permissions,
+            currentPermissions.AssignedPermissionCodes);
         var permissions = await _repository.GetAssignablePermissionsByCodeAsync(
             context.TenantId,
             permissionCodes,
-            context.Permissions,
+            delegationPermissionCodes,
             now,
             cancellationToken);
 
@@ -442,7 +511,12 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
     {
         var accessError = ValidateAccessAny(
             context,
+            TenantAdminUserPermissions.RolesUpdate,
+            TenantAdminUserPermissions.RolesPermissionsUpdate,
             TenantAdminUserPermissions.RolesAssignmentsView,
+            TenantAdminUserPermissions.RolesAssignmentsUpdate,
+            TenantAdminUserPermissions.RolesUsersAssign,
+            TenantAdminUserPermissions.RolesOutletsAssign,
             TenantAdminUserPermissions.RolesManage);
         if (accessError is not null) return ApplicationResult<TenantRoleAssignmentsResponse>.Failure(accessError);
 
@@ -458,17 +532,18 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         TenantRoleAssignmentsUpdateRequest request,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccessAny(
-            context,
-            TenantAdminUserPermissions.RolesAssignmentsUpdate,
-            TenantAdminUserPermissions.RolesManage);
-        if (accessError is not null) return ApplicationResult<TenantRoleAssignmentsResponse>.Failure(accessError);
-
         var role = await _repository.GetEditableAsync(context.TenantId, roleId, cancellationToken);
         if (role is null) return ApplicationResult<TenantRoleAssignmentsResponse>.Failure(NotFound);
         if (HasConcurrencyConflict(role.UpdatedAt, request.ExpectedUpdatedAt)) return ApplicationResult<TenantRoleAssignmentsResponse>.Failure(ConcurrencyConflict);
 
         var assignments = NormalizeAssignments(request.Assignments);
+        var current = await _repository.GetAssignmentsAsync(context.TenantId, roleId, cancellationToken);
+        var accessError = ValidateAssignmentMutationAccess(
+            context,
+            current?.Assignments ?? [],
+            assignments);
+        if (accessError is not null) return ApplicationResult<TenantRoleAssignmentsResponse>.Failure(accessError);
+
         var validation = await _repository.ValidateAssignmentsAsync(context.TenantId, assignments, cancellationToken);
         if (!validation.IsValid)
         {
@@ -505,11 +580,11 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         TenantRoleSetupSaveRequest request,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccessAny(
-            context,
-            TenantAdminUserPermissions.RolesManage,
-            TenantAdminUserPermissions.RolesPermissionsUpdate,
-            TenantAdminUserPermissions.RolesAssignmentsUpdate);
+        var canManageAllRoles = context.HasPermission(TenantAdminUserPermissions.RolesManage);
+        var accessError = canManageAllRoles ||
+                          context.HasPermission(TenantAdminUserPermissions.RolesPermissionsUpdate)
+            ? null
+            : PermissionDenied;
         if (accessError is not null) return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(accessError);
 
         var role = await _repository.GetEditableAsync(context.TenantId, roleId, cancellationToken);
@@ -542,10 +617,17 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
             return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(canonicalError);
         }
 
+        if (currentPermissions is null)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(NotFound);
+        }
+        var delegationPermissionCodes = BuildDelegationPermissionCodes(
+            context.Permissions,
+            currentPermissions.AssignedPermissionCodes);
         var permissions = await _repository.GetAssignablePermissionsByCodeAsync(
             context.TenantId,
             permissionCodes,
-            context.Permissions,
+            delegationPermissionCodes,
             now,
             cancellationToken);
 
@@ -563,6 +645,15 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         }
 
         var assignments = NormalizeAssignments(request.Assignments);
+        var current = await _repository.GetAssignmentsAsync(context.TenantId, roleId, cancellationToken);
+        var assignmentAccessError = ValidateAssignmentMutationAccess(
+            context,
+            current?.Assignments ?? [],
+            assignments);
+        if (assignmentAccessError is not null)
+        {
+            return ApplicationResult<TenantAdminRoleDetailResponse>.Failure(assignmentAccessError);
+        }
         var assignmentValidation = await _repository.ValidateAssignmentsAsync(context.TenantId, assignments, cancellationToken);
         if (!assignmentValidation.IsValid)
         {
@@ -634,6 +725,54 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
                     };
                 })
                 .ToArray();
+
+    private static IReadOnlyCollection<string> BuildDelegationPermissionCodes(
+        IReadOnlyCollection<string> actorPermissionCodes,
+        IReadOnlyCollection<string> existingRolePermissionCodes) =>
+        actorPermissionCodes
+            .Concat(existingRolePermissionCodes)
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static ApplicationError? ValidateAssignmentMutationAccess(
+        TenantRequestContext context,
+        IReadOnlyCollection<TenantAdminRoleAssignmentResponse> current,
+        IReadOnlyCollection<TenantAdminRoleAssignmentRequest> requested)
+    {
+        if (context.HasPermission(TenantAdminUserPermissions.RolesManage)) return null;
+
+        var currentByUser = current.ToDictionary(item => item.UserId);
+        var requestedByUser = requested.ToDictionary(item => item.UserId);
+        var usersChanged = !currentByUser.Keys.ToHashSet().SetEquals(requestedByUser.Keys);
+        var outletScopesChanged = requested.Any(item =>
+        {
+            if (!currentByUser.TryGetValue(item.UserId, out var existing))
+            {
+                return item.AccessScope == TenantRoleSetupCatalog.SelectedOutletsScope;
+            }
+
+            return !string.Equals(existing.AccessScope, item.AccessScope, StringComparison.OrdinalIgnoreCase) ||
+                   !existing.OutletIds.ToHashSet().SetEquals(item.OutletIds ?? []);
+        });
+
+        if (usersChanged && !HasAssignmentPermission(context, TenantAdminUserPermissions.RolesUsersAssign))
+        {
+            return PermissionDenied;
+        }
+
+        if (outletScopesChanged && !HasAssignmentPermission(context, TenantAdminUserPermissions.RolesOutletsAssign))
+        {
+            return PermissionDenied;
+        }
+
+        return null;
+    }
+
+    private static bool HasAssignmentPermission(TenantRequestContext context, string permission) =>
+        context.HasPermission(permission) ||
+        context.HasPermission(TenantAdminUserPermissions.RolesManage);
 
     private static NormalizedRoleRequest NormalizeRoleRequest(string roleName, string roleCode, string? roleDescription)
     {
@@ -813,27 +952,5 @@ public sealed class TenantAdminRoleService : ITenantAdminRoleService
         return string.IsNullOrWhiteSpace(code)
             ? "CUSTOM_ROLE"
             : code[..Math.Min(code.Length, 80)];
-    }
-    public async Task<ApplicationResult<TenantRoleAssignmentOptionsResponse>> GetAssignmentOptionsAsync(
-        TenantRequestContext context,
-        CancellationToken cancellationToken)
-    {
-        var canAssignUsers = (context.HasPermission(TenantAdminUserPermissions.RolesUsersAssign) || context.HasPermission(TenantAdminUserPermissions.RolesManage));
-        var canAssignOutlets = (context.HasPermission(TenantAdminUserPermissions.RolesOutletsAssign) || context.HasPermission(TenantAdminUserPermissions.RolesManage));
-        var canView = context.HasPermission(TenantAdminUserPermissions.RolesAssignmentsView) ||
-                      context.HasPermission(TenantAdminUserPermissions.RolesUpdate) ||
-                      context.HasPermission(TenantAdminUserPermissions.RolesManage);
-
-        if (!canView && !canAssignUsers && !canAssignOutlets)
-        {
-            return ApplicationResult<TenantRoleAssignmentOptionsResponse>.Failure(PermissionDenied);
-        }
-
-        var response = await _repository.GetAssignmentOptionsAsync(
-            context.TenantId,
-            canAssignUsers,
-            canAssignOutlets,
-            cancellationToken);
-        return ApplicationResult<TenantRoleAssignmentOptionsResponse>.Success(response);
     }
 }

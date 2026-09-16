@@ -6,6 +6,7 @@ using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
+using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -100,7 +101,11 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
             
         if (user == null) return false;
         
-        if (user.UserType == "admin" || user.OutletId == outletId) return true;
+        if (string.Equals(user.OutletAccessScope, TenantUserAccessScopes.AllOutlets, StringComparison.Ordinal) ||
+            user.OutletId == outletId)
+        {
+            return true;
+        }
         
         var hasOutletRole = await _dbContext.Set<E_POS.Domain.Modules.Tenant.AccessControl.Entities.OutletUserRole>()
             .AsNoTracking()
@@ -470,7 +475,10 @@ public sealed class TenantAdminTillRepository : ITenantAdminTillRepository
                 .Select(x => x.TenantUserId)
                 .ToListAsync(cancellationToken);
             
-            cashiersQuery = cashiersQuery.Where(x => x.OutletId == outletId.Value || validUserIds.Contains(x.Id) || x.UserType == "admin");
+            cashiersQuery = cashiersQuery.Where(x =>
+                x.OutletAccessScope == TenantUserAccessScopes.AllOutlets ||
+                x.OutletId == outletId.Value ||
+                validUserIds.Contains(x.Id));
         }
 
         var users = await cashiersQuery

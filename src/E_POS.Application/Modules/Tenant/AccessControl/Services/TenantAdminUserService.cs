@@ -134,6 +134,12 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             context,
             TenantAdminUserPermissions.Create,
             TenantAdminUserPermissions.Invite,
+            TenantAdminUserPermissions.Update,
+            TenantAdminUserPermissions.Disable,
+            TenantAdminUserPermissions.RolesAssign,
+            TenantAdminUserPermissions.OutletsAssign,
+            TenantAdminUserPermissions.TillsAssign,
+            TenantAdminUserPermissions.PermissionOverride,
             TenantAdminUserPermissions.Manage);
         if (accessError is not null)
         {
@@ -141,7 +147,18 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         }
 
         var now = _dateTimeProvider.UtcNow;
-        var roleOptions = await _repository.GetRoleOptionsAsync(context.TenantId, cancellationToken);
+        var canManage = context.HasPermission(TenantAdminUserPermissions.Manage);
+        var canCreate = canManage || context.HasPermission(TenantAdminUserPermissions.Create);
+        var canInvite = canManage || context.HasPermission(TenantAdminUserPermissions.Invite);
+        var canUpdateStatus = canManage || context.HasPermission(TenantAdminUserPermissions.Disable);
+        var canAssignRoles = canManage || context.HasPermission(TenantAdminUserPermissions.RolesAssign);
+        var canAssignOutlets = canManage || context.HasPermission(TenantAdminUserPermissions.OutletsAssign);
+        var canAssignTills = canManage || context.HasPermission(TenantAdminUserPermissions.TillsAssign);
+        var canOverridePermissions = canManage || context.HasPermission(TenantAdminUserPermissions.PermissionOverride);
+
+        var roleOptions = canAssignRoles
+            ? await _repository.GetRoleOptionsAsync(context.TenantId, cancellationToken)
+            : Array.Empty<RoleOptionResponse>();
         var roles = new List<RoleOptionResponse>(roleOptions.Count);
         foreach (var role in roleOptions)
         {
@@ -156,13 +173,29 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 roles.Add(role);
             }
         }
-        var outlets = await _repository.GetOutletOptionsAsync(context.TenantId, cancellationToken);
-        var tills = await _repository.GetTillOptionsAsync(context.TenantId, cancellationToken);
-        var permissionGroups = await _repository.GetPermissionGroupsAsync(
-            context.TenantId,
-            context.Permissions,
-            now,
-            cancellationToken);
+        var outlets = canAssignOutlets || canAssignTills
+            ? await _repository.GetOutletOptionsAsync(context.TenantId, cancellationToken)
+            : Array.Empty<OutletOptionResponse>();
+        var tills = canAssignTills
+            ? await _repository.GetTillOptionsAsync(context.TenantId, cancellationToken)
+            : Array.Empty<TillOptionResponse>();
+        var permissionGroups = canOverridePermissions
+            ? await _repository.GetPermissionGroupsAsync(
+                context.TenantId,
+                context.Permissions,
+                now,
+                cancellationToken)
+            : Array.Empty<PermissionGroupResponse>();
+
+        var supportedStatuses = canCreate || canInvite || canUpdateStatus
+            ? TenantAdminUserCreateStatusPolicy.SupportedStatuses
+            : Array.Empty<string>();
+        var supportedOutletScopes = canAssignOutlets
+            ? TenantUserAccessScopes.SupportedOutletScopes
+            : [TenantUserAccessScopes.NoOutletAccess];
+        var supportedTillScopes = canAssignTills
+            ? TenantUserAccessScopes.SupportedTillScopes
+            : [TenantUserAccessScopes.NoTillAccess];
 
         var catalogVersion = ComputePermissionCatalogVersion(roles, permissionGroups);
         return ApplicationResult<TenantAdminUserCreateOptionsResponse>.Success(
@@ -170,20 +203,20 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 roles,
                 outlets,
                 permissionGroups,
-                TenantAdminUserCreateStatusPolicy.SupportedStatuses,
+                supportedStatuses,
                 tills,
-                TenantUserAccessScopes.SupportedOutletScopes,
-                TenantUserAccessScopes.SupportedTillScopes,
+                supportedOutletScopes,
+                supportedTillScopes,
                 new TenantAdminUserCreateCapabilitiesResponse(
-                    SupportsInvitedUserCreation: true,
-                    SupportsDirectActiveCreation: true,
-                    SupportsUserPermissionOverrides: true,
+                    SupportsInvitedUserCreation: canInvite,
+                    SupportsDirectActiveCreation: canCreate,
+                    SupportsUserPermissionOverrides: canOverridePermissions,
                     SupportsPermissionDenies: false,
-                    SupportsAllOutletAccess: true,
+                    SupportsAllOutletAccess: canAssignOutlets,
                     SupportsNoOutletAccess: true,
-                    SupportsExplicitTillAccess: true,
-                    SupportsDefaultOutlet: true,
-                    SupportsDefaultTill: true,
+                    SupportsExplicitTillAccess: canAssignTills,
+                    SupportsDefaultOutlet: canAssignOutlets,
+                    SupportsDefaultTill: canAssignTills,
                     SupportsAccessStartDate: false,
                     SupportsTemporaryPassword: true,
                     SupportsForcePasswordChange: false,
@@ -227,6 +260,11 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         if (accessError is not null)
         {
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(accessError);
+        }
+
+        if (!HasMutationPermission(context, TenantAdminUserPermissions.RolesAssign))
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(PermissionDenied);
         }
 
         var validationError = ValidateWriteRequest(
@@ -294,6 +332,18 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
 
         var outletAccessScope = scopeValidation.OutletAccessScope!;
         var tillAccessScope = scopeValidation.TillAccessScope!;
+        if (!string.Equals(outletAccessScope, TenantUserAccessScopes.NoOutletAccess, StringComparison.Ordinal) &&
+            !HasMutationPermission(context, TenantAdminUserPermissions.OutletsAssign))
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(PermissionDenied);
+        }
+
+        if (!string.Equals(tillAccessScope, TenantUserAccessScopes.NoTillAccess, StringComparison.Ordinal) &&
+            !HasMutationPermission(context, TenantAdminUserPermissions.TillsAssign))
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(PermissionDenied);
+        }
+
         var outletValidation = await _repository.ValidateOutletSelectionAsync(
             context.TenantId,
             outletIds,
@@ -373,6 +423,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             now,
             cancellationToken);
         var currentCatalogVersion = ComputePermissionCatalogVersion(currentRoles, currentPermissionGroups);
+        var userType = ResolveUserType(currentRoles, request.RoleId);
         if (permissionOverrideEnabled &&
             currentPermissionGroups.Count == 0 &&
             overriddenPermissionIds.Count > 0)
@@ -422,7 +473,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         if (isInvited)
         {
             user = TenantUser.Create(userId, context.TenantId, request.Email.Trim(), trimmedFullName, trimmedPhone, trimmedPhone,
-                TenantUserConstants.PendingInvitePasswordHash, "empty_salt", TenantUserConstants.StatusInvited, "admin", "admin", null, now,
+                TenantUserConstants.PendingInvitePasswordHash, "empty_salt", TenantUserConstants.StatusInvited, userType, TenantUserConstants.AdminUserType, null, now,
                 request.EmployeeId, staffCode);
 
             var rawToken = _invitationTokenService.GenerateToken();
@@ -458,8 +509,8 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 _passwordHashService.HashPassword(request.Password!),
                 "pbkdf2_embedded",
                 TenantUserConstants.StatusActive,
-                "admin",
-                "admin",
+                userType,
+                TenantUserConstants.AdminUserType,
                 null,
                 now,
                 request.EmployeeId,
@@ -477,8 +528,8 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 TenantUserConstants.PendingInvitePasswordHash,
                 "empty_salt",
                 TenantUserConstants.StatusInactive,
-                "admin",
-                "admin",
+                userType,
+                TenantUserConstants.AdminUserType,
                 null,
                 now,
                 request.EmployeeId,
@@ -588,7 +639,15 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         TenantAdminUserUpdateRequest request,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateAccess(context, TenantAdminUserPermissions.Update, TenantAdminUserPermissions.Manage);
+        var accessError = ValidateAccessAny(
+            context,
+            TenantAdminUserPermissions.Update,
+            TenantAdminUserPermissions.Disable,
+            TenantAdminUserPermissions.RolesAssign,
+            TenantAdminUserPermissions.OutletsAssign,
+            TenantAdminUserPermissions.TillsAssign,
+            TenantAdminUserPermissions.PermissionOverride,
+            TenantAdminUserPermissions.Manage);
         if (accessError is not null)
         {
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(accessError);
@@ -618,6 +677,50 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound);
         }
 
+        var currentDetail = await _repository.GetDetailAsync(context.TenantId, userId, cancellationToken);
+        if (currentDetail is null)
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(NotFound);
+        }
+
+        var requestedOutletIds = NormalizeIds(request.OutletIds);
+        var requestedTillIds = NormalizeIds(request.TillIds);
+        var normalizedOutletScope = request.OutletAccessScope?.Trim().ToUpperInvariant()
+            ?? TenantUserAccessScopes.AllOutlets;
+        var normalizedTillScope = request.TillAccessScope?.Trim().ToUpperInvariant()
+            ?? TenantUserAccessScopes.AllAccessibleTills;
+        var normalizedStatus = request.Status.Trim().ToUpperInvariant();
+        var profileAction = request.ProfileMediaAction?.Trim().ToUpperInvariant() ?? "KEEP";
+
+        var basicProfileChanged =
+            !string.Equals(currentDetail.FullName.Trim(), request.FullName.Trim(), StringComparison.Ordinal) ||
+            !string.Equals(TenantUser.NormalizeEmail(currentDetail.Email), TenantUser.NormalizeEmail(request.Email), StringComparison.Ordinal) ||
+            !string.Equals(currentDetail.PhoneNumber?.Trim(), request.PhoneNumber?.Trim(), StringComparison.Ordinal) ||
+            profileAction is "REPLACE" or "REMOVE";
+        var statusChanged = !string.Equals(currentDetail.Status.Trim(), normalizedStatus, StringComparison.OrdinalIgnoreCase);
+        var roleChanged = currentDetail.RoleId != request.RoleId;
+        var outletAccessChanged =
+            !string.Equals(currentDetail.OutletAccessScope, normalizedOutletScope, StringComparison.OrdinalIgnoreCase) ||
+            currentDetail.DefaultOutletId != request.DefaultOutletId ||
+            !SameIds(currentDetail.Outlets.Select(outlet => outlet.OutletId), requestedOutletIds);
+        var tillAccessChanged =
+            !string.Equals(currentDetail.TillAccessScope, normalizedTillScope, StringComparison.OrdinalIgnoreCase) ||
+            currentDetail.DefaultTillId != request.DefaultTillId ||
+            !SameIds((currentDetail.Tills ?? []).Select(till => till.TillId), requestedTillIds);
+        var permissionOverridesChanged =
+            currentDetail.PermissionOverrideEnabled != request.PermissionOverrideEnabled ||
+            !SameIds(currentDetail.OverriddenPermissionIds, NormalizeIds(request.OverriddenPermissionIds));
+
+        if (basicProfileChanged && !HasMutationPermission(context, TenantAdminUserPermissions.Update) ||
+            statusChanged && !HasMutationPermission(context, TenantAdminUserPermissions.Disable) ||
+            roleChanged && !HasMutationPermission(context, TenantAdminUserPermissions.RolesAssign) ||
+            outletAccessChanged && !HasMutationPermission(context, TenantAdminUserPermissions.OutletsAssign) ||
+            tillAccessChanged && !HasMutationPermission(context, TenantAdminUserPermissions.TillsAssign) ||
+            permissionOverridesChanged && !HasMutationPermission(context, TenantAdminUserPermissions.PermissionOverride))
+        {
+            return ApplicationResult<TenantAdminUserDetailResponse>.Failure(PermissionDenied);
+        }
+
         var now = _dateTimeProvider.UtcNow;
         if (NormalizeIds(request.DeniedPermissionIds).Count > 0)
         {
@@ -637,8 +740,8 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(ToAccessError(roleValidation.Failure));
         }
 
-        var outletIds = NormalizeIds(request.OutletIds);
-        var tillIds = NormalizeIds(request.TillIds);
+        var outletIds = requestedOutletIds;
+        var tillIds = requestedTillIds;
         var scopeValidation = NormalizeAndValidateAccessScope(
             request.OutletAccessScope,
             request.DefaultOutletId,
@@ -730,6 +833,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
             now,
             cancellationToken);
         var currentCatalogVersion = ComputePermissionCatalogVersion(currentRoles, currentPermissionGroups);
+        var userType = ResolveUserType(currentRoles, request.RoleId);
         if (permissionOverrideEnabled && currentPermissionGroups.Count == 0 && overriddenPermissionIds.Count > 0)
         {
             return ApplicationResult<TenantAdminUserDetailResponse>.Failure(new ApplicationError(
@@ -749,7 +853,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
         }
 
         var previousStatus = user.AccountStatus;
-        var nextStatus = request.Status.Trim().ToUpperInvariant();
+        var nextStatus = normalizedStatus;
         var increasesSeat = !CountsTowardUserLimit(previousStatus) && CountsTowardUserLimit(nextStatus);
         var previousProfileMediaAssetId = user.ProfileImageUrl;
         var profileMediaChange = NormalizeProfileMediaChange(request, previousProfileMediaAssetId);
@@ -787,6 +891,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
                 request.DefaultTillId,
                 context.UserId,
                 now);
+            user.SetUserType(userType, context.UserId, now);
 
             if (profileMediaChange.ShouldApply)
             {
@@ -856,7 +961,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
     {
         var accessError = ValidateAccessAny(
             context,
-            TenantAdminUserPermissions.Invite,
+            TenantAdminUserPermissions.InvitesResend,
             TenantAdminUserPermissions.Manage);
         if (accessError is not null)
         {
@@ -887,7 +992,7 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
     {
         var accessError = ValidateAccessAny(
             context,
-            TenantAdminUserPermissions.Invite,
+            TenantAdminUserPermissions.InvitesRevoke,
             TenantAdminUserPermissions.Manage);
         if (accessError is not null)
         {
@@ -1388,6 +1493,14 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
     private static ApplicationError ValidationFailed(string message) =>
         new("user.validation_failed", message);
 
+    private static string ResolveUserType(IReadOnlyList<RoleOptionResponse> roles, Guid roleId)
+    {
+        var roleCode = roles.FirstOrDefault(role => role.RoleId == roleId)?.RoleCode;
+        return string.Equals(roleCode, TenantUserConstants.DefaultTenantAdminRoleCode, StringComparison.OrdinalIgnoreCase)
+            ? TenantUserConstants.AdminUserType
+            : TenantUserConstants.StandardUserType;
+    }
+
     private static ApplicationError? ValidateAccess(
         TenantRequestContext context,
         string requiredPermission,
@@ -1414,4 +1527,10 @@ public sealed class TenantAdminUserService : ITenantAdminUserService
 
         return permissions.Any(context.HasPermission) ? null : PermissionDenied;
     }
+
+    private static bool HasMutationPermission(TenantRequestContext context, string permission) =>
+        context.HasPermission(permission) || context.HasPermission(TenantAdminUserPermissions.Manage);
+
+    private static bool SameIds(IEnumerable<Guid> left, IEnumerable<Guid> right) =>
+        left.ToHashSet().SetEquals(right);
 }

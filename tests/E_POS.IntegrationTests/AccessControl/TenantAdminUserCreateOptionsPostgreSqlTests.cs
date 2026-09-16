@@ -52,8 +52,8 @@ public sealed class TenantAdminUserCreateOptionsPostgreSqlTests
                 fixture.TenantId,
                 fixture.ActorUserId,
                 [
-                    TenantAdminUserPermissions.Create,
-                    "tenant.users.update",
+                    TenantAdminUserPermissions.Manage,
+                    TenantAdminUserPermissions.Update,
                     "platform.users.view"
                 ]),
             CancellationToken.None);

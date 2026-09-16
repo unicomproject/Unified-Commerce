@@ -50,7 +50,7 @@ public sealed class TenantAdminInvitationDeliveryService : ITenantAdminInvitatio
         }
 
         var activationUrl = TenantAdminInvitationUrlBuilder.Build(baseUrl, request.RawToken);
-        var emailMessage = TenantAdminInvitationEmailComposer.Compose(
+        var emailMessage = E_POS.Application.Modules.Platform.PlatformAdmin.Email.TenantAdminInvitationEmailComposer.Compose(
             toAddress: request.AdminEmail,
             tenantName: request.TenantName,
             tenantCode: request.TenantCode,

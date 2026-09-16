@@ -80,10 +80,9 @@ public sealed class OutletImageService : IOutletImageService
     private async Task<ApplicationError?> ValidateAccessAsync(TenantRequestContext context, CancellationToken ct)
     {
         var hasPermission = context.HasPermission(OutletConstants.ManagePermission) ||
-                            context.HasPermission("tenant.outlets.update") ||
+                            context.HasPermission(TenantAdminOutletPermissions.ImageUpdate) ||
                             context.HasPermission("outlet.create") ||
-                            context.HasPermission("outlet.update") ||
-                            context.HasPermission("outlet.delete");
+                            context.HasPermission(TenantAdminOutletPermissions.Create);
 
         if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty || !hasPermission) 
             return new ApplicationError("outlet.permission_denied", "Permission denied for outlet management.");

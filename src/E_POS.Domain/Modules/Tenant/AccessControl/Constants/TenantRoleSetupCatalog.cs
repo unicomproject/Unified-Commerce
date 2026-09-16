@@ -39,10 +39,13 @@ public static class TenantRoleSetupCatalog
         {
             WorkspacePermissions.PosAccess,
             PosPermissions.Home.View,
+            TenantWorkspacePermissions.PosAccess,
             PosPermissions.Home.ViewDashboard,
             PosPermissions.NewSale.View,
             PosPermissions.Notifications.View,
             PosPermissions.Hardware.Settings,
+            "commerce.online_order.orders.access",
+            "commerce.online_order.orders.view",
             PosPermissions.Till.Open,
             PosPermissions.Till.Close,
             PosPermissions.Till.ViewSession,
@@ -110,15 +113,28 @@ public static class TenantRoleSetupCatalog
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             TenantAdminUserPermissions.Manage,
+            TenantWorkspacePermissions.TenantAdminAccess,
             TenantAdminUserPermissions.Create,
             TenantAdminUserPermissions.Update,
             TenantAdminUserPermissions.Delete,
+            TenantAdminUserPermissions.Disable,
+            TenantAdminUserPermissions.RolesAssign,
+            TenantAdminUserPermissions.OutletsAssign,
+            TenantAdminUserPermissions.TillsAssign,
+            TenantAdminUserPermissions.InvitesResend,
+            TenantAdminUserPermissions.InvitesRevoke,
             TenantAdminUserPermissions.RolesManage,
             TenantAdminUserPermissions.RolesCreate,
             TenantAdminUserPermissions.RolesUpdate,
+            TenantAdminUserPermissions.RolesStatusUpdate,
             TenantAdminUserPermissions.RolesDelete,
             TenantAdminUserPermissions.RolesPermissionsUpdate,
-            TenantAdminUserPermissions.RolesAssignmentsUpdate
+            TenantAdminUserPermissions.RolesAssignmentsUpdate,
+            TenantAdminUserPermissions.RolesUsersAssign,
+            TenantAdminUserPermissions.RolesOutletsAssign,
+            TenantAdminOutletPermissions.StatusUpdate,
+            TenantAdminOutletPermissions.ManagerAssign,
+            TenantAdminOutletPermissions.ImageUpdate
         };
 
     public static bool IsSupportedSetupRoleCode(string? roleCode) =>

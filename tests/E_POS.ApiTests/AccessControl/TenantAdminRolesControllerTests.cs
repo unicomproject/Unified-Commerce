@@ -70,6 +70,27 @@ public sealed class TenantAdminRolesControllerTests
     }
 
     [Fact]
+    public async Task ReplaceAssignments_WithPermissionFailure_ReturnsForbidden()
+    {
+        var roleId = Guid.NewGuid();
+        var service = new FakeTenantAdminRoleService(CreateRoleDetail(roleId))
+        {
+            ReplaceAssignmentsResult = ApplicationResult<TenantRoleAssignmentsResponse>.Failure(
+                new ApplicationError("tenant_roles.permission_denied", "Permission is required.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), TenantAdminUserPermissions.RolesAssignmentsUpdate);
+
+        var result = await controller.ReplaceAssignments(
+            roleId,
+            new TenantRoleAssignmentsUpdateRequest([], DateTimeOffset.UtcNow),
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
     public async Task Delete_WithLastAdminProtection_ReturnsConflict()
     {
         var service = new FakeTenantAdminRoleService(CreateRoleDetail(Guid.NewGuid()))
@@ -180,11 +201,6 @@ public sealed class TenantAdminRolesControllerTests
 
     private sealed class FakeTenantAdminRoleService : ITenantAdminRoleService
     {
-        public Task<ApplicationResult<TenantRoleAssignmentOptionsResponse>> GetAssignmentOptionsAsync(
-            TenantRequestContext context,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantRoleAssignmentOptionsResponse>.Success(
-                new TenantRoleAssignmentOptionsResponse([], [], true, true)));
         private readonly TenantAdminRoleDetailResponse _detail;
 
         public FakeTenantAdminRoleService(TenantAdminRoleDetailResponse detail)
@@ -200,6 +216,9 @@ public sealed class TenantAdminRolesControllerTests
         public ApplicationResult<TenantRolePermissionsResponse> ReplacePermissionsResult { get; set; } =
             ApplicationResult<TenantRolePermissionsResponse>.Success(new TenantRolePermissionsResponse(
                 Guid.NewGuid(), "MANAGER", "Manager", "TENANT", false, [], [], DateTimeOffset.UtcNow));
+        public ApplicationResult<TenantRoleAssignmentsResponse> ReplaceAssignmentsResult { get; set; } =
+            ApplicationResult<TenantRoleAssignmentsResponse>.Success(new TenantRoleAssignmentsResponse(
+                Guid.NewGuid(), "MANAGER", "Manager", false, [], DateTimeOffset.UtcNow));
         public ApplicationResult DeleteResult { get; set; } = ApplicationResult.Success();
 
         public Task<ApplicationResult<TenantAdminRoleListResponse>> ListAsync(
@@ -274,6 +293,12 @@ public sealed class TenantAdminRolesControllerTests
                         DateTimeOffset.UtcNow)
                 ])));
 
+        public Task<ApplicationResult<TenantRoleAssignmentOptionsResponse>> GetAssignmentOptionsAsync(
+            TenantRequestContext context,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<TenantRoleAssignmentOptionsResponse>.Success(
+                new TenantRoleAssignmentOptionsResponse([], [], true, true)));
+
         public Task<ApplicationResult<TenantRolePermissionsResponse>> GetPermissionsAsync(
             TenantRequestContext context,
             Guid roleId,
@@ -299,8 +324,7 @@ public sealed class TenantAdminRolesControllerTests
             Guid roleId,
             TenantRoleAssignmentsUpdateRequest request,
             CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<TenantRoleAssignmentsResponse>.Success(
-                new TenantRoleAssignmentsResponse(roleId, "MANAGER", "Manager", false, [], DateTimeOffset.UtcNow)));
+            Task.FromResult(ReplaceAssignmentsResult);
 
         public Task<ApplicationResult<TenantAdminRoleDetailResponse>> SaveSetupAsync(
             TenantRequestContext context,

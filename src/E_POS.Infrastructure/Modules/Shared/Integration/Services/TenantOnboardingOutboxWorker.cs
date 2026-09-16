@@ -210,7 +210,7 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
             throw new RetryableDeliveryException("invitation_hash_key_not_configured", "Invitation hashing is not configured.");
         }
         var invite = UserInvite.CreatePending(Guid.NewGuid(), tenantId, user.Email, user.Email, roleId, null, hash,
-            now.AddHours(Math.Clamp(_options.InvitationExpiryHours, 1, 168)), now);
+            now.AddHours(Math.Clamp(_options.InvitationExpiryHours, 1, 168)), now, tenantUserId: user.Id);
         db.UserInvites.Add(invite);
         await db.SaveChangesAsync(ct);
         if (!TenantAdminInvitationUrlBuilder.TryValidateBaseUrl(
@@ -222,12 +222,8 @@ public sealed class TenantOnboardingOutboxWorker : BackgroundService
         }
 
         var url = TenantAdminInvitationUrlBuilder.Build(_options.TenantAdminAppBaseUrl!, rawToken);
-        var expiresText = invite.ExpiresAt.ToString("u");
-        var send = await sender.SendAsync(new ApplicationEmailMessage(user.Email, "Set up your Tenant Admin account",
-            $"<p>Your tenant <strong>{System.Net.WebUtility.HtmlEncode(tenant.DisplayName)}</strong> is ready.</p>" +
-            $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(url)}\">Set up your account</a></p>" +
-            $"<p>This invitation expires at {System.Net.WebUtility.HtmlEncode(expiresText)} (UTC). If you did not expect this email, ignore it.</p>",
-            $"Your tenant is ready. Open the secure setup link before {expiresText} UTC.", operationId.ToString("D")), ct);
+        var send = await sender.SendAsync(TenantAdminInvitationEmailComposer.Compose(
+            user.Email, tenant.DisplayName, url, invite.ExpiresAt, operationId.ToString("D")), ct);
         if (send.IsFailure) throw new RetryableDeliveryException(send.Error.Code, "Invitation provider rejected the message.");
         invite.MarkSent(DateTimeOffset.UtcNow);
         var operation = await db.PlatformTenantOnboardingOperations.SingleAsync(x => x.Id == operationId, ct);

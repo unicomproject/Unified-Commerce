@@ -831,6 +831,22 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TenantAdminOutletManagerOptionResponse>> GetManagerOptionsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.TenantUsers
+            .AsNoTracking()
+            .Where(user => user.TenantId == tenantId && user.AccountStatus == ActiveAccountStatus)
+            .OrderBy(user => user.DisplayName ?? user.FullName)
+            .ThenBy(user => user.Email)
+            .Select(user => new TenantAdminOutletManagerOptionResponse(
+                user.Id,
+                user.DisplayName ?? user.FullName,
+                user.Email))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> MediaAssetExistsAndActiveAsync(
         Guid tenantId,
         Guid mediaAssetId,
@@ -1112,19 +1128,4 @@ public sealed class TenantAdminOutletRepository : ITenantAdminOutletRepository
         decimal TaxAmount,
         decimal RefundedAmount,
         DateTimeOffset? CompletedAt);
-    public async Task<IReadOnlyList<TenantAdminOutletManagerOptionResponse>> GetManagerOptionsAsync(
-        Guid tenantId,
-        CancellationToken cancellationToken)
-    {
-        return await _dbContext.TenantUsers
-            .AsNoTracking()
-            .Where(user => user.TenantId == tenantId && user.AccountStatus == ActiveAccountStatus)
-            .OrderBy(user => user.DisplayName ?? user.FullName)
-            .ThenBy(user => user.Email)
-            .Select(user => new TenantAdminOutletManagerOptionResponse(
-                user.Id,
-                user.DisplayName ?? user.FullName,
-                user.Email))
-            .ToListAsync(cancellationToken);
-    }
 }

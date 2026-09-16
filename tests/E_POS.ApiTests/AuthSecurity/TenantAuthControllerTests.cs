@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Claims;
 using E_POS.Api.Controllers;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Dtos;
 using Microsoft.AspNetCore.Authorization;
@@ -252,6 +253,14 @@ public sealed class TenantAuthControllerTests
         {
             RefreshToken = refreshToken;
             return Task.FromResult(_refreshResult);
+        }
+
+        public JwtTokenResult CreateNotificationSocketToken(
+            Guid tenantUserId,
+            Guid tenantId,
+            Guid sessionId)
+        {
+            return new JwtTokenResult("fake-socket-token", DateTimeOffset.UtcNow.AddMinutes(5));
         }
     }
 }

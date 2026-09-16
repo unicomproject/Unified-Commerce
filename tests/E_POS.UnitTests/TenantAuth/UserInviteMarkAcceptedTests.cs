@@ -88,6 +88,26 @@ public sealed class UserInviteMarkAcceptedTests
 public sealed class TenantAdminInvitationUrlBuilderTests
 {
     [Fact]
+    public void NativeTarget_IsDevelopmentOnly_AndEncodesToken()
+    {
+        const string target = "oneverz://tenant-admin/setup";
+        Assert.True(TenantAdminInvitationUrlBuilder.TryValidateBaseUrl(target, false, out _));
+        Assert.False(TenantAdminInvitationUrlBuilder.TryValidateBaseUrl(target, true, out _));
+        Assert.Equal("oneverz://tenant-admin/setup?token=abc%2B%2F%3D",
+            TenantAdminInvitationUrlBuilder.Build(target, "abc+/="));
+    }
+
+    [Theory]
+    [InlineData("oneverz://other/setup")]
+    [InlineData("oneverz://tenant-admin/other")]
+    [InlineData("oneverz://tenant-admin/setup?token=abc")]
+    [InlineData("oneverz://tenant-admin/setup#fragment")]
+    public void RejectsUnapprovedNativeTargets(string target)
+    {
+        Assert.False(TenantAdminInvitationUrlBuilder.TryValidateBaseUrl(target, false, out _));
+    }
+
+    [Fact]
     public void Build_ProducesCanonicalPathTokenUrl()
     {
         var url = TenantAdminInvitationUrlBuilder.Build("https://admin.oneverz.com/", "abc+/=token");

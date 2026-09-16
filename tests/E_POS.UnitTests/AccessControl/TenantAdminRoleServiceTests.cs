@@ -148,7 +148,7 @@ public sealed class TenantAdminRoleServiceTests
         var service = CreateService(repository);
 
         var result = await service.ReplaceAssignmentsAsync(
-            Context(TenantAdminUserPermissions.RolesAssignmentsUpdate),
+            Context(TenantAdminUserPermissions.RolesUsersAssign),
             role.Id,
             new TenantRoleAssignmentsUpdateRequest(
                 [new TenantAdminRoleAssignmentRequest(Guid.NewGuid(), "TENANT_WIDE")],
@@ -239,6 +239,249 @@ public sealed class TenantAdminRoleServiceTests
         Assert.Equal(0, repository.ReplaceAssignmentsCallCount);
     }
 
+    [Fact]
+    public async Task SaveSetup_ForCashierAllowsOnlineOrderPermissions()
+    {
+        const string onlineOrderAccess = "commerce.online_order.orders.access";
+        const string onlineOrderView = "commerce.online_order.orders.view";
+        var role = TenantRole.Create(
+            Guid.NewGuid(),
+            TenantId,
+            null,
+            null,
+            TenantUserConstants.DefaultCashierRoleCode,
+            "Cashier",
+            null,
+            false,
+            true,
+            ActorUserId,
+            Now);
+        var repository = new FakeTenantAdminRoleRepository
+        {
+            EditableRole = role,
+            CurrentPermissionCodes = [onlineOrderAccess, onlineOrderView]
+        };
+        var service = CreateService(repository);
+
+        var result = await service.SaveSetupAsync(
+            Context(TenantAdminUserPermissions.RolesManage),
+            role.Id,
+            new TenantRoleSetupSaveRequest(
+                [onlineOrderAccess, onlineOrderView],
+                [],
+                Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, repository.ReplacePermissionsCallCount);
+    }
+
+    [Fact]
+    public async Task SaveSetup_RetainsExistingPermissionMissingFromActorToken()
+    {
+        var role = TenantRole.Create(
+            Guid.NewGuid(),
+            TenantId,
+            null,
+            null,
+            TenantUserConstants.DefaultTenantAdminRoleCode,
+            "Tenant Administrator",
+            null,
+            false,
+            true,
+            ActorUserId,
+            Now);
+        var repository = new FakeTenantAdminRoleRepository
+        {
+            EditableRole = role,
+            CurrentPermissionCodes = [TenantWorkspacePermissions.TenantAdminAccess]
+        };
+        var service = CreateService(repository);
+
+        var result = await service.SaveSetupAsync(
+            Context(TenantAdminUserPermissions.RolesManage),
+            role.Id,
+            new TenantRoleSetupSaveRequest(
+                [TenantWorkspacePermissions.TenantAdminAccess],
+                [],
+                Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, repository.ReplacePermissionsCallCount);
+    }
+
+    [Fact]
+    public async Task SaveSetup_StillRejectsNewPermissionMissingFromActorToken()
+    {
+        var role = TenantRole.Create(
+            Guid.NewGuid(),
+            TenantId,
+            null,
+            null,
+            TenantUserConstants.DefaultTenantAdminRoleCode,
+            "Tenant Administrator",
+            null,
+            false,
+            true,
+            ActorUserId,
+            Now);
+        var repository = new FakeTenantAdminRoleRepository
+        {
+            EditableRole = role,
+            CurrentPermissionCodes = [TenantWorkspacePermissions.TenantAdminAccess]
+        };
+        var service = CreateService(repository);
+
+        var result = await service.SaveSetupAsync(
+            Context(TenantAdminUserPermissions.RolesManage),
+            role.Id,
+            new TenantRoleSetupSaveRequest(
+                [TenantWorkspacePermissions.TenantAdminAccess, TenantAdminUserPermissions.Manage],
+                [],
+                Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_roles.delegation_ceiling_exceeded", result.Error.Code);
+        Assert.Equal(0, repository.ReplacePermissionsCallCount);
+    }
+
+    [Fact]
+    public async Task SaveSetup_WithOnlyPermissionUpdate_DoesNotAllowAssignmentOrRoleChanges()
+    {
+        var role = TenantRole.Create(
+            Guid.NewGuid(),
+            TenantId,
+            null,
+            null,
+            TenantUserConstants.DefaultCashierRoleCode,
+            "Cashier",
+            null,
+            false,
+            true,
+            ActorUserId,
+            Now);
+        var repository = new FakeTenantAdminRoleRepository
+        {
+            EditableRole = role
+        };
+        var service = CreateService(repository);
+
+        var result = await service.SaveSetupAsync(
+            Context(
+                TenantAdminUserPermissions.RolesPermissionsUpdate,
+                "sales.create"),
+            role.Id,
+            new TenantRoleSetupSaveRequest(
+                ["sales.create"],
+                [new TenantAdminRoleAssignmentRequest(Guid.NewGuid(), TenantRoleSetupCatalog.TenantWideScope)],
+                Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_roles.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.ReplacePermissionsCallCount);
+        Assert.Equal(0, repository.ReplaceAssignmentsCallCount);
+    }
+
+    [Fact]
+    public async Task UpdateStatus_RequiresDedicatedStatusPermission()
+    {
+        var role = ExistingRole(Now);
+        var repository = new FakeTenantAdminRoleRepository { EditableRole = role };
+        var service = CreateService(repository);
+
+        var denied = await service.UpdateStatusAsync(
+            Context(TenantAdminUserPermissions.RolesUpdate),
+            role.Id,
+            new TenantAdminRoleStatusRequest(false, Now),
+            CancellationToken.None);
+        var allowed = await service.UpdateStatusAsync(
+            Context(TenantAdminUserPermissions.RolesStatusUpdate),
+            role.Id,
+            new TenantAdminRoleStatusRequest(false, Now),
+            CancellationToken.None);
+
+        Assert.True(denied.IsFailure);
+        Assert.Equal("tenant_roles.permission_denied", denied.Error.Code);
+        Assert.True(allowed.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ReplaceAssignments_UserChangesRequireUsersAssignPermission()
+    {
+        var role = ExistingRole(Now);
+        var repository = new FakeTenantAdminRoleRepository { EditableRole = role };
+        var service = CreateService(repository);
+
+        var result = await service.ReplaceAssignmentsAsync(
+            Context(TenantAdminUserPermissions.RolesOutletsAssign),
+            role.Id,
+            new TenantRoleAssignmentsUpdateRequest(
+                [new TenantAdminRoleAssignmentRequest(Guid.NewGuid(), TenantRoleSetupCatalog.TenantWideScope)],
+                Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_roles.permission_denied", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ReplaceAssignments_LegacyGeneralPermission_DoesNotGrantGranularAssignments()
+    {
+        var role = ExistingRole(Now);
+        var repository = new FakeTenantAdminRoleRepository { EditableRole = role };
+        var service = CreateService(repository);
+
+        var result = await service.ReplaceAssignmentsAsync(
+            Context(TenantAdminUserPermissions.RolesAssignmentsUpdate),
+            role.Id,
+            new TenantRoleAssignmentsUpdateRequest(
+                [new TenantAdminRoleAssignmentRequest(Guid.NewGuid(), TenantRoleSetupCatalog.TenantWideScope)],
+                Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_roles.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.ReplaceAssignmentsCallCount);
+    }
+
+    [Fact]
+    public async Task ReplaceAssignments_OutletChangesRequireOutletsAssignPermission()
+    {
+        var role = ExistingRole(Now);
+        var userId = Guid.NewGuid();
+        var repository = new FakeTenantAdminRoleRepository
+        {
+            EditableRole = role,
+            CurrentAssignments =
+            [
+                new TenantAdminRoleAssignmentResponse(
+                    userId,
+                    "User",
+                    "user@example.com",
+                    TenantRoleSetupCatalog.TenantWideScope,
+                    [])
+            ]
+        };
+        var service = CreateService(repository);
+
+        var result = await service.ReplaceAssignmentsAsync(
+            Context(TenantAdminUserPermissions.RolesUsersAssign),
+            role.Id,
+            new TenantRoleAssignmentsUpdateRequest(
+                [new TenantAdminRoleAssignmentRequest(
+                    userId,
+                    TenantRoleSetupCatalog.SelectedOutletsScope,
+                    [Guid.NewGuid()])],
+                Now),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("tenant_roles.permission_denied", result.Error.Code);
+    }
+
     private static TenantAdminRoleService CreateService(
         FakeTenantAdminRoleRepository repository,
         FakeIdempotencyService? idempotency = null) =>
@@ -265,7 +508,6 @@ public sealed class TenantAdminRoleServiceTests
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider
     {
-
         public DateTimeOffset UtcNow => Now;
     }
 
@@ -289,14 +531,14 @@ public sealed class TenantAdminRoleServiceTests
 
     private sealed class FakeTenantAdminRoleRepository : ITenantAdminRoleRepository
     {
-        public Task<TenantRoleAssignmentOptionsResponse> GetAssignmentOptionsAsync(Guid tenantId, bool includeUsers, bool includeOutlets, CancellationToken cancellationToken) =>
-            Task.FromResult(new TenantRoleAssignmentOptionsResponse([], [], includeUsers, includeOutlets));
         public TenantRole? EditableRole { get; init; }
         public TenantRole? CreatedRole { get; private set; }
         public bool AssignmentReplacementRemovesLastAdmin { get; init; }
         public int ReplacePermissionsCallCount { get; private set; }
         public int ReplaceAssignmentsCallCount { get; private set; }
+        public IReadOnlyList<string> CurrentPermissionCodes { get; init; } = [];
         public IReadOnlyList<TenantRoleSetupOptionResponse> SetupRoleOptions { get; init; } = [];
+        public IReadOnlyList<TenantAdminRoleAssignmentResponse> CurrentAssignments { get; init; } = [];
 
         public Task<TenantAdminRoleListResponse> ListAsync(Guid tenantId, string? search, string? status, int page, int pageSize, CancellationToken cancellationToken) =>
             Task.FromResult(new TenantAdminRoleListResponse([], page, pageSize, 0, 0));
@@ -309,6 +551,9 @@ public sealed class TenantAdminRoleServiceTests
 
         public Task<IReadOnlyList<TenantRoleSetupOptionResponse>> GetSetupRoleOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult(SetupRoleOptions);
+
+        public Task<TenantRoleAssignmentOptionsResponse> GetAssignmentOptionsAsync(Guid tenantId, bool includeUsers, bool includeOutlets, CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantRoleAssignmentOptionsResponse([], [], includeUsers, includeOutlets));
 
         public Task<TenantRole?> GetEditableAsync(Guid tenantId, Guid roleId, CancellationToken cancellationToken) =>
             Task.FromResult(EditableRole?.Id == roleId ? EditableRole : null);
@@ -343,7 +588,15 @@ public sealed class TenantAdminRoleServiceTests
             Task.FromResult(new TenantPermissionCatalogResponse([]));
 
         public Task<TenantRolePermissionsResponse?> GetPermissionsAsync(Guid tenantId, Guid roleId, CancellationToken cancellationToken) =>
-            Task.FromResult<TenantRolePermissionsResponse?>(new TenantRolePermissionsResponse(roleId, "MANAGER", "Manager", "TENANT", false, [], [], Now));
+            Task.FromResult<TenantRolePermissionsResponse?>(new TenantRolePermissionsResponse(
+                roleId,
+                "MANAGER",
+                "Manager",
+                "TENANT",
+                false,
+                CurrentPermissionCodes,
+                [],
+                Now));
 
         public Task ReplacePermissionsAsync(Guid tenantId, Guid roleId, IReadOnlyCollection<Guid> permissionIds, Guid actorUserId, DateTimeOffset now, CancellationToken cancellationToken)
         {
@@ -352,7 +605,7 @@ public sealed class TenantAdminRoleServiceTests
         }
 
         public Task<TenantRoleAssignmentsResponse?> GetAssignmentsAsync(Guid tenantId, Guid roleId, CancellationToken cancellationToken) =>
-            Task.FromResult<TenantRoleAssignmentsResponse?>(new TenantRoleAssignmentsResponse(roleId, "MANAGER", "Manager", false, [], Now));
+            Task.FromResult<TenantRoleAssignmentsResponse?>(new TenantRoleAssignmentsResponse(roleId, "MANAGER", "Manager", false, CurrentAssignments, Now));
 
         public Task<RoleAssignmentValidationResult> ValidateAssignmentsAsync(Guid tenantId, IReadOnlyCollection<TenantAdminRoleAssignmentRequest> assignments, CancellationToken cancellationToken) =>
             Task.FromResult(RoleAssignmentValidationResult.Valid);

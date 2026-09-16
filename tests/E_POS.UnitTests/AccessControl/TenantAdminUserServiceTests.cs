@@ -96,7 +96,7 @@ public sealed class TenantAdminUserServiceTests
                 throw new InvalidOperationException("Protector should not be resolved for create options.")));
 
         var result = await service.GetCreateOptionsAsync(
-            CreateContext([TenantAdminUserPermissions.Create]),
+            CreateContext([TenantAdminUserPermissions.Manage]),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -111,7 +111,7 @@ public sealed class TenantAdminUserServiceTests
         var service = CreateService(new FakeTenantAdminUserRepository());
 
         var result = await service.GetCreateOptionsAsync(
-            CreateContext([TenantAdminUserPermissions.Create]),
+            CreateContext([TenantAdminUserPermissions.Manage]),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -151,7 +151,7 @@ public sealed class TenantAdminUserServiceTests
         var service = CreateService(new FakeTenantAdminUserRepository());
 
         var result = await service.GetCreateOptionsAsync(
-            CreateContext([TenantAdminUserPermissions.Create]),
+            CreateContext([TenantAdminUserPermissions.Manage]),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -163,6 +163,31 @@ public sealed class TenantAdminUserServiceTests
         Assert.True(capabilities.SupportsDirectActiveCreation);
         Assert.True(capabilities.SupportsTemporaryPassword);
         Assert.False(string.IsNullOrWhiteSpace(result.Value.PermissionCatalogVersion));
+    }
+
+    [Fact]
+    public async Task GetCreateOptions_StatusPermissionOnly_ReturnsNoAssignmentOrOverrideData()
+    {
+        var repository = new FakeTenantAdminUserRepository
+        {
+            RoleOptions = [new RoleOptionResponse(Guid.NewGuid(), "Manager", "MANAGER")]
+        };
+        var service = CreateService(repository);
+
+        var result = await service.GetCreateOptionsAsync(
+            CreateContext([TenantAdminUserPermissions.Disable]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Roles);
+        Assert.Empty(result.Value.Outlets);
+        Assert.Empty(result.Value.Tills!);
+        Assert.Empty(result.Value.PermissionGroups);
+        Assert.Equal([TenantUserAccessScopes.NoOutletAccess], result.Value.SupportedOutletAccessScopes);
+        Assert.Equal([TenantUserAccessScopes.NoTillAccess], result.Value.SupportedTillAccessScopes);
+        Assert.False(result.Value.Capabilities!.SupportsUserPermissionOverrides);
+        Assert.False(result.Value.Capabilities.SupportsAllOutletAccess);
+        Assert.False(result.Value.Capabilities.SupportsExplicitTillAccess);
     }
 
     [Fact]
@@ -666,10 +691,54 @@ public sealed class TenantAdminUserServiceTests
         Assert.Equal(TenantUserConstants.StatusActive, repository.CreatedUser?.AccountStatus);
         Assert.Equal("HASH:SecurePass123", repository.CreatedUser?.EncryptedPassword);
         Assert.Equal("pbkdf2_embedded", repository.CreatedUser?.PasswordSalt);
+        Assert.Equal(TenantUserConstants.StandardUserType, repository.CreatedUser?.UserType);
         Assert.Null(repository.CreatedInvite);
         Assert.Null(repository.CreatedDeliverySecret);
         Assert.Null(repository.CreatedOutbox);
         Assert.Equal(1, repository.CreateCallCount);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithoutRoleAssignmentPermission_ReturnsPermissionDenied()
+    {
+        var repository = new FakeTenantAdminUserRepository();
+        var service = CreateService(repository);
+        var context = new TenantRequestContext(
+            TenantId,
+            UserId,
+            [TenantAdminUserPermissions.Create]);
+
+        var result = await service.CreateAsync(
+            context,
+            CreateValidRequest(),
+            CancellationToken.None,
+            "create-without-role-assignment");
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("user.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.CreateCallCount);
+    }
+
+    [Fact]
+    public async Task CreateUser_WithTenantAdminRole_CreatesAdminUserType()
+    {
+        var repository = new FakeTenantAdminUserRepository
+        {
+            RoleOptions =
+            [
+                new RoleOptionResponse(RoleId, "Tenant Admin", TenantUserConstants.DefaultTenantAdminRoleCode),
+            ],
+        };
+        var service = CreateService(repository);
+
+        var result = await service.CreateAsync(
+            CreateContext([TenantAdminUserPermissions.Manage]),
+            CreateValidRequest(),
+            CancellationToken.None,
+            IdempotencyKey);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TenantUserConstants.AdminUserType, repository.CreatedUser?.UserType);
     }
 
     [Fact]
@@ -1121,7 +1190,15 @@ public sealed class TenantAdminUserServiceTests
             CancellationToken.None,
             "tenant-scope");
         var second = await service.CreateAsync(
-            new TenantRequestContext(Guid.NewGuid(), UserId, [TenantAdminUserPermissions.Create]),
+            new TenantRequestContext(
+                Guid.NewGuid(),
+                UserId,
+                [
+                    TenantAdminUserPermissions.Create,
+                    TenantAdminUserPermissions.RolesAssign,
+                    TenantAdminUserPermissions.OutletsAssign,
+                    TenantAdminUserPermissions.TillsAssign,
+                ]),
             CreateValidRequest(),
             CancellationToken.None,
             "tenant-scope");
@@ -1143,7 +1220,15 @@ public sealed class TenantAdminUserServiceTests
             CancellationToken.None,
             "actor-scope");
         var second = await service.CreateAsync(
-            new TenantRequestContext(TenantId, Guid.NewGuid(), [TenantAdminUserPermissions.Create]),
+            new TenantRequestContext(
+                TenantId,
+                Guid.NewGuid(),
+                [
+                    TenantAdminUserPermissions.Create,
+                    TenantAdminUserPermissions.RolesAssign,
+                    TenantAdminUserPermissions.OutletsAssign,
+                    TenantAdminUserPermissions.TillsAssign,
+                ]),
             CreateValidRequest(),
             CancellationToken.None,
             "actor-scope");
@@ -1177,7 +1262,96 @@ public sealed class TenantAdminUserServiceTests
     }
 
     [Fact]
-    public async Task ResendInviteAsync_WithInvitePermission_ReplacesInviteSideEffects()
+    public async Task UpdateAsync_StatusChange_RequiresDisablePermission()
+    {
+        var service = CreateService(new FakeTenantAdminUserRepository());
+        var request = CreateValidUpdateRequest() with { Status = TenantUserConstants.StatusInactive };
+
+        var denied = await service.UpdateAsync(
+            CreateContext([TenantAdminUserPermissions.Update]), UserId, request, CancellationToken.None);
+        var allowed = await service.UpdateAsync(
+            CreateContext([TenantAdminUserPermissions.Disable]), UserId, request, CancellationToken.None);
+
+        Assert.True(denied.IsFailure);
+        Assert.Equal("user.permission_denied", denied.Error.Code);
+        Assert.True(allowed.IsSuccess);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_RoleChange_RequiresRoleAssignmentPermission()
+    {
+        var service = CreateService(new FakeTenantAdminUserRepository());
+        var request = CreateValidUpdateRequest() with { RoleId = Guid.NewGuid() };
+
+        var denied = await service.UpdateAsync(
+            CreateContext([TenantAdminUserPermissions.Update]), UserId, request, CancellationToken.None);
+        var allowed = await service.UpdateAsync(
+            CreateContext([TenantAdminUserPermissions.RolesAssign]), UserId, request, CancellationToken.None);
+
+        Assert.True(denied.IsFailure);
+        Assert.Equal("user.permission_denied", denied.Error.Code);
+        Assert.True(allowed.IsSuccess);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_OutletChange_RequiresOutletAssignmentPermission()
+    {
+        var outletId = Guid.NewGuid();
+        var service = CreateService(new FakeTenantAdminUserRepository());
+        var request = CreateValidUpdateRequest() with
+        {
+            OutletAccessScope = TenantUserAccessScopes.SelectedOutlets,
+            OutletIds = [outletId],
+            DefaultOutletId = outletId,
+        };
+
+        var denied = await service.UpdateAsync(
+            CreateContext([TenantAdminUserPermissions.Update]), UserId, request, CancellationToken.None);
+        var allowed = await service.UpdateAsync(
+            CreateContext([TenantAdminUserPermissions.OutletsAssign]), UserId, request, CancellationToken.None);
+
+        Assert.True(denied.IsFailure);
+        Assert.Equal("user.permission_denied", denied.Error.Code);
+        Assert.True(allowed.IsSuccess);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_TillChange_RequiresTillAssignmentPermission()
+    {
+        var service = CreateService(new FakeTenantAdminUserRepository());
+        var request = CreateValidUpdateRequest() with
+        {
+            TillAccessScope = TenantUserAccessScopes.SelectedTills,
+            TillIds = [Guid.NewGuid()],
+        };
+
+        var denied = await service.UpdateAsync(
+            CreateContext([TenantAdminUserPermissions.Update]), UserId, request, CancellationToken.None);
+        var allowed = await service.UpdateAsync(
+            CreateContext([TenantAdminUserPermissions.TillsAssign]), UserId, request, CancellationToken.None);
+
+        Assert.True(denied.IsFailure);
+        Assert.Equal("user.permission_denied", denied.Error.Code);
+        Assert.True(allowed.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ResendAndRevokeInvite_LegacyInvitePermissionAlone_IsDenied()
+    {
+        var service = CreateService(new FakeTenantAdminUserRepository());
+        var context = CreateContext([TenantAdminUserPermissions.Invite]);
+
+        var resend = await service.ResendInviteAsync(context, UserId, CancellationToken.None);
+        var revoke = await service.RevokeInviteAsync(context, UserId, CancellationToken.None);
+
+        Assert.True(resend.IsFailure);
+        Assert.True(revoke.IsFailure);
+        Assert.Equal("user.permission_denied", resend.Error.Code);
+        Assert.Equal("user.permission_denied", revoke.Error.Code);
+    }
+
+    [Fact]
+    public async Task ResendInviteAsync_WithResendPermission_ReplacesInviteSideEffects()
     {
         var oldInvite = CreatePendingInvite(UserId, "old-hash");
         var oldSecret = TenantUserInviteDeliverySecret.Create(
@@ -1211,7 +1385,7 @@ public sealed class TenantAdminUserServiceTests
         var service = CreateService(repository);
 
         var result = await service.ResendInviteAsync(
-            CreateContext([TenantAdminUserPermissions.Invite]),
+            CreateContext([TenantAdminUserPermissions.InvitesResend]),
             UserId,
             CancellationToken.None);
 
@@ -1236,7 +1410,7 @@ public sealed class TenantAdminUserServiceTests
     }
 
     [Fact]
-    public async Task ResendInviteAsync_WithoutInvitePermission_ReturnsPermissionDenied()
+    public async Task ResendInviteAsync_WithoutResendPermission_ReturnsPermissionDenied()
     {
         var repository = new FakeTenantAdminUserRepository();
         var service = CreateService(repository);
@@ -1258,7 +1432,7 @@ public sealed class TenantAdminUserServiceTests
         var service = CreateService(repository);
 
         var result = await service.ResendInviteAsync(
-            CreateContext([TenantAdminUserPermissions.Invite]),
+            CreateContext([TenantAdminUserPermissions.InvitesResend]),
             UserId,
             CancellationToken.None);
 
@@ -1294,7 +1468,7 @@ public sealed class TenantAdminUserServiceTests
         var service = CreateService(repository);
 
         var result = await service.ResendInviteAsync(
-            CreateContext([TenantAdminUserPermissions.Invite]),
+            CreateContext([TenantAdminUserPermissions.InvitesResend]),
             UserId,
             CancellationToken.None);
 
@@ -1304,7 +1478,7 @@ public sealed class TenantAdminUserServiceTests
     }
 
     [Fact]
-    public async Task RevokeInviteAsync_WithInvitePermission_RevokesAndPurgesSecret()
+    public async Task RevokeInviteAsync_WithRevokePermission_RevokesAndPurgesSecret()
     {
         var invite = CreatePendingInvite(UserId, "hash");
         var secret = TenantUserInviteDeliverySecret.Create(
@@ -1338,7 +1512,7 @@ public sealed class TenantAdminUserServiceTests
         var service = CreateService(repository);
 
         var result = await service.RevokeInviteAsync(
-            CreateContext([TenantAdminUserPermissions.Invite]),
+            CreateContext([TenantAdminUserPermissions.InvitesRevoke]),
             UserId,
             CancellationToken.None);
 
@@ -1349,7 +1523,7 @@ public sealed class TenantAdminUserServiceTests
     }
 
     [Fact]
-    public async Task RevokeInviteAsync_WithoutInvitePermission_ReturnsPermissionDenied()
+    public async Task RevokeInviteAsync_WithoutRevokePermission_ReturnsPermissionDenied()
     {
         var repository = new FakeTenantAdminUserRepository();
         var service = CreateService(repository);
@@ -1385,7 +1559,7 @@ public sealed class TenantAdminUserServiceTests
         var service = CreateService(repository);
 
         var result = await service.RevokeInviteAsync(
-            CreateContext([TenantAdminUserPermissions.Invite]),
+            CreateContext([TenantAdminUserPermissions.InvitesRevoke]),
             UserId,
             CancellationToken.None);
 
@@ -1413,6 +1587,7 @@ public sealed class TenantAdminUserServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(newMediaAssetId, user.ProfileImageUrl);
+        Assert.Equal(TenantUserConstants.StandardUserType, user.UserType);
         Assert.Equal(newMediaAssetId, repository.ValidatedProfileMediaAssetId);
         Assert.Equal(UserId, repository.ValidatedProfileMediaTargetUserId);
         var change = Assert.Single(repository.ProfileMediaChanges);
@@ -1512,7 +1687,21 @@ public sealed class TenantAdminUserServiceTests
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string>? permissions = null)
     {
-        return new TenantRequestContext(TenantId, UserId, permissions ?? [TenantAdminUserPermissions.Manage]);
+        if (permissions is null)
+        {
+            return new TenantRequestContext(TenantId, UserId, [TenantAdminUserPermissions.Manage]);
+        }
+
+        var effectivePermissions = permissions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (effectivePermissions.Contains(TenantAdminUserPermissions.Create) ||
+            effectivePermissions.Contains(TenantAdminUserPermissions.Invite))
+        {
+            effectivePermissions.Add(TenantAdminUserPermissions.RolesAssign);
+            effectivePermissions.Add(TenantAdminUserPermissions.OutletsAssign);
+            effectivePermissions.Add(TenantAdminUserPermissions.TillsAssign);
+        }
+
+        return new TenantRequestContext(TenantId, UserId, effectivePermissions);
     }
 
     private static TenantAdminUserCreateRequest CreateValidRequest()
@@ -1645,6 +1834,7 @@ public sealed class TenantAdminUserServiceTests
         public bool HasActiveTillSession { get; init; }
         public bool HasSalesReferences { get; init; }
         public TenantAdminUserListResponse? ListResponse { get; init; }
+        public IReadOnlyList<RoleOptionResponse> RoleOptions { get; init; } = [];
         public bool ThrowOnCreate { get; init; }
         public bool ReturnEmptyPermissionCatalog { get; init; }
         public int ThrowOnCreateCount { get; init; }
@@ -1686,7 +1876,7 @@ public sealed class TenantAdminUserServiceTests
             Task.FromResult(ListResponse ?? new TenantAdminUserListResponse([], page, pageSize, 0));
 
         public Task<IReadOnlyList<RoleOptionResponse>> GetRoleOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<RoleOptionResponse>>([]);
+            Task.FromResult(RoleOptions);
 
         public Task<IReadOnlyList<OutletOptionResponse>> GetOutletOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<OutletOptionResponse>>([]);

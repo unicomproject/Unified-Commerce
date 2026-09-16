@@ -1,4 +1,4 @@
-﻿namespace E_POS.Infrastructure.Persistence.Seed;
+namespace E_POS.Infrastructure.Persistence.Seed;
 
 public static class OneverceAdminAndTillSeedData
 {
@@ -13,6 +13,7 @@ public static class OneverceAdminAndTillSeedData
     public static readonly Guid OutletFiveTillId = Guid.Parse("ae46d8f9-6f7d-48eb-9309-948090620d8a");
 
     public const string AdminEmail = "ADMIN@ONEVERCE.LK";
+    public const string AdminPassword = "Oneverce@2026";
     public const string AdminPasswordHash =
         "PBKDF2-SHA256:100000:yDeM0dWO6UHyEV0xR2al5Q==:/50BRK/3tG0okJDw/9iFX9AK/IrEXLovBaxRutSpNqw=";
 

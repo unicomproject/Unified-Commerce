@@ -7,6 +7,7 @@ namespace E_POS.Application.Modules.Tenant.TenantAuth;
 public static class TenantAdminInvitationUrlBuilder
 {
     public const string CanonicalSetupPath = "/tenant-admin/setup";
+    public const string DevelopmentNativeBaseUrl = "oneverz://tenant-admin/setup";
 
     public static string Build(string baseUrl, string rawToken)
     {
@@ -14,12 +15,18 @@ public static class TenantAdminInvitationUrlBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(rawToken);
 
         var trimmed = baseUrl.Trim().TrimEnd('/');
+        if (string.Equals(baseUrl.Trim(), DevelopmentNativeBaseUrl, StringComparison.Ordinal))
+            return $"{DevelopmentNativeBaseUrl}?token={Uri.EscapeDataString(rawToken)}";
         return $"{trimmed}{CanonicalSetupPath}/{Uri.EscapeDataString(rawToken)}";
     }
 
     public static bool TryValidateBaseUrl(string? baseUrl, bool requireHttps, out string? error)
     {
         error = null;
+        // Only this explicit native endpoint is accepted outside Production.
+        // Production validation below continues to require a real HTTPS host.
+        if (!requireHttps && string.Equals(baseUrl?.Trim(), DevelopmentNativeBaseUrl, StringComparison.Ordinal))
+            return true;
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
             error = "TenantOnboardingOutbox:TenantAdminAppBaseUrl is required.";

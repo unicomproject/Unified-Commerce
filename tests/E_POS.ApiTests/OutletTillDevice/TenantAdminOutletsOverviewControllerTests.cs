@@ -105,6 +105,17 @@ public sealed class TenantAdminOutletsOverviewControllerTests
     }
 
     [Fact]
+    public async Task GetManagerOptions_WithValidContext_ReturnsOk()
+    {
+        var controller = CreateController(new FakeTenantAdminOutletService());
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.outlets.update");
+
+        var result = await controller.GetManagerOptions(CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
     public async Task SetImage_ValidRequest_ReturnsOk()
     {
         var tenantId = Guid.NewGuid();
@@ -141,6 +152,36 @@ public sealed class TenantAdminOutletsOverviewControllerTests
         Assert.IsType<OkObjectResult>(result);
     }
 
+    [Fact]
+    public async Task GranularMutationEndpoints_WhenPermissionDenied_ReturnForbidden()
+    {
+        var denied = ApplicationResult.Failure(new ApplicationError(
+            "outlet.permission_denied",
+            "Permission denied for outlet management."));
+        var controller = CreateController(new FakeTenantAdminOutletService
+        {
+            CommandResult = denied
+        });
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "tenant.outlets.update");
+
+        var status = await controller.UpdateStatus(
+            Guid.NewGuid(),
+            new TenantAdminOutletStatusUpdateRequest("INACTIVE"),
+            CancellationToken.None);
+        var manager = await controller.SetManager(
+            Guid.NewGuid(),
+            new TenantAdminOutletManagerUpdateRequest(Guid.NewGuid()),
+            CancellationToken.None);
+        var image = await controller.SetImage(
+            Guid.NewGuid(),
+            new TenantAdminOutletImageUpdateRequest(Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, Assert.IsType<ObjectResult>(status).StatusCode);
+        Assert.Equal(StatusCodes.Status403Forbidden, Assert.IsType<ObjectResult>(manager).StatusCode);
+        Assert.Equal(StatusCodes.Status403Forbidden, Assert.IsType<ObjectResult>(image).StatusCode);
+    }
+
     private static TenantAdminOutletsController CreateController(ITenantAdminOutletService service)
     {
         var controller = new TenantAdminOutletsController(
@@ -170,8 +211,6 @@ public sealed class TenantAdminOutletsOverviewControllerTests
 
     private sealed class FakeTenantAdminOutletService : ITenantAdminOutletService
     {
-        public Task<ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>> GetManagerOptionsAsync(TenantRequestContext context, CancellationToken cancellationToken)
-            => Task.FromResult(ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Success([]));
         public ApplicationResult<TenantAdminOutletOverviewResponse> OverviewResult { get; set; } = ApplicationResult<TenantAdminOutletOverviewResponse>.Failure(new ApplicationError("outlet.not_found", "Not found"));
         public ApplicationResult CommandResult { get; set; } = ApplicationResult.Success();
 
@@ -192,6 +231,9 @@ public sealed class TenantAdminOutletsOverviewControllerTests
 
         public Task<ApplicationResult<TenantAdminOutletOverviewResponse>> GetOverviewAsync(TenantRequestContext context, Guid outletId, CancellationToken cancellationToken)
             => Task.FromResult(OverviewResult);
+
+        public Task<ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>> GetManagerOptionsAsync(TenantRequestContext context, CancellationToken cancellationToken)
+            => Task.FromResult(ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Success([]));
 
         public Task<ApplicationResult> SetManagerAsync(TenantRequestContext context, Guid outletId, TenantAdminOutletManagerUpdateRequest request, CancellationToken cancellationToken)
             => Task.FromResult(CommandResult);
