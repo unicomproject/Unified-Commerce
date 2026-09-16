@@ -256,11 +256,9 @@ public sealed class TenantAuthControllerTests
         }
 
         public JwtTokenResult CreateNotificationSocketToken(
-            Guid tenantUserId,
-            Guid tenantId,
-            Guid sessionId)
+            Guid tenantUserId, Guid tenantId, Guid sessionId)
         {
-            return new JwtTokenResult("fake-socket-token", DateTimeOffset.UtcNow.AddMinutes(5));
+            return new JwtTokenResult("fake-socket-token", DateTimeOffset.UtcNow.AddMinutes(2));
         }
     }
 }
