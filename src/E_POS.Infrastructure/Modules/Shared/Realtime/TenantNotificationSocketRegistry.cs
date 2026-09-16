@@ -52,7 +52,14 @@ public sealed class TenantNotificationSocketRegistry : ITenantNotificationSocket
         foreach (var socket in connections.Keys)
         {
             if (socket.State != WebSocketState.Open)
+            {
+                // A half-open connection can sit in a non-Open state indefinitely without
+                // the client ever observing onDone/onError, so it never reconnects and
+                // never "catches up" on the DB-backed inbox. Evict it here so the next
+                // publish doesn't keep retrying a socket that's already gone.
+                connections.TryRemove(socket, out _);
                 continue;
+            }
 
             try
             {
@@ -66,7 +73,13 @@ public sealed class TenantNotificationSocketRegistry : ITenantNotificationSocket
             {
                 // Best-effort live push; the DB-backed inbox item from InAppNotificationChannelHandler
                 // is the reliable delivery path a client catches up on when it reconnects.
+                connections.TryRemove(socket, out _);
             }
+        }
+
+        if (connections.IsEmpty)
+        {
+            _connectionsByTenantUserId.TryRemove(tenantUserId, out _);
         }
     }
 }
