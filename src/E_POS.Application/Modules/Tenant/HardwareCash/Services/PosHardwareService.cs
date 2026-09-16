@@ -109,7 +109,8 @@ public sealed class PosHardwareService : IPosHardwareService
         if (!context.HasPermission(PosPermissions.Hardware.Settings))
             return Failure<HardwareTestOperationDto>("pos_hardware.permission_denied", "You do not have permission to test hardware.");
         if (request.RequestId == Guid.Empty || request.PosDeviceId == Guid.Empty ||
-            !HardwareTypes.Contains(request.HardwareType) || string.IsNullOrWhiteSpace(request.TestType))
+            !HardwareTypes.Contains(request.HardwareType) || string.IsNullOrWhiteSpace(request.TestType) ||
+            request.TestType.Equals("REMOTE_BATCH", StringComparison.OrdinalIgnoreCase))
             return Failure<HardwareTestOperationDto>("pos_hardware.invalid_test", "Hardware test request is invalid.");
         if ((request.HardwareType.Equals("receiptPrinter", StringComparison.OrdinalIgnoreCase) ||
              request.HardwareType.Equals("barcodeScanner", StringComparison.OrdinalIgnoreCase) ||
@@ -193,13 +194,23 @@ public sealed class PosHardwareService : IPosHardwareService
 
         if (request.HardwareType.Equals("receiptPrinter", StringComparison.OrdinalIgnoreCase))
         {
-            if (!request.TransportType.Equals("localPrintAgent", StringComparison.OrdinalIgnoreCase) ||
-                request.ReceiptPrinter is null)
-                return ("pos_hardware.unsupported_transport", "Only the Local Print Agent receipt-printer transport is supported.");
+            var transport = request.TransportType?.ToUpperInvariant();
+            if (transport is not ("LOCALPRINTAGENT" or "USB" or "BLUETOOTH" or "NETWORK") || request.ReceiptPrinter is null)
+                return ("pos_hardware.unsupported_transport", "Select a configured receipt-printer adapter.");
             var printer = request.ReceiptPrinter;
-            if (!Uri.TryCreate(printer.AgentBaseUrl, UriKind.Absolute, out var uri) ||
-                uri.Scheme is not ("http" or "https") ||
-                uri.IsLoopback ||
+            var invalidAgent = transport == "LOCALPRINTAGENT" &&
+                (!Uri.TryCreate(printer.AgentBaseUrl, UriKind.Absolute, out var uri) ||
+                 uri.Scheme is not ("http" or "https") || uri.IsLoopback);
+            var invalidDirect = transport switch {
+                "USB" => printer.UsbVendorId is null or < 1 or > 65535 ||
+                    printer.UsbProductId is null or < 0 or > 65535 || printer.UsbDeviceIdentifier?.Length > 200,
+                "BLUETOOTH" => printer.BluetoothAddress is null ||
+                    !System.Text.RegularExpressions.Regex.IsMatch(printer.BluetoothAddress, "^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$"),
+                "NETWORK" => string.IsNullOrWhiteSpace(printer.NetworkHost) || printer.NetworkHost.Length > 255 ||
+                    Uri.CheckHostName(printer.NetworkHost) == UriHostNameType.Unknown || printer.NetworkPort is < 1 or > 65535,
+                _ => false
+            };
+            if (invalidAgent || invalidDirect ||
                 string.IsNullOrWhiteSpace(printer.PrinterName) ||
                 printer.PaperWidth is not ("58mm" or "80mm") ||
                 printer.RequestTimeout is < 1000 or > 30000 ||
@@ -210,7 +221,7 @@ public sealed class PosHardwareService : IPosHardwareService
                 (printer.PrintMerchantCopy && printer.MerchantCopyCount == 0) ||
                 (printer.SupportedPurposes?.Any(x =>
                     !PrinterPurposes.Contains(x)) ?? false))
-                return ("pos_hardware.invalid_configuration", "Local Print Agent settings are invalid. Physical devices must use the laptop LAN URL.");
+                return ("pos_hardware.invalid_configuration", "Printer settings are invalid. Check transport identity, paper width and timeout; Local Print Agent requires a LAN URL.");
         }
         else if (request.HardwareType.Equals("barcodeScanner", StringComparison.OrdinalIgnoreCase))
         {
@@ -277,13 +288,26 @@ public sealed class PosHardwareService : IPosHardwareService
     private static object SelectSafeSettings(SavePosHardwareConfigurationRequest request) =>
         request.HardwareType.ToLowerInvariant() switch
         {
-            "receiptprinter" => request.ReceiptPrinter!,
+            "receiptprinter" => SafePrinterSettings(request),
             "barcodescanner" => request.BarcodeScanner!,
             "cashdrawer" => request.CashDrawer ?? new CashDrawerSettingsDto(
                 null, null, null, null, "notConfigured"),
             "cardterminal" => request.CardTerminal ?? new CardTerminalSettingsDto(null, null),
             _ => new { }
         };
+
+    private static object SafePrinterSettings(SavePosHardwareConfigurationRequest request)
+    {
+        if (request.TransportType.Equals("localPrintAgent", StringComparison.OrdinalIgnoreCase)) return request.ReceiptPrinter!;
+        var profile = HardwareCompatibilityCatalog.Search(deviceType: "RECEIPT_PRINTER", connectionType: request.TransportType).Single();
+        var fields = JsonSerializer.Deserialize<Dictionary<string, object?>>(
+            JsonSerializer.Serialize(request.ReceiptPrinter, JsonOptions))!;
+        fields["compatibilityProfileId"] = profile.Id;
+        fields["protocol"] = profile.Protocol;
+        fields["adapterKey"] = profile.AdapterKey;
+        fields["capabilitySource"] = profile.CapabilitySource;
+        return fields;
+    }
 
     private static bool ValidScannerEvidence(ScannerTestEvidenceDto? evidence)
     {

@@ -20,12 +20,10 @@ public sealed class TenantAdminHardwareAuditLogger : ITenantAdminHardwareAuditLo
         string hardwareType)
     {
         _logger.LogInformation(
-            "HARDWARE_CREATED TenantId={TenantId} ActorTenantUserId={ActorTenantUserId} HardwareDeviceId={HardwareDeviceId} DeviceCode={DeviceCode} HardwareType={HardwareType}",
+            "HARDWARE_CREATED TenantId={TenantId} ActorTenantUserId={ActorTenantUserId} HardwareDeviceId={HardwareDeviceId}",
             tenantId,
             actorUserId,
-            hardwareDeviceId,
-            deviceCode,
-            hardwareType);
+            hardwareDeviceId);
     }
 
     public void LogHardwareAssigned(
@@ -54,12 +52,11 @@ public sealed class TenantAdminHardwareAuditLogger : ITenantAdminHardwareAuditLo
         string? reason)
     {
         _logger.LogInformation(
-            "HARDWARE_RELEASED TenantId={TenantId} ActorTenantUserId={ActorTenantUserId} AssignmentId={AssignmentId} HardwareDeviceId={HardwareDeviceId} Reason={Reason}",
+            "HARDWARE_RELEASED TenantId={TenantId} ActorTenantUserId={ActorTenantUserId} AssignmentId={AssignmentId} HardwareDeviceId={HardwareDeviceId}",
             tenantId,
             actorUserId,
             assignmentId,
-            hardwareDeviceId,
-            reason);
+            hardwareDeviceId);
     }
 
     public void LogHardwareHeartbeat(
@@ -69,11 +66,10 @@ public sealed class TenantAdminHardwareAuditLogger : ITenantAdminHardwareAuditLo
         string? warningCode)
     {
         _logger.LogInformation(
-            "HARDWARE_HEARTBEAT TenantId={TenantId} PosDeviceId={PosDeviceId} HardwareDeviceId={HardwareDeviceId} WarningCode={WarningCode}",
+            "HARDWARE_HEARTBEAT TenantId={TenantId} PosDeviceId={PosDeviceId} HardwareDeviceId={HardwareDeviceId}",
             tenantId,
             posDeviceId,
-            hardwareDeviceId,
-            warningCode);
+            hardwareDeviceId);
     }
 
     public void LogHardwareTestFailed(
@@ -83,10 +79,8 @@ public sealed class TenantAdminHardwareAuditLogger : ITenantAdminHardwareAuditLo
         string? message)
     {
         _logger.LogInformation(
-            "HARDWARE_TEST_FAILED TenantId={TenantId} HardwareDeviceId={HardwareDeviceId} TestType={TestType} Message={Message}",
+            "HARDWARE_TEST_FAILED TenantId={TenantId} HardwareDeviceId={HardwareDeviceId}",
             tenantId,
-            hardwareDeviceId,
-            testType,
-            message);
+            hardwareDeviceId);
     }
 }

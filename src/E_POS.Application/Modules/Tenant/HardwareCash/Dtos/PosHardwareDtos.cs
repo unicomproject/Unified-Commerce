@@ -15,7 +15,13 @@ public sealed record ReceiptPrinterSettingsDto(
     int MerchantCopyCount = 0,
     bool ExternalTerminalSlipExpected = false,
     bool ExternalTerminalPrintsCustomerSlip = false,
-    bool ExternalTerminalPrintsMerchantSlip = false);
+    bool ExternalTerminalPrintsMerchantSlip = false,
+    int? UsbVendorId = null,
+    int? UsbProductId = null,
+    string? UsbDeviceIdentifier = null,
+    string? BluetoothAddress = null,
+    string? NetworkHost = null,
+    int NetworkPort = 9100);
 
 public sealed record BarcodeScannerSettingsDto(
     string Mode,

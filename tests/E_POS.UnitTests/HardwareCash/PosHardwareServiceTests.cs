@@ -10,6 +10,31 @@ namespace E_POS.UnitTests.HardwareCash;
 
 public sealed class PosHardwareServiceTests
 {
+    [Theory]
+    [InlineData("USB", 123, 456, null, true)]
+    [InlineData("USB", null, 456, null, false)]
+    [InlineData("BLUETOOTH", null, null, "AA:BB:CC:DD:EE:FF", true)]
+    [InlineData("BLUETOOTH", null, null, "invalid", false)]
+    public async Task NativePrinter_ValidatesTransportIdentity(string transport, int? vendor, int? product, string? address, bool accepted)
+    {
+        var repository = new FakeRepository();
+        var service = new PosHardwareService(repository, new Clock());
+        var request = ValidPrinter() with {
+            TransportType = transport,
+            ReceiptPrinter = ValidPrinter().ReceiptPrinter! with {
+                AgentBaseUrl = "", LocalApiKeyPresent = false,
+                UsbVendorId = vendor, UsbProductId = product, BluetoothAddress = address
+            }
+        };
+        var result = await service.SaveConfigurationAsync(Context([PosPermissions.Hardware.Settings]), request, CancellationToken.None);
+        if (accepted)
+        {
+            Assert.Contains("compatibilityProfileId", repository.SafeSettingsJson);
+            Assert.Contains("DECLARED", repository.SafeSettingsJson);
+        }
+        else Assert.Equal("pos_hardware.invalid_configuration", result.Error.Code);
+    }
+
     [Fact]
     public async Task SaveConfiguration_WithoutPermission_IsDenied()
     {
@@ -293,6 +318,7 @@ public sealed class PosHardwareServiceTests
 
     private sealed class FakeRepository : IPosHardwareRepository
     {
+        public Task<Guid?> GetTestPosDeviceIdAsync(Guid tenantId, Guid testId, CancellationToken cancellationToken) => Task.FromResult<Guid?>(null);
         public string SafeSettingsJson { get; private set; } = string.Empty;
         public string RequestHash { get; private set; } = string.Empty;
         public string SafeResultPayloadJson { get; private set; } = string.Empty;

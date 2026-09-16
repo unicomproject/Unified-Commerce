@@ -10,10 +10,12 @@ namespace E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 public sealed class TenantAdminHardwareRepository : ITenantAdminHardwareRepository
 {
     private readonly EPosDbContext _dbContext;
+    private readonly HardwareQueryScope? _scope;
 
-    public TenantAdminHardwareRepository(EPosDbContext dbContext)
+    public TenantAdminHardwareRepository(EPosDbContext dbContext, HardwareQueryScope? scope = null)
     {
         _dbContext = dbContext;
+        _scope = scope;
     }
 
     public Task<bool> OutletBelongsToTenantAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken)
@@ -24,6 +26,13 @@ public sealed class TenantAdminHardwareRepository : ITenantAdminHardwareReposito
                  x.Status != OutletConstants.DeletedStatus,
             cancellationToken);
     }
+
+    public Task<HardwareTestLog?> GetLatestTelemetryAsync(Guid tenantId, Guid hardwareId, CancellationToken cancellationToken) =>
+        _dbContext.HardwareTestLogs.AsNoTracking().Where(x => x.TenantId == tenantId && x.HardwareDeviceId == hardwareId && x.TestType == "TELEMETRY")
+            .OrderByDescending(x => x.TestedAt).ThenByDescending(x => x.Id).FirstOrDefaultAsync(cancellationToken);
+
+    public Task<HardwareTestLog?> GetTestByRequestIdAsync(Guid tenantId, Guid requestId, CancellationToken cancellationToken) =>
+        _dbContext.HardwareTestLogs.AsNoTracking().SingleOrDefaultAsync(x => x.TenantId == tenantId && x.RequestId == requestId, cancellationToken);
 
     public Task<bool> DeviceCodeExistsAsync(
         Guid tenantId,
@@ -58,10 +67,19 @@ public sealed class TenantAdminHardwareRepository : ITenantAdminHardwareReposito
                   outlet.TenantId == tenantId &&
                   device.Status != "DELETED"
             let activeAssignment = _dbContext.HardwareDeviceAssignments
-                .Where(a => a.HardwareDeviceId == device.Id && a.ReleasedAt == null)
+                .Where(a => a.TenantId == tenantId && a.HardwareDeviceId == device.Id && a.ReleasedAt == null)
                 .OrderByDescending(a => a.AssignedAt)
                 .FirstOrDefault()
             select new { device, outlet, activeAssignment };
+
+        if (_scope?.TillId is Guid scopedTill)
+        {
+            query = query.Where(x => x.device.TenantId == _scope.TenantId &&
+                x.device.OutletId == _scope.OutletId &&
+                ((x.activeAssignment != null && x.activeAssignment.TillId == scopedTill &&
+                  x.activeAssignment.PosDeviceId == null && x.activeAssignment.OutletId == _scope.OutletId) ||
+                 (x.activeAssignment == null && x.device.CreatedByTenantUserId == _scope.UserId)));
+        }
 
         if (outletId.HasValue)
         {
@@ -103,6 +121,7 @@ public sealed class TenantAdminHardwareRepository : ITenantAdminHardwareReposito
         var total = await query.CountAsync(cancellationToken);
         var pageItems = await query
             .OrderBy(x => x.device.HardwareDeviceName)
+            .ThenBy(x => x.device.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -166,6 +185,21 @@ public sealed class TenantAdminHardwareRepository : ITenantAdminHardwareReposito
         return _dbContext.PosDevices.AsNoTracking().FirstOrDefaultAsync(
             x => x.TenantId == tenantId && x.Id == posDeviceId,
             cancellationToken);
+    }
+
+    public Task<bool> IsTrustedPosAssignedToTillAsync(Guid tenantId, Guid outletId, Guid tillId,
+        Guid posDeviceId, CancellationToken cancellationToken)
+    {
+        return _dbContext.TillDeviceAssignments.AsNoTracking().AnyAsync(a =>
+            a.TenantId == tenantId && a.OutletId == outletId && a.TillId == tillId &&
+            a.PosDeviceId == posDeviceId && a.ReleasedAt == null &&
+            _dbContext.PosDevices.Any(p => p.Id == posDeviceId && p.TenantId == tenantId &&
+                p.OutletId == outletId && p.IsTrusted && p.Status == "ACTIVE") &&
+            _dbContext.Tills.Any(t => t.Id == tillId && t.TenantId == tenantId &&
+                t.OutletId == outletId && t.Status == "ACTIVE") &&
+            !_dbContext.TillDeviceAssignments.Any(other => other.PosDeviceId == posDeviceId &&
+                other.ReleasedAt == null && (other.TenantId != tenantId ||
+                    other.OutletId != outletId || other.TillId != tillId)), cancellationToken);
     }
 
     public Task<HardwareDeviceAssignment?> GetActiveAssignmentForDeviceAsync(
@@ -241,5 +275,50 @@ public sealed class TenantAdminHardwareRepository : ITenantAdminHardwareReposito
     public Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<HardwareActivityItem>> GetActivityAsync(Guid tenantId,
+        Guid hardwareDeviceId, CancellationToken cancellationToken)
+    {
+        var items = new List<HardwareActivityItem>();
+        var device = await _dbContext.HardwareDevices.AsNoTracking().FirstOrDefaultAsync(
+            d => d.TenantId == tenantId && d.Id == hardwareDeviceId, cancellationToken);
+        if (device is null || (_scope?.TillId is not null &&
+            (tenantId != _scope.TenantId || device.OutletId != _scope.OutletId))) return items;
+        if (_scope?.TillId is null || device.CreatedByTenantUserId == _scope.UserId)
+            items.Add(new(device.Id, "CREATED", device.CreatedAt, device.CreatedByTenantUserId, null, null));
+        var assignments = _dbContext.HardwareDeviceAssignments.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.HardwareDeviceId == hardwareDeviceId);
+        var changes = _dbContext.HardwareConfigurationChangeAudits.AsNoTracking()
+            .Where(a => a.TenantId == tenantId && a.HardwareDeviceId == hardwareDeviceId);
+        if (_scope?.TillId is Guid tillId)
+        {
+            assignments = assignments.Where(a => a.OutletId == _scope.OutletId && a.TillId == tillId && a.PosDeviceId == null);
+            changes = changes.Where(a => a.OutletId == _scope.OutletId && a.TillId == tillId);
+        }
+        items.AddRange(await assignments.OrderByDescending(a => a.AssignedAt).ThenByDescending(a => a.Id).Take(50)
+            .Select(a => new HardwareActivityItem(a.Id, "ASSIGNED", a.AssignedAt, a.AssignedByTenantUserId, a.TillId, null))
+            .ToListAsync(cancellationToken));
+        items.AddRange(await assignments.Where(a => a.ReleasedAt != null).OrderByDescending(a => a.ReleasedAt).ThenByDescending(a => a.Id).Take(50)
+            .Select(a => new HardwareActivityItem(a.Id, "RELEASED", a.ReleasedAt!.Value, a.ReleasedByTenantUserId, a.TillId, null))
+            .ToListAsync(cancellationToken));
+        items.AddRange(await changes.OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.Id).Take(50)
+            .Select(a => new HardwareActivityItem(a.Id, "CONFIGURATION_CHANGED", a.CreatedAt, a.ChangedByTenantUserId, a.TillId, a.NewVersion))
+            .ToListAsync(cancellationToken));
+        return items.OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id).ThenBy(a => a.Action).Take(50).ToList();
+    }
+
+    public async Task<IReadOnlyList<HardwareTestHistoryItem>> GetTestHistoryAsync(Guid tenantId,
+        Guid hardwareDeviceId, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.HardwareTestLogs.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.HardwareDeviceId == hardwareDeviceId);
+        if (_scope?.TillId is Guid tillId)
+            query = query.Where(x => x.TenantId == _scope.TenantId &&
+                x.OutletId == _scope.OutletId && x.TillId == tillId);
+        return await query.OrderByDescending(x => x.TestedAt).ThenByDescending(x => x.Id)
+            .Take(50).Select(x => new HardwareTestHistoryItem(x.Id, x.TestType, x.TestStatus,
+                x.ConfigurationVersion, x.TestedAt, x.CompletedAt, x.PhysicalConfirmation))
+            .ToListAsync(cancellationToken);
     }
 }

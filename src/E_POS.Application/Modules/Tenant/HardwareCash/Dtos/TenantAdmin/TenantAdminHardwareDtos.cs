@@ -44,7 +44,10 @@ public sealed record TenantAdminHardwareDeviceDetailResponse(
     bool IsAssigned,
     Guid? ActiveAssignmentId,
     Guid? AssignedTillId,
-    Guid? AssignedPosDeviceId);
+    Guid? AssignedPosDeviceId,
+    int ConfigurationVersion = 1);
+
+public sealed record TenantAdminHardwareUpdateRequest(string HardwareDeviceName, string Status, int ExpectedVersion);
 
 public sealed record TenantAdminHardwareDeviceCreateRequest(
     Guid OutletId,
@@ -85,7 +88,8 @@ public sealed record PosHardwareHeartbeatItemRequest(
     string? ConnectionStatus = null,
     string? HealthStatus = null,
     string? WarningCode = null,
-    string? WarningMessage = null);
+    string? WarningMessage = null,
+    int? ConfigurationVersion = null);
 
 public sealed record PosHardwareHeartbeatResponse(
     Guid PosDeviceId,
@@ -99,7 +103,9 @@ public sealed record PosHardwareTestResultRequest(
     string? ResultCode = null,
     string? ResultMessage = null,
     DateTimeOffset? TestedAt = null,
-    Guid? PosDeviceId = null);
+    Guid? PosDeviceId = null,
+    Guid? RequestId = null,
+    int? ConfigurationVersion = null);
 
 public sealed record PosHardwareTestResultResponse(
     Guid TestLogId,

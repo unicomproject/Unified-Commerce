@@ -7,6 +7,8 @@ namespace E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 
 public interface ITenantAdminHardwareService
 {
+    Task<ApplicationResult<TenantAdminHardwareDeviceDetailResponse>> UpdateAsync(TenantRequestContext context,
+        Guid id, TenantAdminHardwareUpdateRequest request, CancellationToken cancellationToken);
     Task<ApplicationResult<TenantAdminHardwareDeviceListResponse>> ListAsync(
         TenantRequestContext context,
         Guid? outletId,
@@ -61,6 +63,14 @@ public interface ITenantAdminHardwareService
 
 public interface ITenantAdminHardwareRepository
 {
+    Task<IReadOnlyList<HardwareActivityItem>> GetActivityAsync(Guid tenantId, Guid hardwareDeviceId,
+        CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<HardwareActivityItem>>([]);
+    Task<IReadOnlyList<HardwareTestHistoryItem>> GetTestHistoryAsync(Guid tenantId, Guid hardwareDeviceId,
+        CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<HardwareTestHistoryItem>>([]);
+    Task<bool> IsTrustedPosAssignedToTillAsync(Guid tenantId, Guid outletId, Guid tillId,
+        Guid posDeviceId, CancellationToken cancellationToken) => Task.FromResult(false);
+    Task<HardwareTestLog?> GetTestByRequestIdAsync(Guid tenantId, Guid requestId, CancellationToken cancellationToken);
+    Task<HardwareTestLog?> GetLatestTelemetryAsync(Guid tenantId, Guid hardwareId, CancellationToken cancellationToken);
     Task<bool> OutletBelongsToTenantAsync(Guid tenantId, Guid outletId, CancellationToken cancellationToken);
 
     Task<bool> DeviceCodeExistsAsync(
@@ -124,6 +134,13 @@ public sealed record HardwareDeviceListRow(
     HardwareDevice Device,
     string OutletName,
     HardwareDeviceAssignment? ActiveAssignment);
+
+public sealed record HardwareTestHistoryItem(Guid Id, string TestType, string TestStatus,
+    int ConfigurationVersion, DateTimeOffset TestedAt, DateTimeOffset? CompletedAt,
+    bool? PhysicalConfirmation);
+
+public sealed record HardwareActivityItem(Guid Id, string Action, DateTimeOffset OccurredAt,
+    Guid? ActorUserId, Guid? TillId, int? ConfigurationVersion);
 
 public sealed record HardwareDeviceDetailRow(
     HardwareDevice Device,
