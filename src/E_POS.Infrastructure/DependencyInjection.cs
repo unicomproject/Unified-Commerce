@@ -140,6 +140,9 @@ public static class DependencyInjection
             configuration.GetSection(DevelopmentTenantRoleAccessSeedOptions.SectionName));
         services.Configure<E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions>(
             configuration.GetSection(E_POS.Application.Modules.Tenant.OutletTillDevice.Options.TillMonitoringOptions.SectionName));
+        // B6: external product lookup — zero providers configured by default (NO_MATCH). No production adapter shipped.
+        services.Configure<E_POS.Application.Modules.Tenant.CatalogProduct.Options.ExternalProductLookupOptions>(
+            configuration.GetSection(E_POS.Application.Modules.Tenant.CatalogProduct.Options.ExternalProductLookupOptions.SectionName));
         services.AddScoped<IDevelopmentPlatformAdminTestAccountSeeder, DevelopmentPlatformAdminTestAccountSeeder>();
         services.AddScoped<IDevelopmentTenantRoleAccessTestAccountSeeder, DevelopmentTenantRoleAccessTestAccountSeeder>();
 

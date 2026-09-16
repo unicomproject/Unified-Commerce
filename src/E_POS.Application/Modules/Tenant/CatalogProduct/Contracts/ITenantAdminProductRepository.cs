@@ -129,6 +129,17 @@ public interface ITenantAdminProductRepository
     Task<bool> IsCategoryEffectivelySelectableAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
     Task<bool> ActiveCategoryExistsAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
     Task<bool> CategoryExistsForExistingMappingAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
+    Task<string?> GetActiveCategoryCodeAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken);
+    Task<long> AllocateNextProductSkuSequenceAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<string?> GetGeneratedSkuBaseAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken);
+    Task<ApplicationError?> ReplaceGeneratedSkuBaseAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        long expectedRowVersion,
+        string generatedSkuBase,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
     Task<bool> ProductCodeExistsAsync(Guid tenantId, string productCode, Guid? excludeProductId, CancellationToken cancellationToken);
     Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductVariantId, CancellationToken cancellationToken);
     Task<bool> BarcodeExistsAsync(Guid tenantId, string barcodeValue, Guid? excludeProductVariantId, CancellationToken cancellationToken);
@@ -166,6 +177,11 @@ public interface ITenantAdminProductRepository
         CancellationToken cancellationToken);
 
     Task<bool> IsInitialCreationDraftAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken);
+
+    Task<bool> HasScanContextAsync(
         Guid tenantId,
         Guid productId,
         CancellationToken cancellationToken);
@@ -264,5 +280,15 @@ public interface ITenantAdminProductRepository
         Guid userId,
         TenantAdminWizardProductCreateRequest request,
         DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Tenant-scoped barcode duplicate detection for Product Setup resolve.
+    /// Includes all lifecycle statuses that retain uniqueness ownership.
+    /// Returns MatchCount for invariant detection when corrupted duplicates exist.
+    /// </summary>
+    Task<ProductBarcodeResolveMatchProjection?> FindBarcodeResolveMatchAsync(
+        Guid tenantId,
+        string normalizedBarcode,
         CancellationToken cancellationToken);
 }

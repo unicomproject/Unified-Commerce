@@ -13,9 +13,11 @@ public class ProductWizardAccessPolicyTests
     {
         public bool IsEntitled { get; set; } = true;
         public HashSet<string> DeniedFeatureCodes { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<string> EvaluatedFeatureCodes { get; } = [];
 
         public Task<TenantFeatureEntitlementEvaluation> EvaluateAsync(Guid tenantId, string featureCode, DateTimeOffset evaluationTime, CancellationToken cancellationToken = default)
         {
+            EvaluatedFeatureCodes.Add(featureCode);
             if (DeniedFeatureCodes.Contains(featureCode) || !IsEntitled)
             {
                 return Task.FromResult(TenantFeatureEntitlementEvaluation.Denied(TenantFeatureEntitlementDecision.Disabled, featureCode, featureCode, false, true, false, "Feature disabled"));
@@ -230,5 +232,76 @@ public class ProductWizardAccessPolicyTests
 
         Assert.NotNull(error);
         Assert.Equal("product.entitlement_denied", error.Code);
+    }
+
+    [Theory]
+    [InlineData("catalog.products.create")]
+    [InlineData("tenant.products.create")]
+    public async Task ValidateProductSetupCreateAccessAsync_AllowsCanonicalAndLegacyCreatePermission(
+        string permission)
+    {
+        var repo = new FakeRepo { TenantStatus = "ACTIVE" };
+        var evaluator = new FakeEntitlementEvaluator();
+        var policy = new ProductWizardAccessPolicy(evaluator, repo, new FakeClock());
+        var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [permission]);
+
+        var error = await policy.ValidateProductSetupCreateAccessAsync(context, CancellationToken.None);
+
+        Assert.Null(error);
+        Assert.Contains("product_catalog", evaluator.EvaluatedFeatureCodes);
+    }
+
+    [Fact]
+    public async Task ValidateProductSetupCreateAccessAsync_BlocksWithoutProductCatalog()
+    {
+        var repo = new FakeRepo { TenantStatus = "ACTIVE" };
+        var evaluator = new FakeEntitlementEvaluator();
+        evaluator.DeniedFeatureCodes.Add("product_catalog");
+        var policy = new ProductWizardAccessPolicy(evaluator, repo, new FakeClock());
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            ["catalog.products.create"]);
+
+        var error = await policy.ValidateProductSetupCreateAccessAsync(context, CancellationToken.None);
+
+        Assert.Equal("product.entitlement_denied", error?.Code);
+    }
+
+    [Fact]
+    public async Task ValidateProductSetupCreateAccessAsync_DoesNotUseProductManagementAsEntitlementCode()
+    {
+        var repo = new FakeRepo { TenantStatus = "ACTIVE" };
+        var evaluator = new FakeEntitlementEvaluator();
+        evaluator.DeniedFeatureCodes.Add("product_management");
+        var policy = new ProductWizardAccessPolicy(evaluator, repo, new FakeClock());
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            ["catalog.products.create"]);
+
+        var error = await policy.ValidateProductSetupCreateAccessAsync(context, CancellationToken.None);
+
+        Assert.Null(error);
+        Assert.DoesNotContain("product_management", evaluator.EvaluatedFeatureCodes);
+        Assert.Equal(["product_catalog"], evaluator.EvaluatedFeatureCodes);
+    }
+
+    [Fact]
+    public async Task ValidateBarcodeManageAccessAsync_RequiresBarcodeManagePermission()
+    {
+        var repo = new FakeRepo { TenantStatus = "ACTIVE" };
+        var evaluator = new FakeEntitlementEvaluator();
+        var policy = new ProductWizardAccessPolicy(evaluator, repo, new FakeClock());
+
+        var denied = await policy.ValidateBarcodeManageAccessAsync(
+            new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), ["catalog.products.create"]),
+            CancellationToken.None);
+        var allowed = await policy.ValidateBarcodeManageAccessAsync(
+            new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), ["catalog.barcodes.manage"]),
+            CancellationToken.None);
+
+        Assert.Equal("product.permission_denied", denied?.Code);
+        Assert.Null(allowed);
     }
 }

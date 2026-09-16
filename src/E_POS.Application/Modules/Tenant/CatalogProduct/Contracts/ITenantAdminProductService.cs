@@ -122,4 +122,28 @@ public interface ITenantAdminProductService
         TenantRequestContext context,
         Guid productId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Side-effect-free Tenant Admin barcode resolve (scanner-first Step 1).
+    /// </summary>
+    Task<ApplicationResult<ResolveProductBarcodeResponse>> ResolveBarcodeAsync(
+        TenantRequestContext context,
+        ResolveProductBarcodeRequest request,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Side-effect-free non-reserved SKU candidate for no-barcode Step 1 (B5).
+    /// </summary>
+    Task<ApplicationResult<GenerateSkuCandidateResponse>> GenerateSkuCandidateAsync(
+        TenantRequestContext context,
+        GenerateSkuCandidateRequest request,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Side-effect-free external product-data lookup (B7). No tenant duplicate checking.
+    /// </summary>
+    Task<ApplicationResult<ExternalLookupProductBarcodeResponse>> ExternalLookupBarcodeAsync(
+        TenantRequestContext context,
+        ExternalLookupProductBarcodeRequest request,
+        CancellationToken cancellationToken);
 }

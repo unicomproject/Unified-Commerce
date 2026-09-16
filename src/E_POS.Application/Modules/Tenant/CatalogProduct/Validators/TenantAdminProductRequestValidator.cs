@@ -240,7 +240,8 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                 $"Product name cannot exceed {ProductConstants.ProductNameMaxLength} characters."));
         }
 
-        ValidateOptionalCode(fieldErrors, "productCode", request.ProductCode);
+        // productCode is server-generated (EnsureUniqueProductCodeAsync) for all wizard draft paths.
+        // It is never supplied by the client at bootstrap time and must NOT be required here.
         ValidateOptionalCode(fieldErrors, "shortName", request.ShortName);
 
         if (request.ShortDescription is { Length: > 0 } &&
@@ -306,6 +307,32 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             "product.validation_failed",
             "Product validation failed.",
             fieldErrors);
+    }
+
+    private static void ValidateRequiredCode(
+        List<ApplicationFieldError> fieldErrors,
+        string field,
+        string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            fieldErrors.Add(new ApplicationFieldError(field, $"{field} is required."));
+            return;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Length > ProductConstants.ProductCodeMaxLength)
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                field,
+                $"{field} cannot exceed {ProductConstants.ProductCodeMaxLength} characters."));
+        }
+        else if (!AlphanumericDashRegex.IsMatch(trimmed))
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                field,
+                $"{field} may only contain letters, numbers, and dashes."));
+        }
     }
 
     private static void ValidateOptionalCode(
@@ -1009,6 +1036,16 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
     {
         var draftError = ValidateBarcodeSkuDraft(request);
         if (draftError != null) return draftError;
+
+        if (string.Equals(
+                request.BarcodeSkuConfiguration?.SkuMode,
+                ProductSkuCandidateGenerator.AutoMode,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            // Backend composes and validates SIMPLE/VARIANT SKUs from the
+            // persisted Step 1 Product base.
+            return null;
+        }
 
         var fieldErrors = new List<ApplicationFieldError>();
         ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);

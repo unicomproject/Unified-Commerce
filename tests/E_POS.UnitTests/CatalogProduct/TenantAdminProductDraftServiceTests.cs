@@ -3,6 +3,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ExternalLookup;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
@@ -39,7 +40,17 @@ public class TenantAdminProductDraftServiceTests
             clock,
             new FakeTenantAdminProductAuditLogger(),
             accessPolicy,
-            new ProductVariantGenerationService());
+            new ProductVariantGenerationService(),
+            new NoOpExternalProductLookupCoordinator());
+    }
+
+    private sealed class NoOpExternalProductLookupCoordinator : IExternalProductLookupCoordinator
+    {
+        public Task<ExternalProductLookupResult> LookupAsync(
+            ExternalProductLookupRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.NoMatch, null, null, false));
     }
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string> permissions) =>
@@ -65,6 +76,9 @@ public class TenantAdminProductDraftServiceTests
 
         public Task<bool> IsInitialCreationDraftAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
             Task.FromResult(IsInitialDraft);
+
+        public Task<bool> HasScanContextAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
 
         public Task<bool> HasOperationalHistoryAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
             Task.FromResult(false);
@@ -297,6 +311,25 @@ public class TenantAdminProductDraftServiceTests
         public Task<bool> ActiveCategoryExistsAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
             Task.FromResult(ActiveCategoryExists);
 
+        public Task<string?> GetActiveCategoryCodeAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>("TSH");
+
+        public Task<long> AllocateNextProductSkuSequenceAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(1L);
+
+        public Task<string?> GetGeneratedSkuBaseAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>(null);
+
+        public Task<ApplicationError?> ReplaceGeneratedSkuBaseAsync(
+            Guid tenantId,
+            Guid userId,
+            Guid productId,
+            long expectedRowVersion,
+            string generatedSkuBase,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<ApplicationError?>(null);
+
         public Task<bool> CategoryExistsForExistingMappingAsync(Guid tenantId, Guid categoryId, CancellationToken cancellationToken) =>
             Task.FromResult(ExistingMappingCategoryExists);
 
@@ -311,6 +344,12 @@ public class TenantAdminProductDraftServiceTests
         public Task DeleteBarcodeAsync(Guid tenantId, Guid userId, Guid productId, Guid variantId, Guid barcodeId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task RestoreAsync(Guid tenantId, Guid userId, Guid productId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<TenantAdminProductCreateResponse> DuplicateAsync(Guid tenantId, Guid userId, Guid productId, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(new TenantAdminProductCreateResponse(Guid.NewGuid(), "Duplicate", "DUP-001", "DRAFT"));
+
+        public Task<ProductBarcodeResolveMatchProjection?> FindBarcodeResolveMatchAsync(
+            Guid tenantId,
+            string normalizedBarcode,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<ProductBarcodeResolveMatchProjection?>(null);
     }
 
     private sealed class FakeDateTimeProvider : IDateTimeProvider

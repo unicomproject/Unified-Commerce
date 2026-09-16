@@ -1,3 +1,5 @@
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ExternalLookup;
+
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 
 public sealed record PublishProductRequest(
@@ -55,6 +57,11 @@ public sealed class SaveProductDraftRequest
     
     // Step 6 — Pricing & Tax
     public PricingTaxConfigurationDto? PricingTax { get; set; }
+
+    /// <summary>
+    /// Scanner-first create bootstrap (B8). Accepted on <c>POST .../draft</c> only.
+    /// </summary>
+    public ProductSetupScanBootstrapRequest? ScanBootstrap { get; set; }
 }
 
 /// <summary>
@@ -107,7 +114,8 @@ public sealed record BarcodeSkuAssignmentDto(
     string? Barcode,
     string? Status,
     string? ClientCombinationKey = null,
-    string? BarcodeType = null);
+    string? BarcodeType = null,
+    string? IdentifierStandard = null);
 
 /// <summary>
 /// Authoritative Step 5 target from persisted included/sellable variants.
@@ -125,7 +133,8 @@ public sealed record Step5IdentifierTargetDto(
 
 public sealed record BarcodeSkuConfigurationDto(
     IReadOnlyList<Step5IdentifierTargetDto>? IdentifierTargets,
-    IReadOnlyList<BarcodeSkuAssignmentDto>? Assignments);
+    IReadOnlyList<BarcodeSkuAssignmentDto>? Assignments,
+    string? SkuMode = null);
 
 public sealed record BundleComponentDto(
     Guid? ComboComponentId,
@@ -310,7 +319,26 @@ public sealed record ProductSetupWizardDto(
     string? InitialBatchNumber = null,
     DateOnly? InitialExpiryDate = null,
     string? InitialSerialNumber = null,
-    Guid? InitialTrackingAssignedVariantId = null);
+    Guid? InitialTrackingAssignedVariantId = null,
+    ProductSetupScanContextDto? ScanContext = null);
+
+/// <summary>
+/// Scanner-first Step 1 acquisition context on GET /setup (B9). LEGACY stub has acquisitionMode only.
+/// </summary>
+public sealed record ProductSetupScanContextDto(
+    string AcquisitionMode,
+    string? CandidateIdentifier = null,
+    string? IdentifierStandard = null,
+    string? SymbologyHint = null,
+    string? NoBarcodeReason = null,
+    string? ExternalLookupStatus = null,
+    string? ExternalSourceReference = null,
+    ExternalProductSuggestion? NormalizedPrefill = null,
+    string? GeneratedSkuCandidate = null)
+{
+    public static ProductSetupScanContextDto CreateLegacy() =>
+        new(AcquisitionMode: "LEGACY");
+}
 
 public sealed record TenantAdminProductSalesChannelOptionResponse(
     Guid SalesChannelId,

@@ -40,5 +40,8 @@ public sealed record SaveProductDraftCommand(
     string? InitialSerialNumber = null,
     bool ConfirmClearIncompatibleInitialTracking = false,
     Guid? InitialTrackingAssignedVariantId = null,
-    bool ApplyChannelMutation = true);
+    bool ApplyChannelMutation = true,
+    ProductSetupScanBootstrapPersistence? ScanBootstrap = null,
+    bool ApplyCompositeStep5Identifiers = false,
+    string? AutoSkuBase = null);
 
