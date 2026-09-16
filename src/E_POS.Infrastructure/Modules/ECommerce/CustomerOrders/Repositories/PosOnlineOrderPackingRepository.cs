@@ -5,7 +5,10 @@ using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
+<<<<<<< HEAD
 using E_POS.Infrastructure.Modules.ECommerce.FulfilmentPickup;
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -191,13 +194,19 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
                 return await RollbackFailureAsync(transaction, "online_orders.invalid_pickup", cancellationToken);
 
             var oldPickupStatus = pickup.PickupStatus;
+<<<<<<< HEAD
             var pickupCode = PickupCodeGenerator.Generate();
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
             try
             {
                 fulfillment.MarkReady(tenantUserId, request.ExpectedVersion, now);
                 order.ApplyPosReadyForCollection(tenantUserId, now);
                 pickup.MarkReady(now);
+<<<<<<< HEAD
                 pickup.IssuePickupCode(pickupCode, (pickup.PickupQrVersion ?? 0) + 1, now.AddHours(24), now);
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
             }
             catch (InvalidOperationException ex) when (ex.Message == "FULFILLMENT_VERSION_CONFLICT")
             {
@@ -222,10 +231,13 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
 
             var pickupEntry = _dbContext.Entry(pickup);
             pickupEntry.Property(x => x.PickupStatus).IsModified = true;
+<<<<<<< HEAD
             pickupEntry.Property(x => x.PickupQrTokenHash).IsModified = true;
             pickupEntry.Property(x => x.PickupQrVersion).IsModified = true;
             pickupEntry.Property(x => x.PickupQrExpiresAt).IsModified = true;
             pickupEntry.Property(x => x.FailedVerificationAttempts).IsModified = true;
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
             pickupEntry.Property(x => x.UpdatedAt).IsModified = true;
 
             var fulfillmentSequence = await NextFulfillmentEventSequenceAsync(

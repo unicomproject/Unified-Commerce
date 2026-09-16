@@ -244,6 +244,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
         services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
         services.AddScoped<ICategoryAuditLogger, CategoryAuditLogger>();
+        services.AddScoped<IBrandAuditLogger, BrandAuditLogger>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<ICurrentStockRepository, CurrentStockRepository>();
         services.AddScoped<IInventoryAuditLogger, InventoryAuditLogger>();
@@ -401,7 +402,10 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IPosOnlineOrderReadyRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IPosOnlineOrderPackingRepository, PosOnlineOrderPackingRepository>();
+<<<<<<< HEAD
         services.AddScoped<IPosOnlineOrderPickupVerificationRepository, PosOnlineOrderPickupVerificationRepository>();
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
         services.AddScoped<IPaymentMethodExecutionCapability, CashPaymentExecutionCapability>();
         services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();

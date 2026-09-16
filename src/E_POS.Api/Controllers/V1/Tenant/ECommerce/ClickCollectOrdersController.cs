@@ -18,7 +18,10 @@ public sealed class ClickCollectOrdersController : ControllerBase
     private readonly IPosOnlineOrderPickingService _pickingService;
     private readonly IPosOnlineOrderPackingService _packingService;
     private readonly IPosOnlineOrderReadyService _readyService;
+<<<<<<< HEAD
     private readonly IPosOnlineOrderPickupVerificationService _pickupVerificationService;
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
     public ClickCollectOrdersController(
@@ -28,8 +31,12 @@ public sealed class ClickCollectOrdersController : ControllerBase
         IPosOnlineOrderPickingService pickingService,
         IPosOnlineOrderPackingService packingService,
         ITenantRequestContextFactory tenantRequestContextFactory,
+<<<<<<< HEAD
         IPosOnlineOrderReadyService readyService,
         IPosOnlineOrderPickupVerificationService pickupVerificationService)
+=======
+        IPosOnlineOrderReadyService readyService)
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     {
         _service = service;
         _detailService = detailService;
@@ -37,7 +44,10 @@ public sealed class ClickCollectOrdersController : ControllerBase
         _pickingService = pickingService;
         _packingService = packingService;
         _readyService = readyService;
+<<<<<<< HEAD
         _pickupVerificationService = pickupVerificationService;
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }
 
@@ -207,6 +217,7 @@ public sealed class ClickCollectOrdersController : ControllerBase
             : ToPackingErrorResult(result.Error);
     }
 
+<<<<<<< HEAD
     [HttpPost("{orderId:guid}/pickup/verify")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -270,6 +281,8 @@ public sealed class ClickCollectOrdersController : ControllerBase
         return ToPickupErrorResult(result.Error);
     }
 
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -470,6 +483,7 @@ public sealed class ClickCollectOrdersController : ControllerBase
         _ => BadRequest(CreateError(error))
     };
 
+<<<<<<< HEAD
     private IActionResult ToPickupErrorResult(ApplicationError error) => error.Code switch
     {
         "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),
@@ -484,6 +498,8 @@ public sealed class ClickCollectOrdersController : ControllerBase
         _ => BadRequest(CreateError(error))
     };
 
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     private IActionResult ToPackingErrorResult(ApplicationError error) => error.Code switch
     {
         "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),

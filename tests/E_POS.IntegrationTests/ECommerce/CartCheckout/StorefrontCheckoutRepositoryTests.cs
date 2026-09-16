@@ -129,6 +129,7 @@ public sealed class StorefrontCheckoutRepositoryTests
     }
 
     [Fact]
+<<<<<<< HEAD
     public async Task ConfirmAsync_CreatesCompleteFulfillmentGraphWithNonNullVersion()
     {
         await using var dbContext = CreateDbContext();
@@ -230,6 +231,8 @@ public sealed class StorefrontCheckoutRepositoryTests
     }
 
     [Fact]
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     public async Task ConfirmAsync_MissingPrimaryBarcode_RejectsWithoutCreatingOrder()
     {
         await using var dbContext = CreateDbContext();
@@ -255,7 +258,10 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "confirm-missing-barcode",
+<<<<<<< HEAD
             StorefrontPaymentMethodCodes.PayAtPickup,
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
             Now.AddMinutes(1),
             CancellationToken.None);
 
@@ -263,11 +269,14 @@ public sealed class StorefrontCheckoutRepositoryTests
         Assert.Equal("storefront_checkout.barcode_unavailable", result.ErrorCode);
         Assert.Empty(await dbContext.SalesOrders.ToListAsync());
         Assert.Empty(await dbContext.SalesOrderLines.ToListAsync());
+<<<<<<< HEAD
         Assert.Empty(await dbContext.FulfillmentOrders.ToListAsync());
         Assert.Empty(await dbContext.FulfillmentOrderLines.ToListAsync());
         Assert.Empty(await dbContext.PickupOrders.ToListAsync());
         Assert.Empty(await dbContext.PickupSlots.ToListAsync());
         Assert.Empty(await dbContext.PickupSlotReservations.ToListAsync());
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     }
 
     [Fact]
@@ -295,7 +304,10 @@ public sealed class StorefrontCheckoutRepositoryTests
             scenario.CustomerId,
             created.Checkout!.Id,
             "confirm-immutable-barcode",
+<<<<<<< HEAD
             StorefrontPaymentMethodCodes.PayAtPickup,
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
             Now.AddMinutes(1),
             CancellationToken.None);
         Assert.True(confirmed.IsSuccess);

@@ -6,4 +6,5 @@ public sealed record BrandCreateRequest(
     string? BrandSlug,
     string? Description,
     string? LogoUrl,
-    string Status);
+    string Status,
+    int SortOrder = 0);

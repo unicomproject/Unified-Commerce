@@ -344,14 +344,22 @@ public sealed class ClickCollectOrdersControllerTests
         FakePosOnlineOrderStartFulfillmentService? startService = null,
         FakePosOnlineOrderPickingService? pickingService = null,
         FakePosOnlineOrderPackingService? packingService = null,
+<<<<<<< HEAD
         FakeReadyService? readyService = null,
         FakePosOnlineOrderPickupVerificationService? pickupVerificationService = null) =>
+=======
+        FakeReadyService? readyService = null) =>
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
         new(service, detailService ?? new FakePosOnlineOrderDetailService(),
             startService ?? new FakePosOnlineOrderStartFulfillmentService(),
             pickingService ?? new FakePosOnlineOrderPickingService(),
             packingService ?? new FakePosOnlineOrderPackingService(),
+<<<<<<< HEAD
             new TenantRequestContextFactory(), readyService ?? new FakeReadyService(),
             pickupVerificationService ?? new FakePosOnlineOrderPickupVerificationService())
+=======
+            new TenantRequestContextFactory(), readyService ?? new FakeReadyService())
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -400,6 +408,7 @@ public sealed class ClickCollectOrdersControllerTests
                 : ApplicationResult<E_POS.Application.Modules.Shared.Notification.Dtos.NotificationCreateResult>.Failure(new(code, "Safe error")));
     }
 
+<<<<<<< HEAD
     private sealed class FakePosOnlineOrderPickupVerificationService(string? code = null)
         : IPosOnlineOrderPickupVerificationService
     {
@@ -418,6 +427,8 @@ public sealed class ClickCollectOrdersControllerTests
                 : ApplicationResult<PosOnlineOrderPickupCollectResponse>.Failure(new(code, "Safe error")));
     }
 
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     private static void SetTenantClaims(
         ClickCollectOrdersController controller,
         Guid tenantId,

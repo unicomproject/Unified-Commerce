@@ -16,9 +16,15 @@ public sealed class CashierPosChunk3PermissionSeedTests
     [Fact]
     public void RoleAssignableCodes_MatchChunk2Counts_AndExcludePreAuth()
     {
+<<<<<<< HEAD
         Assert.Equal(348, CashierPosChunk3PermissionSeedData.RoleAssignableDefinitions.Count);
         Assert.Equal(295, CashierPosChunk3PermissionSeedData.FineGrainedCount);
         Assert.Equal(53, CashierPosChunk3PermissionSeedData.ExistingCatalogCount);
+=======
+        Assert.Equal(346, CashierPosChunk3PermissionSeedData.RoleAssignableDefinitions.Count);
+        Assert.Equal(295, CashierPosChunk3PermissionSeedData.FineGrainedCount);
+        Assert.Equal(51, CashierPosChunk3PermissionSeedData.ExistingCatalogCount);
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
         Assert.Equal(7, CashierPosChunk3PermissionSeedData.PreAuthExcludedCount);
 
         Assert.DoesNotContain(

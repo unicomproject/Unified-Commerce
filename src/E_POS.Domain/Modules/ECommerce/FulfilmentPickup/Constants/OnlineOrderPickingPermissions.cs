@@ -20,8 +20,11 @@ public static class OnlineOrderPickingPermissions
     public const string CollectionMarkReady = "commerce.online_order.collection.mark_ready";
     public const string CollectionViewReady = "commerce.online_order.collection.view_ready";
     public const string CollectionNotifyCustomer = "commerce.online_order.collection.notify_customer";
+<<<<<<< HEAD
     public const string CollectionVerify = "commerce.online_order.collection.verify";
     public const string CollectionComplete = "commerce.online_order.collection.complete";
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
 
     /// <summary>American misspelling — must never be treated as a real permission.</summary>
     public const string FulfilmentStartWrongSpelling = "commerce.online_order.fulfillment.start";

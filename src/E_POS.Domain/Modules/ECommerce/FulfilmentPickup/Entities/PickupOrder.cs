@@ -22,6 +22,7 @@ public class PickupOrder : AuditableEntity
     public Guid? VerifiedByTenantUserId { get; protected set; }
     public DateTimeOffset? VerifiedAt { get; protected set; }
     public DateTimeOffset? CollectedAt { get; protected set; }
+<<<<<<< HEAD
     public int FailedVerificationAttempts { get; protected set; }
 
     public const int MaxVerificationAttempts = 3;
@@ -123,6 +124,8 @@ public class PickupOrder : AuditableEntity
             UpdatedAt = now
         };
     }
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
 
     public void MarkReady(DateTimeOffset now)
     {

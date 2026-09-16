@@ -203,7 +203,10 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderPickingService, PosOnlineOrderPickingService>();
         services.AddScoped<IPosOnlineOrderReadyService, PosOnlineOrderReadyService>();
         services.AddScoped<IPosOnlineOrderPackingService, PosOnlineOrderPackingService>();
+<<<<<<< HEAD
         services.AddScoped<IPosOnlineOrderPickupVerificationService, PosOnlineOrderPickupVerificationService>();
+=======
+>>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
         services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;
