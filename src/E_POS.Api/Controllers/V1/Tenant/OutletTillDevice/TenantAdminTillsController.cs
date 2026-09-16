@@ -129,6 +129,7 @@ public sealed class TenantAdminTillsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/hardware-readiness")]
+    [TypeFilter(typeof(HardwareScopeFilter))]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetHardwareReadiness(Guid id, CancellationToken cancellationToken)
     {

@@ -10,6 +10,12 @@ namespace E_POS.Api.Controllers;
 [ApiController]
 [Authorize(Policy = "TenantOnly")]
 [Route("api/v1/pos/hardware")]
+[RequestSizeLimit(32768)]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("hardware-heartbeat")]
+[TypeFilter(typeof(HardwareEntitlementFilter), Order = -1)]
+[TypeFilter(typeof(PosDeviceProofFilter), Order = 0)]
+[TypeFilter(typeof(HardwareScopeFilter), Order = 1)]
+[TypeFilter(typeof(HardwareTelemetryTransactionFilter), Order = 2)]
 public sealed class PosHardwareController : ControllerBase
 {
     private readonly IPosHardwareService _service;
@@ -73,6 +79,16 @@ public sealed class PosHardwareController : ControllerBase
         if (!_contextFactory.TryCreate(User, out var context))
             return Unauthorized(Error(new ApplicationError("pos_hardware.invalid_context", "Invalid tenant context.")));
         return Result(await _service.GetTestHistoryAsync(context, posDeviceId, take, cancellationToken));
+    }
+
+
+    [HttpGet("remote-tests")]
+    public async Task<IActionResult> GetRemoteTests([FromQuery] Guid posDeviceId, CancellationToken ct)
+    {
+        if (!_contextFactory.TryCreate(User, out var actor)) return Unauthorized();
+        if (!actor.HasPermission("pos.hardware.settings")) return Forbid();
+        var data = await HttpContext.RequestServices.GetRequiredService<E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services.HardwareRemoteTestService>().PendingAsync(actor, posDeviceId, ct);
+        return Ok(new { data });
     }
 
     private IActionResult Result<T>(ApplicationResult<T> result)

@@ -30,6 +30,13 @@ if (builder.Environment.IsDevelopment() && OperatingSystem.IsWindows())
 }
 
 builder.Services.AddControllers();
+builder.Services.AddScoped<E_POS.Application.Modules.Tenant.HardwareCash.Contracts.HardwareQueryScope>();
+builder.Services.AddHostedService<E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services.HardwareTelemetryRetentionWorker>();
+builder.Services.AddScoped<E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services.HardwareRemoteTestService>();
+builder.Services.AddScoped<E_POS.Application.Modules.Tenant.HardwareCash.Contracts.IHardwareDashboardQuery,
+    E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services.HardwareDashboardQuery>();
+builder.Services.AddScoped<E_POS.Application.Modules.Tenant.HardwareCash.Contracts.IHardwareMutationRunner,
+    E_POS.Infrastructure.Modules.Tenant.HardwareCash.Services.HardwareMutationRunner>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -155,6 +162,7 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddSwaggerGen(options =>
 {
+    options.OperationFilter<E_POS.Api.Common.HardwareOpenApiFilter>();
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "TM-EPOS Backend API",
