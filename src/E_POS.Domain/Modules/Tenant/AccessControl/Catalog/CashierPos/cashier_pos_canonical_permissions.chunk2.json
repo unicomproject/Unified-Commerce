@@ -571,6 +571,26 @@
       "roleAssignable": true
     },
     {
+      "code": "commerce.online_order.collection.view_ready",
+      "parent": null,
+      "module": "Existing",
+      "type": "SCREEN",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
+      "code": "commerce.online_order.collection.notify_customer",
+      "parent": null,
+      "module": "Existing",
+      "type": "ACTION",
+      "sensitive": false,
+      "kind": "existing",
+      "reason": "Approved existing canonical business permission",
+      "roleAssignable": true
+    },
+    {
       "code": "pos.shell.topbar.container",
       "parent": "pos.sales.dashboard.view",
       "module": "Shell",

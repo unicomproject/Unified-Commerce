@@ -1,4 +1,5 @@
 using System.Text.Json;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Application.Modules.Shared.Media.Contracts;
@@ -12,7 +13,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace E_POS.Infrastructure.Modules.ECommerce.CustomerOrders.Repositories;
 
-public sealed class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBase, IPosOnlineOrderPickingRepository
+public sealed partial class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBase, IPosOnlineOrderPickingRepository, IPosOnlineOrderReadyRepository
 {
     public const string LinePickedEvent = "FULFILLMENT_LINE_PICKED";
     public const string IssueReportedEvent = "FULFILLMENT_LINE_ISSUE_REPORTED";
@@ -39,9 +40,20 @@ public sealed class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBas
             tenantId, outletId, orderId, tracked: false, cancellationToken);
         if (aggregate is null)
             return PosOnlineOrderPickingRepositoryResult.Failure("online_orders.not_found");
-        if (aggregate.Fulfillment.FulfillmentStatus != "PICKING")
+        var pickup = await DbContext.PickupOrders.AsNoTracking().SingleOrDefaultAsync(
+            x => x.TenantId == tenantId && x.FulfillmentOrderId == aggregate.Fulfillment.Id,
+            cancellationToken);
+        if (aggregate.Fulfillment.FulfillmentStatus is not ("PICKING" or "PACKED" or "READY") ||
+            aggregate.Order.Status is "CANCELLED" or "COMPLETED" or "COLLECTED" or "FULFILLED" or "VOIDED" ||
+            aggregate.Order.CompletedAt.HasValue || aggregate.Order.CancelledAt.HasValue ||
+            pickup?.CollectedAt is not null ||
+            pickup?.PickupStatus is "COLLECTED" or "CANCELLED" or "EXPIRED" ||
+            (aggregate.Fulfillment.FulfillmentStatus == "READY" &&
+             !ReadyForCollectionPolicy.IsReady(aggregate.Order, aggregate.Fulfillment, pickup)))
             return PosOnlineOrderPickingRepositoryResult.Failure("online_orders.invalid_state");
 
+        // Load issue payloads in a separate query, then evaluate Contains in memory.
+        // jsonb columns must not use ToLower()/Contains in SQL (Postgres: lower(jsonb) fails).
         var rows = await (
             from fulfillmentLine in DbContext.FulfillmentOrderLines.AsNoTracking()
             join salesLine in DbContext.SalesOrderLines.AsNoTracking()
@@ -51,7 +63,19 @@ public sealed class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBas
                   fulfillmentLine.FulfillmentOrderId == aggregate.Fulfillment.Id &&
                   salesLine.SalesOrderId == orderId && salesLine.LineStatus != "CANCELLED"
             orderby salesLine.LineNumber
-            select new { FulfillmentLine = fulfillmentLine, SalesLine = salesLine })
+            select new
+            {
+                FulfillmentLine = fulfillmentLine,
+                SalesLine = salesLine
+            })
+            .ToListAsync(cancellationToken);
+        var issuePayloads = await DbContext.FulfillmentOrderEvents.AsNoTracking()
+            .Where(e =>
+                e.TenantId == tenantId &&
+                e.FulfillmentOrderId == aggregate.Fulfillment.Id &&
+                e.EventType == IssueReportedEvent &&
+                e.EventPayloadJson != null)
+            .Select(e => e.EventPayloadJson!)
             .ToListAsync(cancellationToken);
 
         var imageLookup = await BuildImageLookupAsync(
@@ -69,11 +93,6 @@ public sealed class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBas
                 .Select(x => x.DisplayName ?? x.FullName)
                 .FirstOrDefaultAsync(cancellationToken)
             : null;
-        var issuePayloads = await DbContext.FulfillmentOrderEvents.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.FulfillmentOrderId == aggregate.Fulfillment.Id &&
-                        x.EventType == IssueReportedEvent && x.EventPayloadJson != null)
-            .Select(x => x.EventPayloadJson!)
-            .ToListAsync(cancellationToken);
         var notesDescending = await (
             from noteEvent in DbContext.FulfillmentOrderEvents.AsNoTracking()
             join actor in DbContext.TenantUsers.AsNoTracking()
@@ -102,7 +121,9 @@ public sealed class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBas
             var requested = row.FulfillmentLine.RequestedQuantity;
             var remaining = Math.Max(requested - row.FulfillmentLine.CancelledQuantity -
                                      row.FulfillmentLine.PickedQuantity, 0m);
-            var lineIdText = row.FulfillmentLine.Id.ToString("D");
+            var lineIdText = row.FulfillmentLine.Id.ToString();
+            var hasReportedIssue = issuePayloads.Any(payload =>
+                payload.Contains(lineIdText, StringComparison.OrdinalIgnoreCase));
             return new PosOnlineOrderPickingLineResponse
             {
                 Id = row.FulfillmentLine.Id,
@@ -120,18 +141,44 @@ public sealed class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBas
                 LocationName = location?.LocationName,
                 RequestedQuantity = requested,
                 PickedQuantity = row.FulfillmentLine.PickedQuantity,
+                PackedQuantity = row.FulfillmentLine.PackedQuantity,
+                CancelledQuantity = row.FulfillmentLine.CancelledQuantity,
                 RemainingQuantity = remaining,
                 Status = row.FulfillmentLine.LineStatus,
-                HasReportedIssue = issuePayloads.Any(payload =>
-                    payload.Contains(lineIdText, StringComparison.OrdinalIgnoreCase))
+                HasReportedIssue = hasReportedIssue
             };
         }).ToList();
 
         var pickedLines = lines.Count(x => x.RemainingQuantity == 0);
-        var totalUnits = lines.Sum(x => x.RequestedQuantity);
+        var totalUnits = lines.Sum(x => Math.Max(x.RequestedQuantity - x.CancelledQuantity, 0m));
         var pickedUnits = lines.Sum(x => x.PickedQuantity);
+        var canPack = aggregate.Fulfillment.FulfillmentStatus == "PICKING" &&
+                      lines.Count > 0 &&
+                      pickedLines == lines.Count;
+        string? readyNotificationStatus = null;
+        if (aggregate.Fulfillment.FulfillmentStatus == "READY")
+        {
+            var eventNumber = $"ECOM-ORDER-READY-{orderId:N}".ToUpperInvariant();
+            readyNotificationStatus = await (
+                from notification in DbContext.NotificationEvents.AsNoTracking()
+                join message in DbContext.NotificationMessages.AsNoTracking()
+                    on notification.Id equals message.NotificationEventId
+                where notification.TenantId == tenantId && notification.EventNumber == eventNumber &&
+                      message.TenantId == tenantId && message.CustomerId == aggregate.Order.CustomerId &&
+                      message.ChannelType == "IN_APP"
+                select message.MessageStatus).FirstOrDefaultAsync(cancellationToken) ?? "NOT_SENT";
+        }
         return PosOnlineOrderPickingRepositoryResult.QuerySuccess(new PosOnlineOrderPickingResponse
         {
+            SalesOrderStatus = aggregate.Order.Status,
+            FulfillmentStatus = aggregate.Fulfillment.FulfillmentStatus,
+            PickupStatus = pickup?.PickupStatus,
+            ReadyAt = aggregate.Fulfillment.ReadyAt,
+            CollectedAt = pickup?.CollectedAt,
+            CollectionEndAt = aggregate.Order.RequestedCollectionEndAt,
+            CollectionTimezone = aggregate.Order.CollectionTimezoneSnapshot,
+            IssueCount = lines.Count(x => x.HasReportedIssue),
+            ReadyNotificationStatus = readyNotificationStatus,
             OrderId = aggregate.Order.Id,
             OrderNumber = aggregate.Order.OrderNumber,
             FulfillmentOrderId = aggregate.Fulfillment.Id,
@@ -148,7 +195,7 @@ public sealed class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBas
             TotalUnits = totalUnits,
             PickedUnits = pickedUnits,
             RemainingUnits = Math.Max(totalUnits - pickedUnits, 0m),
-            CanPack = lines.Count > 0 && pickedLines == lines.Count,
+            CanPack = canPack,
             FulfillmentVersion = aggregate.Fulfillment.RowVersion,
             ServerTime = serverTime,
             Lines = lines,
@@ -164,11 +211,17 @@ public sealed class PosOnlineOrderPickingRepository : CustomerOrderRepositoryBas
             request.ExpectedVersion, now, cancellationToken,
             async (aggregate, line, salesLine, sequence) =>
             {
-                if (request.InputMethod == "SCAN" &&
-                    (string.IsNullOrWhiteSpace(salesLine.BarcodeSnapshot) ||
-                     !string.Equals(salesLine.BarcodeSnapshot.Trim(), request.Barcode,
-                         StringComparison.OrdinalIgnoreCase)))
-                    return MutationResult.Failure("online_orders.invalid_barcode");
+                if (request.InputMethod is "SCAN" or "MANUAL")
+                {
+                    if (string.IsNullOrWhiteSpace(salesLine.BarcodeSnapshot))
+                        return MutationResult.Failure("online_orders.barcode_snapshot_unavailable");
+
+                    if (!string.Equals(
+                            salesLine.BarcodeSnapshot.Trim(),
+                            request.Barcode,
+                            StringComparison.OrdinalIgnoreCase))
+                        return MutationResult.Failure("online_orders.invalid_barcode");
+                }
 
                 try
                 {

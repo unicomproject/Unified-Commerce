@@ -37,6 +37,7 @@ public static class TenantRoleSetupCatalog
     private static readonly HashSet<string> LegacyCashierAllowedPermissionCodes =
         new(StringComparer.OrdinalIgnoreCase)
         {
+            WorkspacePermissions.PosAccess,
             PosPermissions.Home.View,
             PosPermissions.Home.ViewDashboard,
             PosPermissions.NewSale.View,

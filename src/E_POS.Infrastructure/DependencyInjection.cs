@@ -74,7 +74,11 @@ using E_POS.Infrastructure.Modules.Tenant.Discount.Repositories;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts;
 using E_POS.Infrastructure.Modules.ECommerce.Customer.Repositories;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Payment.Contracts;
+using E_POS.Application.Modules.ECommerce.CartCheckout.Payment.Services;
 using E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Repositories;
+using E_POS.Infrastructure.Modules.ECommerce.CartCheckout.Payment;
+using E_POS.Infrastructure.Modules.Shared.Payment.Options;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.Customer.Contracts.Interfaces;
 using E_POS.Application.Modules.ECommerce.CustomerAuth.Contracts.Services;
@@ -367,6 +371,11 @@ public static class DependencyInjection
         services.AddScoped<IStorefrontCheckoutRepository>(provider => new StorefrontCheckoutRepository(
             provider.GetRequiredService<IStorefrontCheckoutSessionRepository>(),
             provider.GetRequiredService<IStorefrontCheckoutConfirmationRepository>()));
+        services.AddOptions<StripeOptions>()
+            .Bind(configuration.GetSection(StripeOptions.SectionName));
+        services.AddScoped<IOnlineCheckoutPaymentGateway, StripeCheckoutGateway>();
+        services.AddScoped<IOnlineCheckoutPaymentConfirmationRepository, OnlineCheckoutPaymentConfirmationRepository>();
+        services.AddScoped<IOnlineCheckoutPaymentConfirmationService, OnlineCheckoutPaymentConfirmationService>();
         services.AddSingleton<IStorefrontAutocompleteService, StorefrontAutocompleteService>();
         services.AddHostedService<AutocompleteInitializationHostedService>();
         services.AddScoped<ICustomerRegistrationRepository, CustomerRegistrationRepository>();
@@ -387,6 +396,9 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderDetailRepository, PosOnlineOrderDetailRepository>();
         services.AddScoped<IPosOnlineOrderStartFulfillmentRepository, PosOnlineOrderStartFulfillmentRepository>();
         services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
+        services.AddScoped<IPosOnlineOrderReadyRepository, PosOnlineOrderPickingRepository>();
+        services.AddScoped<IPosOnlineOrderPackingRepository, PosOnlineOrderPackingRepository>();
+        services.AddScoped<IPosOnlineOrderPickupVerificationRepository, PosOnlineOrderPickupVerificationRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
         services.AddScoped<IPaymentMethodExecutionCapability, CashPaymentExecutionCapability>();
         services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();

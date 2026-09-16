@@ -188,6 +188,15 @@ public sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sales
             .HasMaxLength(40)
             .IsRequired();
 
+        builder.Property(x => x.ReturnPolicyVersionIdSnapshot)
+            .HasColumnName("return_policy_version_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.ReturnPolicySnapshot)
+            .HasColumnName("return_policy_snapshot")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)

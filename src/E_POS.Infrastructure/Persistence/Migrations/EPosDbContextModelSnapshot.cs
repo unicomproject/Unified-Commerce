@@ -2086,6 +2086,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_fulfillment_orders_e767fb12");
 
+                    b.HasIndex("TenantId", "SalesOrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fulfillment_orders_sales_order");
+
                     b.ToTable("fulfillment_orders", null, t =>
                         {
                             t.HasCheckConstraint("ck_fulfillment_orders_row_version", "row_version >= 1");
@@ -2280,6 +2284,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("document_number_sequence_id");
 
+                    b.Property<int>("FailedVerificationAttempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("failed_verification_attempts");
+
                     b.Property<Guid>("FulfillmentOrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("fulfillment_order_id");
@@ -2377,6 +2387,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("pickup_orders", null, t =>
                         {
+                            t.HasCheckConstraint("ck_pickup_orders_failed_verification_attempts", "failed_verification_attempts >= 0");
+
                             t.HasCheckConstraint("ck_pickup_orders_qr_version", "pickup_qr_version IS NULL OR pickup_qr_version > 0");
 
                             t.HasCheckConstraint("ck_pickup_orders_status", "pickup_status IN ('PENDING', 'READY', 'VERIFIED', 'COLLECTED', 'CANCELLED', 'EXPIRED')");
@@ -14399,6 +14411,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("allow_defective_return");
 
+                    b.Property<Guid>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_token");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -14420,6 +14437,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("is_default_policy");
+
+                    b.Property<string>("LifecycleStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("PUBLISHED")
+                        .HasColumnName("lifecycle_status");
 
                     b.Property<bool>("RequiresManagerApproval")
                         .ValueGeneratedOnAdd()
@@ -14449,6 +14474,24 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("return_window_days");
 
+                    b.Property<bool>("ReviewRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("review_required");
+
+                    b.Property<DateTimeOffset?>("SeededAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("seeded_at");
+
+                    b.Property<Guid?>("SourceTemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_template_id");
+
+                    b.Property<int?>("SourceTemplateVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_template_version");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -14467,16 +14510,29 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("updated_by_tenant_user_id");
 
+                    b.Property<int>("VersionNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version_number");
+
                     b.HasKey("Id")
                         .HasName("pk_return_policies");
 
                     b.HasIndex("CreatedByTenantUserId");
+
+                    b.HasIndex("SourceTemplateId");
 
                     b.HasIndex("UpdatedByTenantUserId");
 
                     b.HasIndex("TenantId", "Id")
                         .IsUnique()
                         .HasDatabaseName("uq_return_policies_tenant_id_id");
+
+                    b.HasIndex("TenantId", "IsDefaultPolicy")
+                        .IsUnique()
+                        .HasDatabaseName("uq_return_policies_tenant_default")
+                        .HasFilter("is_default_policy = true AND status != 'DELETED'");
 
                     b.HasIndex("TenantId", "ReturnPolicyCode")
                         .IsUnique()
@@ -14499,15 +14555,60 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AllowDefectiveReturn")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("allow_defective_return");
+
+                    b.Property<Guid>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_token");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<int?>("ExchangeWindowDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("exchange_window_days");
+
+                    b.Property<bool>("IsPlatformDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_platform_default");
+
+                    b.Property<string>("LifecycleStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("DRAFT")
+                        .HasColumnName("lifecycle_status");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)")
                         .HasColumnName("name");
+
+                    b.Property<bool>("RequiresManagerApproval")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("requires_manager_approval");
+
+                    b.Property<bool>("RequiresReceipt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("requires_receipt");
 
                     b.Property<int?>("ReturnWindowDays")
                         .HasColumnType("integer")
@@ -14529,8 +14630,19 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<int>("VersionNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version_number");
+
                     b.HasKey("Id")
                         .HasName("pk_return_policy_templates");
+
+                    b.HasIndex("IsPlatformDefault")
+                        .IsUnique()
+                        .HasDatabaseName("uq_return_policy_templates_platform_default")
+                        .HasFilter("is_platform_default = true AND status = 'ACTIVE'");
 
                     b.HasIndex("TemplateCode")
                         .IsUnique()
@@ -14538,6 +14650,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("return_policy_templates", null, t =>
                         {
+                            t.HasCheckConstraint("ck_return_policy_templates_exchange_window_days", "exchange_window_days IS NULL OR exchange_window_days >= 0");
+
+                            t.HasCheckConstraint("ck_return_policy_templates_lifecycle_status", "lifecycle_status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')");
+
                             t.HasCheckConstraint("ck_return_policy_templates_return_window_days", "return_window_days IS NULL OR return_window_days >= 0");
 
                             t.HasCheckConstraint("ck_return_policy_templates_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
@@ -20102,6 +20218,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<string>("TermsSnapshot")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("terms_snapshot");
+
+                    b.Property<Guid?>("TermsVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("terms_version_id");
+
                     b.Property<Guid?>("TillId")
                         .HasColumnType("uuid")
                         .HasColumnName("till_id");
@@ -20524,6 +20648,14 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("quantity");
+
+                    b.Property<string>("ReturnPolicySnapshot")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("return_policy_snapshot");
+
+                    b.Property<Guid?>("ReturnPolicyVersionIdSnapshot")
+                        .HasColumnType("uuid")
+                        .HasColumnName("return_policy_version_id");
 
                     b.Property<decimal>("ReturnedQuantity")
                         .ValueGeneratedOnAdd()
@@ -21054,11 +21186,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(150)")
                         .HasColumnName("tax_name_snapshot");
 
-                    b.Property<string>("TaxTreatmentSnapshot")
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasColumnName("tax_treatment_snapshot");
-
                     b.Property<string>("TaxRateCodeSnapshot")
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)")
@@ -21072,6 +21199,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrecision(7, 4)
                         .HasColumnType("numeric(7,4)")
                         .HasColumnName("tax_rate_percent");
+
+                    b.Property<string>("TaxTreatmentSnapshot")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("tax_treatment_snapshot");
 
                     b.Property<decimal>("TaxableAmount")
                         .HasPrecision(18, 4)
@@ -24083,6 +24215,7 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_classes", null, t =>
                         {
                             t.HasCheckConstraint("ck_tax_classes_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+
                             t.HasCheckConstraint("ck_tax_classes_tax_treatment", "tax_treatment IN ('TAXABLE', 'ZERO_RATED', 'EXEMPT')");
                         });
                 });
@@ -29525,6 +29658,12 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CreatedByTenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_return_policies_created_by_tenant_user_id_tenant_users");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicyTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("SourceTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_return_policies_source_template");
 
                     b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
                         .WithMany()

@@ -38,7 +38,23 @@ public sealed class ReturnPolicyTemplateRepository : IReturnPolicyTemplateReposi
         }
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query.OrderBy(x => x.TemplateCode).Skip((pageNumber - 1) * pageSize).Take(pageSize)
-            .Select(x => new ReturnPolicyTemplateSummaryResponse(x.Id, x.TemplateCode, x.Name, x.ReturnWindowDays, x.Status, x.CreatedAt, x.UpdatedAt))
+            .Select(x => new ReturnPolicyTemplateSummaryResponse(
+                x.Id,
+                x.TemplateCode,
+                x.Name,
+                x.Description,
+                x.ReturnWindowDays,
+                x.ExchangeWindowDays,
+                x.RequiresReceipt,
+                x.AllowDefectiveReturn,
+                x.RequiresManagerApproval,
+                x.IsPlatformDefault,
+                x.VersionNumber,
+                x.LifecycleStatus,
+                x.ConcurrencyToken,
+                x.Status,
+                x.CreatedAt,
+                x.UpdatedAt))
             .ToListAsync(cancellationToken);
         return new ReturnPolicyTemplateListResponse(items, pageNumber, pageSize, totalCount);
     }
@@ -47,13 +63,51 @@ public sealed class ReturnPolicyTemplateRepository : IReturnPolicyTemplateReposi
     {
         return _dbContext.ReturnPolicyTemplates.AsNoTracking()
             .Where(x => x.Id == templateId && (includeDeleted || x.Status != ReturnPolicyTemplateConstants.DeletedStatus))
-            .Select(x => new ReturnPolicyTemplateResponse(x.Id, x.TemplateCode, x.Name, x.ReturnWindowDays, x.Status, x.CreatedAt, x.UpdatedAt))
+            .Select(x => new ReturnPolicyTemplateResponse(
+                x.Id,
+                x.TemplateCode,
+                x.Name,
+                x.Description,
+                x.ReturnWindowDays,
+                x.ExchangeWindowDays,
+                x.RequiresReceipt,
+                x.AllowDefectiveReturn,
+                x.RequiresManagerApproval,
+                x.IsPlatformDefault,
+                x.VersionNumber,
+                x.LifecycleStatus,
+                x.ConcurrencyToken,
+                x.Status,
+                x.CreatedAt,
+                x.UpdatedAt))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
     public Task<ReturnPolicyTemplate?> GetEditableAsync(Guid templateId, CancellationToken cancellationToken)
     {
         return _dbContext.ReturnPolicyTemplates.FirstOrDefaultAsync(x => x.Id == templateId && x.Status != ReturnPolicyTemplateConstants.DeletedStatus, cancellationToken);
+    }
+
+    public Task<ReturnPolicyTemplate?> GetDefaultPublishedTemplateAsync(CancellationToken cancellationToken)
+    {
+        return _dbContext.ReturnPolicyTemplates.AsNoTracking()
+            .Where(x => x.IsPlatformDefault &&
+                        x.LifecycleStatus == ReturnPolicyTemplateConstants.LifecycleStatusPublished &&
+                        x.Status == ReturnPolicyTemplateConstants.ActiveStatus)
+            .OrderByDescending(x => x.VersionNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task ClearPlatformDefaultsAsync(Guid? excludeTemplateId, CancellationToken cancellationToken)
+    {
+        var existingDefaults = await _dbContext.ReturnPolicyTemplates
+            .Where(x => x.IsPlatformDefault && (!excludeTemplateId.HasValue || x.Id != excludeTemplateId.Value))
+            .ToListAsync(cancellationToken);
+
+        foreach (var def in existingDefaults)
+        {
+            def.UnsetDefault(DateTimeOffset.UtcNow);
+        }
     }
 
     public async Task AddAsync(ReturnPolicyTemplate template, CancellationToken cancellationToken)

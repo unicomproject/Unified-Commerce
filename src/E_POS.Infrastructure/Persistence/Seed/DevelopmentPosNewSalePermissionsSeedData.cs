@@ -37,6 +37,7 @@ public static class DevelopmentPosNewSalePermissionsSeedData
         new(Guid.Parse("77777777-0314-4000-8000-000000000001"), SalesPermissions.Park.Create, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId, "park_create", "Park a POS sale for later."),
         new(Guid.Parse("77777777-0315-4000-8000-000000000001"), SalesPermissions.Park.View, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId, "park_view", "View parked POS sales."),
         new(Guid.Parse("77777777-0333-4000-8000-000000000001"), SalesPermissions.Park.Recall, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId, "park_recall", "Recall parked POS sales."),
+        new(Guid.Parse("77777777-0399-4000-8000-000000000001"), WorkspacePermissions.PosAccess, ModuleId, DevelopmentPosPermissionCatalogSeedConstants.PosCheckoutFeatureId, "access", "Land in the POS workspace after sign-in."),
     ];
 
     public static IReadOnlyList<string> CashierPermissionCodes { get; } =

@@ -24,6 +24,7 @@ public static class PlatformTenantFeatureCodes
     public const string TenantProfile = "tenant_profile";
     public const string RoleManagement = "role_management";
     public const string PermissionManagement = "permission_management";
+    public const string CommerceReturnsRefunds = "commerce.returns_refunds";
 
     /// <summary>
     /// Temporary Phase 1 compatibility alias for outlet management.
@@ -50,7 +51,8 @@ public static class PlatformTenantFeatureCodes
             [TenantSettings] = TenantSettings,
             [TenantProfile] = TenantProfile,
             [RoleManagement] = RoleManagement,
-            [PermissionManagement] = PermissionManagement
+            [PermissionManagement] = PermissionManagement,
+            [CommerceReturnsRefunds] = CommerceReturnsRefunds
         };
 
     private static readonly Dictionary<string, IReadOnlyList<string>> LegacyAliasesByCanonical =

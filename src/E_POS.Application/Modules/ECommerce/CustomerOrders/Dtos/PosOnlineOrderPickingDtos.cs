@@ -55,6 +55,8 @@ public sealed class PosOnlineOrderPickingLineResponse
     public string? LocationName { get; init; }
     public decimal RequestedQuantity { get; init; }
     public decimal PickedQuantity { get; init; }
+    public decimal PackedQuantity { get; init; }
+    public decimal CancelledQuantity { get; init; }
     public decimal RemainingQuantity { get; init; }
     public string Status { get; init; } = string.Empty;
     public bool HasReportedIssue { get; init; }
@@ -62,6 +64,16 @@ public sealed class PosOnlineOrderPickingLineResponse
 
 public sealed class PosOnlineOrderPickingResponse
 {
+    public string SalesOrderStatus { get; init; } = string.Empty;
+    public string FulfillmentStatus { get; init; } = string.Empty;
+    public string? PickupStatus { get; init; }
+    public DateTimeOffset? ReadyAt { get; init; }
+    public DateTimeOffset? CollectedAt { get; init; }
+    public DateTimeOffset? CollectionEndAt { get; init; }
+    public string? CollectionTimezone { get; init; }
+    public int IssueCount { get; init; }
+    public string? ReadyNotificationStatus { get; init; }
+    public decimal PendingUnits => RemainingUnits;
     public Guid OrderId { get; init; }
     public string OrderNumber { get; init; } = string.Empty;
     public Guid FulfillmentOrderId { get; init; }

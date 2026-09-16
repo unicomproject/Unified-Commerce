@@ -16,6 +16,9 @@ public sealed class ClickCollectOrdersController : ControllerBase
     private readonly IPosOnlineOrderDetailService _detailService;
     private readonly IPosOnlineOrderStartFulfillmentService _startFulfillmentService;
     private readonly IPosOnlineOrderPickingService _pickingService;
+    private readonly IPosOnlineOrderPackingService _packingService;
+    private readonly IPosOnlineOrderReadyService _readyService;
+    private readonly IPosOnlineOrderPickupVerificationService _pickupVerificationService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
     public ClickCollectOrdersController(
@@ -23,13 +26,42 @@ public sealed class ClickCollectOrdersController : ControllerBase
         IPosOnlineOrderDetailService detailService,
         IPosOnlineOrderStartFulfillmentService startFulfillmentService,
         IPosOnlineOrderPickingService pickingService,
-        ITenantRequestContextFactory tenantRequestContextFactory)
+        IPosOnlineOrderPackingService packingService,
+        ITenantRequestContextFactory tenantRequestContextFactory,
+        IPosOnlineOrderReadyService readyService,
+        IPosOnlineOrderPickupVerificationService pickupVerificationService)
     {
         _service = service;
         _detailService = detailService;
         _startFulfillmentService = startFulfillmentService;
         _pickingService = pickingService;
+        _packingService = packingService;
+        _readyService = readyService;
+        _pickupVerificationService = pickupVerificationService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
+    }
+
+    [HttpPost("{orderId:guid}/notify-ready")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> NotifyReady(
+        [FromRoute] Guid orderId, [FromQuery] Guid outletId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "online_orders.invalid_tenant_context", "Invalid tenant context.")));
+        var result = await _readyService.NotifyAsync(context, outletId, orderId, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+            return Ok(new { success = true, message = "Customer notification recorded.", data = result.Value });
+        return result.Error.Code == "online_orders.notification_failed"
+            ? StatusCode(StatusCodes.Status503ServiceUnavailable, CreateError(result.Error))
+            : ToPickingErrorResult(result.Error);
     }
 
     [HttpGet("{orderId:guid}/picking")]
@@ -125,6 +157,117 @@ public sealed class ClickCollectOrdersController : ControllerBase
         return result.IsSuccess && result.Value is not null
             ? Ok(new { success = true, message = "Picking note added successfully.", data = result.Value })
             : ToPickingErrorResult(result.Error);
+    }
+
+    [HttpPost("{orderId:guid}/pack")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Pack(
+        [FromRoute] Guid orderId,
+        [FromQuery] Guid outletId,
+        [FromBody] PosOnlineOrderPackRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "online_orders.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _packingService.PackAsync(
+            context, outletId, orderId, request, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { success = true, message = "Order packed successfully.", data = result.Value })
+            : ToPackingErrorResult(result.Error);
+    }
+
+    [HttpPost("{orderId:guid}/ready")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> MarkReady(
+        [FromRoute] Guid orderId,
+        [FromQuery] Guid outletId,
+        [FromBody] PosOnlineOrderReadyRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "online_orders.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _packingService.MarkReadyAsync(
+            context, outletId, orderId, request, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { success = true, message = "Order marked ready for collection.", data = result.Value })
+            : ToPackingErrorResult(result.Error);
+    }
+
+    [HttpPost("{orderId:guid}/pickup/verify")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> VerifyPickup(
+        [FromRoute] Guid orderId,
+        [FromQuery] Guid outletId,
+        [FromBody] PosOnlineOrderPickupVerifyRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "online_orders.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _pickupVerificationService.VerifyAsync(
+            context, outletId, orderId, request, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Ok(new
+            {
+                success = true,
+                message = "Pickup code verified successfully.",
+                data = result.Value
+            });
+        }
+
+        return ToPickupErrorResult(result.Error);
+    }
+
+    [HttpPost("{orderId:guid}/pickup/collect")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CompleteCollection(
+        [FromRoute] Guid orderId,
+        [FromQuery] Guid outletId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "online_orders.invalid_tenant_context", "Invalid tenant context.")));
+
+        var result = await _pickupVerificationService.CollectAsync(
+            context, outletId, orderId, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            return Ok(new
+            {
+                success = true,
+                message = "Order marked as collected.",
+                data = result.Value
+            });
+        }
+
+        return ToPickupErrorResult(result.Error);
     }
 
     [HttpGet]
@@ -324,6 +467,35 @@ public sealed class ClickCollectOrdersController : ControllerBase
         "online_orders.not_found" => NotFound(CreateError(error)),
         "online_orders.concurrency_conflict" or
         "online_orders.invalid_state" => Conflict(CreateError(error)),
+        _ => BadRequest(CreateError(error))
+    };
+
+    private IActionResult ToPickupErrorResult(ApplicationError error) => error.Code switch
+    {
+        "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),
+        "online_orders.permission_denied" or
+        "online_orders.feature_not_entitled" or
+        "online_orders.outlet_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+        "online_orders.not_found" => NotFound(CreateError(error)),
+        "online_orders.invalid_state" or
+        "online_orders.pickup_code_expired" or
+        "online_orders.pickup_code_mismatch" or
+        "online_orders.pickup_verification_locked" => Conflict(CreateError(error)),
+        _ => BadRequest(CreateError(error))
+    };
+
+    private IActionResult ToPackingErrorResult(ApplicationError error) => error.Code switch
+    {
+        "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),
+        "online_orders.permission_denied" or
+        "online_orders.feature_not_entitled" or
+        "online_orders.outlet_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+        "online_orders.not_found" => NotFound(CreateError(error)),
+        "online_orders.concurrency_conflict" or
+        "online_orders.invalid_state" or
+        "online_orders.not_packable" or
+        "online_orders.not_readyable" or
+        "online_orders.invalid_pickup" => Conflict(CreateError(error)),
         _ => BadRequest(CreateError(error))
     };
 

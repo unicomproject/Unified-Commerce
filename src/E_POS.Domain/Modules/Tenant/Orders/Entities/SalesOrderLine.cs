@@ -35,6 +35,8 @@ public class SalesOrderLine : AuditableEntity
     public decimal LineDiscountAmount { get; protected set; }
     public decimal LineTaxAmount { get; protected set; }
     public string LineStatus { get; protected set; } = string.Empty;
+    public Guid? ReturnPolicyVersionIdSnapshot { get; protected set; }
+    public string? ReturnPolicySnapshot { get; protected set; }
 
     public static SalesOrderLine CreateForPosSale(
         Guid id,
@@ -209,6 +211,7 @@ public class SalesOrderLine : AuditableEntity
         Guid? productVariantId,
         Guid uomId,
         string? skuSnapshot,
+        string? barcodeSnapshot,
         string productNameSnapshot,
         string? variantNameSnapshot,
         string uomCodeSnapshot,
@@ -237,6 +240,7 @@ public class SalesOrderLine : AuditableEntity
             ProductVariantId = productVariantId,
             UomId = uomId,
             SkuSnapshot = string.IsNullOrWhiteSpace(skuSnapshot) ? null : skuSnapshot.Trim(),
+            BarcodeSnapshot = string.IsNullOrWhiteSpace(barcodeSnapshot) ? null : barcodeSnapshot.Trim(),
             ProductNameSnapshot = productNameSnapshot.Trim(),
             VariantNameSnapshot = string.IsNullOrWhiteSpace(variantNameSnapshot) ? null : variantNameSnapshot.Trim(),
             UomCodeSnapshot = uomCodeSnapshot.Trim().ToUpperInvariant(),

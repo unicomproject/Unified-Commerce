@@ -152,7 +152,7 @@ public static class DevelopmentClickCollectOrderStatusSeedData
         )
         INSERT INTO sales_order_lines (
             id, tenant_id, sales_order_id, line_number, product_id, product_variant_id,
-            uom_id, sku_snapshot, product_name_snapshot, uom_code_snapshot, uom_name_snapshot,
+            uom_id, sku_snapshot, barcode_snapshot, product_name_snapshot, uom_code_snapshot, uom_name_snapshot,
             product_type_snapshot, product_structure_snapshot, quantity, original_unit_price,
             unit_price, line_subtotal_amount, line_discount_amount, line_tax_amount,
             line_total_amount, fulfilled_quantity, cancelled_quantity, returned_quantity,
@@ -167,6 +167,16 @@ public static class DevelopmentClickCollectOrderStatusSeedData
             seed_orders.product_variant_id,
             '91000000-0000-4000-8000-000000000001'::uuid,
             seed_orders.sku,
+            (
+                SELECT pb.barcode
+                FROM product_barcodes pb
+                WHERE pb.tenant_id = '55555555-0000-4000-8000-000000000001'::uuid
+                  AND pb.product_variant_id = seed_orders.product_variant_id
+                  AND pb.is_primary_barcode = TRUE
+                  AND pb.status = 'ACTIVE'
+                ORDER BY pb.id
+                LIMIT 1
+            ),
             seed_orders.product_name,
             'PCS',
             'Pieces',
@@ -190,6 +200,7 @@ public static class DevelopmentClickCollectOrderStatusSeedData
         SET product_id = EXCLUDED.product_id,
             product_variant_id = EXCLUDED.product_variant_id,
             sku_snapshot = EXCLUDED.sku_snapshot,
+            barcode_snapshot = COALESCE(EXCLUDED.barcode_snapshot, sales_order_lines.barcode_snapshot),
             product_name_snapshot = EXCLUDED.product_name_snapshot,
             quantity = EXCLUDED.quantity,
             original_unit_price = EXCLUDED.original_unit_price,

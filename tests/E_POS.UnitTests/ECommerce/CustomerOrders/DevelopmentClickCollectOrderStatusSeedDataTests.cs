@@ -85,4 +85,33 @@ public sealed class DevelopmentClickCollectOrderStatusSeedDataTests
         Assert.DoesNotContain("DELETE FROM", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ALTER TABLE", sql, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void HistoricalUpSql_CapturesBarcodeSnapshotFromPrimaryProductBarcode()
+    {
+        var sql = DevelopmentClickCollectOrderStatusSeedData.UpSql;
+        Assert.Contains("barcode_snapshot", sql, StringComparison.Ordinal);
+        Assert.Contains("product_barcodes", sql, StringComparison.Ordinal);
+        Assert.Contains("is_primary_barcode", sql, StringComparison.Ordinal);
+        Assert.Contains("COALESCE(EXCLUDED.barcode_snapshot, sales_order_lines.barcode_snapshot)", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BarcodeSnapshotRepairSql_IsGeneralizedFixtureRepairWithoutSingleOrderHardcode()
+    {
+        var sql = DevelopmentClickCollectBarcodeSnapshotRepairSeedData.RepairSql;
+        Assert.Contains("barcode_snapshot", sql, StringComparison.Ordinal);
+        Assert.Contains("product_barcodes", sql, StringComparison.Ordinal);
+        Assert.Contains("ECOMM-SEED-%", sql, StringComparison.Ordinal);
+        Assert.Contains("OVZ-ECOMM-SEED-%", sql, StringComparison.Ordinal);
+        Assert.Contains("is_primary_barcode", sql, StringComparison.Ordinal);
+        Assert.Contains("COUNT(DISTINCT pb2.barcode)", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("ECOMM-SEED-ACCEPTED-001", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("ECOMM-SEED-ACCEPTED-002", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("ECOMM-SEED-ACCEPTED-003", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("MER-012", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("2000000001210", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("DELETE FROM", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ALTER TABLE", sql, StringComparison.OrdinalIgnoreCase);
+    }
 }

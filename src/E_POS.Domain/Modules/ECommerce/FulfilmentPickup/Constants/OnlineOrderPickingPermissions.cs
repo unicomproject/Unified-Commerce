@@ -18,6 +18,10 @@ public static class OnlineOrderPickingPermissions
     public const string PackingView = "commerce.online_order.packing.view";
     public const string PackingPack = "commerce.online_order.packing.pack";
     public const string CollectionMarkReady = "commerce.online_order.collection.mark_ready";
+    public const string CollectionViewReady = "commerce.online_order.collection.view_ready";
+    public const string CollectionNotifyCustomer = "commerce.online_order.collection.notify_customer";
+    public const string CollectionVerify = "commerce.online_order.collection.verify";
+    public const string CollectionComplete = "commerce.online_order.collection.complete";
 
     /// <summary>American misspelling — must never be treated as a real permission.</summary>
     public const string FulfilmentStartWrongSpelling = "commerce.online_order.fulfillment.start";
@@ -35,6 +39,8 @@ public static class OnlineOrderPickingPermissions
         PickingNote,
         PackingView,
         PackingPack,
-        CollectionMarkReady
+        CollectionMarkReady,
+        CollectionVerify,
+        CollectionComplete
     ];
 }

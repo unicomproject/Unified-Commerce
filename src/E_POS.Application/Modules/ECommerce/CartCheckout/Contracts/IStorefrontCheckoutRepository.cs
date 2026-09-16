@@ -41,6 +41,15 @@ public interface IStorefrontCheckoutConfirmationRepository
         Guid customerId,
         Guid checkoutSessionId,
         string idempotencyKey,
+        string paymentMethodCode,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<bool> CancelAwaitingOnlinePaymentAsync(
+        Guid tenantId,
+        Guid salesOrderId,
+        Guid salesPaymentId,
+        string reason,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }

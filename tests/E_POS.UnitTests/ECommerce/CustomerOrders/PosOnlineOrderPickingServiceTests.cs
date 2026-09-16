@@ -33,6 +33,23 @@ public sealed class PosOnlineOrderPickingServiceTests
     }
 
     [Fact]
+    public async Task GetAsync_RequiresOrdersViewPermission()
+    {
+        var repository = new FakeRepository();
+        var service = CreateService(repository);
+
+        var result = await service.GetAsync(
+            new TenantRequestContext(TenantId, UserId,
+                [PosOnlineOrderPickingService.AccessPermission,
+                 PosOnlineOrderPickingService.ViewPermission]),
+            OutletId, OrderId, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("online_orders.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.QueryCalls);
+    }
+
+    [Fact]
     public async Task PickLine_ScanRequiresPickAndScanPermissions()
     {
         var repository = new FakeRepository();
@@ -105,6 +122,51 @@ public sealed class PosOnlineOrderPickingServiceTests
         Assert.Equal("SCAN", repository.PickRequest?.InputMethod);
         Assert.Equal(7, repository.PickRequest?.ExpectedVersion);
         Assert.Equal(Now, repository.Now);
+    }
+
+    [Theory]
+    [InlineData("SCAN")]
+    [InlineData("MANUAL")]
+    public async Task PickLine_ScanAndManualRequireBarcode(string inputMethod)
+    {
+        var repository = new FakeRepository();
+        var service = CreateService(repository);
+        var inputPermission = inputMethod == "SCAN"
+            ? PosOnlineOrderPickingService.ScanPermission
+            : PosOnlineOrderPickingService.ManualEntryPermission;
+
+        var result = await service.PickLineAsync(
+            Context(PosOnlineOrderPickingService.AccessPermission,
+                PosOnlineOrderPickingService.PickPermission, inputPermission),
+            OutletId, OrderId, LineId,
+            new PosOnlineOrderPickLineRequest
+            {
+                Quantity = 1,
+                Barcode = "   ",
+                InputMethod = inputMethod,
+                ExpectedVersion = 7
+            }, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("online_orders.invalid_barcode", result.Error.Code);
+        Assert.Equal(0, repository.PickCalls);
+    }
+
+    [Fact]
+    public async Task PickLine_AuthorizedManual_ForwardsTrimmedBarcode()
+    {
+        var repository = new FakeRepository();
+        var service = CreateService(repository);
+
+        var result = await service.PickLineAsync(
+            Context(PosOnlineOrderPickingService.AccessPermission,
+                PosOnlineOrderPickingService.PickPermission,
+                PosOnlineOrderPickingService.ManualEntryPermission),
+            OutletId, OrderId, LineId, PickRequest("manual"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("MANUAL", repository.PickRequest?.InputMethod);
+        Assert.Equal("012345", repository.PickRequest?.Barcode);
     }
 
     [Fact]
@@ -202,7 +264,25 @@ public sealed class PosOnlineOrderPickingServiceTests
     };
 
     private static TenantRequestContext Context(params string[] permissions) =>
-        new(TenantId, UserId, permissions);
+        new(TenantId, UserId,
+            permissions.Append(PosOnlineOrderPickingService.OrdersViewPermission).Distinct().ToArray());
+
+    [Theory]
+    [InlineData("READY", "commerce.online_order.collection.view_ready", true)]
+    [InlineData("READY", "commerce.online_order.picking.view", false)]
+    [InlineData("PICKING", "commerce.online_order.collection.view_ready", false)]
+    [InlineData("PACKED", "commerce.online_order.collection.view_ready", false)]
+    [InlineData("PICKING", "commerce.online_order.picking.view", true)]
+    [InlineData("PACKED", "commerce.online_order.picking.view", true)]
+    public async Task GetAsync_EnforcesStateSpecificPermission(string state, string permission, bool allowed)
+    {
+        var repository = new FakeRepository { State = state };
+        var result = await CreateService(repository).GetAsync(
+            Context(PosOnlineOrderPickingService.AccessPermission, permission),
+            OutletId, OrderId, CancellationToken.None);
+        Assert.Equal(allowed, result.IsSuccess);
+        if (!allowed) Assert.Equal("online_orders.permission_denied", result.Error.Code);
+    }
 
     private static PosOnlineOrderPickingService CreateService(FakeRepository repository, bool allowed = true) =>
         new(repository, new FakeEntitlements(allowed), new FakeClock());
@@ -229,6 +309,7 @@ public sealed class PosOnlineOrderPickingServiceTests
 
     private sealed class FakeRepository : IPosOnlineOrderPickingRepository
     {
+        public string State { get; init; } = "PICKING";
         public int QueryCalls { get; private set; }
         public int PickCalls { get; private set; }
         public int IssueCalls { get; private set; }
@@ -245,7 +326,7 @@ public sealed class PosOnlineOrderPickingServiceTests
             QueryCalls++;
             Now = serverTime;
             return Task.FromResult(PosOnlineOrderPickingRepositoryResult.QuerySuccess(
-                new PosOnlineOrderPickingResponse()));
+                new PosOnlineOrderPickingResponse { Status = State }));
         }
 
         public Task<PosOnlineOrderPickingRepositoryResult> PickLineAsync(

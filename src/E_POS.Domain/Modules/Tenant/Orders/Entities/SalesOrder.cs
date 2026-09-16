@@ -49,6 +49,8 @@ public class SalesOrder : AuditableEntity
     public string? CancellationReason { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+    public Guid? TermsVersionId { get; protected set; }
+    public string? TermsSnapshot { get; protected set; }
 
     public static SalesOrder CreateCompletedPosSale(
         Guid id,
@@ -410,6 +412,30 @@ public class SalesOrder : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void ApplyPosReadyForCollection(Guid updatedByTenantUserId, DateTimeOffset now)
+    {
+        if (!string.Equals(OrderType, "CLICK_AND_COLLECT", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Only click and collect orders can be marked ready from POS.");
+
+        if (string.Equals(Status, "CANCELLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "CANCELLED", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot mark a cancelled order ready for collection.");
+
+        if (string.Equals(Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "FULFILLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "COLLECTED", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot mark a collected order ready for collection.");
+
+        if (string.Equals(FulfillmentStatus, "READY_FOR_COLLECTION", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "READY", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Order is already ready for collection.");
+
+        Status = "ACCEPTED";
+        FulfillmentStatus = "READY_FOR_COLLECTION";
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
     public void CancelClickAndCollectByCustomer(
         string? reason,
         DateTimeOffset now)
@@ -500,6 +526,40 @@ public class SalesOrder : AuditableEntity
         RefundedAmount += amount;
         PaymentStatus = RefundedAmount >= TotalAmount ? "REFUNDED" : "PARTIALLY_REFUNDED";
         UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+    }
+
+    // Orders awaiting an online payment stay "UNPAID" (sales_orders.payment_status has a
+    // fixed CHECK constraint: UNPAID, PARTIALLY_PAID, PAID, PARTIALLY_REFUNDED, REFUNDED, FAILED —
+    // no "AWAITING_PAYMENT"/"CANCELLED" value exists at this level). The in-flight signal lives on
+    // the SalesPayment row instead (PaymentStatus = "PENDING", which that table's own constraint allows).
+    public void MarkOnlinePaymentSucceeded(decimal paidAmount, DateTimeOffset now)
+    {
+        if (!string.Equals(PaymentStatus, "UNPAID", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Cannot mark online payment succeeded from payment status {PaymentStatus}.");
+        }
+
+        PaidAmount = paidAmount;
+        BalanceDue = TotalAmount - paidAmount;
+        PaymentStatus = "PAID";
+        UpdatedAt = now;
+    }
+
+    public void CancelForFailedOnlinePayment(string? reason, DateTimeOffset now)
+    {
+        if (!string.Equals(PaymentStatus, "UNPAID", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cancel for failed online payment from payment status {PaymentStatus}.");
+        }
+
+        Status = "CANCELLED";
+        FulfillmentStatus = "CANCELLED";
+        PaymentStatus = "FAILED";
+        CancelledAt = now;
+        CancellationReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         UpdatedAt = now;
     }
 }

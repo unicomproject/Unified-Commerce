@@ -30,5 +30,6 @@ public interface IStorefrontCheckoutService
         Guid customerId,
         Guid checkoutSessionId,
         string? idempotencyKey,
+        string? paymentMethodCode,
         CancellationToken cancellationToken);
 }

@@ -99,6 +99,107 @@ public sealed class FulfillmentPickingDomainTests
         Assert.Equal(4, fulfillment.RowVersion);
     }
 
+    [Fact]
+    public void Pack_PickingMatchingVersion_TransitionsToPackedOnce()
+    {
+        var fulfillment = Fulfillment("PICKING", 4);
+
+        fulfillment.Pack(ActorId, 4, Now);
+
+        Assert.Equal("PACKED", fulfillment.FulfillmentStatus);
+        Assert.Equal(5, fulfillment.RowVersion);
+        Assert.Equal(Now, fulfillment.PackedAt);
+        Assert.Null(fulfillment.ReadyAt);
+    }
+
+    [Fact]
+    public void Pack_DoesNotMarkReady()
+    {
+        var fulfillment = Fulfillment("PICKING", 4);
+
+        fulfillment.Pack(ActorId, 4, Now);
+
+        Assert.Equal("PACKED", fulfillment.FulfillmentStatus);
+        Assert.Null(fulfillment.ReadyAt);
+    }
+
+    [Theory]
+    [InlineData("PACKED")]
+    [InlineData("READY")]
+    [InlineData("FULFILLED")]
+    [InlineData("CANCELLED")]
+    public void Pack_InvalidLifecycle_IsRejected(string status)
+    {
+        var fulfillment = Fulfillment(status, 4);
+
+        var error = Assert.Throws<InvalidOperationException>(() => fulfillment.Pack(ActorId, 4, Now));
+
+        Assert.Equal("FULFILLMENT_NOT_PACKABLE", error.Message);
+        Assert.Equal(4, fulfillment.RowVersion);
+    }
+
+    [Fact]
+    public void MarkReady_PackedMatchingVersion_TransitionsToReadyOnce()
+    {
+        var fulfillment = Fulfillment("PACKED", 6);
+        Set(fulfillment, nameof(FulfillmentOrder.PackedAt), Now.AddMinutes(-5));
+
+        fulfillment.MarkReady(ActorId, 6, Now);
+
+        Assert.Equal("READY", fulfillment.FulfillmentStatus);
+        Assert.Equal(7, fulfillment.RowVersion);
+        Assert.Equal(Now, fulfillment.ReadyAt);
+        Assert.Equal(Now.AddMinutes(-5), fulfillment.PackedAt);
+    }
+
+    [Fact]
+    public void MarkReady_FromPicking_IsRejected()
+    {
+        var fulfillment = Fulfillment("PICKING", 4);
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            fulfillment.MarkReady(ActorId, 4, Now));
+
+        Assert.Equal("FULFILLMENT_NOT_READYABLE", error.Message);
+        Assert.Equal(4, fulfillment.RowVersion);
+        Assert.Null(fulfillment.ReadyAt);
+    }
+
+    [Fact]
+    public void LinePack_SetsPackedQuantityEqualToPickedWithoutExceeding()
+    {
+        var line = Line(requested: 3, picked: 3);
+
+        line.Pack(ActorId, Now);
+
+        Assert.Equal(3, line.PackedQuantity);
+        Assert.Equal("PACKED", line.LineStatus);
+        Assert.Equal(ActorId, line.PackedByTenantUserId);
+    }
+
+    [Fact]
+    public void LinePack_WhenNotFullyPicked_IsRejected()
+    {
+        var line = Line(requested: 3, picked: 1);
+
+        var error = Assert.Throws<InvalidOperationException>(() => line.Pack(ActorId, Now));
+
+        Assert.Equal("FULFILLMENT_PACK_NOT_READY", error.Message);
+        Assert.Equal(0, line.PackedQuantity);
+    }
+
+    [Fact]
+    public void LinePack_FullyCancelledLine_AllowsZeroPackedQuantity()
+    {
+        var line = Line(requested: 2, picked: 0);
+        Set(line, nameof(FulfillmentOrderLine.CancelledQuantity), 2m);
+
+        line.Pack(ActorId, Now);
+
+        Assert.Equal(0, line.PackedQuantity);
+        Assert.Equal("PACKED", line.LineStatus);
+    }
+
     private static FulfillmentOrderLine Line(decimal requested, decimal picked)
     {
         var line = Create<FulfillmentOrderLine>();

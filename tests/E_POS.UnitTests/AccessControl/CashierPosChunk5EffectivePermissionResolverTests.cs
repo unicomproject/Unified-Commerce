@@ -261,7 +261,7 @@ public sealed class CashierPosChunk5EffectivePermissionResolverTests
     [Fact]
     public void CatalogSize_IsNotAutoGranted()
     {
-        Assert.Equal(344, CashierPosPermissionAssignmentRules.RoleAssignablePermissionCodes.Count);
+        Assert.Equal(348, CashierPosPermissionAssignmentRules.RoleAssignablePermissionCodes.Count);
         var effective = CashierPosEffectivePermissionResolver.Resolve(
         [
             PaymentPermissions.AcceptCash,

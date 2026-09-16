@@ -96,6 +96,7 @@ public sealed class StorefrontCheckoutController : ControllerBase
     public async Task<IActionResult> Confirm(
         [FromRoute] Guid sessionId,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        [FromBody] ConfirmStorefrontCheckoutRequest? request,
         CancellationToken cancellationToken)
     {
         if (!TryGetCustomerContext(out var tenantId, out var customerId))
@@ -106,6 +107,7 @@ public sealed class StorefrontCheckoutController : ControllerBase
             customerId,
             sessionId,
             idempotencyKey,
+            request?.PaymentMethodCode,
             cancellationToken);
         return result.IsSuccess && result.Value is not null
             ? Ok(new { success = true, message = "Checkout confirmed successfully.", data = result.Value })
@@ -137,7 +139,8 @@ public sealed class StorefrontCheckoutController : ControllerBase
             "storefront_checkout.session_expired" or
             "storefront_checkout.invalid_state" or
             "storefront_checkout.uom_not_configured" or
-            "storefront_checkout.sales_channel_not_configured" => Conflict(response),
+            "storefront_checkout.sales_channel_not_configured" or
+            "storefront_checkout.online_payment_unavailable" => Conflict(response),
             _ => BadRequest(response)
         };
     }

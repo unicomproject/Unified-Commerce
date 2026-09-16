@@ -19,6 +19,35 @@ public class FulfillmentOrderLine : AuditableEntity
 
     protected FulfillmentOrderLine() { }
 
+    public static FulfillmentOrderLine Create(
+        Guid id,
+        Guid tenantId,
+        Guid fulfillmentOrderId,
+        Guid salesOrderLineId,
+        decimal requestedQuantity,
+        decimal cancelledQuantity,
+        DateTimeOffset now)
+    {
+        if (requestedQuantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(requestedQuantity));
+
+        return new FulfillmentOrderLine
+        {
+            Id = id,
+            TenantId = tenantId,
+            FulfillmentOrderId = fulfillmentOrderId,
+            SalesOrderLineId = salesOrderLineId,
+            RequestedQuantity = requestedQuantity,
+            PickedQuantity = 0,
+            PackedQuantity = 0,
+            FulfilledQuantity = 0,
+            CancelledQuantity = cancelledQuantity,
+            LineStatus = "PENDING",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
     public void Pick(decimal quantity, Guid tenantUserId, DateTimeOffset now)
     {
         if (quantity <= 0)
@@ -33,6 +62,27 @@ public class FulfillmentOrderLine : AuditableEntity
         LineStatus = PickedQuantity + CancelledQuantity >= RequestedQuantity
             ? "PICKED"
             : "PARTIALLY_PICKED";
+        UpdatedAt = now;
+    }
+
+    public void Pack(Guid tenantUserId, DateTimeOffset now)
+    {
+        var effectiveRequired = RequestedQuantity - CancelledQuantity;
+        if (effectiveRequired < 0)
+            throw new InvalidOperationException("FULFILLMENT_PACK_QUANTITY_INVALID");
+
+        if (PickedQuantity < effectiveRequired)
+            throw new InvalidOperationException("FULFILLMENT_PACK_NOT_READY");
+
+        if (PackedQuantity > 0 && PackedQuantity >= PickedQuantity)
+            throw new InvalidOperationException("FULFILLMENT_ALREADY_PACKED");
+
+        PackedQuantity = PickedQuantity;
+        if (PackedQuantity > effectiveRequired)
+            throw new InvalidOperationException("FULFILLMENT_PACK_QUANTITY_EXCEEDED");
+
+        PackedByTenantUserId = tenantUserId;
+        LineStatus = "PACKED";
         UpdatedAt = now;
     }
 }

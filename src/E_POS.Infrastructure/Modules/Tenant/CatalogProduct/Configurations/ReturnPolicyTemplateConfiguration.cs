@@ -40,8 +40,53 @@ public sealed class ReturnPolicyTemplateConfiguration : IEntityTypeConfiguration
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasColumnType("text")
+            .IsRequired(false);
+
         builder.Property(x => x.ReturnWindowDays)
             .HasColumnName("return_window_days");
+
+        builder.Property(x => x.ExchangeWindowDays)
+            .HasColumnName("exchange_window_days");
+
+        builder.Property(x => x.RequiresReceipt)
+            .HasColumnName("requires_receipt")
+            .HasDefaultValue(true)
+            .IsRequired();
+
+        builder.Property(x => x.AllowDefectiveReturn)
+            .HasColumnName("allow_defective_return")
+            .HasDefaultValue(true)
+            .IsRequired();
+
+        builder.Property(x => x.RequiresManagerApproval)
+            .HasColumnName("requires_manager_approval")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(x => x.IsPlatformDefault)
+            .HasColumnName("is_platform_default")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(x => x.VersionNumber)
+            .HasColumnName("version_number")
+            .HasDefaultValue(1)
+            .IsRequired();
+
+        builder.Property(x => x.LifecycleStatus)
+            .HasColumnName("lifecycle_status")
+            .HasColumnType("varchar(30)")
+            .HasMaxLength(30)
+            .HasDefaultValue("DRAFT")
+            .IsRequired();
+
+        builder.Property(x => x.ConcurrencyToken)
+            .HasColumnName("concurrency_token")
+            .IsConcurrencyToken()
+            .IsRequired();
 
         builder.Property(x => x.Status)
             .HasColumnName("status")
@@ -53,10 +98,17 @@ public sealed class ReturnPolicyTemplateConfiguration : IEntityTypeConfiguration
             .IsUnique()
             .HasDatabaseName("uq_return_policy_templates_template_code");
 
+        builder.HasIndex(x => x.IsPlatformDefault)
+            .IsUnique()
+            .HasFilter("is_platform_default = true AND status = 'ACTIVE'")
+            .HasDatabaseName("uq_return_policy_templates_platform_default");
+
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_return_policy_templates_return_window_days", "return_window_days IS NULL OR return_window_days >= 0");
+            t.HasCheckConstraint("ck_return_policy_templates_exchange_window_days", "exchange_window_days IS NULL OR exchange_window_days >= 0");
             t.HasCheckConstraint("ck_return_policy_templates_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
+            t.HasCheckConstraint("ck_return_policy_templates_lifecycle_status", "lifecycle_status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')");
         });
     }
 }

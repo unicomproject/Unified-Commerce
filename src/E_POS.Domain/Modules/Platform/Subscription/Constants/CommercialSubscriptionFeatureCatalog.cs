@@ -27,6 +27,7 @@ public static class CommercialSubscriptionFeatureCatalog
             PlatformTenantFeatureCodes.SalesReports,
             PlatformTenantFeatureCodes.HardwareDeviceManagement,
             PlatformTenantFeatureCodes.OfflineOperationSync,
+            PlatformTenantFeatureCodes.CommerceReturnsRefunds,
             PlatformTenantFeatureCodes.OutletManagementLegacyAlias
         };
 

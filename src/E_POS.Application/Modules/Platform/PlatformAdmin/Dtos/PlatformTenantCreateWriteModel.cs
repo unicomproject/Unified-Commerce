@@ -56,6 +56,8 @@ public sealed class PlatformTenantCreateWriteModel
     public IReadOnlyList<IntegrationOutboxMessage> OnboardingOutboxMessages { get; init; } = [];
 
     public IReadOnlyList<TenantSetting> TenantSettings { get; init; } = [];
+
+    public E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ReturnPolicy? TenantDefaultReturnPolicy { get; init; }
 }
 
 

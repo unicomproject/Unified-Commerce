@@ -15,6 +15,44 @@ public class PickupSlot : AuditableEntity
     public string SlotStatus { get; protected set; } = string.Empty;
     public long RowVersion { get; protected set; }
 
+    protected PickupSlot() { }
+
+    public static PickupSlot CreateOpen(
+        Guid id,
+        Guid tenantId,
+        Guid fulfillmentMethodOutletId,
+        string slotCode,
+        DateOnly slotDate,
+        TimeOnly windowStart,
+        TimeOnly windowEnd,
+        int capacity,
+        DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(slotCode))
+            throw new ArgumentException("Slot code is required.", nameof(slotCode));
+        if (capacity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(capacity));
+        if (windowEnd <= windowStart)
+            throw new ArgumentOutOfRangeException(nameof(windowEnd), "Window end must be after window start.");
+
+        return new PickupSlot
+        {
+            Id = id,
+            TenantId = tenantId,
+            FulfillmentMethodOutletId = fulfillmentMethodOutletId,
+            SlotCode = slotCode.Trim(),
+            SlotDate = slotDate,
+            WindowStart = windowStart,
+            WindowEnd = windowEnd,
+            Capacity = capacity,
+            ReservedCount = 0,
+            SlotStatus = "OPEN",
+            RowVersion = 0,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
     public void Reserve(int capacity, DateTimeOffset now)
     {
         if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));

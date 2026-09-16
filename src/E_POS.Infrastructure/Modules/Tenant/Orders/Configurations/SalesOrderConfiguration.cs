@@ -248,6 +248,15 @@ public sealed class SalesOrderConfiguration : IEntityTypeConfiguration<SalesOrde
         builder.Property(x => x.UpdatedByTenantUserId)
             .HasColumnName("updated_by_tenant_user_id");
 
+        builder.Property(x => x.TermsVersionId)
+            .HasColumnName("terms_version_id")
+            .IsRequired(false);
+
+        builder.Property(x => x.TermsSnapshot)
+            .HasColumnName("terms_snapshot")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)
