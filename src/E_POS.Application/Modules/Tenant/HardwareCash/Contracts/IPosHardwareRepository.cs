@@ -4,6 +4,7 @@ namespace E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 
 public interface IPosHardwareRepository
 {
+    Task<Guid?> GetTestPosDeviceIdAsync(Guid tenantId, Guid testId, CancellationToken cancellationToken);
     Task<IReadOnlyList<PosHardwareConfigurationDto>> GetConfigurationsAsync(
         Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken);
 

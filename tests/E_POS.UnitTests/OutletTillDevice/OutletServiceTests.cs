@@ -282,6 +282,48 @@ public sealed class OutletServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_StatusChangeWithUpdatePermissionOnly_ReturnsPermissionDenied()
+    {
+        var aggregate = new OutletEditAggregate(
+            Outlet.Create(Guid.NewGuid(), TenantId, "Main Outlet", "OUT001", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now),
+            null,
+            [],
+            null);
+        var service = CreateService(new FakeOutletRepository { EditAggregate = aggregate });
+        var request = CreateValidUpdateRequest() with { Status = "INACTIVE" };
+
+        var result = await service.UpdateAsync(
+            CreateContext([OutletConstants.UpdatePermission]),
+            aggregate.Outlet.Id,
+            request,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.permission_denied", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ImageChangeWithUpdatePermissionOnly_ReturnsPermissionDenied()
+    {
+        var aggregate = new OutletEditAggregate(
+            Outlet.Create(Guid.NewGuid(), TenantId, "Main Outlet", "OUT001", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now),
+            null,
+            [],
+            null);
+        var service = CreateService(new FakeOutletRepository { EditAggregate = aggregate });
+        var request = CreateValidUpdateRequest() with { ImageOperation = OutletImageOperation.REMOVE };
+
+        var result = await service.UpdateAsync(
+            CreateContext([OutletConstants.UpdatePermission]),
+            aggregate.Outlet.Id,
+            request,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.permission_denied", result.Error.Code);
+    }
+
+    [Fact]
     public async Task CreateAsync_WithInvalidCountryCode_ReturnsValidationFailure()
     {
         var service = CreateService(new FakeOutletRepository());
@@ -479,6 +521,59 @@ public sealed class OutletServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("outlet.permission_denied", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithCanonicalCreatePermission_ReachesCreateRepository()
+    {
+        var repository = new FakeOutletRepository();
+        var service = CreateService(repository);
+
+        await service.CreateAsync(
+            CreateContext([OutletConstants.CreatePermission]),
+            CreateValidRequest(),
+            CancellationToken.None);
+
+        Assert.NotNull(repository.AddedOutlet);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithCanonicalDeletePermission_Succeeds()
+    {
+        var outlet = Outlet.Create(Guid.NewGuid(), TenantId, "Main", "MAIN", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now);
+        var repository = new FakeOutletRepository
+        {
+            EditAggregate = new OutletEditAggregate(outlet, null, [], null)
+        };
+        var service = CreateService(repository);
+
+        var result = await service.DeleteAsync(
+            CreateContext([OutletConstants.DeletePermission]),
+            outlet.Id,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, repository.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithUpdatePermissionOnly_ReturnsPermissionDenied()
+    {
+        var outlet = Outlet.Create(Guid.NewGuid(), TenantId, "Main", "MAIN", "ACTIVE", "STORE", "UTC", false, null, null, UserId, Now);
+        var repository = new FakeOutletRepository
+        {
+            EditAggregate = new OutletEditAggregate(outlet, null, [], null)
+        };
+        var service = CreateService(repository);
+
+        var result = await service.DeleteAsync(
+            CreateContext([OutletConstants.UpdatePermission]),
+            outlet.Id,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.GetEditAggregateCallCount);
     }
 
     [Fact]

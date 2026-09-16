@@ -121,6 +121,39 @@ public sealed class TenantAdminOutletServiceOverviewTests
     }
 
     [Fact]
+    public async Task GetManagerOptionsAsync_ManagerAssignPermission_ReturnsActiveTenantUsers()
+    {
+        var managerId = Guid.NewGuid();
+        var repository = new FakeTenantAdminOutletRepository
+        {
+            ManagerOptions = [new TenantAdminOutletManagerOptionResponse(managerId, "Store Manager", "manager@example.com")]
+        };
+        var service = new TenantAdminOutletService(repository);
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new HashSet<string> { TenantAdminOutletPermissions.ManagerAssign });
+
+        var result = await service.GetManagerOptionsAsync(context, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var option = Assert.Single(result.Value!);
+        Assert.Equal(managerId, option.TenantUserId);
+    }
+
+    [Fact]
+    public async Task GetManagerOptionsAsync_MissingManagePermission_ReturnsPermissionDenied()
+    {
+        var service = new TenantAdminOutletService(new FakeTenantAdminOutletRepository());
+        var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), new HashSet<string>());
+
+        var result = await service.GetManagerOptionsAsync(context, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("outlet.permission_denied", result.Error.Code);
+    }
+
+    [Fact]
     public async Task SetImageAsync_Success_AssignsOutletImage()
     {
         var tenantId = Guid.NewGuid();
@@ -130,12 +163,55 @@ public sealed class TenantAdminOutletServiceOverviewTests
 
         var repository = new FakeTenantAdminOutletRepository { Exists = true, MediaAssetActive = true };
         var service = new TenantAdminOutletService(repository);
-        var context = new TenantRequestContext(tenantId, userId, new HashSet<string> { TenantAdminOutletPermissions.Update });
+        var context = new TenantRequestContext(tenantId, userId, new HashSet<string> { TenantAdminOutletPermissions.ImageUpdate });
 
         var result = await service.SetImageAsync(context, outletId, new TenantAdminOutletImageUpdateRequest(mediaAssetId), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(mediaAssetId, repository.AssignedMediaAssetId);
+    }
+
+    [Fact]
+    public async Task GranularActions_WithUpdatePermissionOnly_ReturnPermissionDenied()
+    {
+        var outletId = Guid.NewGuid();
+        var repository = new FakeTenantAdminOutletRepository
+        {
+            Exists = true,
+            TenantUserActive = true,
+            MediaAssetActive = true,
+            LifecycleState = new TenantAdminOutletLifecycleState(false, false, false, false, false)
+        };
+        var service = new TenantAdminOutletService(repository);
+        var context = new TenantRequestContext(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new HashSet<string> { TenantAdminOutletPermissions.Update });
+
+        var managerResult = await service.SetManagerAsync(
+            context,
+            outletId,
+            new TenantAdminOutletManagerUpdateRequest(Guid.NewGuid()),
+            CancellationToken.None);
+        var imageResult = await service.SetImageAsync(
+            context,
+            outletId,
+            new TenantAdminOutletImageUpdateRequest(Guid.NewGuid()),
+            CancellationToken.None);
+        var statusResult = await service.UpdateStatusAsync(
+            context,
+            outletId,
+            new TenantAdminOutletStatusUpdateRequest("INACTIVE"),
+            CancellationToken.None);
+
+        Assert.All(new[] { managerResult, imageResult, statusResult }, result =>
+        {
+            Assert.True(result.IsFailure);
+            Assert.Equal("outlet.permission_denied", result.Error.Code);
+        });
+        Assert.Null(repository.AssignedManagerId);
+        Assert.Null(repository.AssignedMediaAssetId);
+        Assert.Null(repository.UpdatedStatus);
     }
 
     [Fact]
@@ -188,8 +264,6 @@ public sealed class TenantAdminOutletServiceOverviewTests
 
     private sealed class FakeTenantAdminOutletRepository : ITenantAdminOutletRepository
     {
-        public Task<IReadOnlyList<TenantAdminOutletManagerOptionResponse>> GetManagerOptionsAsync(Guid tenantId, CancellationToken cancellationToken)
-            => Task.FromResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>([]);
         public bool Exists { get; set; } = true;
         public bool TenantUserActive { get; set; } = true;
         public bool MediaAssetActive { get; set; } = true;
@@ -197,6 +271,7 @@ public sealed class TenantAdminOutletServiceOverviewTests
         public Guid? AssignedMediaAssetId { get; set; }
         public string? UpdatedStatus { get; private set; }
         public TenantAdminOutletLifecycleState? LifecycleState { get; set; }
+        public IReadOnlyList<TenantAdminOutletManagerOptionResponse> ManagerOptions { get; set; } = [];
 
         public OutletOverviewInfoResponse? InfoResponse { get; set; }
         public TenantAdminOutletTillsResponse TillsResponse { get; set; } = new(new(0, 0, 0, 0), Array.Empty<TenantAdminOutletTillItemResponse>());
@@ -252,6 +327,9 @@ public sealed class TenantAdminOutletServiceOverviewTests
 
         public Task<bool> TenantUserExistsAndActiveAsync(Guid tenantId, Guid tenantUserId, CancellationToken cancellationToken)
             => Task.FromResult(TenantUserActive);
+
+        public Task<IReadOnlyList<TenantAdminOutletManagerOptionResponse>> GetManagerOptionsAsync(Guid tenantId, CancellationToken cancellationToken)
+            => Task.FromResult(ManagerOptions);
 
         public Task<bool> MediaAssetExistsAndActiveAsync(Guid tenantId, Guid mediaAssetId, CancellationToken cancellationToken)
             => Task.FromResult(MediaAssetActive);

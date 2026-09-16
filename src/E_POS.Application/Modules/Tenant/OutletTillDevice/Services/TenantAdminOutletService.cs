@@ -234,13 +234,27 @@ public sealed class TenantAdminOutletService : ITenantAdminOutletService
         return ApplicationResult<TenantAdminOutletOverviewResponse>.Success(response);
     }
 
+    public async Task<ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>> GetManagerOptionsAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateActionAccess(context, TenantAdminOutletPermissions.ManagerAssign);
+        if (accessError is not null)
+        {
+            return ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Failure(accessError);
+        }
+
+        var options = await _repository.GetManagerOptionsAsync(context.TenantId, cancellationToken);
+        return ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Success(options);
+    }
+
     public async Task<ApplicationResult> SetManagerAsync(
         TenantRequestContext context,
         Guid outletId,
         TenantAdminOutletManagerUpdateRequest request,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
+        var accessError = ValidateActionAccess(context, TenantAdminOutletPermissions.ManagerAssign);
         if (accessError is not null) return ApplicationResult.Failure(accessError);
 
         if (!await _repository.OutletExistsAsync(context.TenantId, outletId, cancellationToken))
@@ -276,7 +290,7 @@ public sealed class TenantAdminOutletService : ITenantAdminOutletService
         Guid outletId,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
+        var accessError = ValidateActionAccess(context, TenantAdminOutletPermissions.ManagerAssign);
         if (accessError is not null) return ApplicationResult.Failure(accessError);
 
         if (!await _repository.OutletExistsAsync(context.TenantId, outletId, cancellationToken))
@@ -302,7 +316,7 @@ public sealed class TenantAdminOutletService : ITenantAdminOutletService
         TenantAdminOutletImageUpdateRequest request,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
+        var accessError = ValidateActionAccess(context, TenantAdminOutletPermissions.ImageUpdate);
         if (accessError is not null) return ApplicationResult.Failure(accessError);
 
         if (!await _repository.OutletExistsAsync(context.TenantId, outletId, cancellationToken))
@@ -338,7 +352,7 @@ public sealed class TenantAdminOutletService : ITenantAdminOutletService
         Guid outletId,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
+        var accessError = ValidateActionAccess(context, TenantAdminOutletPermissions.ImageUpdate);
         if (accessError is not null) return ApplicationResult.Failure(accessError);
 
         if (!await _repository.OutletExistsAsync(context.TenantId, outletId, cancellationToken))
@@ -364,7 +378,7 @@ public sealed class TenantAdminOutletService : ITenantAdminOutletService
         TenantAdminOutletStatusUpdateRequest request,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateManageAccess(context);
+        var accessError = ValidateActionAccess(context, TenantAdminOutletPermissions.StatusUpdate);
         if (accessError is not null) return ApplicationResult.Failure(accessError);
 
         if (string.IsNullOrWhiteSpace(request.Status) || !OutletConstants.IsValidWriteStatus(request.Status))
@@ -438,6 +452,18 @@ public sealed class TenantAdminOutletService : ITenantAdminOutletService
             : PermissionDenied;
     }
 
+    private static ApplicationError? ValidateActionAccess(
+        TenantRequestContext context,
+        string actionPermission)
+    {
+        return HasAnyPermission(
+            context,
+            actionPermission,
+            TenantAdminOutletPermissions.Manage)
+            ? null
+            : PermissionDenied;
+    }
+
     private static ApplicationError? ValidateRevenueAccess(TenantRequestContext context)
     {
         return HasAnyPermission(
@@ -482,18 +508,5 @@ public sealed class TenantAdminOutletService : ITenantAdminOutletService
         }
 
         return false;
-    }
-    public async Task<ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>> GetManagerOptionsAsync(
-        TenantRequestContext context,
-        CancellationToken cancellationToken)
-    {
-        var accessError = (HasAnyPermission(context, TenantAdminOutletPermissions.ManagerAssign, TenantAdminOutletPermissions.Manage) ? null : PermissionDenied);
-        if (accessError is not null)
-        {
-            return ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Failure(accessError);
-        }
-
-        var options = await _repository.GetManagerOptionsAsync(context.TenantId, cancellationToken);
-        return ApplicationResult<IReadOnlyList<TenantAdminOutletManagerOptionResponse>>.Success(options);
     }
 }

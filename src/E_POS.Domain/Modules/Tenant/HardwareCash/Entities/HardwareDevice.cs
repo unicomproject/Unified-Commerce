@@ -122,7 +122,8 @@ public class HardwareDevice : AuditableEntity
 
     public void RecordHeartbeat(DateTimeOffset lastSeenAt)
     {
-        LastSeenAt = lastSeenAt;
+        if (LastSeenAt is null || lastSeenAt > LastSeenAt)
+            LastSeenAt = lastSeenAt;
     }
 
     public void SoftDelete(Guid? updatedByTenantUserId, DateTimeOffset now)

@@ -411,6 +411,13 @@ public sealed class TenantAdminTillService : ITenantAdminTillService
             return ApplicationResult<TenantAdminTillDetailResponse>.Failure(NotFound);
         }
 
+        if (till.OutletId != request.OutletId &&
+            !context.HasPermission(TenantAdminTillPermissions.AssignOutlet) &&
+            !context.HasPermission(TenantAdminTillPermissions.Manage))
+        {
+            return ApplicationResult<TenantAdminTillDetailResponse>.Failure(PermissionDenied);
+        }
+
         if (!await _repository.OutletBelongsToTenantAsync(context.TenantId, request.OutletId, cancellationToken))
         {
             return ApplicationResult<TenantAdminTillDetailResponse>.Failure(OutletNotFound);

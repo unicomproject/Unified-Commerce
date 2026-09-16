@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using E_POS.Application.Modules.Tenant.HardwareCash.Contracts;
 using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
@@ -12,6 +13,10 @@ public sealed class PosHardwareRepository : IPosHardwareRepository
     private readonly EPosDbContext _db;
 
     public PosHardwareRepository(EPosDbContext db) => _db = db;
+
+    public Task<Guid?> GetTestPosDeviceIdAsync(Guid tenantId, Guid testId, CancellationToken cancellationToken) =>
+        _db.HardwareTestLogs.AsNoTracking().Where(x => x.TenantId == tenantId && x.Id == testId)
+            .Select(x => x.InitiatedFromPosDeviceId).FirstOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<PosHardwareConfigurationDto>> GetConfigurationsAsync(
         Guid tenantId, Guid posDeviceId, CancellationToken cancellationToken)
@@ -28,8 +33,10 @@ public sealed class PosHardwareRepository : IPosHardwareRepository
             join device in _db.HardwareDevices.AsNoTracking()
                 on assignment.HardwareDeviceId equals device.Id
             where assignment.TenantId == tenantId &&
-                  assignment.PosDeviceId == posDeviceId &&
+                  (assignment.PosDeviceId == posDeviceId ||
+                   (activeTillId != null && assignment.TillId == activeTillId)) &&
                   assignment.ReleasedAt == null &&
+                  device.TenantId == tenantId &&
                   device.Status != "DELETED"
             orderby device.HardwareDeviceType
             select new { assignment, device }).ToListAsync(cancellationToken);
@@ -65,18 +72,31 @@ public sealed class PosHardwareRepository : IPosHardwareRepository
             if (!assigned) return ("pos_hardware.assignment_mismatch", null);
         }
 
-        var type = request.HardwareType.Trim().ToUpperInvariant();
+        var legacyType = request.HardwareType.Trim().Replace("_", string.Empty).ToUpperInvariant();
+        var type = legacyType switch
+        {
+            "RECEIPTPRINTER" => "RECEIPT_PRINTER",
+            "BARCODESCANNER" => "BARCODE_SCANNER",
+            "CASHDRAWER" => "CASH_DRAWER",
+            "CARDTERMINAL" => "CARD_READER",
+            _ => legacyType
+        };
         var activeSession = await ActiveSessionAsync(
             tenantId, request.PosDeviceId, request.TillId, cancellationToken);
-        var existing = await (
+        var candidates = await (
             from assignment in _db.HardwareDeviceAssignments
             join device in _db.HardwareDevices on assignment.HardwareDeviceId equals device.Id
             where assignment.TenantId == tenantId &&
-                  assignment.PosDeviceId == request.PosDeviceId &&
+                  (assignment.PosDeviceId == request.PosDeviceId ||
+                   (request.TillId != null && assignment.TillId == request.TillId)) &&
                   assignment.ReleasedAt == null &&
-                  device.HardwareDeviceType == type &&
+                  device.TenantId == tenantId && device.OutletId == request.OutletId &&
+                  (device.HardwareDeviceType == type || device.HardwareDeviceType == legacyType) &&
                   device.Status != "DELETED"
-            select new { assignment, device }).SingleOrDefaultAsync(cancellationToken);
+            select new { assignment, device }).Take(2).ToListAsync(cancellationToken);
+        // Never pick an arbitrary physical device or create a duplicate on ambiguous assignments.
+        if (candidates.Count > 1) return ("pos_hardware.assignment_mismatch", null);
+        var existing = candidates.SingleOrDefault();
 
         if (existing is null)
         {
@@ -109,6 +129,26 @@ public sealed class PosHardwareRepository : IPosHardwareRepository
 
         if (existing.device.ConfigurationVersion != request.ExpectedVersion)
             return ("pos_hardware.version_conflict", null);
+
+        // Runtime settings must not erase the registry's physical identity or capability declaration.
+        if (JsonNode.Parse(existing.device.ConfigJson ?? "{}") is JsonObject registered &&
+            registered.ContainsKey("compatibilityProfileId"))
+        {
+            if (!string.Equals(ToCamel(existing.device.ConnectionType), ToCamel(request.TransportType), StringComparison.OrdinalIgnoreCase))
+                return ("pos_hardware.assignment_mismatch", null);
+            var settings = JsonNode.Parse(safeSettingsJson)!.AsObject();
+            foreach (var key in new[] { "usbVendorId", "usbProductId", "usbDeviceIdentifier", "bluetoothAddress", "networkHost", "networkPort" })
+            {
+                if (registered.TryGetPropertyValue(key, out var identity) && identity is not null &&
+                    settings.TryGetPropertyValue(key, out var selected) && selected is not null &&
+                    !string.Equals(identity.ToString(), selected.ToString(), StringComparison.OrdinalIgnoreCase))
+                    return ("pos_hardware.assignment_mismatch", null);
+            }
+            foreach (var key in new[] { "compatibilityProfileId", "protocol", "adapterKey", "capabilitySource",
+                "parentPrinterId", "cashDrawer", "usbVendorId", "usbProductId", "usbDeviceName", "bluetoothAddress" })
+                if (registered.TryGetPropertyValue(key, out var value)) settings[key] = value?.DeepClone();
+            safeSettingsJson = settings.ToJsonString();
+        }
 
         var criticalChanged =
             !string.Equals(existing.device.ConnectionType, request.TransportType, StringComparison.OrdinalIgnoreCase) ||
@@ -180,7 +220,8 @@ public sealed class PosHardwareRepository : IPosHardwareRepository
                 .AnyAsync(x =>
                     x.TenantId == tenantId &&
                     x.HardwareDeviceId == configurationId &&
-                    x.PosDeviceId == request.PosDeviceId &&
+                    (x.PosDeviceId == request.PosDeviceId ||
+                     (request.TillId != null && x.TillId == request.TillId)) &&
                     x.ReleasedAt == null,
                     cancellationToken);
             if (!assigned)
@@ -258,6 +299,7 @@ public sealed class PosHardwareRepository : IPosHardwareRepository
             x => x.TenantId == tenantId && x.Id == testId,
             cancellationToken);
         if (operation is null) return ("pos_hardware.test_not_found", null);
+        if (operation.TestType == "REMOTE_BATCH") return ("pos_hardware.invalid_test_result", null);
         if (operation.TestedByTenantUserId != userId)
             return ("pos_hardware.permission_denied", null);
         if (operation.HardwareType == "BARCODESCANNER" &&
@@ -276,6 +318,34 @@ public sealed class PosHardwareRepository : IPosHardwareRepository
                        string.Equals(operation.ResultCategory, request.ResultCategory, StringComparison.OrdinalIgnoreCase) &&
                        operation.PhysicalConfirmation == request.PhysicalConfirmation;
             return same ? (null, MapTest(operation)) : ("pos_hardware.result_conflict", null);
+        }
+
+        if (operation.TestedAt < now.AddMinutes(-10))
+            return ("pos_hardware.test_expired", null);
+        if (operation.HardwareDeviceId is { } hardwareId)
+        {
+            var current = await _db.HardwareDevices.SingleOrDefaultAsync(
+                x => x.TenantId == tenantId && x.Id == hardwareId, cancellationToken);
+            if (current is null || current.Status != "ACTIVE" ||
+                current.ConfigurationVersion != operation.ConfigurationVersion)
+                return ("pos_hardware.version_conflict", null);
+            var stillAssigned = await _db.HardwareDeviceAssignments.AsNoTracking().AnyAsync(x =>
+                x.TenantId == tenantId && x.HardwareDeviceId == hardwareId && x.ReleasedAt == null &&
+                x.AssignedAt <= operation.TestedAt &&
+                (x.PosDeviceId == operation.InitiatedFromPosDeviceId ||
+                 (operation.TillId != null && x.TillId == operation.TillId &&
+                  _db.TillDeviceAssignments.Any(t => t.TenantId == tenantId && t.TillId == x.TillId &&
+                      t.PosDeviceId == operation.InitiatedFromPosDeviceId && t.ReleasedAt == null))), cancellationToken);
+            if (!stillAssigned) return ("pos_hardware.assignment_mismatch", null);
+            // Event-driven observation, never a scheduled claim that an idle scanner/drawer is alive.
+            // Refresh only from physical confirmation of this current, assigned test.
+            if (request.PhysicalConfirmation == true && request.Status.Equals("PASSED", StringComparison.OrdinalIgnoreCase))
+            {
+                var observed = request.DetectedAt ?? now;
+                if (observed < operation.TestedAt || observed > now.AddSeconds(30) || observed < now.AddMinutes(-5))
+                    return ("pos_hardware.invalid_test_result", null);
+                current.RecordHeartbeat(observed);
+            }
         }
 
         operation.Complete(
@@ -406,7 +476,7 @@ public sealed class PosHardwareRepository : IPosHardwareRepository
             "receiptprinter" => "receiptPrinter",
             "barcodescanner" => "barcodeScanner",
             "cashdrawer" => "cashDrawer",
-            "cardterminal" => "cardTerminal",
+            "cardterminal" or "cardreader" => "cardTerminal",
             "localprintagent" => "localPrintAgent",
             _ => compact
         };

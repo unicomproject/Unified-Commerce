@@ -52,7 +52,7 @@ public sealed class OutletService : IOutletService
         TenantRequestContext context,
         CancellationToken cancellationToken)
     {
-        var gateError = await ValidateOutletAccessAsync(context, requireManage: true, cancellationToken);
+        var gateError = await ValidateOutletAccessAsync(context, OutletConstants.CreatePermission, cancellationToken);
         if (gateError is not null)
         {
             return ApplicationResult<OutletCreateOptionsResponse>.Failure(gateError);
@@ -80,7 +80,7 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletResponse>> CreateAsync(TenantRequestContext context, OutletCreateRequest request, CancellationToken cancellationToken)
     {
-        var gateError = await ValidateOutletAccessAsync(context, requireManage: true, cancellationToken);
+        var gateError = await ValidateOutletAccessAsync(context, OutletConstants.CreatePermission, cancellationToken);
         if (gateError is not null)
         {
             return ApplicationResult<OutletResponse>.Failure(gateError);
@@ -203,7 +203,7 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletSummaryDashboardResponse>> GetSummaryAsync(TenantRequestContext context, CancellationToken cancellationToken)
     {
-        var gateError = await ValidateOutletAccessAsync(context, requireManage: false, cancellationToken);
+        var gateError = await ValidateOutletAccessAsync(context, OutletConstants.ViewPermission, cancellationToken);
         if (gateError is not null)
         {
             return ApplicationResult<OutletSummaryDashboardResponse>.Failure(gateError);
@@ -215,7 +215,7 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, string? outletType, string? status, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
     {
-        var gateError = await ValidateOutletAccessAsync(context, requireManage: false, cancellationToken);
+        var gateError = await ValidateOutletAccessAsync(context, OutletConstants.ViewPermission, cancellationToken);
         if (gateError is not null)
         {
             return ApplicationResult<OutletListResponse>.Failure(gateError);
@@ -229,7 +229,7 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletResponse>> GetByIdAsync(TenantRequestContext context, Guid outletId, CancellationToken cancellationToken)
     {
-        var gateError = await ValidateOutletAccessAsync(context, requireManage: false, cancellationToken);
+        var gateError = await ValidateOutletAccessAsync(context, OutletConstants.ViewPermission, cancellationToken);
         if (gateError is not null)
         {
             return ApplicationResult<OutletResponse>.Failure(gateError);
@@ -241,7 +241,7 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult<OutletResponse>> UpdateAsync(TenantRequestContext context, Guid outletId, OutletUpdateRequest request, CancellationToken cancellationToken)
     {
-        var gateError = await ValidateOutletAccessAsync(context, requireManage: true, cancellationToken);
+        var gateError = await ValidateOutletAccessAsync(context, OutletConstants.UpdatePermission, cancellationToken);
         if (gateError is not null)
         {
             return ApplicationResult<OutletResponse>.Failure(gateError);
@@ -262,13 +262,33 @@ public sealed class OutletService : IOutletService
         var aggregate = await _repository.GetEditAggregateAsync(context.TenantId, outletId, cancellationToken);
         if (aggregate is null) return ApplicationResult<OutletResponse>.Failure(NotFound);
 
+        var requestedStatus = OutletConstants.NormalizeStatus(request.Status);
+        var statusChanged = !string.Equals(
+            OutletConstants.NormalizeStatus(aggregate.Outlet.Status),
+            requestedStatus,
+            StringComparison.OrdinalIgnoreCase);
+        if (statusChanged &&
+            !context.HasPermission(TenantAdminOutletPermissions.StatusUpdate) &&
+            !context.HasPermission(TenantAdminOutletPermissions.Manage))
+        {
+            return ApplicationResult<OutletResponse>.Failure(PermissionDenied);
+        }
+
+        var imageOperation = request.ImageOperation ?? OutletImageOperation.KEEP;
+        if (imageOperation != OutletImageOperation.KEEP &&
+            !context.HasPermission(TenantAdminOutletPermissions.ImageUpdate) &&
+            !context.HasPermission(TenantAdminOutletPermissions.Manage))
+        {
+            return ApplicationResult<OutletResponse>.Failure(PermissionDenied);
+        }
+
         var normalizedOutletCode = aggregate.Outlet.OutletCode;
         if (await _repository.OutletCodeExistsAsync(context.TenantId, normalizedOutletCode, outletId, cancellationToken))
         {
             return ApplicationResult<OutletResponse>.Failure(CreateDuplicateCodeError());
         }
 
-        var status = OutletConstants.NormalizeStatus(request.Status);
+        var status = requestedStatus;
         if (status == OutletConstants.DeletedStatus && await _repository.HasActiveTillOrDeviceAsync(context.TenantId, outletId, cancellationToken))
         {
             return ApplicationResult<OutletResponse>.Failure(CreateDeleteConflict());
@@ -289,7 +309,6 @@ public sealed class OutletService : IOutletService
             now);
 
         // Apply image operation matrix: null defaults to KEEP.
-        var imageOperation = request.ImageOperation ?? OutletImageOperation.KEEP;
         switch (imageOperation)
         {
             case OutletImageOperation.REPLACE:
@@ -343,7 +362,7 @@ public sealed class OutletService : IOutletService
 
     public async Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid outletId, CancellationToken cancellationToken)
     {
-        var gateError = await ValidateOutletAccessAsync(context, requireManage: true, cancellationToken);
+        var gateError = await ValidateOutletAccessAsync(context, OutletConstants.DeletePermission, cancellationToken);
         if (gateError is not null)
         {
             return ApplicationResult.Failure(gateError);
@@ -370,7 +389,7 @@ public sealed class OutletService : IOutletService
     /// </summary>
     private async Task<ApplicationError?> ValidateOutletAccessAsync(
         TenantRequestContext context,
-        bool requireManage,
+        string requiredPermission,
         CancellationToken cancellationToken)
     {
         var contextError = ValidateTenantContext(context);
@@ -385,9 +404,7 @@ public sealed class OutletService : IOutletService
             return operationalError;
         }
 
-        return requireManage
-            ? ValidateManagePermission(context)
-            : ValidateReadPermission(context);
+        return ValidatePermission(context, requiredPermission);
     }
 
     private async Task<ApplicationError?> ValidateOperationalAccessAsync(
@@ -413,25 +430,34 @@ public sealed class OutletService : IOutletService
         return null;
     }
 
-    private static ApplicationError? ValidateReadPermission(TenantRequestContext context) =>
-        context.HasPermission(OutletConstants.ViewPermission) || 
-        context.HasPermission(OutletConstants.ManagePermission) ||
-        context.HasPermission("outlet.view") ||
-        context.HasPermission("outlets.view") ||
-        context.HasPermission("tenant.outlets.view") ||
-        context.HasPermission("tenant.outlets.details.view") ||
-        context.HasPermission("tenant.outlets.manage") ||
-        context.HasPermission("tenant.outlets.update")
-            ? null
-            : PermissionDenied;
+    private static ApplicationError? ValidatePermission(
+        TenantRequestContext context,
+        string requiredPermission)
+    {
+        if (context.HasPermission(OutletConstants.ManagePermission) ||
+            context.HasPermission(requiredPermission))
+        {
+            return null;
+        }
 
-    private static ApplicationError? ValidateManagePermission(TenantRequestContext context) =>
-        context.HasPermission(OutletConstants.ManagePermission) ||
-        context.HasPermission("tenant.outlets.update") ||
-        context.HasPermission("outlet.create") ||
-        context.HasPermission("outlet.update") ||
-        context.HasPermission("outlet.delete")
-            ? null : PermissionDenied;
+        var hasLegacyPermission = requiredPermission switch
+        {
+            OutletConstants.ViewPermission =>
+                context.HasPermission("outlet.view") ||
+                context.HasPermission("outlets.view") ||
+                context.HasPermission(TenantAdminOutletPermissions.DetailsView),
+            OutletConstants.CreatePermission =>
+                context.HasPermission("outlet.create") ||
+                context.HasPermission("outlets.create"),
+            OutletConstants.UpdatePermission =>
+                context.HasPermission("outlet.update") ||
+                context.HasPermission("outlets.update"),
+            OutletConstants.DeletePermission => context.HasPermission("outlet.delete"),
+            _ => false
+        };
+
+        return hasLegacyPermission ? null : PermissionDenied;
+    }
 
     private static ApplicationError? ValidateTenantContext(TenantRequestContext context)
     {

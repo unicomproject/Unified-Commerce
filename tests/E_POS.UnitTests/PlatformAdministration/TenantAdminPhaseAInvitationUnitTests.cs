@@ -9,6 +9,7 @@ using E_POS.Application.Modules.Platform.PlatformAdmin.Services;
 using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Platform.Subscription.Dtos;
 using E_POS.Application.Modules.Tenant.TenantAuth;
+using TenantAdminInvitationEmailComposer = E_POS.Application.Modules.Platform.PlatformAdmin.Email.TenantAdminInvitationEmailComposer;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Contracts;
 using E_POS.Application.Modules.Tenant.TenantFoundation.Dtos;
 using E_POS.Domain.Modules.Platform.PlatformAdmin.Constants;

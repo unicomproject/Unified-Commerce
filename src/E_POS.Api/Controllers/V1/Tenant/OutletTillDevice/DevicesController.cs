@@ -40,7 +40,7 @@ public sealed class DevicesController : ControllerBase
 
         var result = await _deviceContextService.GetCurrentDeviceAsync(
             context,
-            deviceFingerprint,
+            Request.Headers[PosDeviceProofFilter.HeaderName].FirstOrDefault() ?? deviceFingerprint,
             cancellationToken);
 
         if (!result.IsSuccess || result.Value is null)

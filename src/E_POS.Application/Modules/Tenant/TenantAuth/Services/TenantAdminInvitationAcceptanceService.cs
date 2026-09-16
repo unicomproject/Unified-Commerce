@@ -139,10 +139,10 @@ public sealed class TenantAdminInvitationAcceptanceService : ITenantAdminInvitat
 
         // Hash before entering the claim transaction so CPU work is outside the row lock.
         var passwordHash = _passwordHashService.HashPassword(request.Password);
-        var now = _clock.UtcNow;
-
         return await _repository.ExecuteClaimAsync(hash, async (claim, ct) =>
         {
+            // Re-evaluate expiry after waiting for the invitation row lock.
+            var now = _clock.UtcNow;
             if (claim is null)
             {
                 return ApplicationResult<SetupTenantAdminPasswordResponse>.Failure(InviteInvalid);

@@ -180,7 +180,7 @@ public sealed class TenantOnboardingOutboxWorkerIntegrationTests
             Assert.Single(fakeSender.SentMessages);
             var sent = fakeSender.SentMessages[0];
             Assert.Equal(ids.RecipientEmail, sent.ToAddress, ignoreCase: true);
-            Assert.Contains("Set up your Tenant Admin account", sent.Subject);
+            Assert.Contains("Activate your Tenant Admin account", sent.Subject);
             Assert.Contains("http://localhost:4200/tenant-admin/setup/", sent.HtmlBody);
             Assert.DoesNotContain("/setup-account?token=", sent.HtmlBody);
 
@@ -189,6 +189,8 @@ public sealed class TenantOnboardingOutboxWorkerIntegrationTests
             var invite = await db.UserInvites.SingleAsync(x => x.TenantId == ids.TenantId);
             Assert.Equal("SENT", invite.InviteStatus);
             Assert.NotNull(invite.InviteTokenHash);
+            var invitedUser = await db.TenantUsers.SingleAsync(x => x.TenantId == ids.TenantId);
+            Assert.Equal(invitedUser.Id, invite.TenantUserId);
         }
         finally
         {

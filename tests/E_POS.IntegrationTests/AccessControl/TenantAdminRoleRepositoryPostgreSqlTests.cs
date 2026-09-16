@@ -200,6 +200,9 @@ public sealed class TenantAdminRoleRepositoryPostgreSqlTests
             Now,
             CancellationToken.None);
 
+        var salesModule = Assert.Single(catalog.Modules);
+        Assert.Equal("sales_pos", salesModule.Code);
+        Assert.Equal("Sales (POS)", salesModule.Name);
         Assert.Contains(
             catalog.Modules.SelectMany(module => module.Features)
                 .SelectMany(feature => feature.Permissions),

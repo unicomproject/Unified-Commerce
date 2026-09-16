@@ -168,6 +168,19 @@ public class TenantUser : AuditableEntity
         UpdatedAt = now;
     }
 
+    public void SetUserType(string userType, Guid? updatedBy, DateTimeOffset now)
+    {
+        if (!string.Equals(userType, TenantUserConstants.AdminUserType, StringComparison.Ordinal) &&
+            !string.Equals(userType, TenantUserConstants.StandardUserType, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Invalid tenant user type.");
+        }
+
+        UserType = userType;
+        UpdatedByTenantUserId = updatedBy;
+        UpdatedAt = now;
+    }
+
     public void AssignStaffCode(string staffCode, DateTimeOffset now)
     {
         var normalized = NormalizeOptional(staffCode);

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.AccessControl.Mappers;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Shared.Audit.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Catalog.CashierPos;
@@ -22,9 +23,22 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
     private static readonly string[] AdministrativePermissionCodes =
     [
         TenantAdminUserPermissions.Manage,
+        TenantWorkspacePermissions.TenantAdminAccess,
+        TenantAdminUserPermissions.Disable,
+        TenantAdminUserPermissions.RolesAssign,
+        TenantAdminUserPermissions.OutletsAssign,
+        TenantAdminUserPermissions.TillsAssign,
+        TenantAdminUserPermissions.InvitesResend,
+        TenantAdminUserPermissions.InvitesRevoke,
+        TenantAdminOutletPermissions.StatusUpdate,
+        TenantAdminOutletPermissions.ManagerAssign,
+        TenantAdminOutletPermissions.ImageUpdate,
         TenantAdminUserPermissions.RolesManage,
+        TenantAdminUserPermissions.RolesStatusUpdate,
         TenantAdminUserPermissions.RolesPermissionsUpdate,
-        TenantAdminUserPermissions.RolesAssignmentsUpdate
+        TenantAdminUserPermissions.RolesAssignmentsUpdate,
+        TenantAdminUserPermissions.RolesUsersAssign,
+        TenantAdminUserPermissions.RolesOutletsAssign
     ];
 
     private readonly EPosDbContext _dbContext;
@@ -181,6 +195,45 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
             .ToArray();
     }
 
+    public async Task<TenantRoleAssignmentOptionsResponse> GetAssignmentOptionsAsync(
+        Guid tenantId,
+        bool includeUsers,
+        bool includeOutlets,
+        CancellationToken cancellationToken)
+    {
+        var users = includeUsers
+            ? await _dbContext.TenantUsers
+                .AsNoTracking()
+                .Where(user => user.TenantId == tenantId && user.AccountStatus != TenantUserConstants.StatusInactive)
+                .OrderBy(user => user.FullName)
+                .Select(user => new TenantRoleAssignmentUserOptionResponse(
+                    user.Id,
+                    user.FullName,
+                    user.Email,
+                    user.StaffCode,
+                    user.AccountStatus))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var outlets = includeOutlets
+            ? await _dbContext.Outlets
+                .AsNoTracking()
+                .Where(outlet =>
+                    outlet.TenantId == tenantId &&
+                    outlet.Status != OutletConstants.InactiveStatus &&
+                    outlet.Status != OutletConstants.DeletedStatus)
+                .OrderBy(outlet => outlet.OutletName)
+                .Select(outlet => new TenantRoleAssignmentOutletOptionResponse(
+                    outlet.Id,
+                    outlet.OutletName,
+                    outlet.OutletCode,
+                    outlet.Status))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        return new TenantRoleAssignmentOptionsResponse(users, outlets, includeUsers, includeOutlets);
+    }
+
     public Task<TenantRole?> GetEditableAsync(Guid tenantId, Guid roleId, CancellationToken cancellationToken)
     {
         return _dbContext.TenantRoles
@@ -320,24 +373,23 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
             .ToList();
 
         var modules = rows
-            .GroupBy(row => new
+            .Select(row => new
             {
-                row.ModuleId,
-                row.ModuleCode,
-                row.ModuleName,
-                row.ModuleDescription,
-                row.ModuleSortOrder,
-                row.ModuleStatus
+                Row = row,
+                PresentationModule = TenantPermissionPresentationModuleCatalog.Resolve(row.PermissionCode)
             })
+            .GroupBy(item => item.PresentationModule)
+            .OrderBy(moduleGroup => moduleGroup.Key.SortOrder)
             .Select(moduleGroup => new TenantPermissionCatalogModuleResponse(
-                moduleGroup.Key.ModuleId,
-                moduleGroup.Key.ModuleCode,
-                moduleGroup.Key.ModuleName,
-                moduleGroup.Key.ModuleDescription,
+                moduleGroup.Key.Id,
+                moduleGroup.Key.Code,
+                moduleGroup.Key.Name,
+                moduleGroup.Key.Description,
                 "TENANT",
-                moduleGroup.Key.ModuleSortOrder,
-                IsActiveStatus(moduleGroup.Key.ModuleStatus),
+                moduleGroup.Key.SortOrder,
+                true,
                 moduleGroup
+                    .Select(item => item.Row)
                     .GroupBy(row => new
                     {
                         row.FeatureId,
@@ -970,42 +1022,4 @@ public sealed class TenantAdminRoleRepository : ITenantAdminRoleRepository
         string ActionType,
         string? PermissionDescription,
         bool PermissionIsActive);
-    public async Task<TenantRoleAssignmentOptionsResponse> GetAssignmentOptionsAsync(
-        Guid tenantId,
-        bool includeUsers,
-        bool includeOutlets,
-        CancellationToken cancellationToken)
-    {
-        var users = includeUsers
-            ? await _dbContext.TenantUsers
-                .AsNoTracking()
-                .Where(user => user.TenantId == tenantId && user.AccountStatus != TenantUserConstants.StatusInactive)
-                .OrderBy(user => user.FullName)
-                .Select(user => new TenantRoleAssignmentUserOptionResponse(
-                    user.Id,
-                    user.FullName,
-                    user.Email,
-                    user.StaffCode,
-                    user.AccountStatus))
-                .ToListAsync(cancellationToken)
-            : [];
-
-        var outlets = includeOutlets
-            ? await _dbContext.Outlets
-                .AsNoTracking()
-                .Where(outlet =>
-                    outlet.TenantId == tenantId &&
-                    outlet.Status != OutletConstants.InactiveStatus &&
-                    outlet.Status != OutletConstants.DeletedStatus)
-                .OrderBy(outlet => outlet.OutletName)
-                .Select(outlet => new TenantRoleAssignmentOutletOptionResponse(
-                    outlet.Id,
-                    outlet.OutletName,
-                    outlet.OutletCode,
-                    outlet.Status))
-                .ToListAsync(cancellationToken)
-            : [];
-
-        return new TenantRoleAssignmentOptionsResponse(users, outlets, includeUsers, includeOutlets);
-    }
 }

@@ -94,6 +94,65 @@ public sealed class TenantAdminTillCrudIntegrationTests
         Assert.Equal("till.duplicate_code", duplicate.Error.Code);
     }
 
+    [Fact]
+    public async Task UpdateAsync_WhenOutletChangesWithoutAssignOutletPermission_ReturnsPermissionDenied()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var originalOutlet = CreateOutlet(tenantId, "MAIN", "ACTIVE");
+        var targetOutlet = CreateOutlet(tenantId, "SECOND", "ACTIVE");
+        dbContext.Outlets.AddRange(originalOutlet, targetOutlet);
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(dbContext, Now);
+        var created = await service.CreateAsync(
+            CreateContext(tenantId),
+            CreateRequest(originalOutlet.Id, tillCode: "MOVE-01"),
+            CancellationToken.None);
+
+        var result = await service.UpdateAsync(
+            CreateContext(tenantId, TenantAdminTillPermissions.Update),
+            created.Value!.TillId,
+            CreateUpdateRequest(targetOutlet.Id, "MOVE-01"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("till.permission_denied", result.Error.Code);
+        Assert.Equal(
+            originalOutlet.Id,
+            (await dbContext.Tills.SingleAsync(x => x.Id == created.Value.TillId)).OutletId);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WhenOutletChangesWithAssignOutletPermission_UpdatesOutlet()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var originalOutlet = CreateOutlet(tenantId, "MAIN", "ACTIVE");
+        var targetOutlet = CreateOutlet(tenantId, "SECOND", "ACTIVE");
+        dbContext.Outlets.AddRange(originalOutlet, targetOutlet);
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(dbContext, Now);
+        var created = await service.CreateAsync(
+            CreateContext(tenantId),
+            CreateRequest(originalOutlet.Id, tillCode: "MOVE-02"),
+            CancellationToken.None);
+
+        var result = await service.UpdateAsync(
+            CreateContext(
+                tenantId,
+                TenantAdminTillPermissions.Update,
+                TenantAdminTillPermissions.AssignOutlet),
+            created.Value!.TillId,
+            CreateUpdateRequest(targetOutlet.Id, "MOVE-02"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(targetOutlet.Id, result.Value!.OutletId);
+        Assert.Equal(
+            targetOutlet.Id,
+            (await dbContext.Tills.SingleAsync(x => x.Id == created.Value.TillId)).OutletId);
+    }
+
     private static readonly DateTimeOffset Now = new(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
 
     private static EPosDbContext CreateDbContext()
@@ -129,12 +188,23 @@ public sealed class TenantAdminTillCrudIntegrationTests
         public TillMonitoringOptions Get(string? name) => Value;
     }
 
-    private static TenantRequestContext CreateContext(Guid tenantId)
+    private static TenantRequestContext CreateContext(Guid tenantId, params string[] permissions)
     {
         return new TenantRequestContext(
             tenantId,
             Guid.NewGuid(),
-            [TenantAdminTillPermissions.Create, TenantAdminTillPermissions.Manage]);
+            permissions.Length == 0
+                ? [TenantAdminTillPermissions.Create, TenantAdminTillPermissions.Manage]
+                : permissions);
+    }
+
+    private static TenantAdminTillUpdateRequest CreateUpdateRequest(Guid outletId, string tillCode)
+    {
+        return new TenantAdminTillUpdateRequest(
+            "Main Till",
+            tillCode,
+            outletId,
+            TillConstants.ActiveStatus);
     }
 
     private static TenantAdminTillCreateRequest CreateRequest(
