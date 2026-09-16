@@ -127,7 +127,17 @@ public sealed class CustomerOrderReadRepository : CustomerOrderRepositoryBase, I
             .OrderBy(x => x.SequenceNumber)
             .ToListAsync(cancellationToken);
 
-        return BuildDetail(order, lines, imageLookup, statusHistory);
+        var pickup = await (
+                from fulfillment in DbContext.FulfillmentOrders.AsNoTracking()
+                join pickupOrder in DbContext.PickupOrders.AsNoTracking()
+                    on new { fulfillment.TenantId, FulfillmentOrderId = fulfillment.Id }
+                    equals new { pickupOrder.TenantId, FulfillmentOrderId = pickupOrder.FulfillmentOrderId }
+                where fulfillment.TenantId == tenantId && fulfillment.SalesOrderId == orderId
+                orderby fulfillment.CreatedAt descending
+                select pickupOrder)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return BuildDetail(order, lines, imageLookup, statusHistory, pickup, DateTimeOffset.UtcNow);
     }
 
 }

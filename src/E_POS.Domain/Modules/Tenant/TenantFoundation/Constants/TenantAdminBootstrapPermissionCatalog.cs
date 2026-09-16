@@ -19,7 +19,8 @@ public static class TenantAdminBootstrapPermissionCatalog
     public static readonly IReadOnlyList<string> BasePermissionCodes =
     [
         "tenant.dashboard.view", // Basic home / account landing
-        "tenant.settings.manage" // Basic tenant settings required for initial setup
+        "tenant.settings.manage", // Basic tenant settings required for initial setup
+        WorkspacePermissions.TenantAdminAccess // Gate to land in the Tenant Admin workspace
     ];
 
     /// <summary>

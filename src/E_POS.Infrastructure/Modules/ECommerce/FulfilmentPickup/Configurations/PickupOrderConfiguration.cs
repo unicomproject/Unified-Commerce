@@ -114,6 +114,11 @@ public sealed class PickupOrderConfiguration : IEntityTypeConfiguration<PickupOr
             .HasColumnType("timestamp with time zone")
             .IsRequired(false);
 
+        builder.Property(x => x.FailedVerificationAttempts)
+            .HasColumnName("failed_verification_attempts")
+            .HasDefaultValue(0)
+            .IsRequired();
+
         // <second-brain-constraints>
         builder.HasIndex(x => new { x.TenantId, x.PickupNumber })
             .IsUnique()
@@ -156,6 +161,7 @@ public sealed class PickupOrderConfiguration : IEntityTypeConfiguration<PickupOr
         {
             t.HasCheckConstraint("ck_pickup_orders_status", "pickup_status IN ('PENDING', 'READY', 'VERIFIED', 'COLLECTED', 'CANCELLED', 'EXPIRED')");
             t.HasCheckConstraint("ck_pickup_orders_qr_version", "pickup_qr_version IS NULL OR pickup_qr_version > 0");
+            t.HasCheckConstraint("ck_pickup_orders_failed_verification_attempts", "failed_verification_attempts >= 0");
         });
         // </second-brain-constraints>
     }

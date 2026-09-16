@@ -22,6 +22,71 @@ public class PickupOrder : AuditableEntity
     public Guid? VerifiedByTenantUserId { get; protected set; }
     public DateTimeOffset? VerifiedAt { get; protected set; }
     public DateTimeOffset? CollectedAt { get; protected set; }
+    public int FailedVerificationAttempts { get; protected set; }
+
+    public const int MaxVerificationAttempts = 3;
+
+    // The pickup code is shown to, and must be re-displayable to, the order's own
+    // customer for as long as it is valid — unlike a password, a peer reading it off
+    // the customer's own screen is the intended, legitimate use. Storing it in
+    // recoverable form (rather than one-way hashed) is a deliberate choice: what makes
+    // it safe is that it is a large random value, single-use, and time-limited — not
+    // secrecy from its rightful holder. Comparisons still use fixed-time equality.
+    public void IssuePickupCode(string pickupCode, int version, DateTimeOffset expiresAt, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(pickupCode))
+            throw new ArgumentException("Pickup code is required.", nameof(pickupCode));
+        if (PickupStatus != "READY")
+            throw new InvalidOperationException("PICKUP_NOT_READY_FOR_CODE");
+
+        PickupQrTokenHash = pickupCode;
+        PickupQrVersion = version;
+        PickupQrExpiresAt = expiresAt;
+        FailedVerificationAttempts = 0;
+        UpdatedAt = now;
+    }
+
+    public void RecordFailedVerification(DateTimeOffset now)
+    {
+        if (PickupStatus != "READY")
+            throw new InvalidOperationException("PICKUP_NOT_VERIFIABLE");
+
+        FailedVerificationAttempts++;
+        UpdatedAt = now;
+    }
+
+    public bool IsLockedOut => FailedVerificationAttempts >= MaxVerificationAttempts;
+
+    public bool IsPickupCodeExpired(DateTimeOffset now) =>
+        !PickupQrExpiresAt.HasValue || PickupQrExpiresAt.Value <= now;
+
+    public void Verify(Guid tenantUserId, string verificationMethod, DateTimeOffset now)
+    {
+        if (PickupStatus != "READY")
+            throw new InvalidOperationException("PICKUP_NOT_VERIFIABLE");
+        if (IsLockedOut)
+            throw new InvalidOperationException("PICKUP_VERIFICATION_LOCKED");
+        if (string.IsNullOrWhiteSpace(verificationMethod))
+            throw new ArgumentException("Verification method is required.", nameof(verificationMethod));
+
+        PickupStatus = "VERIFIED";
+        VerificationMethod = verificationMethod.Trim();
+        VerifiedByTenantUserId = tenantUserId;
+        VerifiedAt = now;
+        // Single-use: burn the code immediately so it can never be replayed.
+        PickupQrTokenHash = null;
+        UpdatedAt = now;
+    }
+
+    public void MarkCollected(DateTimeOffset now)
+    {
+        if (PickupStatus != "VERIFIED")
+            throw new InvalidOperationException("PICKUP_NOT_COLLECTIBLE");
+
+        PickupStatus = "COLLECTED";
+        CollectedAt = now;
+        UpdatedAt = now;
+    }
 
     protected PickupOrder() { }
 

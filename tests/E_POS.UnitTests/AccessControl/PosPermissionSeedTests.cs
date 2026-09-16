@@ -376,10 +376,10 @@ public sealed class PosPermissionSeedTests
     }
 
     [Fact]
-    public void CashierOnlineOrderPermissions_ContainAll8CanonicalCodes()
+    public void CashierOnlineOrderPermissions_ContainAll10CanonicalCodes()
     {
         var definitions = DevelopmentPosCashierOnlineOrderPermissionsSeedData.Definitions;
-        Assert.Equal(8, definitions.Count);
+        Assert.Equal(10, definitions.Count);
 
         var codes = definitions.Select(d => d.PermissionCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var requiredCode in DevelopmentPosCashierOnlineOrderPermissionsSeedData.CashierPermissionCodes)
@@ -408,6 +408,8 @@ public sealed class PosPermissionSeedTests
         Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.manual_entry"]);
         Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.report_issue"]);
         Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.note"]);
+        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.collection.verify"]);
+        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.collection.complete"]);
     }
 
     [Fact]
