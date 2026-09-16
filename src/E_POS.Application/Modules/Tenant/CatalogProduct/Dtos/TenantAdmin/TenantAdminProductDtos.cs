@@ -124,7 +124,7 @@ public sealed class TenantAdminProductCreateRequest
     public Guid ResolveSelectedCategoryId() => SubCategoryId ?? CategoryId;
 
     public string ResolveProductCode() =>
-        !string.IsNullOrWhiteSpace(ProductCode) ? ProductCode.Trim() : Sku.Trim();
+        !string.IsNullOrWhiteSpace(ProductCode) ? ProductCode.Trim() : string.Empty;
     public Guid? BrandId { get; set; }
     public string UnitType { get; set; } = string.Empty;
     public string? ShortDescription { get; set; }

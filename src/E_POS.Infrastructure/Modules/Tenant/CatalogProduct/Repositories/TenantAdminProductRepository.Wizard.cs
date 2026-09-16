@@ -1,5 +1,7 @@
+using System.Data;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ExternalLookup;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
 using E_POS.Application.Modules.Tenant.PricingTax.Services;
@@ -16,6 +18,8 @@ using E_POS.Domain.Modules.Tenant.PricingTax.Entities;
 using E_POS.Infrastructure.Persistence;
 using E_POS.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 
 namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 
@@ -23,6 +27,7 @@ public sealed partial class TenantAdminProductRepository
 {
     private const string DefaultCostingMethod = "WEIGHTED_AVERAGE";
     private const string StagedMediaStatus = "STAGED";
+    private const string ProductSkuSequenceType = "PRODUCT_SKU";
 
     public async Task<bool> IsCategoryEffectivelySelectableAsync(
         Guid tenantId,
@@ -46,6 +51,141 @@ public sealed partial class TenantAdminProductRepository
         Guid categoryId,
         CancellationToken cancellationToken) =>
         IsCategoryEffectivelySelectableAsync(tenantId, categoryId, cancellationToken);
+
+    public async Task<string?> GetActiveCategoryCodeAsync(
+        Guid tenantId,
+        Guid categoryId,
+        CancellationToken cancellationToken)
+    {
+        if (!await IsCategoryEffectivelySelectableAsync(tenantId, categoryId, cancellationToken))
+        {
+            return null;
+        }
+
+        return await _dbContext.Categories
+            .AsNoTracking()
+            .Where(category => category.TenantId == tenantId && category.Id == categoryId)
+            .Select(category => category.CategoryCode)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<long> AllocateNextProductSkuSequenceAsync(
+        Guid tenantId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var connection = _dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+        if (shouldClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            if (_dbContext.Database.CurrentTransaction is not null)
+            {
+                command.Transaction = _dbContext.Database.CurrentTransaction.GetDbTransaction();
+            }
+
+            command.CommandText = """
+                INSERT INTO tenant_user_code_sequences
+                    (id, tenant_id, sequence_type, year, current_value, created_at, updated_at)
+                VALUES
+                    (@id, @tenant_id, @sequence_type, 0, 1, @created_at, @updated_at)
+                ON CONFLICT (tenant_id, sequence_type, year)
+                DO UPDATE SET
+                    current_value = tenant_user_code_sequences.current_value + 1,
+                    updated_at = EXCLUDED.updated_at
+                RETURNING current_value
+                """;
+            AddProductSkuSequenceParameter(command, "id", Guid.NewGuid());
+            AddProductSkuSequenceParameter(command, "tenant_id", tenantId);
+            AddProductSkuSequenceParameter(command, "sequence_type", ProductSkuSequenceType);
+            AddProductSkuSequenceParameter(command, "created_at", now);
+            AddProductSkuSequenceParameter(command, "updated_at", now);
+
+            return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    public Task<string?> GetGeneratedSkuBaseAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken) =>
+        _dbContext.ProductSetupScanContexts
+            .AsNoTracking()
+            .Where(context =>
+                context.TenantId == tenantId &&
+                context.ProductId == productId &&
+                context.AcquisitionMode == "NO_BARCODE")
+            .Select(context => context.GeneratedSkuCandidate)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<ApplicationError?> ReplaceGeneratedSkuBaseAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid productId,
+        long expectedRowVersion,
+        string generatedSkuBase,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var product = await _dbContext.Products
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item =>
+                item.TenantId == tenantId &&
+                item.Id == productId &&
+                item.Status == ProductConstants.DraftStatus,
+                cancellationToken);
+        if (product is null)
+        {
+            return new ApplicationError("product.not_found", "Product draft was not found.");
+        }
+
+        if (product.RowVersion != expectedRowVersion)
+        {
+            return new ApplicationError(
+                "product.concurrency_conflict",
+                "Product was modified by another user. Refresh and try again.");
+        }
+
+        var scanContext = await _dbContext.ProductSetupScanContexts
+            .SingleOrDefaultAsync(context =>
+                context.TenantId == tenantId &&
+                context.ProductId == productId &&
+                context.AcquisitionMode == "NO_BARCODE",
+                cancellationToken);
+        if (scanContext is null)
+        {
+            return new ApplicationError(
+                "product.auto_sku_regeneration_not_allowed",
+                "AUTO SKU regeneration is only allowed for a no-barcode Product draft.");
+        }
+
+        scanContext.ReplaceGeneratedSkuCandidate(generatedSkuBase, userId, now);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
+    private static void AddProductSkuSequenceParameter(
+        System.Data.Common.DbCommand command,
+        string name,
+        object value)
+    {
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.Value = value;
+        command.Parameters.Add(parameter);
+    }
 
     public Task<bool> CategoryExistsForExistingMappingAsync(
         Guid tenantId,
@@ -89,7 +229,7 @@ public sealed partial class TenantAdminProductRepository
             .Where(x =>
                 (x.TenantId == null || x.TenantId == tenantId) &&
                 x.Status != "DELETED" &&
-                preferredCodes.Contains(x.UomCode.ToUpper()))
+                preferredCodes.Contains(x.UomCode))
             .OrderBy(x => x.TenantId == null ? 0 : 1)
             .ThenBy(x => x.UomCode)
             .Select(x => (Guid?)x.Id)
@@ -158,6 +298,14 @@ public sealed partial class TenantAdminProductRepository
 
         return product != null && product.Status == ProductConstants.DraftStatus && product.PublishedAt == null;
     }
+
+    public Task<bool> HasScanContextAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken) =>
+        _dbContext.ProductSetupScanContexts
+            .AsNoTracking()
+            .AnyAsync(x => x.TenantId == tenantId && x.ProductId == productId, cancellationToken);
 
     public async Task<SaveProductDraftResult> SaveProductDraftAsync(
         Guid tenantId,
@@ -230,6 +378,42 @@ public sealed partial class TenantAdminProductRepository
                         command.IsExplicitDraftSave);
 
                     await _dbContext.Products.AddAsync(product, cancellationToken);
+
+                    if (command.ScanBootstrap is not null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(command.ScanBootstrap.CandidateIdentifier))
+                        {
+                            var occupied = await _dbContext.ProductBarcodes
+                                .AsNoTracking()
+                                .AnyAsync(
+                                    x => x.TenantId == tenantId &&
+                                         x.Barcode == command.ScanBootstrap.CandidateIdentifier,
+                                    cancellationToken);
+                            if (occupied)
+                            {
+                                return SaveProductDraftResult.Failure(new ApplicationError(
+                                    "product.duplicate_barcode",
+                                    "Barcode already exists."));
+                            }
+                        }
+
+                        var scanContext = ProductSetupScanContext.Create(
+                            Guid.NewGuid(),
+                            tenantId,
+                            product.Id,
+                            command.ScanBootstrap.AcquisitionMode,
+                            command.ScanBootstrap.CandidateIdentifier,
+                            command.ScanBootstrap.IdentifierStandard,
+                            command.ScanBootstrap.SymbologyHint,
+                            command.ScanBootstrap.NoBarcodeReason,
+                            command.ScanBootstrap.ExternalLookupStatus,
+                            command.ScanBootstrap.ExternalSourceReference,
+                            command.ScanBootstrap.NormalizedPrefillJson,
+                            command.ScanBootstrap.GeneratedSkuCandidate,
+                            userId,
+                            now);
+                        await _dbContext.ProductSetupScanContexts.AddAsync(scanContext, cancellationToken);
+                    }
                 }
                 else
                 {
@@ -446,6 +630,13 @@ public sealed partial class TenantAdminProductRepository
                         "Product was modified by another user. Refresh and try again."));
                 }
 
+                if (string.Equals(product.ProductStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.units_pack_not_applicable",
+                        "Unit & Pack Conversion is not applicable for BUNDLE products."));
+                }
+
                 oldStructure = product.ProductStructure;
                 var oldSetting = await _dbContext.ProductInventorySettings
                     .AsNoTracking()
@@ -539,6 +730,13 @@ public sealed partial class TenantAdminProductRepository
                         "Product was not found."));
                 }
 
+                if (product.RowVersion != command.ExpectedRowVersion.Value)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.concurrency_conflict",
+                        "Product was modified by another user. Refresh and try again."));
+                }
+
                 if (command.VariantConfiguration != null && string.Equals(product.ProductStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
                 {
                     if (command.VariantConfiguration.Options.Any() && !command.VariantConfiguration.Variants.Any())
@@ -552,6 +750,54 @@ public sealed partial class TenantAdminProductRepository
                     await SaveVariantsAsync(tenantId, product.Id, command.VariantConfiguration, cancellationToken);
                 }
 
+                // B10: scanner-first composite Step 5 — persist identifiers in the same transaction
+                // as Product Configuration (single SaveWizardDraft / single rowVersion bump).
+                if (command.ApplyCompositeStep5Identifiers)
+                {
+                    var autoApplied = false;
+                    if (!string.IsNullOrWhiteSpace(command.AutoSkuBase))
+                    {
+                        var autoSkuError = await ApplyProductTypeAwareAutoSkusAsync(
+                            tenantId,
+                            userId,
+                            product,
+                            command.AutoSkuBase,
+                            now,
+                            cancellationToken);
+                        if (autoSkuError is not null)
+                        {
+                            return SaveProductDraftResult.Failure(autoSkuError);
+                        }
+
+                        autoApplied = true;
+                    }
+
+                    if (command.BarcodeSkuConfiguration != null)
+                    {
+                        var identifierConfiguration = autoApplied
+                            ? command.BarcodeSkuConfiguration with
+                            {
+                                Assignments = command.BarcodeSkuConfiguration.Assignments?
+                                    .Select(assignment => assignment with { Sku = null })
+                                    .ToList()
+                            }
+                            : command.BarcodeSkuConfiguration;
+
+                        var barcodeError = await ApplyBarcodeSkuConfigurationAsync(
+                            tenantId,
+                            userId,
+                            product.Id,
+                            identifierConfiguration,
+                            now,
+                            cancellationToken);
+
+                        if (barcodeError is not null)
+                        {
+                            return SaveProductDraftResult.Failure(barcodeError);
+                        }
+                    }
+                }
+
                 product.SaveWizardDraft(
                     command.TargetSetupStep,
                     command.DesiredPublishStatus,
@@ -561,6 +807,13 @@ public sealed partial class TenantAdminProductRepository
             }
             else if (command.CurrentStage == ProductWizardStage.PricingTax)
             {
+                if (!command.ExpectedRowVersion.HasValue)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.row_version_required",
+                        "expectedRowVersion is required when updating a persisted product."));
+                }
+
                 product = await _dbContext.Products
                     .FirstOrDefaultAsync(
                         x => x.TenantId == tenantId &&
@@ -573,6 +826,13 @@ public sealed partial class TenantAdminProductRepository
                     return SaveProductDraftResult.Failure(new ApplicationError(
                         "product.not_found",
                         "Product was not found."));
+                }
+
+                if (product.RowVersion != command.ExpectedRowVersion.Value)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.concurrency_conflict",
+                        "Product was modified by another user. Refresh and try again."));
                 }
 
                 if (command.PricingTax != null)
@@ -599,6 +859,14 @@ public sealed partial class TenantAdminProductRepository
             }
             else
             {
+                // ReviewCreate / publish and other residual stages.
+                if (!command.ExpectedRowVersion.HasValue)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.row_version_required",
+                        "expectedRowVersion is required when updating a persisted product."));
+                }
+
                 product = await _dbContext.Products
                     .FirstOrDefaultAsync(
                         x => x.TenantId == tenantId &&
@@ -611,6 +879,13 @@ public sealed partial class TenantAdminProductRepository
                     return SaveProductDraftResult.Failure(new ApplicationError(
                         "product.not_found",
                         "Product was not found."));
+                }
+
+                if (product.RowVersion != command.ExpectedRowVersion.Value)
+                {
+                    return SaveProductDraftResult.Failure(new ApplicationError(
+                        "product.concurrency_conflict",
+                        "Product was modified by another user. Refresh and try again."));
                 }
 
                 product.SaveWizardDraft(
@@ -897,11 +1172,47 @@ public sealed partial class TenantAdminProductRepository
                 "product.concurrency_conflict",
                 "Product was modified by another user. Refresh and try again."));
         }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            var message = ex.GetBaseException().Message;
+            if (message.Contains("sku", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("product_variants", StringComparison.OrdinalIgnoreCase))
+            {
+                return SaveProductDraftResult.Failure(new ApplicationError(
+                    "product.duplicate_sku",
+                    "SKU already exists."));
+            }
+
+            return SaveProductDraftResult.Failure(new ApplicationError(
+                "product.duplicate_barcode",
+                "Barcode already exists."));
+        }
         catch
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is PostgresException { SqlState: "23505" })
+            {
+                return true;
+            }
+
+            if (current.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) ||
+                current.Message.Contains("unique constraint", StringComparison.OrdinalIgnoreCase) ||
+                current.Message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public async Task<ProductSetupWizardDto?> GetSetupAsync(
@@ -922,24 +1233,19 @@ public sealed partial class TenantAdminProductRepository
             return null;
         }
 
-        var channelIds = await ResolvePosAndOnlineChannelIdsAsync(tenantId, cancellationToken);
+        var channelIds = await FindPosAndOnlineChannelIdsAsync(tenantId, cancellationToken);
         var images = await ProjectProductImagesAsync(tenantId, productId, cancellationToken);
         var categoryId = await GetPrimaryCategoryIdAsync(tenantId, productId, cancellationToken);
         var trackingFlags = await GetInventoryTrackingFlagsAsync(tenantId, productId, cancellationToken);
 
-        var posSellable = false;
-        var allowOnlineSale = false;
-        if (channelIds.PosSalesChannelId.HasValue && channelIds.OnlineSalesChannelId.HasValue)
-        {
-            var flags = await GetChannelFlagsAsync(
-                tenantId,
-                productId,
-                channelIds.PosSalesChannelId.Value,
-                channelIds.OnlineSalesChannelId.Value,
-                cancellationToken);
-            posSellable = flags.PosSellable;
-            allowOnlineSale = flags.AllowOnlineSale;
-        }
+        var channelFlags = await ProjectSetupChannelVisibilityFlagsAsync(
+            tenantId,
+            productId,
+            channelIds.PosSalesChannelId,
+            channelIds.OnlineSalesChannelId,
+            cancellationToken);
+        var posSellable = channelFlags.PosSellable;
+        var allowOnlineSale = channelFlags.AllowOnlineSale;
 
         var categoryName = categoryId.HasValue
             ? await _dbContext.Categories
@@ -984,6 +1290,25 @@ public sealed partial class TenantAdminProductRepository
         var unitProjection = await ProjectProductUnitSettingsAsync(tenantId, product.Id, cancellationToken);
         var barcodeSkuProjection = await ProjectBarcodeSkuConfigurationAsync(tenantId, product.Id, cancellationToken);
         var trackingValues = await LoadInitialTrackingValuesAsync(tenantId, productId, cancellationToken);
+        var scanContext = await ProjectScanContextAsync(tenantId, productId, cancellationToken);
+        if (barcodeSkuProjection is not null &&
+            !string.IsNullOrWhiteSpace(scanContext?.GeneratedSkuCandidate))
+        {
+            var autoBase = scanContext.GeneratedSkuCandidate.Trim().ToUpperInvariant();
+            var isAuto = barcodeSkuProjection.Assignments is not { Count: > 0 } assignments ||
+                         assignments
+                             .Where(assignment => !string.IsNullOrWhiteSpace(assignment.Sku))
+                             .All(assignment =>
+                             {
+                                 var sku = assignment.Sku!.Trim().ToUpperInvariant();
+                                 return sku == autoBase ||
+                                        sku.StartsWith($"{autoBase}-", StringComparison.Ordinal);
+                             });
+            barcodeSkuProjection = barcodeSkuProjection with
+            {
+                SkuMode = isAuto ? ProductSkuCandidateGenerator.AutoMode : "MANUAL"
+            };
+        }
 
         VariantConfigurationDto? variantConfiguration = null;
         var totalVariantCount = 0;
@@ -1052,15 +1377,69 @@ public sealed partial class TenantAdminProductRepository
             InitialBatchNumber: trackingValues.Batch,
             InitialExpiryDate: trackingValues.Expiry,
             InitialSerialNumber: trackingValues.Serial,
-            InitialTrackingAssignedVariantId: trackingValues.AssignedVariantId);
+            InitialTrackingAssignedVariantId: trackingValues.AssignedVariantId,
+            ScanContext: scanContext);
     }
 
-    private async Task<(Guid? PosSalesChannelId, Guid? OnlineSalesChannelId, ApplicationError? Error)>
-        ResolvePosAndOnlineChannelIdsAsync(Guid tenantId, CancellationToken cancellationToken)
+    private async Task<ProductSetupScanContextDto?> ProjectScanContextAsync(
+        Guid tenantId,
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        var row = await _dbContext.ProductSetupScanContexts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.TenantId == tenantId && x.ProductId == productId,
+                cancellationToken);
+
+        if (row is null)
+        {
+            return null;
+        }
+
+        return new ProductSetupScanContextDto(
+            AcquisitionMode: row.AcquisitionMode,
+            CandidateIdentifier: row.CandidateIdentifier,
+            IdentifierStandard: row.IdentifierStandard,
+            SymbologyHint: row.SymbologyHint,
+            NoBarcodeReason: row.NoBarcodeReason,
+            ExternalLookupStatus: row.ExternalLookupStatus,
+            ExternalSourceReference: row.ExternalSourceReference,
+            NormalizedPrefill: DeserializeScanPrefill(row.NormalizedPrefillJson),
+            GeneratedSkuCandidate: row.GeneratedSkuCandidate);
+    }
+
+    private static ExternalProductSuggestion? DeserializeScanPrefill(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<ExternalProductSuggestion>(
+                json,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Read-only POS/ONLINE sales-channel id lookup for GET /setup. Never provisions or SaveChanges.
+    /// </summary>
+    private async Task<(Guid? PosSalesChannelId, Guid? OnlineSalesChannelId)>
+        FindPosAndOnlineChannelIdsAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         var rows = await (
-            from channel in _dbContext.SalesChannels
-            join platform in _dbContext.PlatformSalesChannels
+            from channel in _dbContext.SalesChannels.AsNoTracking()
+            join platform in _dbContext.PlatformSalesChannels.AsNoTracking()
                 on channel.PlatformSalesChannelId equals platform.Id
             where channel.TenantId == tenantId &&
                   channel.Status == "ACTIVE" &&
@@ -1074,6 +1453,19 @@ public sealed partial class TenantAdminProductRepository
             x.ChannelCode == PlatformSalesChannelSeedConstants.PosChannelCode ||
             x.ChannelCode == "PHYSICAL")?.Id;
         var onlineId = rows.FirstOrDefault(x => x.ChannelCode == "ONLINE")?.Id;
+        return (posId, onlineId);
+    }
+
+    /// <summary>
+    /// Write-path resolver: finds POS/ONLINE tenant sales channels and auto-provisions missing ones.
+    /// Used by draft create/save — not by GET /setup.
+    /// </summary>
+    private async Task<(Guid? PosSalesChannelId, Guid? OnlineSalesChannelId, ApplicationError? Error)>
+        ResolvePosAndOnlineChannelIdsAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var existing = await FindPosAndOnlineChannelIdsAsync(tenantId, cancellationToken);
+        var posId = existing.PosSalesChannelId;
+        var onlineId = existing.OnlineSalesChannelId;
 
         if (!posId.HasValue || !onlineId.HasValue)
         {
@@ -1535,8 +1927,42 @@ public sealed partial class TenantAdminProductRepository
         Guid productId,
         Guid posSalesChannelId,
         Guid onlineSalesChannelId,
+        CancellationToken cancellationToken) =>
+        await ProjectSetupChannelVisibilityFlagsAsync(
+            tenantId,
+            productId,
+            posSalesChannelId,
+            onlineSalesChannelId,
+            cancellationToken);
+
+    /// <summary>
+    /// GET /setup (and write response projection) channel visibility flags.
+    /// Missing SalesChannel id or missing ProductChannelVisibility → false (canonical GetChannelFlags default).
+    /// Never inserts visibility or sales-channel rows.
+    /// </summary>
+    private async Task<(bool PosSellable, bool AllowOnlineSale)> ProjectSetupChannelVisibilityFlagsAsync(
+        Guid tenantId,
+        Guid productId,
+        Guid? posSalesChannelId,
+        Guid? onlineSalesChannelId,
         CancellationToken cancellationToken)
     {
+        if (!posSalesChannelId.HasValue && !onlineSalesChannelId.HasValue)
+        {
+            return (false, false);
+        }
+
+        var channelIds = new List<Guid>(2);
+        if (posSalesChannelId.HasValue)
+        {
+            channelIds.Add(posSalesChannelId.Value);
+        }
+
+        if (onlineSalesChannelId.HasValue)
+        {
+            channelIds.Add(onlineSalesChannelId.Value);
+        }
+
         var rows = await _dbContext.ProductChannelVisibilities
             .AsNoTracking()
             .Where(x =>
@@ -1544,12 +1970,16 @@ public sealed partial class TenantAdminProductRepository
                 x.ProductId == productId &&
                 x.ProductVariantId == null &&
                 x.Status != "DELETED" &&
-                (x.SalesChannelId == posSalesChannelId || x.SalesChannelId == onlineSalesChannelId))
+                channelIds.Contains(x.SalesChannelId))
             .Select(x => new { x.SalesChannelId, x.IsVisible, x.IsOrderable })
             .ToListAsync(cancellationToken);
 
-        var pos = rows.FirstOrDefault(x => x.SalesChannelId == posSalesChannelId);
-        var online = rows.FirstOrDefault(x => x.SalesChannelId == onlineSalesChannelId);
+        var pos = posSalesChannelId.HasValue
+            ? rows.FirstOrDefault(x => x.SalesChannelId == posSalesChannelId.Value)
+            : null;
+        var online = onlineSalesChannelId.HasValue
+            ? rows.FirstOrDefault(x => x.SalesChannelId == onlineSalesChannelId.Value)
+            : null;
 
         return (
             pos is not null && pos.IsVisible && pos.IsOrderable,
@@ -1871,6 +2301,226 @@ public sealed partial class TenantAdminProductRepository
         public IReadOnlyList<ProductUnitConversionResponse>? UnitConversions { get; set; }
     }
 
+    private async Task<ApplicationError?> ApplyProductTypeAwareAutoSkusAsync(
+        Guid tenantId,
+        Guid userId,
+        Product product,
+        string productBase,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var structure = ProductStructureConstants.Normalize(product.ProductStructure);
+        if (!string.Equals(structure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(structure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var categoryCode = await (
+                from mapping in _dbContext.ProductCategories.AsNoTracking()
+                join category in _dbContext.Categories.AsNoTracking()
+                    on new { mapping.TenantId, mapping.CategoryId }
+                    equals new { category.TenantId, CategoryId = category.Id }
+                where mapping.TenantId == tenantId &&
+                      mapping.ProductId == product.Id &&
+                      mapping.IsPrimaryCategory &&
+                      category.Status != CategoryConstants.DeletedStatus
+                orderby mapping.SortOrder
+                select category.CategoryCode)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(categoryCode))
+        {
+            return AutoSkuError(
+                "barcodeSkuConfiguration.skuMode",
+                "Category code is required for automatic SKU generation.");
+        }
+
+        try
+        {
+            if (!ProductSkuCandidateGenerator.MatchesCategory(productBase, categoryCode))
+            {
+                return new ApplicationError(
+                    "product.auto_sku_category_changed",
+                    "The selected Category changed after the AUTO SKU base was generated.",
+                    [new ApplicationFieldError(
+                        "barcodeSkuConfiguration.skuMode",
+                        "Regenerate the AUTO SKU in Step 1 for the selected Category.")]);
+            }
+        }
+        catch (ArgumentException exception)
+        {
+            return AutoSkuError("barcodeSkuConfiguration.skuMode", exception.Message);
+        }
+
+        if (string.Equals(structure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase))
+        {
+            var hasDefaultIdentity = _dbContext.ProductVariants.Local.Any(variant =>
+                    variant.TenantId == tenantId &&
+                    variant.ProductId == product.Id &&
+                    variant.Status != ProductConstants.ArchivedStatus &&
+                    variant.Status != ProductConstants.DeletedStatus) ||
+                await _dbContext.ProductVariants.AnyAsync(variant =>
+                    variant.TenantId == tenantId &&
+                    variant.ProductId == product.Id &&
+                    variant.Status != ProductConstants.ArchivedStatus &&
+                    variant.Status != ProductConstants.DeletedStatus,
+                    cancellationToken);
+            if (!hasDefaultIdentity)
+            {
+                var ensureError = await EnsureDefaultSellableVariantAsync(
+                    tenantId,
+                    userId,
+                    product,
+                    now,
+                    cancellationToken);
+                if (ensureError is not null)
+                {
+                    return ensureError;
+                }
+            }
+        }
+
+        var persistedVariants = await _dbContext.ProductVariants
+            .Where(variant =>
+                variant.TenantId == tenantId &&
+                variant.ProductId == product.Id &&
+                variant.Status != ProductConstants.ArchivedStatus &&
+                variant.Status != ProductConstants.DeletedStatus)
+            .ToListAsync(cancellationToken);
+        var variants = persistedVariants
+            .Concat(_dbContext.ProductVariants.Local.Where(variant =>
+                variant.TenantId == tenantId &&
+                variant.ProductId == product.Id &&
+                variant.Status != ProductConstants.ArchivedStatus &&
+                variant.Status != ProductConstants.DeletedStatus))
+            .GroupBy(variant => variant.Id)
+            .Select(group => group.First())
+            .Where(variant => variant.IsSellable)
+            .ToList();
+
+        if (variants.Count == 0)
+        {
+            return AutoSkuError(
+                "barcodeSkuConfiguration.assignments",
+                "At least one sellable identity is required for automatic SKU generation.");
+        }
+
+        var generatedByVariant = new Dictionary<Guid, string>();
+        if (string.Equals(structure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase))
+        {
+            var target = variants.FirstOrDefault(variant => variant.IsDefaultVariant) ?? variants[0];
+            generatedByVariant[target.Id] = productBase.Trim().ToUpperInvariant();
+        }
+        else
+        {
+            var persistedOptions = await _dbContext.ProductOptions
+                .Where(option => option.TenantId == tenantId && option.ProductId == product.Id)
+                .ToListAsync(cancellationToken);
+            var options = persistedOptions
+                .Concat(_dbContext.ProductOptions.Local.Where(option =>
+                    option.TenantId == tenantId && option.ProductId == product.Id))
+                .GroupBy(option => option.Id)
+                .Select(group => group.First())
+                .ToDictionary(option => option.Id);
+
+            var optionIds = options.Keys.ToList();
+            var persistedValues = await _dbContext.ProductOptionValues
+                .Where(value => value.TenantId == tenantId && optionIds.Contains(value.ProductOptionId))
+                .ToListAsync(cancellationToken);
+            var values = persistedValues
+                .Concat(_dbContext.ProductOptionValues.Local.Where(value =>
+                    value.TenantId == tenantId && optionIds.Contains(value.ProductOptionId)))
+                .GroupBy(value => value.Id)
+                .Select(group => group.First())
+                .ToDictionary(value => value.Id);
+
+            var variantIds = variants.Select(variant => variant.Id).ToList();
+            var persistedMappings = await _dbContext.ProductVariantOptionValues
+                .Where(mapping =>
+                    mapping.TenantId == tenantId &&
+                    mapping.ProductId == product.Id &&
+                    variantIds.Contains(mapping.ProductVariantId))
+                .ToListAsync(cancellationToken);
+            var mappings = persistedMappings
+                .Concat(_dbContext.ProductVariantOptionValues.Local.Where(mapping =>
+                    mapping.TenantId == tenantId &&
+                    mapping.ProductId == product.Id &&
+                    variantIds.Contains(mapping.ProductVariantId)))
+                .GroupBy(mapping => mapping.Id)
+                .Select(group => group.First())
+                .ToList();
+
+            foreach (var variant in variants)
+            {
+                var orderedCodes = mappings
+                    .Where(mapping => mapping.ProductVariantId == variant.Id)
+                    .Select(mapping => new
+                    {
+                        Option = options.GetValueOrDefault(mapping.ProductOptionId),
+                        Value = values.GetValueOrDefault(mapping.ProductOptionValueId)
+                    })
+                    .Where(item => item.Option is not null && item.Value is not null)
+                    .OrderBy(item => item.Option!.SortOrder)
+                    .ThenBy(item => item.Option!.OptionCode, StringComparer.Ordinal)
+                    .Select(item => item.Value!.ValueCode)
+                    .ToList();
+
+                try
+                {
+                    generatedByVariant[variant.Id] =
+                        ProductSkuCandidateGenerator.BuildVariantSku(productBase, orderedCodes);
+                }
+                catch (ArgumentException exception)
+                {
+                    return AutoSkuError(
+                        "barcodeSkuConfiguration.assignments",
+                        $"Unable to generate SKU for variant '{variant.VariantName}': {exception.Message}");
+                }
+            }
+        }
+
+        if (generatedByVariant.Values.Distinct(StringComparer.Ordinal).Count() != generatedByVariant.Count)
+        {
+            return AutoSkuError(
+                "barcodeSkuConfiguration.assignments",
+                "Variant Value codes must produce unique automatic SKUs.");
+        }
+
+        var targetIds = generatedByVariant.Keys.ToList();
+        var generatedSkus = generatedByVariant.Values.ToList();
+        var conflict = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .AnyAsync(variant =>
+                variant.TenantId == tenantId &&
+                !targetIds.Contains(variant.Id) &&
+                variant.Status != ProductConstants.ArchivedStatus &&
+                generatedSkus.Contains(variant.Sku!),
+                cancellationToken);
+        if (conflict)
+        {
+            return AutoSkuError(
+                "barcodeSkuConfiguration.assignments",
+                "An automatically generated SKU already exists in the system.");
+        }
+
+        foreach (var variant in variants)
+        {
+            if (generatedByVariant.TryGetValue(variant.Id, out var generatedSku))
+            {
+                variant.UpdateSku(generatedSku, userId, now);
+            }
+        }
+
+        return null;
+    }
+
+    private static ApplicationError AutoSkuError(string field, string message) =>
+        new(
+            "product.auto_sku_generation_failed",
+            "Automatic SKU generation failed.",
+            [new ApplicationFieldError(field, message)]);
+
     private async Task<ApplicationError?> ApplyBarcodeSkuConfigurationAsync(
         Guid tenantId,
         Guid userId,
@@ -1882,6 +2532,17 @@ public sealed partial class TenantAdminProductRepository
         if (configuration.Assignments == null || configuration.Assignments.Count == 0)
             return null;
 
+        var product = await _dbContext.Products
+            .FirstOrDefaultAsync(
+                x => x.TenantId == tenantId &&
+                     x.Id == productId &&
+                     x.Status != ProductConstants.ArchivedStatus,
+                cancellationToken);
+        if (product is null)
+        {
+            return new ApplicationError("product.not_found", "Product was not found.");
+        }
+
         var variants = await _dbContext.ProductVariants
             .Where(v =>
                 v.TenantId == tenantId &&
@@ -1889,6 +2550,28 @@ public sealed partial class TenantAdminProductRepository
                 v.Status != ProductConstants.ArchivedStatus &&
                 v.Status != ProductConstants.DeletedStatus)
             .ToListAsync(cancellationToken);
+
+        if (variants.Count == 0)
+        {
+            var ensureError = await EnsureDefaultSellableVariantAsync(
+                tenantId,
+                userId,
+                product,
+                now,
+                cancellationToken);
+            if (ensureError is not null)
+            {
+                return ensureError;
+            }
+
+            variants = await _dbContext.ProductVariants
+                .Where(v =>
+                    v.TenantId == tenantId &&
+                    v.ProductId == productId &&
+                    v.Status != ProductConstants.ArchivedStatus &&
+                    v.Status != ProductConstants.DeletedStatus)
+                .ToListAsync(cancellationToken);
+        }
 
         var variantById = variants.ToDictionary(v => v.Id);
         var variantIds = variants.Select(v => v.Id).ToList();
@@ -1936,6 +2619,18 @@ public sealed partial class TenantAdminProductRepository
                     ]);
             }
 
+            if (!targetVariant.IsSellable)
+            {
+                return new ApplicationError(
+                    "product.validation_failed",
+                    "Product validation failed.",
+                    [
+                        new ApplicationFieldError(
+                            $"{prefix}.productVariantId",
+                            "Excluded or non-sellable variants cannot receive identifier assignments.")
+                    ]);
+            }
+
             if (!string.IsNullOrWhiteSpace(assignment.Sku))
             {
                 targetVariant.UpdateSku(assignment.Sku.Trim(), userId, now);
@@ -1948,8 +2643,13 @@ public sealed partial class TenantAdminProductRepository
 
             if (!string.IsNullOrWhiteSpace(assignment.Barcode))
             {
-                var barcodeType = ProductBarcodeFormatValidator.NormalizeType(assignment.BarcodeType);
-                if (barcodeType is null)
+                var classification = ProductBarcodeFormatValidator.Classify(
+                    assignment.Barcode,
+                    assignment.BarcodeType);
+                var barcodeType = ProductBarcodeFormatValidator.NormalizeType(assignment.BarcodeType)
+                    ?? classification.BarcodeType
+                    ?? ProductBarcodeFormatValidator.Unknown;
+                if (ProductBarcodeFormatValidator.NormalizeType(barcodeType) is null)
                 {
                     return new ApplicationError(
                         "product.validation_failed",
@@ -1960,6 +2660,12 @@ public sealed partial class TenantAdminProductRepository
                                 "Barcode type is required when a barcode is provided.")
                         ]);
                 }
+
+                // Server classification is authoritative for identifier_standard when classifiable.
+                var identifierStandard = classification.IdentifierStandard
+                    ?? (string.IsNullOrWhiteSpace(assignment.IdentifierStandard)
+                        ? null
+                        : assignment.IdentifierStandard.Trim().ToUpperInvariant());
 
                 if (existingBarcode == null)
                 {
@@ -1975,27 +2681,86 @@ public sealed partial class TenantAdminProductRepository
                         true,
                         ProductConstants.InactiveStatus,
                         userId,
-                        now
-                    );
+                        now,
+                        identifierStandard);
                     await _dbContext.ProductBarcodes.AddAsync(newBarcode, cancellationToken);
                 }
                 else
                 {
-                    existingBarcode.UpdateIdentifier(assignment.Barcode.Trim(), barcodeType, userId, now);
-                    if (existingBarcode.Status != ProductConstants.InactiveStatus && existingBarcode.Status != ProductConstants.ActiveStatus)
+                    existingBarcode.UpdateIdentifier(
+                        assignment.Barcode.Trim(),
+                        barcodeType,
+                        userId,
+                        now,
+                        identifierStandard);
+                    if (existingBarcode.Status != ProductConstants.InactiveStatus &&
+                        existingBarcode.Status != ProductConstants.ActiveStatus)
                     {
                         existingBarcode.Deactivate(userId, now);
                     }
                 }
             }
-            else if (existingBarcode != null &&
-                     string.Equals(existingBarcode.Status, ProductConstants.InactiveStatus, StringComparison.OrdinalIgnoreCase))
+            else if (existingBarcode != null)
             {
-                // Clear draft (inactive) primary barcode safely without touching active historical rows.
+                // Optional barcode cleared — soft-delete product-owned primary assignment only.
                 existingBarcode.Delete(userId, now);
             }
         }
 
+        return null;
+    }
+
+    private async Task<ApplicationError?> EnsureDefaultSellableVariantAsync(
+        Guid tenantId,
+        Guid userId,
+        Product product,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var structure = ProductStructureConstants.Normalize(product.ProductStructure);
+        if (!string.Equals(structure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(structure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+        {
+            return new ApplicationError(
+                "product.validation_failed",
+                "Product validation failed.",
+                [new ApplicationFieldError(
+                    "barcodeSkuConfiguration.assignments",
+                    "No applicable variant found for identifier assignment.")]);
+        }
+
+        var uomId = await GetDefaultInventoryUomIdAsync(tenantId, cancellationToken);
+        if (!uomId.HasValue)
+        {
+            var unitSetting = await _dbContext.ProductUnitSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ProductId == product.Id, cancellationToken);
+            uomId = unitSetting?.BaseUomId ?? unitSetting?.SellingUomId;
+        }
+
+        if (!uomId.HasValue)
+        {
+            return new ApplicationError(
+                "product.validation_failed",
+                "A default unit of measure is required before assigning SKU/barcode.");
+        }
+
+        var defaultVariant = ProductVariant.Create(
+            Guid.NewGuid(),
+            tenantId,
+            product.Id,
+            "DEFAULT",
+            product.ProductName,
+            sku: null,
+            uomId.Value,
+            uomId.Value,
+            isDefaultVariant: true,
+            isSellable: true,
+            allowFractionalQuantity: false,
+            ProductConstants.DraftStatus,
+            userId,
+            now);
+        await _dbContext.ProductVariants.AddAsync(defaultVariant, cancellationToken);
         return null;
     }
 
@@ -2632,7 +3397,8 @@ public sealed partial class TenantAdminProductRepository
                 Barcode: hasBarcode ? primaryBarcode!.Barcode : null,
                 Status: status,
                 ClientCombinationKey: clientKey,
-                BarcodeType: primaryBarcode?.BarcodeType));
+                BarcodeType: primaryBarcode?.BarcodeType,
+                IdentifierStandard: primaryBarcode?.IdentifierStandard));
         }
 
         return new BarcodeSkuConfigurationDto(

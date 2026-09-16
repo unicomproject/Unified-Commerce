@@ -9,6 +9,7 @@ using E_POS.Application.Modules.Platform.PlatformAdmin.Validators;
 using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.AccessControl.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.AccessControl.Services;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Domain.Modules.Platform.Subscription.Constants;
 using E_POS.Domain.Modules.Platform.Subscription.Entities;
@@ -20,6 +21,7 @@ using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Modules.Shared.Idempotency.Services;
 using E_POS.Infrastructure.Modules.Tenant.AccessControl.Repositories;
 using E_POS.Infrastructure.Modules.Tenant.AccessControl.Services;
+using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Persistence;
 using E_POS.IntegrationTests.TestSupport;
 using Microsoft.EntityFrameworkCore;
@@ -110,6 +112,29 @@ public sealed class TenantUserStaffCodePostgreSqlTests
         Assert.Contains("USR-2026-00001", codes.Take(2));
         Assert.Contains("USR-2026-00001", codes.Skip(2));
         Assert.All(codes, code => Assert.Matches(StaffCodeRegex, code));
+    }
+
+    [Fact]
+    public async Task ProductSkuSequence_ConcurrentAllocation_IsAtomicAndTenantScoped()
+    {
+        if (!await CanConnectAsync())
+        {
+            return;
+        }
+
+        await using var harness = await DisposablePostgresHarness.CreateAsync("product_sku_sequence");
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+
+        var tenantATasks = Enumerable.Range(0, 8)
+            .Select(_ => AllocateProductSkuSequenceAsync(harness.ConnectionString, tenantA))
+            .ToArray();
+        var tenantAValues = await Task.WhenAll(tenantATasks);
+        var tenantBValue = await AllocateProductSkuSequenceAsync(harness.ConnectionString, tenantB);
+
+        Assert.Equal(8, tenantAValues.Distinct().Count());
+        Assert.Equal(Enumerable.Range(1, 8).Select(value => (long)value), tenantAValues.Order());
+        Assert.Equal(1L, tenantBValue);
     }
 
     [Fact]
@@ -287,6 +312,18 @@ public sealed class TenantUserStaffCodePostgreSqlTests
         return await new TenantUserStaffCodeService(db).GenerateAsync(tenantId, Now, CancellationToken.None);
     }
 
+    private static async Task<long> AllocateProductSkuSequenceAsync(
+        string connectionString,
+        Guid tenantId)
+    {
+        await using var db = CreateDb(connectionString);
+        var repository = new TenantAdminProductRepository(db, new NoOpCodeSequenceRepository());
+        return await repository.AllocateNextProductSkuSequenceAsync(
+            tenantId,
+            Now,
+            CancellationToken.None);
+    }
+
     private static TenantAdminUserService CreateUserService(EPosDbContext db) =>
         new(
             new IdempotencyService(db, new FixedDateTimeProvider(Now)),
@@ -409,6 +446,18 @@ public sealed class TenantUserStaffCodePostgreSqlTests
         new(new DbContextOptionsBuilder<EPosDbContext>()
             .UseNpgsql(connectionString)
             .Options);
+
+    private sealed class NoOpCodeSequenceRepository : ICodeSequenceRepository
+    {
+        public Task<string> GetNextCodeAsync(
+            Guid tenantId,
+            string sequenceKey,
+            string prefix,
+            int paddingLength,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult($"{prefix}1");
+    }
 
     private static async Task<bool> CanConnectAsync()
     {

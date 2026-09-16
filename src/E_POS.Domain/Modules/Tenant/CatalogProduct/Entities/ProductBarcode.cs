@@ -9,6 +9,7 @@ public class ProductBarcode : AuditableEntity
     public Guid? ProductVariantId { get; protected set; }
     public string Barcode { get; protected set; } = string.Empty;
     public string BarcodeType { get; protected set; } = string.Empty;
+    public string? IdentifierStandard { get; protected set; }
     public Guid? UomId { get; protected set; }
     public decimal QuantityPerScan { get; protected set; }
     public bool IsPrimaryBarcode { get; protected set; }
@@ -28,7 +29,8 @@ public class ProductBarcode : AuditableEntity
         bool isPrimaryBarcode,
         string status,
         Guid? createdByTenantUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? identifierStandard = null)
     {
         return new ProductBarcode
         {
@@ -38,6 +40,7 @@ public class ProductBarcode : AuditableEntity
             ProductVariantId = productVariantId,
             Barcode = barcode.Trim(),
             BarcodeType = barcodeType.Trim().ToUpperInvariant(),
+            IdentifierStandard = NormalizeOptionalCode(identifierStandard),
             UomId = uomId,
             QuantityPerScan = quantityPerScan,
             IsPrimaryBarcode = isPrimaryBarcode,
@@ -48,13 +51,22 @@ public class ProductBarcode : AuditableEntity
             UpdatedAt = now
         };
     }
-    public void UpdateIdentifier(string barcode, string barcodeType, Guid? updatedByTenantUserId, DateTimeOffset now)
+    public void UpdateIdentifier(
+        string barcode,
+        string barcodeType,
+        Guid? updatedByTenantUserId,
+        DateTimeOffset now,
+        string? identifierStandard = null)
     {
         Barcode = barcode.Trim();
         BarcodeType = barcodeType.Trim().ToUpperInvariant();
+        IdentifierStandard = NormalizeOptionalCode(identifierStandard);
         UpdatedByTenantUserId = updatedByTenantUserId;
         UpdatedAt = now;
     }
+
+    private static string? NormalizeOptionalCode(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
 
     public void AssignVariant(Guid? productVariantId, Guid? updatedByTenantUserId, DateTimeOffset now)
     {

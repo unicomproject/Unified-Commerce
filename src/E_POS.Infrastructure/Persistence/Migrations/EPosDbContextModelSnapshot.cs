@@ -12718,6 +12718,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_tenant_user_id");
 
+                    b.Property<string>("IdentifierStandard")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("identifier_standard");
+
                     b.Property<bool>("IsPrimaryBarcode")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -12783,6 +12788,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("product_barcodes", null, t =>
                         {
+                            t.HasCheckConstraint("ck_product_barcodes_identifier_standard", "identifier_standard IS NULL OR identifier_standard IN ('GTIN8', 'GTIN12', 'GTIN13', 'GTIN14', 'OTHER')");
+
                             t.HasCheckConstraint("ck_product_barcodes_quantity_per_scan", "quantity_per_scan > 0");
 
                             t.HasCheckConstraint("ck_product_barcodes_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
@@ -14010,6 +14017,113 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.ToTable("product_setup_initial_tracking", null, t =>
                         {
                             t.HasCheckConstraint("ck_product_setup_initial_tracking_row_version", "row_version >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductSetupScanContext", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AcquisitionMode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("acquisition_mode");
+
+                    b.Property<string>("CandidateIdentifier")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("candidate_identifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_tenant_user_id");
+
+                    b.Property<string>("ExternalLookupStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("external_lookup_status");
+
+                    b.Property<string>("ExternalSourceReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("external_source_reference");
+
+                    b.Property<string>("GeneratedSkuCandidate")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("generated_sku_candidate");
+
+                    b.Property<string>("IdentifierStandard")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("identifier_standard");
+
+                    b.Property<string>("NoBarcodeReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("no_barcode_reason");
+
+                    b.Property<string>("NormalizedPrefillJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("normalized_prefill_json");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<long>("RowVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("SymbologyHint")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("symbology_hint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_tenant_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_setup_scan_context");
+
+                    b.HasIndex("CreatedByTenantUserId");
+
+                    b.HasIndex("UpdatedByTenantUserId");
+
+                    b.HasIndex("TenantId", "Id")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_setup_scan_context_tenant_id_id");
+
+                    b.HasIndex("TenantId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_setup_scan_context_tenant_id_product_id");
+
+                    b.ToTable("product_setup_scan_context", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_setup_scan_context_acquisition_mode", "acquisition_mode IN ('SCAN', 'MANUAL', 'NO_BARCODE', 'LEGACY')");
+
+                            t.HasCheckConstraint("ck_product_setup_scan_context_no_barcode_reason", "no_barcode_reason IS NULL OR no_barcode_reason IN ('OWN_MADE', 'SERVICE_FEE', 'UNLABELLED')");
+
+                            t.HasCheckConstraint("ck_product_setup_scan_context_row_version", "row_version >= 1");
                         });
                 });
 
@@ -29525,6 +29639,36 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_product_setup_initial_tracking_product_id_products");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductSetupScanContext", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_setup_scan_context_created_by");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_setup_scan_context_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_setup_scan_context_updated_by");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ProductId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_setup_scan_context_product_id_products");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ProductUnitConversion", b =>

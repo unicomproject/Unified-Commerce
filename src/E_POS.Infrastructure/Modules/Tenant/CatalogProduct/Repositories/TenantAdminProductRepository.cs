@@ -2264,7 +2264,7 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 newProductId,
                 newVariantCode,
                 variant.VariantName,
-                variant.Sku,
+                sku: null, // Journey: clear conflicting SKU on Create Duplicate
                 variant.StockUomId,
                 variant.SalesUomId,
                 variant.IsDefaultVariant,
@@ -2296,6 +2296,9 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             );
             _dbContext.ProductCategories.Add(newCategory);
         }
+
+        // Scanner-first: land duplicate draft on Basic Details (public step 2).
+        newProduct.SetDraftSaved(2, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -2449,6 +2452,99 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
         return _dbContext.Products
             .AsNoTracking()
             .AnyAsync(x => x.ProductSlug == slug, cancellationToken);
+    }
+
+    public async Task<ProductBarcodeResolveMatchProjection?> FindBarcodeResolveMatchAsync(
+        Guid tenantId,
+        string normalizedBarcode,
+        CancellationToken cancellationToken)
+    {
+        // Include all barcode statuses: UNIQUE(tenant_id, barcode) has no DELETED filter,
+        // so any retained row would block later publish uniqueness.
+        var matches = await (
+            from barcode in _dbContext.ProductBarcodes.AsNoTracking()
+            join product in _dbContext.Products.AsNoTracking()
+                on new { barcode.TenantId, barcode.ProductId } equals new { product.TenantId, ProductId = product.Id }
+            where barcode.TenantId == tenantId && barcode.Barcode == normalizedBarcode
+            select new
+            {
+                barcode.ProductId,
+                barcode.ProductVariantId,
+                product.ProductName,
+                product.Status,
+                product.BrandId,
+            })
+            .ToListAsync(cancellationToken);
+
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        var match = matches[0];
+        string? variantLabel = null;
+        string? sku = null;
+
+        if (match.ProductVariantId.HasValue)
+        {
+            var variant = await _dbContext.ProductVariants
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.Id == match.ProductVariantId.Value)
+                .Select(x => new { x.VariantName, x.Sku })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            variantLabel = variant?.VariantName;
+            sku = variant?.Sku;
+        }
+        else
+        {
+            var defaultVariant = await _dbContext.ProductVariants
+                .AsNoTracking()
+                .Where(x =>
+                    x.TenantId == tenantId &&
+                    x.ProductId == match.ProductId &&
+                    x.IsDefaultVariant)
+                .Select(x => new { x.Sku })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            sku = defaultVariant?.Sku;
+        }
+
+        string? brandName = null;
+        if (match.BrandId.HasValue)
+        {
+            brandName = await _dbContext.Brands
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.Id == match.BrandId.Value)
+                .Select(x => x.BrandName)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var categoryName = await (
+            from link in _dbContext.ProductCategories.AsNoTracking()
+            join category in _dbContext.Categories.AsNoTracking()
+                on new { link.TenantId, link.CategoryId } equals new { category.TenantId, CategoryId = category.Id }
+            where link.TenantId == tenantId &&
+                  link.ProductId == match.ProductId &&
+                  link.IsPrimaryCategory
+            select category.CategoryName)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var imageUrls = await GetPrimaryImageUrlsAsync(tenantId, [match.ProductId], cancellationToken);
+        imageUrls.TryGetValue(match.ProductId, out var imageUrl);
+
+        return new ProductBarcodeResolveMatchProjection(
+            match.ProductId,
+            match.ProductVariantId,
+            match.ProductVariantId.HasValue ? "VARIANT" : "PRODUCT",
+            match.ProductName,
+            variantLabel,
+            brandName,
+            categoryName,
+            sku,
+            match.Status,
+            imageUrl,
+            matches.Count);
     }
 
     private static ProductCategory CreateSelectedCategoryLink(
