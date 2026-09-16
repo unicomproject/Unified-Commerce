@@ -262,6 +262,66 @@ public sealed class TenantAdminProductsController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpPost("barcodes/resolve")]
+    [ProducesResponseType(typeof(ResolveProductBarcodeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ResolveBarcode(
+        [FromBody] ResolveProductBarcodeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.ResolveBarcodeAsync(context, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpPost("sku-candidates/generate")]
+    [ProducesResponseType(typeof(GenerateSkuCandidateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GenerateSkuCandidate(
+        [FromBody] GenerateSkuCandidateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.GenerateSkuCandidateAsync(context, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpPost("barcodes/external-lookup")]
+    [ProducesResponseType(typeof(ExternalLookupProductBarcodeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ExternalLookupBarcode(
+        [FromBody] ExternalLookupProductBarcodeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        var result = await _tenantAdminProductService.ExternalLookupBarcodeAsync(context, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpPost("draft")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -454,6 +514,8 @@ public sealed class TenantAdminProductsController : ControllerBase
             "product.unsafe_tracking_change" or
             "product.validation_failed" or
             "product.delete_blocked" or
+            "product.barcode_integrity_violation" or
+            "product.sku_candidate_exhausted" or
             "product.initial_tracking.incompatible_values_require_confirmation" or
             "product.initial_tracking.batch_required_for_expiry" or
             "product.initial_tracking.invalid_expiry_date" or
@@ -462,12 +524,14 @@ public sealed class TenantAdminProductsController : ControllerBase
             "product.initial_tracking.bundle_parent_not_supported" => BadRequest(CreateError(error)),
             "product.not_found" => NotFound(CreateError(error)),
             "product.concurrency_conflict" or
+            "product.already_published" or
             "product.duplicate_sku" or
             "product.duplicate_barcode" or
             "product.initial_tracking.duplicate_batch" or
             "product.initial_tracking.duplicate_serial" => StatusCode(
                 StatusCodes.Status409Conflict,
                 CreateError(error)),
+            "product.barcode_sku_validation_failed" => BadRequest(CreateError(error)),
             _ => BadRequest(CreateError(error)),
         };
     }

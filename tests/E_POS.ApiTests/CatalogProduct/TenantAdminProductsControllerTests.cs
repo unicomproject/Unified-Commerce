@@ -6,6 +6,7 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Shared.Media.Dtos;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ExternalLookup;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using Microsoft.AspNetCore.Authorization;
@@ -112,6 +113,544 @@ public sealed class TenantAdminProductsControllerTests
 
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public void ResolveBarcode_Route_IsPostBarcodesResolve()
+    {
+        var method = typeof(TenantAdminProductsController).GetMethod(
+            nameof(TenantAdminProductsController.ResolveBarcode));
+        Assert.NotNull(method);
+        var httpPost = Assert.Single(method!.GetCustomAttributes<HttpPostAttribute>());
+        Assert.Equal("barcodes/resolve", httpPost.Template);
+
+        var route = Assert.Single(typeof(TenantAdminProductsController).GetCustomAttributes<RouteAttribute>());
+        Assert.Equal("api/v1/tenant-admin/products", route.Template);
+    }
+
+    [Fact]
+    public async Task ResolveBarcode_WithoutTenantClaims_ReturnsUnauthorized()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+
+        var result = await controller.ResolveBarcode(
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Null(service.LastResolveRequest);
+    }
+
+    [Fact]
+    public async Task ResolveBarcode_WithPermissionDenied_ReturnsForbidden()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            ResolveBarcodeResult = ApplicationResult<ResolveProductBarcodeResponse>.Failure(
+                new ApplicationError("product.permission_denied", "Permission denied for product management.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.view");
+
+        var result = await controller.ResolveBarcode(
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResolveBarcode_WithEntitlementDenied_ReturnsForbidden()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            ResolveBarcodeResult = ApplicationResult<ResolveProductBarcodeResponse>.Failure(
+                new ApplicationError("product.entitlement_denied", "Product management feature is not included.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ResolveBarcode(
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResolveBarcode_InvalidBusinessOutcome_ReturnsOkEnvelope()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            ResolveBarcodeResult = ApplicationResult<ResolveProductBarcodeResponse>.Success(
+                new ResolveProductBarcodeResponse(
+                    "INVALID",
+                    null,
+                    null,
+                    "UNKNOWN",
+                    "CHECKSUM_FAILED",
+                    null)),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ResolveBarcode(
+            new ResolveProductBarcodeRequest { Barcode = "4006381333930", InputMode = "MANUAL" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ResolveProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+        Assert.Equal("INVALID", body.Outcome);
+        Assert.Equal("CHECKSUM_FAILED", body.InvalidReason);
+        Assert.NotNull(service.LastResolveRequest);
+        Assert.Equal("MANUAL", service.LastResolveRequest!.InputMode);
+    }
+
+    [Fact]
+    public async Task ResolveBarcode_ValidNoLocalMatch_ReturnsOk()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ResolveBarcode(
+            new ResolveProductBarcodeRequest
+            {
+                Barcode = "4006381333931",
+                InputMode = "SCAN",
+                ReportedSymbology = "EAN13",
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ResolveProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+        Assert.Equal("VALID_NO_LOCAL_MATCH", body.Outcome);
+        Assert.Equal("4006381333931", service.LastResolveRequest!.Barcode);
+        Assert.Equal("EAN13", service.LastResolveRequest.ReportedSymbology);
+    }
+
+    [Fact]
+    public async Task ResolveBarcode_ValidLocalMatch_ReturnsOkWithProjection()
+    {
+        var productId = Guid.NewGuid();
+        var service = new FakeTenantAdminProductService
+        {
+            ResolveBarcodeResult = ApplicationResult<ResolveProductBarcodeResponse>.Success(
+                new ResolveProductBarcodeResponse(
+                    "VALID_LOCAL_MATCH",
+                    "012345678905",
+                    "GTIN12",
+                    "UPCA",
+                    null,
+                    new ResolveProductBarcodeLocalMatchDto(
+                        "PRODUCT",
+                        productId,
+                        null,
+                        "Existing Product",
+                        null,
+                        "Brand",
+                        "Category",
+                        "SKU-1",
+                        null,
+                        null,
+                        "ACTIVE",
+                        null,
+                        true,
+                        false))),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ResolveBarcode(
+            new ResolveProductBarcodeRequest { Barcode = "012345678905", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ResolveProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+        Assert.Equal("VALID_LOCAL_MATCH", body.Outcome);
+        Assert.Equal(productId, body.LocalMatch!.ProductId);
+        Assert.True(body.LocalMatch.CanViewProduct);
+        Assert.False(body.LocalMatch.CanEditProduct);
+    }
+
+    [Fact]
+    public void GenerateSkuCandidate_Route_IsPostSkuCandidatesGenerate()
+    {
+        var method = typeof(TenantAdminProductsController).GetMethod(
+            nameof(TenantAdminProductsController.GenerateSkuCandidate));
+        Assert.NotNull(method);
+        var httpPost = Assert.Single(method!.GetCustomAttributes<HttpPostAttribute>());
+        Assert.Equal("sku-candidates/generate", httpPost.Template);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidate_WithoutTenantClaims_ReturnsUnauthorized()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+
+        var result = await controller.GenerateSkuCandidate(
+            new GenerateSkuCandidateRequest { Purpose = "NO_BARCODE_PRODUCT" },
+            CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Null(service.LastGenerateSkuRequest);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidate_WithPermissionDenied_ReturnsForbidden()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            GenerateSkuCandidateResult = ApplicationResult<GenerateSkuCandidateResponse>.Failure(
+                new ApplicationError("product.permission_denied", "Permission denied.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.view");
+
+        var result = await controller.GenerateSkuCandidate(
+            new GenerateSkuCandidateRequest { Purpose = "NO_BARCODE_PRODUCT" },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidate_ValidRequest_ReturnsOkEnvelope()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            GenerateSkuCandidateResult = ApplicationResult<GenerateSkuCandidateResponse>.Success(
+                new GenerateSkuCandidateResponse("TSH-000125", true)),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+        var categoryId = Guid.NewGuid();
+
+        var result = await controller.GenerateSkuCandidate(
+            new GenerateSkuCandidateRequest
+            {
+                Purpose = "NO_BARCODE_PRODUCT",
+                CategoryId = categoryId,
+                Mode = "AUTO",
+                ProductName = "House Lemon Juice",
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<GenerateSkuCandidateResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+        Assert.Equal("TSH-000125", body.Candidate);
+        Assert.True(body.Reserved);
+        Assert.Equal("NO_BARCODE_PRODUCT", service.LastGenerateSkuRequest!.Purpose);
+        Assert.Equal(categoryId, service.LastGenerateSkuRequest.CategoryId);
+        Assert.Equal("AUTO", service.LastGenerateSkuRequest.Mode);
+        Assert.Equal("House Lemon Juice", service.LastGenerateSkuRequest.ProductName);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidate_BadPurpose_ReturnsBadRequest()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            GenerateSkuCandidateResult = ApplicationResult<GenerateSkuCandidateResponse>.Failure(
+                new ApplicationError(
+                    "product.validation_failed",
+                    "purpose must be NO_BARCODE_PRODUCT.",
+                    [new ApplicationFieldError("purpose", "Unsupported purpose.")])),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.GenerateSkuCandidate(
+            new GenerateSkuCandidateRequest { Purpose = "IMPORT" },
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidate_WithEntitlementDenied_ReturnsForbidden()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            GenerateSkuCandidateResult = ApplicationResult<GenerateSkuCandidateResponse>.Failure(
+                new ApplicationError("product.entitlement_denied", "Product management feature is not included.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.GenerateSkuCandidate(
+            new GenerateSkuCandidateRequest { Purpose = "NO_BARCODE_PRODUCT" },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public void SaveDraft_Route_IsPostDraft()
+    {
+        var method = typeof(TenantAdminProductsController).GetMethod(
+            nameof(TenantAdminProductsController.SaveDraft));
+        Assert.NotNull(method);
+        var httpPost = Assert.Single(method!.GetCustomAttributes<HttpPostAttribute>());
+        Assert.Equal("draft", httpPost.Template);
+    }
+
+    [Fact]
+    public async Task SaveDraft_WithScanBootstrap_ReturnsCreatedEnvelope_Step2()
+    {
+        var productId = Guid.NewGuid();
+        var service = new FakeTenantAdminProductService
+        {
+            DraftResult = ApplicationResult<ProductDraftResponse>.Success(
+                new ProductDraftResponse(
+                    productId,
+                    "Scanner Product",
+                    "DRF-1",
+                    ProductConstants.DraftStatus,
+                    ProductConstants.DesiredPublishActive,
+                    2,
+                    null,
+                    1,
+                    null,
+                    null,
+                    null,
+                    null,
+                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "SIMPLE",
+                    false,
+                    [],
+                    TargetSetupStep: 2))
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.SaveDraft(
+            new SaveProductDraftRequest
+            {
+                CurrentSetupStep = 2,
+                ScanBootstrap = new ProductSetupScanBootstrapRequest
+                {
+                    AcquisitionMode = "SCAN",
+                    CreationAction = "CONTINUE_WITH_BARCODE",
+                    CandidateIdentifier = "4006381333931"
+                }
+            },
+            CancellationToken.None);
+
+        var created = Assert.IsType<CreatedResult>(result);
+        Assert.Equal(StatusCodes.Status201Created, created.StatusCode);
+        Assert.NotNull(service.LastSaveDraftRequest);
+        Assert.NotNull(service.LastSaveDraftRequest!.ScanBootstrap);
+        Assert.Equal(2, service.LastSaveDraftRequest.CurrentSetupStep);
+    }
+
+    [Fact]
+    public async Task SaveDraft_DuplicateBarcode_ReturnsConflict()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            DraftResult = ApplicationResult<ProductDraftResponse>.Failure(
+                new ApplicationError("product.duplicate_barcode", "Barcode already exists."))
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.SaveDraft(
+            new SaveProductDraftRequest
+            {
+                CurrentSetupStep = 2,
+                ScanBootstrap = new ProductSetupScanBootstrapRequest
+                {
+                    AcquisitionMode = "SCAN",
+                    CreationAction = "CONTINUE_WITH_BARCODE",
+                    CandidateIdentifier = "4006381333931"
+                }
+            },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task SaveDraft_WithoutTenantClaims_ReturnsUnauthorized()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+
+        var result = await controller.SaveDraft(
+            new SaveProductDraftRequest { CurrentSetupStep = 2 },
+            CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public void ExternalLookupBarcode_Route_IsPostBarcodesExternalLookup()
+    {
+        var method = typeof(TenantAdminProductsController).GetMethod(
+            nameof(TenantAdminProductsController.ExternalLookupBarcode));
+        Assert.NotNull(method);
+        var httpPost = Assert.Single(method!.GetCustomAttributes<HttpPostAttribute>());
+        Assert.Equal("barcodes/external-lookup", httpPost.Template);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_WithoutTenantClaims_ReturnsUnauthorized()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Null(service.LastExternalLookupRequest);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_PermissionDenied_ReturnsForbidden()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Failure(
+                new ApplicationError("product.permission_denied", "Permission denied.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.view");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_EntitlementDenied_ReturnsForbidden()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Failure(
+                new ApplicationError("product.entitlement_denied", "Product management feature is not included.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_NoMatch_ReturnsOkEnvelope()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "04006381333931" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+        Assert.Equal(ExternalProductLookupStatuses.NoMatch, body.Status);
+        Assert.Equal("04006381333931", service.LastExternalLookupRequest!.Barcode);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_Found_SerializesSuggestion()
+    {
+        var suggestion = new ExternalProductSuggestion(
+            "Cola", null, "Brand", "Cat", "1L", null, null, null,
+            "https://cdn.example/x.png", "4006381333931", "GTIN13");
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.Found, suggestion, "ref", false)),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+        Assert.Equal(ExternalProductLookupStatuses.Found, body.Status);
+        Assert.Equal("Cola", body.Suggestion!.ProductName);
+        Assert.Equal("Brand", body.Suggestion.BrandText);
+        var json = System.Text.Json.JsonSerializer.Serialize(body);
+        Assert.DoesNotContain("apiKey", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Authorization", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_TemporaryFailure_SerializesRetryAllowed()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.TemporaryFailure, null, null, true)),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+        Assert.Equal(ExternalProductLookupStatuses.TemporaryFailure, body.Status);
+        Assert.True(body.RetryAllowed);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_InvalidBarcode_ReturnsBadRequest()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Failure(
+                new ApplicationError(
+                    "product.validation_failed",
+                    "barcode is not a valid product identifier.",
+                    [new ApplicationFieldError("barcode", "CHECKSUM_FAILED")])),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "123" },
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
@@ -621,6 +1160,87 @@ public sealed class TenantAdminProductsControllerTests
     }
 
     [Fact]
+    public async Task GetSetup_WithViewPermission_ReturnsOk()
+    {
+        var productId = Guid.NewGuid();
+        var setup = new ProductSetupWizardDto(
+            productId,
+            "Draft Product",
+            "DRF-001",
+            "DRAFT",
+            "ACTIVE",
+            2,
+            DateTimeOffset.UtcNow,
+            1,
+            Guid.NewGuid(),
+            null,
+            null,
+            null,
+            true,
+            false,
+            false,
+            false,
+            false,
+            "SIMPLE",
+            false,
+            [],
+            ScanContext: new ProductSetupScanContextDto("SCAN", "012345678905"));
+        var service = new FakeTenantAdminProductService
+        {
+            SetupResult = ApplicationResult<ProductSetupWizardDto>.Success(setup),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), ProductConstants.ViewPermission);
+
+        var result = await controller.GetSetup(productId, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetSetup_WithPermissionDenied_ReturnsForbidden()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            SetupResult = ApplicationResult<ProductSetupWizardDto>.Failure(
+                new ApplicationError("product.permission_denied", "Permission denied for product management.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.delete");
+
+        var result = await controller.GetSetup(Guid.NewGuid(), CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSetup_WhenNotFound_ReturnsNotFound()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            SetupResult = ApplicationResult<ProductSetupWizardDto>.Failure(
+                new ApplicationError("product.not_found", "Product was not found.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), ProductConstants.ViewPermission);
+
+        var result = await controller.GetSetup(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetSetup_WithoutTenantClaims_ReturnsUnauthorized()
+    {
+        var controller = CreateController(new FakeTenantAdminProductService());
+
+        var result = await controller.GetSetup(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
     public async Task GetDashboard_WithDashboardPermission_ReturnsOk()
     {
         var dashboard = new TenantAdminProductDashboardResponse(
@@ -889,11 +1509,16 @@ public sealed class TenantAdminProductsControllerTests
                     false,
                     []));
 
+        public SaveProductDraftRequest? LastSaveDraftRequest { get; private set; }
+
         public Task<ApplicationResult<ProductDraftResponse>> SaveDraftAsync(
             TenantRequestContext context,
             SaveProductDraftRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(DraftResult);
+            CancellationToken cancellationToken)
+        {
+            LastSaveDraftRequest = request;
+            return Task.FromResult(DraftResult);
+        }
 
         public Task<ApplicationResult<ProductDraftResponse>> UpdateDraftAsync(
             TenantRequestContext context,
@@ -919,6 +1544,58 @@ public sealed class TenantAdminProductsControllerTests
         public Task<ApplicationResult> DeleteBarcodeAsync(TenantRequestContext context, Guid productId, Guid variantId, Guid barcodeId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
         public Task<ApplicationResult> RestoreAsync(TenantRequestContext context, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
         public Task<ApplicationResult<TenantAdminProductCreateResponse>> DuplicateAsync(TenantRequestContext context, Guid productId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<TenantAdminProductCreateResponse>.Success(new TenantAdminProductCreateResponse(Guid.NewGuid(), "Sample", "SKU", "ACTIVE")));
+
+        public ApplicationResult<ResolveProductBarcodeResponse> ResolveBarcodeResult { get; init; } =
+            ApplicationResult<ResolveProductBarcodeResponse>.Success(
+                new ResolveProductBarcodeResponse(
+                    "VALID_NO_LOCAL_MATCH",
+                    "4006381333931",
+                    "GTIN13",
+                    "UNKNOWN",
+                    null,
+                    null));
+
+        public ResolveProductBarcodeRequest? LastResolveRequest { get; private set; }
+
+        public Task<ApplicationResult<ResolveProductBarcodeResponse>> ResolveBarcodeAsync(
+            TenantRequestContext context,
+            ResolveProductBarcodeRequest request,
+            CancellationToken cancellationToken)
+        {
+            LastResolveRequest = request;
+            return Task.FromResult(ResolveBarcodeResult);
+        }
+
+        public ApplicationResult<GenerateSkuCandidateResponse> GenerateSkuCandidateResult { get; init; } =
+            ApplicationResult<GenerateSkuCandidateResponse>.Success(
+                new GenerateSkuCandidateResponse("SKU-NB", false));
+
+        public GenerateSkuCandidateRequest? LastGenerateSkuRequest { get; private set; }
+
+        public Task<ApplicationResult<GenerateSkuCandidateResponse>> GenerateSkuCandidateAsync(
+            TenantRequestContext context,
+            GenerateSkuCandidateRequest request,
+            CancellationToken cancellationToken)
+        {
+            LastGenerateSkuRequest = request;
+            return Task.FromResult(GenerateSkuCandidateResult);
+        }
+
+        public ApplicationResult<ExternalLookupProductBarcodeResponse> ExternalLookupResult { get; init; } =
+            ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.NoMatch, null, null, false));
+
+        public ExternalLookupProductBarcodeRequest? LastExternalLookupRequest { get; private set; }
+
+        public Task<ApplicationResult<ExternalLookupProductBarcodeResponse>> ExternalLookupBarcodeAsync(
+            TenantRequestContext context,
+            ExternalLookupProductBarcodeRequest request,
+            CancellationToken cancellationToken)
+        {
+            LastExternalLookupRequest = request;
+            return Task.FromResult(ExternalLookupResult);
+        }
     }
 
 

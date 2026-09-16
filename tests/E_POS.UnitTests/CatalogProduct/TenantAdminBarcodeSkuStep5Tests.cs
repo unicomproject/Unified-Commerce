@@ -35,6 +35,8 @@ public sealed class TenantAdminBarcodeSkuStep5Tests
         Assert.Contains(ProductBarcodeFormatValidator.CanonicalTypes, t => t is ("UPCA", "UPC-A"));
         Assert.Contains(ProductBarcodeFormatValidator.CanonicalTypes, t => t is ("CODE128", "CODE-128"));
         Assert.Contains(ProductBarcodeFormatValidator.CanonicalTypes, t => t is ("CODE39", "CODE-39"));
+        Assert.Contains(ProductBarcodeFormatValidator.CanonicalTypes, t => t is ("UNKNOWN", "Unknown"));
+        Assert.DoesNotContain(ProductBarcodeFormatValidator.CanonicalTypes, t => t.Code == "GTIN14");
     }
 
     [Fact]

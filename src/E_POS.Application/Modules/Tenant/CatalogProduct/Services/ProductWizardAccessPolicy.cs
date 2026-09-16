@@ -105,6 +105,16 @@ public sealed class ProductWizardAccessPolicy
         return null;
     }
 
+    public Task<ApplicationError?> ValidateProductSetupCreateAccessAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken) =>
+        ValidatePermissionAccessAsync(context, ProductConstants.CreatePermission, cancellationToken);
+
+    public Task<ApplicationError?> ValidateBarcodeManageAccessAsync(
+        TenantRequestContext context,
+        CancellationToken cancellationToken) =>
+        ValidatePermissionAccessAsync(context, ProductConstants.BarcodesManagePermission, cancellationToken);
+
     public async Task<ApplicationError?> ValidatePublishAccessAsync(
         TenantRequestContext context,
         SaveProductDraftRequest? request,
@@ -158,6 +168,20 @@ public sealed class ProductWizardAccessPolicy
         }
 
         return null;
+    }
+
+    private async Task<ApplicationError?> ValidatePermissionAccessAsync(
+        TenantRequestContext context,
+        string permission,
+        CancellationToken cancellationToken)
+    {
+        var baseline = await ValidateBaselineAsync(context, cancellationToken);
+        if (baseline is not null)
+        {
+            return baseline;
+        }
+
+        return context.HasPermission(permission) ? null : PermissionDenied;
     }
 
     private async Task<ApplicationError?> ValidatePayloadAsync(

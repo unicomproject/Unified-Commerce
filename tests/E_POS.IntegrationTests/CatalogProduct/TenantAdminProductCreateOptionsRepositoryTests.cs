@@ -61,9 +61,10 @@ public sealed class TenantAdminProductCreateOptionsRepositoryTests
         Assert.NotNull(options.VariantOptionTemplates);
         Assert.NotNull(options.SalesChannels);
         Assert.NotNull(options.BarcodeTypes);
-        Assert.Equal(5, options.BarcodeTypes.Count);
+        Assert.Equal(6, options.BarcodeTypes.Count);
         Assert.Contains(options.BarcodeTypes, t => t.Code == "EAN13" && t.Label == "EAN-13");
         Assert.Contains(options.BarcodeTypes, t => t.Code == "CODE128" && t.Label == "CODE-128");
+        Assert.Contains(options.BarcodeTypes, t => t.Code == "UNKNOWN" && t.Label == "Unknown");
         Assert.Equal("LKR", options.CurrencyCode);
     }
 

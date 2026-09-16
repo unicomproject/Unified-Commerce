@@ -52,6 +52,12 @@ public sealed class ProductBarcodeConfiguration : IEntityTypeConfiguration<Produ
             .HasMaxLength(40)
             .IsRequired();
 
+        builder.Property(x => x.IdentifierStandard)
+            .HasColumnName("identifier_standard")
+            .HasColumnType("varchar(40)")
+            .HasMaxLength(40)
+            .IsRequired(false);
+
         builder.Property(x => x.UomId)
             .HasColumnName("uom_id")
             .IsRequired(false);
@@ -114,6 +120,9 @@ public sealed class ProductBarcodeConfiguration : IEntityTypeConfiguration<Produ
 
         builder.ToTable(t => t.HasCheckConstraint("ck_product_barcodes_quantity_per_scan", "quantity_per_scan > 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_product_barcodes_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')"));
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_product_barcodes_identifier_standard",
+            "identifier_standard IS NULL OR identifier_standard IN ('GTIN8', 'GTIN12', 'GTIN13', 'GTIN14', 'OTHER')"));
     }
 }
 

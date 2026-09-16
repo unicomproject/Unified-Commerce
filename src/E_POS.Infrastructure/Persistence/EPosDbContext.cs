@@ -155,6 +155,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<ComboGroupItem> ComboGroupItems => Set<ComboGroupItem>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductSetupScanContext> ProductSetupScanContexts => Set<ProductSetupScanContext>();
     public DbSet<ProductSetupInitialTracking> ProductSetupInitialTrackings => Set<ProductSetupInitialTracking>();
     public DbSet<ProductAttributeDefinition> ProductAttributeDefinitions => Set<ProductAttributeDefinition>();
     public DbSet<ProductAttributeOption> ProductAttributeOptions => Set<ProductAttributeOption>();

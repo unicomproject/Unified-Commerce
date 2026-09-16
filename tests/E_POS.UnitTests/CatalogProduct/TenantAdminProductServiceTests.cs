@@ -4,6 +4,7 @@ using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ExternalLookup;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
@@ -15,7 +16,7 @@ using Xunit;
 
 namespace E_POS.UnitTests.CatalogProduct;
 
-public sealed class TenantAdminProductServiceTests
+public sealed partial class TenantAdminProductServiceTests
 {
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
@@ -68,6 +69,633 @@ public sealed class TenantAdminProductServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(0, result.Value!.TotalProducts);
         Assert.Equal(0, result.Value.CategoryCount);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_WithoutCreatePermission_ReturnsPermissionDenied()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.ViewPermission]),
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_WithoutProductCatalogEntitlement_ReturnsEntitlementDenied()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository, entitlementEvaluator: new FakeEntitlementEvaluator { IsEntitled = false });
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.entitlement_denied", result.Error.Code);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_InvalidChecksum_ReturnsInvalid_WithoutLookup()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ResolveProductBarcodeRequest { Barcode = "4006381333930", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("INVALID", result.Value!.Outcome);
+        Assert.Equal("CHECKSUM_FAILED", result.Value.InvalidReason);
+        Assert.Null(result.Value.NormalizedBarcode);
+        Assert.Null(result.Value.LocalMatch);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_UnsupportedLength_ReturnsInvalid_WithoutLookup()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ResolveProductBarcodeRequest { Barcode = "1234567", InputMode = "MANUAL" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("INVALID", result.Value!.Outcome);
+        Assert.Equal("LENGTH_NOT_SUPPORTED", result.Value.InvalidReason);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Theory]
+    [InlineData("96385074", "GTIN8")]
+    [InlineData("012345678905", "GTIN12")]
+    [InlineData("4006381333931", "GTIN13")]
+    [InlineData("10012345678902", "GTIN14")]
+    public async Task ResolveBarcodeAsync_ValidGtin_NoMatch_PreservesStandardAndDoesNotSetGtin14AsBarcodeType(
+        string barcode,
+        string expectedStandard)
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ResolveProductBarcodeRequest { Barcode = barcode, InputMode = "SCAN", ReportedSymbology = "UNKNOWN" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("VALID_NO_LOCAL_MATCH", result.Value!.Outcome);
+        Assert.Equal(barcode, result.Value.NormalizedBarcode);
+        Assert.Equal(expectedStandard, result.Value.IdentifierStandard);
+        Assert.Equal("UNKNOWN", result.Value.BarcodeType);
+        Assert.NotEqual("GTIN14", result.Value.BarcodeType);
+        Assert.Null(result.Value.LocalMatch);
+        Assert.Equal(1, repository.ResolveLookupCallCount);
+        Assert.Equal(barcode, repository.LastResolvedBarcode);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_PreservesLeadingZeros_IntoRepositoryLookup()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ResolveProductBarcodeRequest { Barcode = " 012345678905 ", InputMode = "MANUAL" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("VALID_NO_LOCAL_MATCH", result.Value!.Outcome);
+        Assert.Equal("012345678905", repository.LastResolvedBarcode);
+        Assert.Equal("012345678905", result.Value.NormalizedBarcode);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_ScanAndManual_UseSameLookupPath()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+        var context = CreateContext([ProductConstants.CreatePermission]);
+
+        var scan = await service.ResolveBarcodeAsync(
+            context,
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+        var manual = await service.ResolveBarcodeAsync(
+            context,
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "MANUAL" },
+            CancellationToken.None);
+
+        Assert.Equal(scan.Value!.Outcome, manual.Value!.Outcome);
+        Assert.Equal(scan.Value.NormalizedBarcode, manual.Value.NormalizedBarcode);
+        Assert.Equal(2, repository.ResolveLookupCallCount);
+        Assert.Equal("4006381333931", repository.LastResolvedBarcode);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_LocalMatch_CreateWithoutView_ReturnsConflictProjectionWithCanViewFalse()
+    {
+        var productId = Guid.NewGuid();
+        var repository = new FakeTenantAdminProductRepository
+        {
+            ResolveMatch = new ProductBarcodeResolveMatchProjection(
+                productId,
+                null,
+                "PRODUCT",
+                "Cola 330ml",
+                null,
+                "BrandX",
+                "Drinks",
+                "SKU-COLA",
+                ProductConstants.ActiveStatus,
+                null,
+                1),
+        };
+        var service = CreateService(repository);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("VALID_LOCAL_MATCH", result.Value!.Outcome);
+        Assert.NotNull(result.Value.LocalMatch);
+        Assert.Equal(productId, result.Value.LocalMatch!.ProductId);
+        Assert.Equal("Cola 330ml", result.Value.LocalMatch.ProductName);
+        Assert.Equal("SKU-COLA", result.Value.LocalMatch.Sku);
+        Assert.False(result.Value.LocalMatch.CanViewProduct);
+        Assert.False(result.Value.LocalMatch.CanEditProduct);
+        Assert.Null(result.Value.LocalMatch.SellingPrice);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_LocalMatch_WithViewAndUpdate_SetsCapabilityFlags()
+    {
+        var productId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var repository = new FakeTenantAdminProductRepository
+        {
+            ResolveMatch = new ProductBarcodeResolveMatchProjection(
+                productId,
+                variantId,
+                "VARIANT",
+                "Shirt",
+                "Red / M",
+                null,
+                null,
+                "SKU-RED-M",
+                ProductConstants.InactiveStatus,
+                "https://cdn.example/p.png",
+                1),
+        };
+        var service = CreateService(repository);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([
+                ProductConstants.CreatePermission,
+                ProductConstants.ViewPermission,
+                ProductConstants.UpdatePermission,
+                ProductConstants.ProductCostViewPermission]),
+            new ResolveProductBarcodeRequest { Barcode = "012345678905", InputMode = "SCAN", ReportedSymbology = "UPCA" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("VALID_LOCAL_MATCH", result.Value!.Outcome);
+        Assert.Equal("UPCA", result.Value.BarcodeType);
+        Assert.Equal("GTIN12", result.Value.IdentifierStandard);
+        Assert.Equal(variantId, result.Value.LocalMatch!.VariantId);
+        Assert.Equal("VARIANT", result.Value.LocalMatch.MatchedAt);
+        Assert.Equal("Red / M", result.Value.LocalMatch.VariantLabel);
+        Assert.True(result.Value.LocalMatch.CanViewProduct);
+        Assert.True(result.Value.LocalMatch.CanEditProduct);
+        Assert.Null(result.Value.LocalMatch.SellingPrice);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_CorruptMultipleMatches_ReturnsIntegrityViolation()
+    {
+        var repository = new FakeTenantAdminProductRepository
+        {
+            ResolveMatch = new ProductBarcodeResolveMatchProjection(
+                Guid.NewGuid(),
+                null,
+                "PRODUCT",
+                "A",
+                null,
+                null,
+                null,
+                "SKU",
+                ProductConstants.ActiveStatus,
+                null,
+                2),
+        };
+        var service = CreateService(repository);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.barcode_integrity_violation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_WithoutCreatePermission_ReturnsPermissionDenied()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.ViewPermission]),
+            new GenerateSkuCandidateRequest { Purpose = "NO_BARCODE_PRODUCT" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.permission_denied", result.Error.Code);
+        Assert.Equal(0, repository.SkuExistsCallCount);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_WithoutProductCatalog_ReturnsEntitlementDenied()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository, entitlementEvaluator: new FakeEntitlementEvaluator { IsEntitled = false });
+
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new GenerateSkuCandidateRequest { Purpose = "NO_BARCODE_PRODUCT" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.entitlement_denied", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_UnsupportedPurpose_ReturnsValidationFailed()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new GenerateSkuCandidateRequest { Purpose = "VARIANT" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.validation_failed", result.Error.Code);
+        Assert.Equal(0, repository.SkuExistsCallCount);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_WithoutCategory_ReturnsValidationError()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new GenerateSkuCandidateRequest { Purpose = "NO_BARCODE_PRODUCT" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.validation_failed", result.Error.Code);
+        Assert.Contains(result.Error.FieldErrors!, error => error.Field == "categoryId");
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_WithCategory_UsesCategoryCodeAndTenantSequence()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var categoryId = Guid.NewGuid();
+        var service = CreateService(repository);
+
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new GenerateSkuCandidateRequest
+            {
+                Purpose = "NO_BARCODE_PRODUCT",
+                CategoryId = categoryId,
+                Mode = "AUTO",
+                ProductName = " House Lemon Juice! ",
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("TSH-000125", result.Value!.Candidate);
+        Assert.True(result.Value.Reserved);
+        Assert.True(result.Value.Candidate.Length <= ProductSkuCandidateGenerator.MaxLength);
+        Assert.Equal(0, repository.CreateProductCallCount);
+        Assert.Equal(0, repository.SaveDraftCallCount);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_Collision_ConsumesNextTenantSequence()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        repository.ExistingSkus.Add("TSH-000125");
+        var service = CreateService(repository);
+
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new GenerateSkuCandidateRequest
+            {
+                Purpose = "NO_BARCODE_PRODUCT",
+                CategoryId = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("TSH-000126", result.Value!.Candidate);
+        Assert.True(result.Value.Reserved);
+        Assert.Equal(2, repository.SkuExistsCallCount);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_ExistingDraft_ReplacesStaleBase()
+    {
+        var repository = new FakeTenantAdminProductRepository
+        {
+            ActiveCategoryCode = "BEV",
+            GeneratedSkuBase = "TSH-000124",
+            NextProductSkuSequence = 128,
+        };
+        var service = CreateService(repository);
+
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new GenerateSkuCandidateRequest
+            {
+                Purpose = "NO_BARCODE_PRODUCT",
+                CategoryId = Guid.NewGuid(),
+                ProductId = Guid.NewGuid(),
+                ExpectedRowVersion = 3,
+                Mode = "AUTO",
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("BEV-000128", result.Value!.Candidate);
+        Assert.Equal("BEV-000128", repository.GeneratedSkuBase);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_DifferentTenants_AreRepositoryScoped()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var service = CreateService(repository);
+
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new GenerateSkuCandidateRequest
+            {
+                Purpose = "NO_BARCODE_PRODUCT",
+                CategoryId = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("TSH-000125", result.Value!.Candidate);
+    }
+
+    [Fact]
+    public async Task GenerateSkuCandidateAsync_ExhaustedAttempts_ReturnsBusinessError()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        for (var i = 0; i < ProductSkuCandidateGenerator.MaxAttempts; i++)
+        {
+            repository.ExistingSkus.Add(
+                ProductSkuCandidateGenerator.BuildProductBase("TSH", 125 + i));
+        }
+
+        var service = CreateService(repository);
+        var result = await service.GenerateSkuCandidateAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new GenerateSkuCandidateRequest
+            {
+                Purpose = "NO_BARCODE_PRODUCT",
+                CategoryId = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.sku_candidate_exhausted", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_WithoutCreatePermission_ReturnsPermissionDenied()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator();
+        var service = CreateService(repository, coordinator);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.ViewPermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.permission_denied", result.Error.Code);
+        Assert.Equal(0, coordinator.CallCount);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_WithoutProductCatalog_ReturnsEntitlementDenied()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator();
+        var service = CreateService(
+            repository,
+            coordinator,
+            entitlementEvaluator: new FakeEntitlementEvaluator { IsEntitled = false });
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.entitlement_denied", result.Error.Code);
+        Assert.Equal(0, coordinator.CallCount);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_InvalidBarcode_NeverCallsCoordinatorOrLocalLookup()
+    {
+        var repository = new FakeTenantAdminProductRepository { ResolveMatch = new ProductBarcodeResolveMatchProjection(
+            Guid.NewGuid(), null, "PRODUCT", "X", null, null, null, null, "ACTIVE", null, 1) };
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(ExternalProductLookupStatuses.Found, null, null, false),
+        };
+        var service = CreateService(repository, coordinator);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "123" },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("product.validation_failed", result.Error.Code);
+        Assert.Equal(0, coordinator.CallCount);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_Found_ReturnsNormalizedSuggestion_WithoutLocalLookup()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var suggestion = new ExternalProductSuggestion(
+            "Cola", "C", "BrandText", "CategoryText", "330ml", "US",
+            "short", "long", "https://cdn.example/c.png", "4006381333931", "GTIN13");
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found, suggestion, "src-1", false),
+        };
+        var service = CreateService(repository, coordinator);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Value!.Status);
+        Assert.Equal("Cola", result.Value.Suggestion!.ProductName);
+        Assert.Equal("BrandText", result.Value.Suggestion.BrandText);
+        Assert.Equal("https://cdn.example/c.png", result.Value.Suggestion.ImageCandidate);
+        Assert.Equal("src-1", result.Value.SourceReference);
+        Assert.False(result.Value.RetryAllowed);
+        Assert.Equal(1, coordinator.CallCount);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+        Assert.Equal(0, repository.CreateProductCallCount);
+        Assert.Equal(0, repository.SaveDraftCallCount);
+        Assert.Null(result.Value.Suggestion.GetType().GetProperty("BrandId"));
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_NoMatch_IncludingZeroProviderPath()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.NoMatch, null, null, false),
+        };
+        var service = CreateService(repository, coordinator);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ExternalProductLookupStatuses.NoMatch, result.Value!.Status);
+        Assert.False(result.Value.RetryAllowed);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_TemporaryFailure_ReturnsRetryAllowed()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.TemporaryFailure, null, null, true),
+        };
+        var service = CreateService(repository, coordinator);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ExternalProductLookupStatuses.TemporaryFailure, result.Value!.Status);
+        Assert.True(result.Value.RetryAllowed);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_PreservesLeadingZeros_AndNeverCallsLocalLookup()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.NoMatch, null, null, false),
+        };
+        var service = CreateService(repository, coordinator);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "04006381333931" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("04006381333931", coordinator.LastRequest!.Identifier);
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_PropagatesCancellation()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator { ThrowOnCancel = true };
+        var service = CreateService(repository, coordinator);
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.ExternalLookupBarcodeAsync(
+                CreateContext([ProductConstants.CreatePermission]),
+                new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+                cts.Token));
+        Assert.Equal(0, repository.ResolveLookupCallCount);
+    }
+
+    [Fact]
+    public async Task ResolveBarcodeAsync_NeverInvokesExternalCoordinator()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found,
+                new ExternalProductSuggestion("X", null, null, null, null, null, null, null, null, null, null),
+                "should-not-leak",
+                false),
+        };
+        var service = CreateService(repository, coordinator);
+
+        var result = await service.ResolveBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ResolveProductBarcodeRequest { Barcode = "4006381333931", InputMode = "SCAN" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("VALID_NO_LOCAL_MATCH", result.Value!.Outcome);
+        Assert.Equal(0, coordinator.CallCount);
+        Assert.Equal(1, repository.ResolveLookupCallCount);
     }
 
     [Fact]
@@ -1104,20 +1732,36 @@ public sealed class TenantAdminProductServiceTests
 
     private class FakeEntitlementEvaluator : ITenantFeatureEntitlementEvaluator
     {
+        public bool IsEntitled { get; set; } = true;
+
         public Task<TenantFeatureEntitlementEvaluation> EvaluateAsync(Guid tenantId, string featureCode, DateTimeOffset evaluationTime, CancellationToken cancellationToken = default) =>
-            Task.FromResult(TenantFeatureEntitlementEvaluation.Allowed(featureCode, featureCode, false, true, false));
+            Task.FromResult(IsEntitled
+                ? TenantFeatureEntitlementEvaluation.Allowed(featureCode, featureCode, false, true, false)
+                : TenantFeatureEntitlementEvaluation.Denied(
+                    TenantFeatureEntitlementDecision.Disabled,
+                    featureCode,
+                    featureCode,
+                    false,
+                    true,
+                    false,
+                    "Feature disabled"));
 
         public Task<bool> IsEnabledAsync(Guid tenantId, string featureCode, DateTimeOffset evaluationTime, CancellationToken cancellationToken = default) =>
-            Task.FromResult(true);
+            Task.FromResult(IsEntitled);
     }
 
     private static TenantAdminProductService CreateService(
         ITenantAdminProductRepository tenantAdminProductRepository,
         FakeProductRepository? productRepository = null,
-        ITenantAdminProductAuditLogger? auditLogger = null)
+        ITenantAdminProductAuditLogger? auditLogger = null,
+        FakeEntitlementEvaluator? entitlementEvaluator = null,
+        IExternalProductLookupCoordinator? externalProductLookupCoordinator = null)
     {
         var clock = new FakeDateTimeProvider();
-        var accessPolicy = new ProductWizardAccessPolicy(new FakeEntitlementEvaluator(), tenantAdminProductRepository, clock);
+        var accessPolicy = new ProductWizardAccessPolicy(
+            entitlementEvaluator ?? new FakeEntitlementEvaluator(),
+            tenantAdminProductRepository,
+            clock);
         return new TenantAdminProductService(
             productRepository ?? new FakeProductRepository(),
             tenantAdminProductRepository,
@@ -1125,8 +1769,20 @@ public sealed class TenantAdminProductServiceTests
             clock,
             auditLogger ?? new FakeTenantAdminProductAuditLogger(),
             accessPolicy,
-            new ProductVariantGenerationService());
+            new ProductVariantGenerationService(),
+            externalProductLookupCoordinator ?? new FakeExternalProductLookupCoordinator());
     }
+
+    private static TenantAdminProductService CreateService(
+        ITenantAdminProductRepository tenantAdminProductRepository,
+        FakeExternalProductLookupCoordinator externalProductLookupCoordinator,
+        FakeEntitlementEvaluator? entitlementEvaluator = null) =>
+        CreateService(
+            tenantAdminProductRepository,
+            productRepository: null,
+            auditLogger: null,
+            entitlementEvaluator: entitlementEvaluator,
+            externalProductLookupCoordinator: externalProductLookupCoordinator);
 
     private static TenantRequestContext CreateContext(string[] permissions) =>
         new(TenantId, UserId, permissions);
@@ -1396,9 +2052,15 @@ public sealed class TenantAdminProductServiceTests
 
         public ProductSetupWizardDto? SetupDto { get; init; }
 
-        public Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductId = null, CancellationToken cancellationToken = default)
+        public HashSet<string> ExistingSkus { get; } = new(StringComparer.Ordinal);
+        public int SkuExistsCallCount { get; private set; }
+        public string? LastSkuExistsQuery { get; private set; }
+
+        public Task<bool> SkuExistsAsync(Guid tenantId, string sku, Guid? excludeProductVariantId = null, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(false);
+            SkuExistsCallCount++;
+            LastSkuExistsQuery = sku;
+            return Task.FromResult(ExistingSkus.Contains(sku));
         }
 
         public Task<bool> BarcodeExistsAsync(Guid tenantId, string barcode, Guid? excludeProductId = null, CancellationToken cancellationToken = default)
@@ -1451,6 +2113,11 @@ public sealed class TenantAdminProductServiceTests
         public Task<bool> IsInitialCreationDraftAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
+        public bool HasScanContext { get; set; }
+
+        public Task<bool> HasScanContextAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken) =>
+            Task.FromResult(HasScanContext);
+
         public Task<bool> IsCategoryEffectivelySelectableAsync(
             Guid tenantId,
             Guid categoryId,
@@ -1462,6 +2129,41 @@ public sealed class TenantAdminProductServiceTests
             Guid categoryId,
             CancellationToken cancellationToken) =>
             Task.FromResult(ActiveCategoryExists);
+
+        public string? ActiveCategoryCode { get; set; } = "TSH";
+        public long NextProductSkuSequence { get; set; } = 125;
+        public string? GeneratedSkuBase { get; set; }
+
+        public Task<string?> GetActiveCategoryCodeAsync(
+            Guid tenantId,
+            Guid categoryId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ActiveCategoryCode);
+
+        public Task<long> AllocateNextProductSkuSequenceAsync(
+            Guid tenantId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(NextProductSkuSequence++);
+
+        public Task<string?> GetGeneratedSkuBaseAsync(
+            Guid tenantId,
+            Guid productId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(GeneratedSkuBase);
+
+        public Task<ApplicationError?> ReplaceGeneratedSkuBaseAsync(
+            Guid tenantId,
+            Guid userId,
+            Guid productId,
+            long expectedRowVersion,
+            string generatedSkuBase,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            GeneratedSkuBase = generatedSkuBase;
+            return Task.FromResult<ApplicationError?>(null);
+        }
 
         public Task<bool> CategoryExistsForExistingMappingAsync(
             Guid tenantId,
@@ -1503,6 +2205,9 @@ public sealed class TenantAdminProductServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ApplicationFieldError>>([]);
 
+        public int CreateProductCallCount { get; private set; }
+        public int SaveDraftCallCount { get; private set; }
+
         public Task<SaveProductDraftResult> CreateProductFromWizardAsync(
             Guid tenantId,
             Guid userId,
@@ -1510,6 +2215,7 @@ public sealed class TenantAdminProductServiceTests
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
+            CreateProductCallCount++;
             return Task.FromResult(SaveProductDraftResult.Failure(
                 new ApplicationError("not_implemented", "Fake repository")));
         }
@@ -1519,8 +2225,27 @@ public sealed class TenantAdminProductServiceTests
             Guid userId,
             SaveProductDraftCommand command,
             DateTimeOffset now,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(DraftResult);
+            CancellationToken cancellationToken)
+        {
+            SaveDraftCallCount++;
+            LastSaveDraftCommand = command;
+            if (DraftResult.IsSuccess && DraftResult.Response is not null && command.ScanBootstrap is not null)
+            {
+                var baseline = DraftResult.Response;
+                return Task.FromResult(SaveProductDraftResult.Success(baseline with
+                {
+                    CurrentSetupStep = command.TargetSetupStep,
+                    Status = ProductConstants.DraftStatus,
+                    ProductName = command.ProductName,
+                    ShortDescription = command.ShortDescription,
+                    LongDescription = command.LongDescription
+                }));
+            }
+
+            return Task.FromResult(DraftResult);
+        }
+
+        public SaveProductDraftCommand? LastSaveDraftCommand { get; private set; }
 
         public Task<ProductSetupWizardDto?> GetSetupAsync(
             Guid tenantId,
@@ -1532,6 +2257,20 @@ public sealed class TenantAdminProductServiceTests
         public Task DeleteBarcodeAsync(Guid tenantId, Guid userId, Guid productId, Guid variantId, Guid barcodeId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task RestoreAsync(Guid tenantId, Guid userId, Guid productId, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<TenantAdminProductCreateResponse> DuplicateAsync(Guid tenantId, Guid userId, Guid productId, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(new TenantAdminProductCreateResponse(Guid.NewGuid(), "Duplicate", "DUP-001", "DRAFT"));
+
+        public ProductBarcodeResolveMatchProjection? ResolveMatch { get; set; }
+        public string? LastResolvedBarcode { get; private set; }
+        public int ResolveLookupCallCount { get; private set; }
+
+        public Task<ProductBarcodeResolveMatchProjection?> FindBarcodeResolveMatchAsync(
+            Guid tenantId,
+            string normalizedBarcode,
+            CancellationToken cancellationToken)
+        {
+            ResolveLookupCallCount++;
+            LastResolvedBarcode = normalizedBarcode;
+            return Task.FromResult(ResolveMatch);
+        }
 
         public Task<IReadOnlyList<BundleValidationProductProjection>> GetProductsForBundleValidationAsync(
             Guid tenantId,
@@ -1728,6 +2467,29 @@ public sealed class TenantAdminProductServiceTests
             bool oldExpiryTracking, bool newExpiryTracking, bool oldSerialTracking, bool newSerialTracking,
             long rowVersion)
         {
+        }
+    }
+
+    private sealed class FakeExternalProductLookupCoordinator : IExternalProductLookupCoordinator
+    {
+        public int CallCount { get; private set; }
+        public ExternalProductLookupRequest? LastRequest { get; private set; }
+        public ExternalProductLookupResult Result { get; init; } =
+            new(ExternalProductLookupStatuses.NoMatch, null, null, false);
+        public bool ThrowOnCancel { get; init; }
+
+        public Task<ExternalProductLookupResult> LookupAsync(
+            ExternalProductLookupRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (ThrowOnCancel)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            CallCount++;
+            LastRequest = request;
+            return Task.FromResult(Result);
         }
     }
 }
