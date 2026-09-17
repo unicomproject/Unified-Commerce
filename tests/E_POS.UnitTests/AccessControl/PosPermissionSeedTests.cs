@@ -1,3 +1,4 @@
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Constants;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
 using E_POS.Domain.Modules.Tenant.Orders.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -408,8 +409,8 @@ public sealed class PosPermissionSeedTests
         Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.manual_entry"]);
         Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.report_issue"]);
         Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.picking.note"]);
-        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.collection.verify"]);
-        Assert.Equal(clickCollectFeatureId, definitions["commerce.online_order.collection.complete"]);
+        Assert.Equal(clickCollectFeatureId, definitions[OnlineOrderPickingPermissions.CollectionValidateQr]);
+        Assert.Equal(clickCollectFeatureId, definitions[OnlineOrderPickingPermissions.CollectionCollect]);
     }
 
     [Fact]
