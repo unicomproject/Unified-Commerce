@@ -421,6 +421,12 @@ public static class DependencyInjection
                 provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<E_POS.Infrastructure.Integrations.ProductLookup.OpenFoodFacts.OpenFoodFactsProductLookupProvider>>(),
                 provider.GetRequiredService<E_POS.Infrastructure.Integrations.ProductLookup.Resilience.IProductLookupCircuitBreakerRegistry>()));
 
+        // Scanner-first: server-side fetch of external imageCandidate → existing stage pipeline
+        services.AddScoped<IExternalImageCandidateFetcher>(provider =>
+            new E_POS.Infrastructure.Integrations.ProductLookup.ExternalImageCandidateFetcher(
+                new HttpClient { Timeout = TimeSpan.FromSeconds(10) },
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<E_POS.Infrastructure.Integrations.ProductLookup.ExternalImageCandidateFetcher>>()));
+
         // Shared Product Metadata Cache (Phase 2)
         services.AddScoped<ISharedProductMetadataCacheRepository, E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories.SharedProductMetadataCacheRepository>();
 

@@ -1682,6 +1682,13 @@ public sealed class TenantAdminProductsControllerTests
             Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(
                 new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
 
+        public Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+            TenantRequestContext context,
+            string imageUrl,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
         public Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
             TenantRequestContext context,
             Guid productId,
