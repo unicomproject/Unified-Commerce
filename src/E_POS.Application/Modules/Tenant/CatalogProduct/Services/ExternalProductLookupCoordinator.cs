@@ -13,17 +13,20 @@ namespace E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 public sealed class ExternalProductLookupCoordinator : IExternalProductLookupCoordinator
 {
     private readonly IReadOnlyList<IExternalProductLookupProvider> _providers;
+    private readonly ISharedProductMetadataCacheRepository? _cacheRepository;
     private readonly ExternalProductLookupOptions _options;
     private readonly ILogger<ExternalProductLookupCoordinator> _logger;
 
     public ExternalProductLookupCoordinator(
         IEnumerable<IExternalProductLookupProvider> providers,
         IOptions<ExternalProductLookupOptions> options,
-        ILogger<ExternalProductLookupCoordinator> logger)
+        ILogger<ExternalProductLookupCoordinator> logger,
+        ISharedProductMetadataCacheRepository? cacheRepository = null)
     {
         _providers = providers?.ToArray() ?? Array.Empty<IExternalProductLookupProvider>();
         _options = options?.Value ?? new ExternalProductLookupOptions();
         _logger = logger;
+        _cacheRepository = cacheRepository;
     }
 
     public async Task<ExternalProductLookupResult> LookupAsync(
@@ -39,6 +42,47 @@ public sealed class ExternalProductLookupCoordinator : IExternalProductLookupCoo
                 Suggestion: null,
                 SourceReference: null,
                 RetryAllowed: false);
+        }
+
+        var normalizedIdentifier = request.Identifier.Trim();
+
+        // 1. Check shared product metadata cache
+        if (_cacheRepository is not null && _options.Cache.Enabled)
+        {
+            try
+            {
+                var cachedSuggestion = await _cacheRepository.GetValidAsync(normalizedIdentifier, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (cachedSuggestion is not null)
+                {
+                    _logger.LogInformation(
+                        "Shared product metadata cache HIT for barcode {Barcode}. Outcome={Outcome}",
+                        normalizedIdentifier,
+                        ExternalProductLookupStatuses.Found);
+
+                    return new ExternalProductLookupResult(
+                        ExternalProductLookupStatuses.Found,
+                        cachedSuggestion,
+                        SourceReference: "cache",
+                        RetryAllowed: false);
+                }
+
+                _logger.LogInformation(
+                    "Shared product metadata cache MISS for barcode {Barcode}.",
+                    normalizedIdentifier);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Error reading from shared product metadata cache for barcode {Barcode}. Continuing to provider lookup.",
+                    normalizedIdentifier);
+            }
         }
 
         // Preserve exact identifier string (including leading zeros) — do not parse as numeric.
@@ -68,6 +112,34 @@ public sealed class ExternalProductLookupCoordinator : IExternalProductLookupCoo
 
             if (outcome.Kind == ProviderInvokeKind.Found)
             {
+                // Write normalized result to shared metadata cache
+                if (_cacheRepository is not null && _options.Cache.Enabled && outcome.Suggestion is not null)
+                {
+                    var ttl = TimeSpan.FromDays(_options.Cache.TtlDays > 0 ? _options.Cache.TtlDays : 30);
+                    try
+                    {
+                        await _cacheRepository.SetAsync(
+                            normalizedIdentifier,
+                            request.IdentifierStandard,
+                            provider.Name,
+                            outcome.Suggestion,
+                            rawResponseJson: null,
+                            ttl,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to write to cache for barcode {Barcode}. Lookup operation will continue unaffected.",
+                            normalizedIdentifier);
+                    }
+                }
+
                 return new ExternalProductLookupResult(
                     ExternalProductLookupStatuses.Found,
                     outcome.Suggestion,

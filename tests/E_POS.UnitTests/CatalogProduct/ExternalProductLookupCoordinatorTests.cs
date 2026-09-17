@@ -463,11 +463,13 @@ public sealed class ExternalProductLookupCoordinatorTests
 
     private static ExternalProductLookupCoordinator CreateCoordinator(
         IEnumerable<IExternalProductLookupProvider> providers,
-        ExternalProductLookupOptions options) =>
+        ExternalProductLookupOptions options,
+        ISharedProductMetadataCacheRepository? cacheRepository = null) =>
         new(
             providers,
             Options.Create(options),
-            NullLogger<ExternalProductLookupCoordinator>.Instance);
+            NullLogger<ExternalProductLookupCoordinator>.Instance,
+            cacheRepository);
 
     private static ExternalProductLookupProviderResult FoundResult(
         string productName,
