@@ -407,6 +407,41 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
             tillSession.OpeningFloatAmount,
             cancellationToken);
 
+        var completedOrders = _dbContext.SalesOrders
+            .AsNoTracking()
+            .Where(order =>
+                order.TenantId == context.TenantId &&
+                order.ReportingOutletId == resolvedOutletId &&
+                order.TillId == till.Id &&
+                order.TillSessionId == tillSession.Id &&
+                order.Status == "COMPLETED" &&
+                (order.PaymentStatus == "PAID" ||
+                 order.PaymentStatus == "PARTIALLY_REFUNDED" ||
+                 order.PaymentStatus == "REFUNDED") &&
+                order.CompletedAt != null &&
+                order.CancelledAt == null);
+
+        var transactionCount = await completedOrders.CountAsync(cancellationToken);
+        var grossSalesAmount = await completedOrders
+            .SumAsync(order => (decimal?)order.SubtotalAmount, cancellationToken) ?? 0m;
+        var discountAmount = await completedOrders
+            .SumAsync(order => (decimal?)order.DiscountAmount, cancellationToken) ?? 0m;
+        var refundAmount = await completedOrders
+            .SumAsync(order => (decimal?)order.RefundedAmount, cancellationToken) ?? 0m;
+        var refundCount = await (
+                from refund in _dbContext.SalesRefunds.AsNoTracking()
+                join order in completedOrders
+                    on new { refund.TenantId, refund.SalesOrderId }
+                    equals new { order.TenantId, SalesOrderId = order.Id }
+                where refund.TenantId == context.TenantId &&
+                      refund.RefundStatus == "COMPLETED" &&
+                      refund.CompletedAt != null &&
+                      refund.CancelledAt == null
+                select refund.Id)
+            .CountAsync(cancellationToken);
+        var netSalesAmount = await completedOrders
+            .SumAsync(order => (decimal?)(order.TotalAmount - order.RefundedAmount), cancellationToken) ?? 0m;
+
         _logger.LogDebug(
             "POS home context resolved for user {UserId}, device {DeviceId}, till {TillId}, session {SessionId}.",
             context.UserId,
@@ -448,7 +483,13 @@ public sealed class PosHomeDashboardRepository : IPosHomeDashboardRepository
                 ReturnsRefundsCount: returnsRefundsCount,
                 CustomersCount: customersCount,
                 ParkedSalesCount: parkedSalesCount,
-                CashDrawerBalance: cashDrawerBalance));
+                CashDrawerBalance: cashDrawerBalance,
+                GrossSalesAmount: grossSalesAmount,
+                TransactionCount: transactionCount,
+                RefundAmount: refundAmount,
+                RefundCount: refundCount,
+                DiscountAmount: discountAmount,
+                NetSalesAmount: netSalesAmount));
     }
 
     private async Task<Guid?> ResolveTrustedDeviceIdByFingerprintAsync(

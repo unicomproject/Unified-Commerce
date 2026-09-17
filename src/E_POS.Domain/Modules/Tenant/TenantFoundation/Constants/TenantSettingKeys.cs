@@ -23,6 +23,8 @@ public static class TenantSettingKeys
     public const string PosLoginBackgroundColor = "pos.login.background_color";
     public const string PosLoginBackgroundMediaAssetId = "pos.login.background_media_asset_id";
     public const string PosLoginHeroMediaAssetId = "pos.login.hero_media_asset_id";
+    public const string PosThemePrimaryColor = "pos.theme.primary_color";
+    public const string PosThemeSecondaryColor = "pos.theme.secondary_color";
 
     public const string TaxPricingModeExclusive = "TAX_EXCLUSIVE";
     public const string TaxPricingModeInclusive = "TAX_INCLUSIVE";

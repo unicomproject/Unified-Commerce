@@ -67,6 +67,44 @@ public sealed class SalesOrderClickCollectStatusTests
             order.CancelClickAndCollectByCustomer("Too late", Now.AddMinutes(5)));
     }
 
+    [Fact]
+    public void ApplyPosStartPreparing_FromConfirmedPending_ProjectsAcceptedPreparing()
+    {
+        var order = CreateOrder();
+        var actor = Guid.NewGuid();
+
+        order.ApplyPosStartPreparing(actor, Now.AddMinutes(1));
+
+        Assert.Equal("ACCEPTED", order.Status);
+        Assert.Equal("PREPARING", order.FulfillmentStatus);
+        Assert.Equal("PREPARING", order.GetClickAndCollectCustomerStatus());
+        Assert.Equal(actor, order.UpdatedByTenantUserId);
+    }
+
+    [Fact]
+    public void ApplyPosStartPreparing_FromAccepted_ProjectsPreparing()
+    {
+        var order = CreateOrder();
+        order.UpdateClickAndCollectStatus("ACCEPTED", Guid.NewGuid(), Now.AddMinutes(1));
+
+        order.ApplyPosStartPreparing(Guid.NewGuid(), Now.AddMinutes(2));
+
+        Assert.Equal("ACCEPTED", order.Status);
+        Assert.Equal("PREPARING", order.FulfillmentStatus);
+    }
+
+    [Fact]
+    public void ApplyPosStartPreparing_WhenAlreadyReady_Throws()
+    {
+        var order = CreateOrder();
+        order.UpdateClickAndCollectStatus("ACCEPTED", Guid.NewGuid(), Now.AddMinutes(1));
+        order.UpdateClickAndCollectStatus("PREPARING", Guid.NewGuid(), Now.AddMinutes(2));
+        order.UpdateClickAndCollectStatus("READY_FOR_COLLECTION", Guid.NewGuid(), Now.AddMinutes(3));
+
+        Assert.Throws<InvalidOperationException>(() =>
+            order.ApplyPosStartPreparing(Guid.NewGuid(), Now.AddMinutes(4)));
+    }
+
     private static SalesOrder CreateOrder() => SalesOrder.CreateClickAndCollect(
         Guid.NewGuid(),
         Guid.NewGuid(),

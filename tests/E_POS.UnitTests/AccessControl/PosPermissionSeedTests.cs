@@ -425,6 +425,7 @@ public sealed class PosPermissionSeedTests
             .Concat(new[]
             {
                 DevelopmentPosCustomerCreatePermissionSeedData.Definition.PermissionCode,
+                E_POS.Domain.Modules.Tenant.AccessControl.Constants.WorkspacePermissions.PosAccess,
                 DevelopmentPosHardwareSettingsPermissionSeedData.PermissionCode
             })
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

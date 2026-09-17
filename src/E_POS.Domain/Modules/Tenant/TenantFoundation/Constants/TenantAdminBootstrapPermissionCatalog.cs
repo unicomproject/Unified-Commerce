@@ -18,6 +18,7 @@ public static class TenantAdminBootstrapPermissionCatalog
     /// </summary>
     public static readonly IReadOnlyList<string> BasePermissionCodes =
     [
+        WorkspacePermissions.TenantAdminAccess,
         "tenant.dashboard.view", // Basic home / account landing
         "tenant.settings.manage", // Basic tenant settings required for initial setup
         WorkspacePermissions.TenantAdminAccess // Gate to land in the Tenant Admin workspace
@@ -127,6 +128,7 @@ public static class TenantAdminBootstrapPermissionCatalog
             // POS checkout lets a Tenant Admin configure the supported Cashier template
             // without bypassing the delegation ceiling; it grants no platform permissions.
             [PlatformTenantFeatureCodes.PosCheckout] = TenantRoleSetupCatalog.CashierAllowedPermissionCodes
+                .Where(permissionCode => permissionCode != WorkspacePermissions.PosAccess)
                 .OrderBy(permissionCode => permissionCode, StringComparer.Ordinal)
                 .ToArray(),
             [PlatformTenantFeatureCodes.OfflineOperationSync] = [],

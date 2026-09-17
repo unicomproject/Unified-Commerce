@@ -14,12 +14,19 @@ namespace E_POS.UnitTests.AccessControl;
 public sealed class CashierPosChunk3PermissionSeedTests
 {
     [Fact]
-    public void RoleAssignableCodes_MatchChunk2Counts_AndExcludePreAuth()
+    public void RoleAssignableCodes_IncludeCollectionPermissions_AndExcludePreAuth()
     {
-        Assert.Equal(348, CashierPosChunk3PermissionSeedData.RoleAssignableDefinitions.Count);
+        Assert.Equal(352, CashierPosChunk3PermissionSeedData.RoleAssignableDefinitions.Count);
         Assert.Equal(295, CashierPosChunk3PermissionSeedData.FineGrainedCount);
-        Assert.Equal(53, CashierPosChunk3PermissionSeedData.ExistingCatalogCount);
+        Assert.Equal(57, CashierPosChunk3PermissionSeedData.ExistingCatalogCount);
         Assert.Equal(7, CashierPosChunk3PermissionSeedData.PreAuthExcludedCount);
+
+        foreach (var action in new[] { "scan_qr", "validate_qr", "manual_lookup", "verify_items", "handover", "collect" })
+        {
+            Assert.Single(CashierPosChunk3PermissionSeedData.RoleAssignableDefinitions,
+                definition => definition.Code == $"commerce.online_order.collection.{action}" &&
+                              definition.Kind == CashierPosPermissionDefinitionKind.Existing);
+        }
 
         Assert.DoesNotContain(
             CashierPosChunk3PermissionSeedData.RoleAssignableDefinitions,

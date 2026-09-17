@@ -47,4 +47,10 @@ public sealed record PosHomeDashboardDbSnapshot(
     int ReturnsRefundsCount,
     int CustomersCount,
     int ParkedSalesCount,
-    double CashDrawerBalance);
+    double CashDrawerBalance,
+    decimal GrossSalesAmount,
+    int TransactionCount,
+    decimal RefundAmount,
+    int RefundCount,
+    decimal DiscountAmount,
+    decimal NetSalesAmount);

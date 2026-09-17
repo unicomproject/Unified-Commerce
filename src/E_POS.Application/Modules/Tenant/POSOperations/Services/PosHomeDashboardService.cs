@@ -1,6 +1,7 @@
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
+using E_POS.Domain.Modules.Tenant.AccessControl.Catalog.CashierPos;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Constants;
 using E_POS.Domain.Modules.Tenant.Orders.Constants;
@@ -66,7 +67,8 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     Time: null,
                     Notifications: null,
                     Metrics: null,
-                    QuickActions: null));
+                    QuickActions: null,
+                    Summary: null));
         }
 
         var snapshot = resolution.Snapshot;
@@ -100,6 +102,13 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
 
         var canViewNotifications =
             context.HasPermission(PosPermissions.Notifications.View);
+
+        var canViewSummary = context.HasPermission(CashierPosFineGrainedPermissions.PosHomeSessionSummaryView);
+        var canViewTotalSales = context.HasPermission(CashierPosFineGrainedPermissions.PosHomeSessionSummaryTotalSales);
+        var canViewTransactionCount = context.HasPermission(CashierPosFineGrainedPermissions.PosHomeSessionSummaryTransactionCount);
+        var canViewSummaryReturns = context.HasPermission(CashierPosFineGrainedPermissions.PosHomeSessionSummaryReturns);
+        var canViewDiscounts = context.HasPermission(CashierPosFineGrainedPermissions.PosHomeSessionSummaryDiscounts);
+        var canViewNetSales = context.HasPermission(CashierPosFineGrainedPermissions.PosHomeSessionSummaryNetSales);
 
         var startSaleEnabled = canStartSalePermission && snapshot.DeviceTrusted && tillOpen;
         var serverNowUtc = DateTimeOffset.UtcNow;
@@ -168,6 +177,21 @@ public sealed class PosHomeDashboardService : IPosHomeDashboardService
                     CanViewReturns: canViewReturns,
                     CanViewParkedSales: canParkOrViewParkedSales,
                     CanViewCashDrawer: canViewCashDrawer,
-                    CanViewNotifications: canViewNotifications)));
+                    CanViewNotifications: canViewNotifications),
+                Summary: !canViewSummary
+                    ? null
+                    : new PosHomeSummaryDto(
+                        Scope: "CURRENT_TILL_SESSION",
+                        BusinessDate: snapshot.BusinessDate,
+                        TillSessionId: snapshot.TillSessionId,
+                        CurrencyCode: snapshot.CurrencyCode,
+                        GrossSalesAmount: canViewTotalSales ? snapshot.GrossSalesAmount : null,
+                        TransactionCount: canViewTransactionCount ? snapshot.TransactionCount : null,
+                        RefundAmount: canViewSummaryReturns ? snapshot.RefundAmount : null,
+                        RefundCount: canViewSummaryReturns ? snapshot.RefundCount : null,
+                        ReturnsApplicable: canViewSummaryReturns && snapshot.RefundCount > 0,
+                        DiscountAmount: canViewDiscounts ? snapshot.DiscountAmount : null,
+                        DiscountsApplicable: canViewDiscounts && snapshot.DiscountAmount > 0m,
+                        NetSalesAmount: canViewNetSales ? snapshot.NetSalesAmount : null)));
     }
 }

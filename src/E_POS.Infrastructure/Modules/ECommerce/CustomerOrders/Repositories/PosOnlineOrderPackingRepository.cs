@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
@@ -5,7 +7,6 @@ using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
-using E_POS.Infrastructure.Modules.ECommerce.FulfilmentPickup;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -18,6 +19,8 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
     public const string ReadyEvent = "FULFILLMENT_READY_FOR_COLLECTION";
     public const string PickupReadyEvent = "PICKUP_READY_FOR_COLLECTION";
     private const string ClickAndCollectOrderType = "CLICK_AND_COLLECT";
+    /// <summary>Collection QR validity window after MarkReady (Chunk 2 MVP).</summary>
+    public static readonly TimeSpan CollectionQrTtl = TimeSpan.FromDays(7);
 
     private readonly EPosDbContext _dbContext;
 
@@ -191,13 +194,21 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
                 return await RollbackFailureAsync(transaction, "online_orders.invalid_pickup", cancellationToken);
 
             var oldPickupStatus = pickup.PickupStatus;
-            var pickupCode = PickupCodeGenerator.Generate();
+            string? collectionQrToken = null;
             try
             {
                 fulfillment.MarkReady(tenantUserId, request.ExpectedVersion, now);
                 order.ApplyPosReadyForCollection(tenantUserId, now);
                 pickup.MarkReady(now);
-                pickup.IssuePickupCode(pickupCode, (pickup.PickupQrVersion ?? 0) + 1, now.AddHours(24), now);
+
+                // One-time reveal in MarkReady response; only the hash is persisted.
+                collectionQrToken = CreateCollectionQrToken();
+                var tokenHash = Convert.ToHexString(
+                        SHA256.HashData(Encoding.UTF8.GetBytes(collectionQrToken)))
+                    .ToLowerInvariant();
+                var qrVersion = (pickup.PickupQrVersion ?? 0) + 1;
+                var qrExpiresAt = now.Add(CollectionQrTtl);
+                pickup.IssueCollectionQr(tokenHash, qrVersion, qrExpiresAt, now);
             }
             catch (InvalidOperationException ex) when (ex.Message == "FULFILLMENT_VERSION_CONFLICT")
             {
@@ -205,6 +216,7 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
             }
             catch (InvalidOperationException ex) when (
                 ex.Message is "FULFILLMENT_NOT_READYABLE" or "PICKUP_NOT_READYABLE" or "PICKUP_ALREADY_READY"
+                or "PICKUP_NOT_READY_FOR_QR"
                 || ex.Message.Contains("ready for collection", StringComparison.OrdinalIgnoreCase))
             {
                 return await RollbackFailureAsync(transaction, "online_orders.invalid_state", cancellationToken);
@@ -225,7 +237,6 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
             pickupEntry.Property(x => x.PickupQrTokenHash).IsModified = true;
             pickupEntry.Property(x => x.PickupQrVersion).IsModified = true;
             pickupEntry.Property(x => x.PickupQrExpiresAt).IsModified = true;
-            pickupEntry.Property(x => x.FailedVerificationAttempts).IsModified = true;
             pickupEntry.Property(x => x.UpdatedAt).IsModified = true;
 
             var fulfillmentSequence = await NextFulfillmentEventSequenceAsync(
@@ -256,7 +267,8 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
                 CompletedLines = lines.Count,
                 CanPack = false,
                 FulfillmentVersion = fulfillment.RowVersion,
-                UpdatedAt = now
+                UpdatedAt = now,
+                CollectionQrToken = collectionQrToken
             });
         }
         catch (DbUpdateConcurrencyException)
@@ -362,6 +374,15 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
         if (transaction is not null)
             await transaction.RollbackAsync(cancellationToken);
         return PosOnlineOrderPackingRepositoryResult.Failure(errorCode);
+    }
+
+    private static string CreateCollectionQrToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 
     private sealed record PackingAggregate(

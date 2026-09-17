@@ -412,6 +412,45 @@ public class SalesOrder : AuditableEntity
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// POS Start Fulfilment projection: keep fulfilment lifecycle on
+    /// <c>fulfillment_orders</c> (<c>PICKING</c>) while aligning the sales-order
+    /// read model to <c>PREPARING</c> for cashier list/detail buckets.
+    /// </summary>
+    public void ApplyPosStartPreparing(Guid updatedByTenantUserId, DateTimeOffset now)
+    {
+        if (!string.Equals(OrderType, "CLICK_AND_COLLECT", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Only click and collect orders can start preparing from POS.");
+
+        if (string.Equals(Status, "CANCELLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "CANCELLED", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot start preparing a cancelled order.");
+
+        if (string.Equals(Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "FULFILLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "COLLECTED", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot start preparing a collected order.");
+
+        if (string.Equals(FulfillmentStatus, "READY_FOR_COLLECTION", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "READY", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "READY_FOR_PICKUP", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot start preparing an order that is already ready.");
+
+        if (string.Equals(FulfillmentStatus, "PREPARING", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(Status, "ACCEPTED", StringComparison.OrdinalIgnoreCase))
+        {
+            UpdatedByTenantUserId = updatedByTenantUserId;
+            UpdatedAt = now;
+            return;
+        }
+
+        Status = "ACCEPTED";
+        FulfillmentStatus = "PREPARING";
+        ConfirmedAt ??= now;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
     public void ApplyPosReadyForCollection(Guid updatedByTenantUserId, DateTimeOffset now)
     {
         if (!string.Equals(OrderType, "CLICK_AND_COLLECT", StringComparison.OrdinalIgnoreCase))
@@ -433,6 +472,63 @@ public class SalesOrder : AuditableEntity
         Status = "ACCEPTED";
         FulfillmentStatus = "READY_FOR_COLLECTION";
         UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// POS collection handover projection: sales-order COMPLETED + COLLECTED
+    /// (mirrors <see cref="UpdateClickAndCollectStatus"/> COMPLETED).
+    /// </summary>
+    public void ApplyPosCollected(Guid userId, DateTimeOffset now)
+    {
+        if (!string.Equals(OrderType, "CLICK_AND_COLLECT", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Only click and collect orders can be collected from POS.");
+
+        if (string.Equals(Status, "CANCELLED", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(FulfillmentStatus, "CANCELLED", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot collect a cancelled order.");
+
+        if (string.Equals(Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(FulfillmentStatus, "COLLECTED", StringComparison.OrdinalIgnoreCase) &&
+            CompletedAt.HasValue)
+        {
+            UpdatedByTenantUserId = userId;
+            UpdatedAt = now;
+            return;
+        }
+
+        Status = "COMPLETED";
+        FulfillmentStatus = "COLLECTED";
+        CompletedAt = now;
+        UpdatedByTenantUserId = userId;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Records a POS tender against an unpaid/partially paid click &amp; collect order.
+    /// Does not mark the order collected.
+    /// </summary>
+    public void ApplyPosCollectionPayment(decimal amountPaidThisTxn, Guid userId, DateTimeOffset now)
+    {
+        if (!string.Equals(OrderType, "CLICK_AND_COLLECT", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Only click and collect orders can accept collection payments.");
+
+        if (amountPaidThisTxn <= 0m)
+            throw new InvalidOperationException("COLLECTION_PAYMENT_AMOUNT_INVALID");
+
+        const decimal epsilon = 0.01m;
+        if (string.Equals(PaymentStatus, "PAID", StringComparison.OrdinalIgnoreCase) &&
+            BalanceDue <= epsilon)
+            throw new InvalidOperationException("COLLECTION_PAYMENT_ALREADY_PAID");
+
+        if (amountPaidThisTxn > BalanceDue + epsilon)
+            throw new InvalidOperationException("COLLECTION_PAYMENT_EXCEEDS_BALANCE");
+
+        PaidAmount += amountPaidThisTxn;
+        var remaining = BalanceDue - amountPaidThisTxn;
+        BalanceDue = remaining <= epsilon ? 0m : remaining;
+        PaymentStatus = BalanceDue <= epsilon ? "PAID" : "PARTIALLY_PAID";
+        UpdatedByTenantUserId = userId;
         UpdatedAt = now;
     }
 

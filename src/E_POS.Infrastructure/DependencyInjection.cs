@@ -300,6 +300,7 @@ public static class DependencyInjection
         services.AddSingleton<TenantNotificationSocketRegistry>();
         services.AddSingleton<ITenantNotificationSocketRegistry>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
         services.AddSingleton<IRealtimeNotificationPublisher>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
+        services.AddSingleton<IWebSocketNotificationTicketService, WebSocketNotificationTicketService>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
@@ -401,7 +402,7 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IPosOnlineOrderReadyRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IPosOnlineOrderPackingRepository, PosOnlineOrderPackingRepository>();
-        services.AddScoped<IPosOnlineOrderPickupVerificationRepository, PosOnlineOrderPickupVerificationRepository>();
+        services.AddScoped<IPosOnlineOrderCollectionRepository, PosOnlineOrderCollectionRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
         services.AddScoped<IPaymentMethodExecutionCapability, CashPaymentExecutionCapability>();
         services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();

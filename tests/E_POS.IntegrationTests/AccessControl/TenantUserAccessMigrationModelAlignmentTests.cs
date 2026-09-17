@@ -1,4 +1,5 @@
 using E_POS.Infrastructure.Persistence;
+using E_POS.IntegrationTests.TestSupport;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -105,8 +106,7 @@ public sealed class TenantUserAccessMigrationModelAlignmentTests
 
             await using var db = new EPosDbContext(
                 new DbContextOptionsBuilder<EPosDbContext>().UseNpgsql(connectionString).Options);
-            var script = db.Database.GetService<IMigrator>().GenerateScript(
-                "20260824120000_SeedProductWizardSpecializedPermissions",
+            var script = MigrationTestSql.ForMigration(db,
                 "20260826120000_AddTenantUserExplicitOutletTillAccess");
             await using (var migrate = new NpgsqlCommand(script, connection))
             {

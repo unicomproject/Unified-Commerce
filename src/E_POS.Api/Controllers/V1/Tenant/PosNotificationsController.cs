@@ -39,4 +39,16 @@ public sealed class PosNotificationsController : ControllerBase
             ? StatusCode(StatusCodes.Status403Forbidden, new { code = result.Error.Code, message = result.Error.Message })
             : BadRequest(new { code = result.Error.Code, message = result.Error.Message });
     }
+
+    [HttpPost("ticket")]
+    public async Task<IActionResult> CreateTicket(
+        [FromServices] IWebSocketNotificationTicketService ticketService,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_contextFactory.TryCreate(User, out var context))
+            return Unauthorized(new { code = "pos_notifications.invalid_tenant_context" });
+
+        var ticket = await ticketService.CreateTicketAsync(context, cancellationToken);
+        return Ok(ticket);
+    }
 }
