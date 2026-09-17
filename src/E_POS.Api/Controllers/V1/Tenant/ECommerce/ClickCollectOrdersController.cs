@@ -38,6 +38,8 @@ public sealed class ClickCollectOrdersController : ControllerBase
         _packingService = packingService;
         _readyService = readyService;
         _pickupVerificationService = pickupVerificationService;
+        _tenantRequestContextFactory = tenantRequestContextFactory;
+    }
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

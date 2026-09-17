@@ -118,11 +118,7 @@ public sealed class PosOnlineOrderReadyServiceTests
     {
         public SalesOrder Order { get; } = new();
         public FulfillmentOrder Fulfillment { get; } = (FulfillmentOrder)Activator.CreateInstance(typeof(FulfillmentOrder), nonPublic: true)!;
-<<<<<<< HEAD
         public PickupOrder Pickup { get; } = (PickupOrder)Activator.CreateInstance(typeof(PickupOrder), nonPublic: true)!;
-=======
-        public PickupOrder Pickup { get; } = new();
->>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
         public CallbackRepository(string fulfillment = "READY", string pickup = "READY", string sales = "ACCEPTED")
         {
             Set(Order, "Id", Guid.NewGuid()); Set(Order, "CustomerId", Guid.NewGuid());
