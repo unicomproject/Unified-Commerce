@@ -254,5 +254,6 @@ public sealed class CatalogMediaBrandLogoControllerTests
             Guid brandId,
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
+        public Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

@@ -6,6 +6,7 @@ using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 
@@ -27,6 +28,16 @@ public sealed class BrandRepository : IBrandRepository
                      x.BrandCode == brandCode &&
                      (!excludeBrandId.HasValue || x.Id != excludeBrandId.Value),
                 cancellationToken);
+    }
+
+    public Task<bool> HasProductLinksAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)
+    {
+        return _dbContext.Products.AsNoTracking().AnyAsync(
+            x => x.TenantId == tenantId &&
+                 x.BrandId == brandId &&
+                 x.Status != ProductConstants.DeletedStatus &&
+                 x.Status != ProductConstants.ArchivedStatus,
+            cancellationToken);
     }
 
     public async Task<BrandListResponse> ListAsync(Guid tenantId, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken)
@@ -62,8 +73,13 @@ public sealed class BrandRepository : IBrandRepository
                               JoinedMediaAssetId = mediaAsset == null ? null : (Guid?)mediaAsset.Id,
                               MediaStatus = mediaAsset == null ? null : mediaAsset.Status,
                               MediaPublicUrl = mediaAsset == null ? null : mediaAsset.PublicUrl,
+                              ProductCount = _dbContext.Products.Count(product =>
+                                  product.TenantId == tenantId &&
+                                  product.BrandId == brand.Id &&
+                                  product.Status != "ARCHIVED"),
                           })
-            .OrderBy(x => x.Brand.BrandCode)
+            .OrderBy(x => x.Brand.SortOrder)
+            .ThenBy(x => x.Brand.BrandCode)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -84,7 +100,8 @@ public sealed class BrandRepository : IBrandRepository
                     hasActiveMedia ? x.JoinedMediaAssetId : null,
                     x.Brand.Status,
                     x.Brand.CreatedAt,
-                    x.Brand.UpdatedAt);
+                    x.Brand.UpdatedAt,
+                    x.ProductCount);
             })
             .ToList();
 
@@ -132,7 +149,10 @@ public sealed class BrandRepository : IBrandRepository
             hasActiveMedia ? row.JoinedMediaAssetId : null,
             row.Brand.Status,
             row.Brand.CreatedAt,
-            row.Brand.UpdatedAt);
+            row.Brand.UpdatedAt,
+            row.Brand.Description,
+            row.Brand.SortOrder,
+            row.Brand.RowVersion);
     }
 
     public Task<Brand?> GetEditableAsync(Guid tenantId, Guid brandId, CancellationToken cancellationToken)
@@ -144,7 +164,11 @@ public sealed class BrandRepository : IBrandRepository
     public async Task AddAsync(Brand brand, CancellationToken cancellationToken)
     {
         _dbContext.Brands.Add(brand);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try { await _dbContext.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException ex) when (TryMapUniqueConflict(ex, out var code))
+        {
+            throw new BrandPersistenceException(code!, ex);
+        }
     }
 
     public Task AddMediaAssetAsync(MediaAsset mediaAsset, CancellationToken cancellationToken)
@@ -166,9 +190,29 @@ public sealed class BrandRepository : IBrandRepository
         mediaAsset?.MarkInactive(updatedByTenantUserId, now);
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken)
+    public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        try { await _dbContext.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new BrandPersistenceException("brand.concurrency_conflict", ex);
+        }
+        catch (DbUpdateException ex) when (TryMapUniqueConflict(ex, out var code))
+        {
+            throw new BrandPersistenceException(code!, ex);
+        }
+    }
+
+    private static bool TryMapUniqueConflict(DbUpdateException exception, out string? errorCode)
+    {
+        var constraint = (exception.InnerException as PostgresException)?.ConstraintName;
+        errorCode = constraint switch
+        {
+            "uq_brands_tenant_id_brand_code" => "brand.code_conflict",
+            "uq_brands_tenant_id_brand_slug" => "brand.slug_conflict",
+            _ => null
+        };
+        return errorCode is not null;
     }
 
     private static bool IsActiveMedia(
