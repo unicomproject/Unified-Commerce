@@ -230,6 +230,32 @@ public sealed class StorefrontCheckoutRepositoryTests
     }
 
     [Fact]
+    public async Task ConfirmAsync_MissingPrimaryBarcode_RejectsWithoutCreatingOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var scenario = await SeedScenarioAsync(dbContext, selectedOutletStock: 5m, seedPrimaryBarcode: false);
+        await AddCartItemAsync(dbContext, scenario, 1m);
+        var repository = new StorefrontCheckoutRepository(dbContext);
+        var created = await CreateCheckoutAsync(repository, scenario);
+        var selected = await repository.UpdateCollectionAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            new UpdateStorefrontCheckoutCollectionRequest
+            {
+                SelectedOutletId = scenario.OutletId,
+                RequestedCollectionAt = CollectionAt
+            },
+            Now,
+            CancellationToken.None);
+        Assert.True(selected.IsSuccess);
+
+        var result = await repository.ConfirmAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            "confirm-missing-barcode",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(1),
             CancellationToken.None);
 
@@ -242,6 +268,34 @@ public sealed class StorefrontCheckoutRepositoryTests
         Assert.Empty(await dbContext.PickupOrders.ToListAsync());
         Assert.Empty(await dbContext.PickupSlots.ToListAsync());
         Assert.Empty(await dbContext.PickupSlotReservations.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_CapturedBarcodeSnapshot_SurvivesLaterCatalogueBarcodeChange()
+    {
+        await using var dbContext = CreateDbContext();
+        var scenario = await SeedScenarioAsync(dbContext, selectedOutletStock: 5m);
+        await AddCartItemAsync(dbContext, scenario, 1m);
+        var repository = new StorefrontCheckoutRepository(dbContext);
+        var created = await CreateCheckoutAsync(repository, scenario);
+        Assert.True((await repository.UpdateCollectionAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            new UpdateStorefrontCheckoutCollectionRequest
+            {
+                SelectedOutletId = scenario.OutletId,
+                RequestedCollectionAt = CollectionAt
+            },
+            Now,
+            CancellationToken.None)).IsSuccess);
+
+        var confirmed = await repository.ConfirmAsync(
+            scenario.TenantId,
+            scenario.CustomerId,
+            created.Checkout!.Id,
+            "confirm-immutable-barcode",
+            StorefrontPaymentMethodCodes.PayAtPickup,
             Now.AddMinutes(1),
             CancellationToken.None);
         Assert.True(confirmed.IsSuccess);

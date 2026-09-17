@@ -224,5 +224,6 @@ public sealed class CatalogMediaCategoryControllerTests
 
         public Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult.Failure(new ApplicationError("brand.not_found", "unused")));
+        public Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

@@ -1727,6 +1727,7 @@ public sealed class TenantAdminProductsControllerTests
             BrandLogoId = brandId;
             return Task.FromResult(BrandLogoResult);
         }
+        public Task<ApplicationResult> RemoveCategoryImageAsync(TenantRequestContext context, Guid categoryId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Failure(new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
     }
 
     private sealed class FakeBrandService : IBrandService
@@ -1741,12 +1742,6 @@ public sealed class TenantAdminProductsControllerTests
         public Task<ApplicationResult<BrandResponse>> UpdateAsync(TenantRequestContext context, Guid brandId, BrandUpdateRequest request, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
         public Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
 
-        public Task<ApplicationResult> RemoveCategoryImageAsync(
-            TenantRequestContext context,
-            Guid categoryId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult.Failure(
-                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory
