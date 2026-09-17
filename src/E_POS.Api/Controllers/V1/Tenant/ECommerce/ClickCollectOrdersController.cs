@@ -19,6 +19,17 @@ public sealed class ClickCollectOrdersController : ControllerBase
     private readonly IPosOnlineOrderPackingService _packingService;
     private readonly IPosOnlineOrderReadyService _readyService;
     private readonly IPosOnlineOrderPickupVerificationService _pickupVerificationService;
+    private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
+
+    public ClickCollectOrdersController(
+        IClickCollectOrderStatusService service,
+        IPosOnlineOrderDetailService detailService,
+        IPosOnlineOrderStartFulfillmentService startFulfillmentService,
+        IPosOnlineOrderPickingService pickingService,
+        IPosOnlineOrderPackingService packingService,
+        IPosOnlineOrderReadyService readyService,
+        IPosOnlineOrderPickupVerificationService pickupVerificationService,
+        ITenantRequestContextFactory tenantRequestContextFactory)
     {
         _service = service;
         _detailService = detailService;
