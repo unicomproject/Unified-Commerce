@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Contracts;
 using E_POS.Application.Modules.ECommerce.CartCheckout.Dtos;
@@ -261,11 +261,7 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
                     barcodeByProductId,
                     out var barcodeSnapshot))
                 return Failure("storefront_checkout.barcode_unavailable");
-<<<<<<< HEAD
             var orderLine = SalesOrderLine.CreateForClickAndCollect(
-=======
-            DbContext.SalesOrderLines.Add(SalesOrderLine.CreateForClickAndCollect(
->>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
                 Guid.NewGuid(), tenantId, orderId, line.LineNumber, line.ProductId,
                 line.ProductVariantId, uom.Id, line.SkuSnapshot, barcodeSnapshot,
                 line.ProductNameSnapshot, variant?.VariantName, uom.UomCode, uom.UomName,
@@ -310,7 +306,6 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
         return Success(await BuildReadModelAsync(checkout, cancellationToken));
     }
 
-<<<<<<< HEAD
     public async Task<bool> CancelAwaitingOnlinePaymentAsync(
         Guid tenantId,
         Guid salesOrderId,
@@ -426,8 +421,6 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
             now));
     }
 
-=======
->>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     private static bool TryResolvePrimaryBarcodeSnapshot(
         Guid productId,
         Guid? productVariantId,

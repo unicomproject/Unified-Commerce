@@ -21,10 +21,7 @@ internal static class OnlineOrderPermissions
         new("commerce.online_order.collection.mark_ready", null, "Existing", CashierPosPermissionSemanticType.Screen, false, CashierPosPermissionDefinitionKind.Existing, "Approved existing canonical business permission", true),
         new("commerce.online_order.collection.view_ready", null, "Existing", CashierPosPermissionSemanticType.Screen, false, CashierPosPermissionDefinitionKind.Existing, "Approved existing canonical business permission", true),
         new("commerce.online_order.collection.notify_customer", null, "Existing", CashierPosPermissionSemanticType.Action, false, CashierPosPermissionDefinitionKind.Existing, "Approved existing canonical business permission", true),
-<<<<<<< HEAD
         new("commerce.online_order.collection.verify", null, "Existing", CashierPosPermissionSemanticType.Action, false, CashierPosPermissionDefinitionKind.Existing, "Approved existing canonical business permission", true),
         new("commerce.online_order.collection.complete", null, "Existing", CashierPosPermissionSemanticType.Action, false, CashierPosPermissionDefinitionKind.Existing, "Approved existing canonical business permission", true),
-=======
->>>>>>> e48762da864721bec8833d67bc01c9213cb2d357
     ];
 }
