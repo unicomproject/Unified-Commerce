@@ -4,6 +4,7 @@ using System.Net;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace E_POS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EPosDbContext))]
-    partial class EPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916212811_AddSharedProductMetadataCache")]
+    partial class AddSharedProductMetadataCache
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -11161,19 +11164,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("logo_media_asset_id");
 
-                    b.Property<long>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasDefaultValue(1L)
-                        .HasColumnName("row_version");
-
-                    b.Property<int>("SortOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("sort_order");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -11214,15 +11204,8 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "LogoMediaAssetId")
                         .HasDatabaseName("ix_brands_tenant_id_logo_media_asset_id");
 
-                    b.HasIndex("TenantId", "SortOrder", "BrandCode")
-                        .HasDatabaseName("ix_brands_tenant_id_sort_order_brand_code");
-
                     b.ToTable("brands", null, t =>
                         {
-                            t.HasCheckConstraint("ck_brands_row_version", "row_version >= 1");
-
-                            t.HasCheckConstraint("ck_brands_sort_order", "sort_order >= 0");
-
                             t.HasCheckConstraint("ck_brands_status", "status IN ('ACTIVE', 'INACTIVE', 'DELETED')");
                         });
                 });
@@ -12361,9 +12344,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasName("pk_products");
 
                     b.HasIndex("TenantId", "ArchivedByTenantUserId");
-
-                    b.HasIndex("TenantId", "BrandId")
-                        .HasDatabaseName("ix_products_tenant_id_brand_id");
 
                     b.HasIndex("TenantId", "Id")
                         .IsUnique()
@@ -29278,13 +29258,6 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_products_tenant_users_archived_by");
-
-                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Brand", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "BrandId")
-                        .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_products_brand_tenant");
 
                     b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
                         .WithMany()

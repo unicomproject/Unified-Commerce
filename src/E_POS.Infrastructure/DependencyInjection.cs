@@ -411,6 +411,21 @@ public static class DependencyInjection
         services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();
         services.AddScoped<IPaymentMethodCapabilityResolver, PaymentMethodCapabilityResolver>();
 
+        // Product Lookup Circuit Breaker (Phase 3)
+        services.AddSingleton<E_POS.Infrastructure.Integrations.ProductLookup.Resilience.IProductLookupCircuitBreakerRegistry,
+            E_POS.Infrastructure.Integrations.ProductLookup.Resilience.ProductLookupCircuitBreakerRegistry>();
+
+        // External Product Lookup providers (Phase 1)
+        services.AddScoped<IExternalProductLookupProvider>(provider =>
+            new E_POS.Infrastructure.Integrations.ProductLookup.OpenFoodFacts.OpenFoodFactsProductLookupProvider(
+                new HttpClient(),
+                provider.GetRequiredService<IOptions<E_POS.Application.Modules.Tenant.CatalogProduct.Options.ExternalProductLookupOptions>>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<E_POS.Infrastructure.Integrations.ProductLookup.OpenFoodFacts.OpenFoodFactsProductLookupProvider>>(),
+                provider.GetRequiredService<E_POS.Infrastructure.Integrations.ProductLookup.Resilience.IProductLookupCircuitBreakerRegistry>()));
+
+        // Shared Product Metadata Cache (Phase 2)
+        services.AddScoped<ISharedProductMetadataCacheRepository, E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories.SharedProductMetadataCacheRepository>();
+
         return services;
     }
 }
