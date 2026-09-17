@@ -330,6 +330,7 @@ public sealed class CatalogMediaController : ControllerBase
         return error.Code switch
         {
             "media.permission_denied" or
+                "media.initial_brand_logo_not_authorized" or
                 "brand.permission_denied" or
                 "category.permission_denied" or
                 "category.entitlement_denied" =>
