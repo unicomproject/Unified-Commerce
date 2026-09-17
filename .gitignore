@@ -7,3 +7,13 @@ TestResults/
 artifacts/
 .codex-tmp/
 src/E_POS.Api/appsettings.Development.json
+
+# Local screenshots / device dumps / runtime evidence (do not commit or push)
+screenshots/
+**/screenshots/
+test_evidence/
+*_e2e_artifacts/
+*screenshot*.png
+*screenshot*.jpg
+*screenshot*.jpeg
+*screenshot*.webp

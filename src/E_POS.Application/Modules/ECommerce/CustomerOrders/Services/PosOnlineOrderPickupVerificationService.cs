@@ -12,8 +12,8 @@ public sealed class PosOnlineOrderPickupVerificationService : IPosOnlineOrderPic
 {
     public const string AccessPermission = OnlineOrderPickingPermissions.OrdersAccess;
     public const string OrdersViewPermission = OnlineOrderPickingPermissions.OrdersView;
-    public const string VerifyPermission = OnlineOrderPickingPermissions.CollectionVerify;
-    public const string CompletePermission = OnlineOrderPickingPermissions.CollectionComplete;
+    public const string VerifyPermission = OnlineOrderPickingPermissions.CollectionValidateQr;
+    public const string CompletePermission = OnlineOrderPickingPermissions.CollectionCollect;
     public const int PickupCodeMaxLength = 128;
 
     private readonly IPosOnlineOrderPickupVerificationRepository _repository;

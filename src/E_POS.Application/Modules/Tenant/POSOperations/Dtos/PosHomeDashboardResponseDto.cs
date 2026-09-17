@@ -21,7 +21,8 @@ public sealed record PosHomeDashboardResponseDto(
     PosHomeTimeDto? Time,
     PosHomeNotificationsDto? Notifications,
     PosHomeMetricsDto? Metrics,
-    PosHomeQuickActionsDto? QuickActions);
+    PosHomeQuickActionsDto? QuickActions,
+    PosHomeSummaryDto? Summary);
 
 public sealed record PosHomeUserDto(
     string FullName);
@@ -79,6 +80,20 @@ public sealed record PosHomeNotificationsDto(
 
 public sealed record PosHomeMetricsDto(
     int ParkedSalesCount);
+
+public sealed record PosHomeSummaryDto(
+    string Scope,
+    DateOnly BusinessDate,
+    Guid TillSessionId,
+    string CurrencyCode,
+    decimal? GrossSalesAmount,
+    int? TransactionCount,
+    decimal? RefundAmount,
+    int? RefundCount,
+    bool ReturnsApplicable,
+    decimal? DiscountAmount,
+    bool DiscountsApplicable,
+    decimal? NetSalesAmount);
 
 public sealed record PosHomeQuickActionsDto(
     bool CanStartSale,

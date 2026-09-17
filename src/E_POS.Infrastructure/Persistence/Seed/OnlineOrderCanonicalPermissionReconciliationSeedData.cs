@@ -68,6 +68,14 @@ public static class OnlineOrderCanonicalPermissionReconciliationSeedData
             ("pos.online_orders.packing.view", OnlineOrderPickingPermissions.PackingView),
             ("pos.online_orders.packing.pack", OnlineOrderPickingPermissions.PackingPack),
             ("pos.online_orders.collection.mark_ready", OnlineOrderPickingPermissions.CollectionMarkReady),
+            ("pos.online_orders.collection.notify", OnlineOrderPickingPermissions.CollectionNotifyCustomer),
+            ("pos.online_orders.collection.view", OnlineOrderPickingPermissions.CollectionViewReady),
+            ("pos.online_orders.collection.scan_qr", OnlineOrderPickingPermissions.CollectionScanQr),
+            ("pos.online_orders.collection.validate_qr", OnlineOrderPickingPermissions.CollectionValidateQr),
+            ("pos.online_orders.collection.lookup", OnlineOrderPickingPermissions.CollectionManualLookup),
+            ("pos.online_orders.collection.verify", OnlineOrderPickingPermissions.CollectionVerifyItems),
+            ("pos.online_orders.collection.handover", OnlineOrderPickingPermissions.CollectionHandover),
+            ("pos.online_orders.collection.collect", OnlineOrderPickingPermissions.CollectionCollect),
         };
 
         var values = string.Join(",\n                ",

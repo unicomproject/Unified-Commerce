@@ -24,9 +24,51 @@ using Xunit;
 
 namespace E_POS.IntegrationTests.POSOperations;
 
-public sealed class PosCheckoutRepositoryTests
+public sealed partial class PosCheckoutRepositoryTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 10, 10, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task ReconcileMissingCash_FencesLateOriginal_AndAllowsExplicitNewKey()
+    {
+        await using var db = CreateDbContext();
+        var f = await SeedCashCheckoutFixtureAsync(db);
+        var repository = CreateRepository(db);
+        var result = await repository.ReconcileCashPaymentAsync(f.TenantId, f.UserId, "late-original", CancellationToken.None);
+        Assert.Equal("not_completed", result.Status);
+        var late = await repository.StartPaymentAsync(f.TenantId, f.UserId,
+            [PaymentPermissions.AcceptCash], CashRequest(f, null, "late-original"), Now, CancellationToken.None);
+        Assert.Equal("pos_checkout.attempt_closed", late.ErrorCode);
+        Assert.Empty(db.SalesPayments);
+        var retry = await repository.StartPaymentAsync(f.TenantId, f.UserId,
+            [PaymentPermissions.AcceptCash], CashRequest(f, null, "explicit-new-attempt"), Now, CancellationToken.None);
+        Assert.True(retry.IsSuccess);
+        Assert.Single(db.SalesPayments);
+    }
+
+    [Fact]
+    public async Task CashReconciliation_ReadsOriginalReceipt_WithoutAnotherPayment_AndIsScoped()
+    {
+        await using var db = CreateDbContext();
+        var f = await SeedCashCheckoutFixtureAsync(db);
+        var repository = CreateRepository(db);
+        const string key = "reconcile-test";
+        Assert.Null(await repository.FindCompletedCashPaymentAsync(f.TenantId, f.UserId, key, CancellationToken.None));
+        var paid = await repository.StartPaymentAsync(f.TenantId, f.UserId,
+            [PaymentPermissions.AcceptCash], CashRequest(f, null, key), Now, CancellationToken.None);
+        Assert.True(paid.IsSuccess);
+        var recovered = await repository.FindCompletedCashPaymentAsync(f.TenantId, f.UserId, key, CancellationToken.None);
+        Assert.NotNull(recovered);
+        Assert.Equal(paid.Payment!.SaleId, recovered.SaleId);
+        Assert.Equal(paid.Payment.ReceiptDataJson, recovered.ReceiptDataJson);
+        Assert.Equal(paid.Payment.GrandTotal, recovered.GrandTotal);
+        Assert.Equal(paid.Payment.CashReceived, recovered.CashReceived);
+        Assert.Equal(paid.Payment.ChangeDue, recovered.ChangeDue);
+        Assert.Null(await repository.FindCompletedCashPaymentAsync(Guid.NewGuid(), f.UserId, key, CancellationToken.None));
+        Assert.Null(await repository.FindCompletedCashPaymentAsync(f.TenantId, Guid.NewGuid(), key, CancellationToken.None));
+        Assert.Equal(1, await db.SalesPayments.CountAsync());
+        Assert.Equal(1, await db.SalesOrders.CountAsync());
+    }
 
     [Fact]
     public async Task CalculateSummaryAsync_WithOpenTillAndPricedVariant_ReturnsTotals()

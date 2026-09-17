@@ -2385,6 +2385,11 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_pickup_orders_917d8d64");
 
+                    b.HasIndex("TenantId", "PickupQrTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pickup_orders_qr_token_hash")
+                        .HasFilter("pickup_qr_token_hash IS NOT NULL");
+
                     b.ToTable("pickup_orders", null, t =>
                         {
                             t.HasCheckConstraint("ck_pickup_orders_failed_verification_attempts", "failed_verification_attempts >= 0");

@@ -336,6 +336,13 @@ public sealed class ClickCollectOrdersControllerTests
         Assert.Equal("{orderId:guid}/ready", Assert.Single(typeof(ClickCollectOrdersController)
             .GetMethod(nameof(ClickCollectOrdersController.MarkReady))!
             .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("/api/v1/tenant/ecommerce/click-collect/collection/qr/validate",
+            Assert.Single(typeof(ClickCollectOrdersController)
+                .GetMethod(nameof(ClickCollectOrdersController.ValidateCollectionQr))!
+                .GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("{orderId:guid}/collection/complete", Assert.Single(typeof(ClickCollectOrdersController)
+            .GetMethod(nameof(ClickCollectOrdersController.CompleteCollection))!
+            .GetCustomAttributes<HttpPostAttribute>()).Template);
     }
 
     private static ClickCollectOrdersController CreateController(
@@ -345,13 +352,13 @@ public sealed class ClickCollectOrdersControllerTests
         FakePosOnlineOrderPickingService? pickingService = null,
         FakePosOnlineOrderPackingService? packingService = null,
         FakeReadyService? readyService = null,
-        FakePosOnlineOrderPickupVerificationService? pickupVerificationService = null) =>
+        FakeCollectionService? collectionService = null) =>
         new(service, detailService ?? new FakePosOnlineOrderDetailService(),
             startService ?? new FakePosOnlineOrderStartFulfillmentService(),
             pickingService ?? new FakePosOnlineOrderPickingService(),
             packingService ?? new FakePosOnlineOrderPackingService(),
             new TenantRequestContextFactory(), readyService ?? new FakeReadyService(),
-            pickupVerificationService ?? new FakePosOnlineOrderPickupVerificationService())
+            collectionService ?? new FakeCollectionService())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -400,22 +407,24 @@ public sealed class ClickCollectOrdersControllerTests
                 : ApplicationResult<E_POS.Application.Modules.Shared.Notification.Dtos.NotificationCreateResult>.Failure(new(code, "Safe error")));
     }
 
-    private sealed class FakePosOnlineOrderPickupVerificationService(string? code = null)
-        : IPosOnlineOrderPickupVerificationService
+    private sealed class FakeCollectionService : IPosOnlineOrderCollectionService
     {
-        public Task<ApplicationResult<PosOnlineOrderPickupVerifyResponse>> VerifyAsync(
-            TenantRequestContext context, Guid outletId, Guid orderId,
-            PosOnlineOrderPickupVerifyRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(code is null
-                ? ApplicationResult<PosOnlineOrderPickupVerifyResponse>.Success(new())
-                : ApplicationResult<PosOnlineOrderPickupVerifyResponse>.Failure(new(code, "Safe error")));
-
-        public Task<ApplicationResult<PosOnlineOrderPickupCollectResponse>> CollectAsync(
-            TenantRequestContext context, Guid outletId, Guid orderId,
+        public Task<ApplicationResult<PosOnlineOrderCollectionValidateResponse>> ValidateQrAsync(
+            TenantRequestContext context,
+            Guid outletId,
+            PosOnlineOrderCollectionValidateRequest request,
             CancellationToken cancellationToken) =>
-            Task.FromResult(code is null
-                ? ApplicationResult<PosOnlineOrderPickupCollectResponse>.Success(new())
-                : ApplicationResult<PosOnlineOrderPickupCollectResponse>.Failure(new(code, "Safe error")));
+            Task.FromResult(ApplicationResult<PosOnlineOrderCollectionValidateResponse>.Success(
+                new PosOnlineOrderCollectionValidateResponse { OrderId = Guid.NewGuid() }));
+
+        public Task<ApplicationResult<PosOnlineOrderCollectionCompleteResponse>> CompleteAsync(
+            TenantRequestContext context,
+            Guid outletId,
+            Guid orderId,
+            PosOnlineOrderCollectionCompleteRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<PosOnlineOrderCollectionCompleteResponse>.Success(
+                new PosOnlineOrderCollectionCompleteResponse { OrderId = orderId }));
     }
 
     private static void SetTenantClaims(

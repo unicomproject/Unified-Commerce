@@ -5,6 +5,10 @@ namespace E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 
 public interface IPosCheckoutService
 {
+    Task<ApplicationResult<PosCheckoutPaymentStatusDto>> GetPaymentStatusAsync(
+        TenantRequestContext context, string idempotencyKey,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<PosCheckoutSummaryResponseDto>> CalculateCartAsync(
         TenantRequestContext context,
         PosCheckoutSummaryRequestDto request,

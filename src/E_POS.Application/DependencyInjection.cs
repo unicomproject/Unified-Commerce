@@ -1,4 +1,7 @@
 using E_POS.Application.Common.Contracts;
+using E_POS.Application.Common.Email;
+using E_POS.Application.Common.Idempotency;
+using E_POS.Application.Common.Security;
 using E_POS.Application.Common.Services;
 using E_POS.Application.Modules.Tenant.TenantAuth.Contracts;
 using E_POS.Application.Modules.Tenant.TenantAuth.Services;
@@ -84,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<IDefaultTenantSettingsProvider, DefaultTenantSettingsProvider>();
         services.AddScoped<IPosLoginBrandingService, PosLoginBrandingService>();
         services.AddScoped<IPosLoginBrandingMediaService, PosLoginBrandingMediaService>();
+        services.AddScoped<IPosThemeService, PosThemeService>();
         services.AddScoped<IPlatformBillingService, PlatformBillingService>();
         services.AddScoped<IManualPaymentService, ManualPaymentService>();
         services.AddScoped<IPlatformRoleService, PlatformRoleService>();
@@ -203,7 +207,7 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderPickingService, PosOnlineOrderPickingService>();
         services.AddScoped<IPosOnlineOrderReadyService, PosOnlineOrderReadyService>();
         services.AddScoped<IPosOnlineOrderPackingService, PosOnlineOrderPackingService>();
-        services.AddScoped<IPosOnlineOrderPickupVerificationService, PosOnlineOrderPickupVerificationService>();
+        services.AddScoped<IPosOnlineOrderCollectionService, PosOnlineOrderCollectionService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
 
         return services;

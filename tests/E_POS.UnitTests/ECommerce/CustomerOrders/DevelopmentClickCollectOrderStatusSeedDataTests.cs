@@ -114,4 +114,22 @@ public sealed class DevelopmentClickCollectOrderStatusSeedDataTests
         Assert.DoesNotContain("DELETE FROM", sql, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ALTER TABLE", sql, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void StartableNewOrderSeed_CreatesPending001GraphAndFutureWindow()
+    {
+        var sql = DevelopmentClickCollectStartableNewOrderSeedData.UpSql;
+        Assert.Contains(DevelopmentClickCollectStartableNewOrderSeedData.OrderNumber, sql, StringComparison.Ordinal);
+        Assert.Contains(DevelopmentClickCollectStartableNewOrderSeedData.OrderId, sql, StringComparison.Ordinal);
+        Assert.Contains(DevelopmentClickCollectStartableNewOrderSeedData.FulfillmentId, sql, StringComparison.Ordinal);
+        Assert.Contains("INSERT INTO fulfillment_orders", sql, StringComparison.Ordinal);
+        Assert.Contains("INSERT INTO pickup_slot_reservations", sql, StringComparison.Ordinal);
+        Assert.Contains("INSERT INTO inventory_reservations", sql, StringComparison.Ordinal);
+        Assert.Contains("now() + interval '1 day'", sql, StringComparison.Ordinal);
+        Assert.Contains("fulfillment_status = 'PENDING'", sql, StringComparison.Ordinal);
+        Assert.Contains("UPDATE fulfillment_orders", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ECOMM-SEED-ACCEPTED-001", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("DELETE FROM", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ALTER TABLE", sql, StringComparison.OrdinalIgnoreCase);
+    }
 }

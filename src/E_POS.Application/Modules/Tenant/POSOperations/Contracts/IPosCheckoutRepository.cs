@@ -4,6 +4,14 @@ namespace E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 
 public interface IPosCheckoutRepository
 {
+    Task<PosCheckoutPaymentStatusDto> ReconcileCashPaymentAsync(
+        Guid tenantId, Guid tenantUserId, string idempotencyKey,
+        CancellationToken cancellationToken);
+
+    Task<PosCheckoutStartPaymentResponseDto?> FindCompletedCashPaymentAsync(
+        Guid tenantId, Guid tenantUserId, string idempotencyKey,
+        CancellationToken cancellationToken);
+
     Task<PosCheckoutCalculationResult> CalculateSummaryAsync(
         Guid tenantId,
         Guid tenantUserId,

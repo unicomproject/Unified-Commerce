@@ -26,6 +26,12 @@ public abstract class CustomerOrderRepositoryBase
 
     protected EPosDbContext DbContext { get; }
 
+    protected static bool CanPackPickingLines(string status, IEnumerable<decimal> remainingQuantities)
+    {
+        var remaining = remainingQuantities.ToList();
+        return status == "PICKING" && remaining.Count > 0 && remaining.All(x => x == 0m);
+    }
+
     protected static IQueryable<SalesOrder> ApplyStatusFilter(
         IQueryable<SalesOrder> query,
         string? normalizedStatus) => normalizedStatus switch
@@ -382,7 +388,11 @@ public abstract class CustomerOrderRepositoryBase
             Is(order.FulfillmentStatus, "READY"))
             return "READY_FOR_COLLECTION";
 
-        if ((Is(order.Status, "ACCEPTED") && Is(order.FulfillmentStatus, "PREPARING")) ||
+        // Sales PREPARING (POS Start projection) and partial fulfilment share the
+        // cashier Preparing stage with list bucket PREPARING.
+        if (Is(order.FulfillmentStatus, "PREPARING") ||
+            Is(order.FulfillmentStatus, "PARTIALLY_FULFILLED") ||
+            (Is(order.Status, "ACCEPTED") && Is(order.FulfillmentStatus, "PREPARING")) ||
             (Is(order.Status, "CONFIRMED") && Is(order.FulfillmentStatus, "PARTIALLY_FULFILLED")))
             return "PREPARING";
 

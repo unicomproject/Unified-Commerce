@@ -1,5 +1,6 @@
 using System.Net.WebSockets;
 using E_POS.Api.Common;
+using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
 using E_POS.Infrastructure.Modules.Shared.Realtime;
 
 namespace E_POS.Api.Realtime;
@@ -11,7 +12,7 @@ public static class NotificationWebSocketEndpoint
 
     public static IEndpointRouteBuilder MapNotificationWebSocket(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.Map(RoutePattern, HandleAsync).RequireAuthorization("TenantOnly");
+        endpoints.Map(RoutePattern, HandleAsync);
         return endpoints;
     }
 
@@ -25,16 +26,33 @@ public static class NotificationWebSocketEndpoint
             return;
         }
 
-        var contextFactory = context.RequestServices.GetRequiredService<ITenantRequestContextFactory>();
-        if (context.User is null || !contextFactory.TryCreate(context.User, out var tenantRequestContext))
+        Guid targetUserId;
+        var ticket = context.Request.Query["ticket"].ToString();
+
+        if (!string.IsNullOrEmpty(ticket))
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return;
+            var ticketService = context.RequestServices.GetRequiredService<IWebSocketNotificationTicketService>();
+            if (!ticketService.TryConsumeTicket(ticket, out var ticketContext) || ticketContext is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+            targetUserId = ticketContext.UserId;
+        }
+        else
+        {
+            var contextFactory = context.RequestServices.GetRequiredService<ITenantRequestContextFactory>();
+            if (context.User is null || !contextFactory.TryCreate(context.User, out var tenantRequestContext))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+            targetUserId = tenantRequestContext.UserId;
         }
 
         var registry = context.RequestServices.GetRequiredService<ITenantNotificationSocketRegistry>();
         var socket = await context.WebSockets.AcceptWebSocketAsync();
-        registry.Register(tenantRequestContext.UserId, socket);
+        registry.Register(targetUserId, socket);
 
         try
         {
@@ -48,20 +66,18 @@ public static class NotificationWebSocketEndpoint
                     break;
                 }
 
-                // This endpoint is push-only from the server's side; any inbound payloads are discarded.
+                // Push-only from server: any inbound frames are discarded.
             }
         }
         catch (OperationCanceledException)
         {
-            // Client disconnected or the app is shutting down - normal during teardown.
         }
         catch (WebSocketException)
         {
-            // Underlying transport dropped unexpectedly - normal during teardown.
         }
         finally
         {
-            registry.Unregister(tenantRequestContext.UserId, socket);
+            registry.Unregister(targetUserId, socket);
         }
     }
 }

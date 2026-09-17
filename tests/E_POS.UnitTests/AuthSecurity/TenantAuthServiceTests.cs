@@ -148,12 +148,15 @@ public sealed class TenantAuthServiceTests
         Assert.Null(repository.RevokedTenantUserId);
     }
 
-    [Fact]
-    public async Task RefreshAsync_WithValidToken_RotatesTokenAndReloadsPermissions()
+    [Theory]
+    [InlineData("pos.home.view")]
+    [InlineData("workspace.pos.access")]
+    [InlineData("workspace.tenant_admin.access")]
+    public async Task RefreshAsync_WithValidToken_RotatesTokenAndReloadsPermissions(string permission)
     {
         var account = CreateAccount(passwordHash: "valid-hash");
         var sessionId = Guid.NewGuid();
-        var repository = new FakeTenantAuthRepository(account, ["pos.home.view"])
+        var repository = new FakeTenantAuthRepository(account, [permission])
         {
             RotationResult = new TenantRefreshRotationResult(
                 TenantRefreshRotationStatus.Succeeded,
@@ -168,7 +171,8 @@ public sealed class TenantAuthServiceTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.Equal("tenant-refresh-token", result.Value!.RefreshToken);
-        Assert.Contains("pos.home.view", result.Value.Permissions);
+        Assert.Contains(permission, result.Value.Permissions);
+        Assert.Contains(permission, jwtFactory.PermissionClaims ?? []);
         Assert.Equal("hash:current-refresh-token", repository.RotatedCurrentTokenHash);
         Assert.Equal("hash:tenant-refresh-token", repository.RotatedReplacementTokenHash);
         Assert.Equal(sessionId.ToString(), jwtFactory.SessionId);
@@ -192,11 +196,14 @@ public sealed class TenantAuthServiceTests
         Assert.Equal("tenant_auth.invalid_refresh_token", result.Error.Code);
     }
 
-    [Fact]
-    public async Task LoginAsync_EmitsPosTillOpenPermissionInResponseAndJwtClaims()
+    [Theory]
+    [InlineData("pos.till.open")]
+    [InlineData("workspace.pos.access")]
+    [InlineData("workspace.tenant_admin.access")]
+    public async Task LoginAsync_EmitsPermissionInResponseAndJwtClaims(string permission)
     {
         var account = CreateAccount(passwordHash: "valid-hash");
-        var repository = new FakeTenantAuthRepository(account, ["pos.till.open"]);
+        var repository = new FakeTenantAuthRepository(account, [permission]);
         var jwtFactory = new FakeJwtTokenFactory();
         var service = CreateService(repository, jwtFactory: jwtFactory);
 
@@ -206,8 +213,8 @@ public sealed class TenantAuthServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        Assert.Contains("pos.till.open", result.Value!.Permissions);
-        Assert.Contains("pos.till.open", jwtFactory.PermissionClaims ?? []);
+        Assert.Contains(permission, result.Value!.Permissions);
+        Assert.Contains(permission, jwtFactory.PermissionClaims ?? []);
     }
 
     private static TenantLoginAccount CreateAccount(

@@ -1,3 +1,4 @@
+using System.Data.Common;
 using E_POS.Application.Modules.Tenant.HardwareCash.Dtos;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
@@ -6,6 +7,7 @@ using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.Tenant.HardwareCash.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 using Xunit;
 
@@ -104,6 +106,57 @@ public sealed class PosCashDrawerPostgreSqlConcurrencyTests
         finally
         {
             await CleanupAsync(ids);
+        }
+    }
+
+    [Fact]
+    public async Task CreateFinancialMovement_SerializationFailureAtCommit_RetriesAfterCompletedTransaction()
+    {
+        if (!await CanConnectAsync()) return;
+
+        var ids = FixtureIds.Create();
+        await SeedFixtureAsync(ids, openingFloat: 25000m, direction: "IN", code: "COMMIT_RETRY");
+        try
+        {
+            var interceptor = new FailFirstCommitInterceptor();
+            await using var db = new EPosDbContext(new DbContextOptionsBuilder<EPosDbContext>()
+                .UseNpgsql(ConnectionString).AddInterceptors(interceptor).Options);
+            var request = new CreatePosCashMovementRequest(
+                ids.RequestId, ids.DeviceId, ids.MovementTypeId, 1000m, "Commit retry");
+
+            var result = await new PosDrawerRepository(db).CreateFinancialMovementAsync(
+                ids.TenantId, ids.UserId, ids.TillId, request, Now, default);
+
+            Assert.Null(result.ErrorCode);
+            Assert.Equal(2, interceptor.CommitAttempts);
+            Assert.Equal(26000m, result.Movement!.CurrentExpectedCash);
+            await using var verify = CreateDb();
+            Assert.Equal(1, await verify.CashMovements.CountAsync(
+                x => x.TenantId == ids.TenantId && x.RequestId == ids.RequestId));
+        }
+        finally
+        {
+            await CleanupAsync(ids);
+        }
+    }
+
+    private sealed class FailFirstCommitInterceptor : DbTransactionInterceptor
+    {
+        public int CommitAttempts { get; private set; }
+
+        public override async ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction, TransactionEventData eventData, InterceptionResult result,
+            CancellationToken cancellationToken = default)
+        {
+            if (++CommitAttempts == 1)
+            {
+                // Reproduce PostgreSQL ending the transaction before reporting a commit conflict.
+                await transaction.RollbackAsync(cancellationToken);
+                throw new PostgresException("Commit serialization conflict", "ERROR", "ERROR",
+                    PostgresErrorCodes.SerializationFailure);
+            }
+
+            return result;
         }
     }
 

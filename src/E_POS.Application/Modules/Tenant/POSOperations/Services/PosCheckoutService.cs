@@ -208,13 +208,15 @@ public sealed class PosCheckoutService : IPosCheckoutService
             return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(InvalidDeviceId);
         }
 
-        if (request.Lines is null || request.Lines.Count == 0)
+        var hasExistingOrder = request.ExistingSalesOrderId is { } existingId && existingId != Guid.Empty;
+        if (!hasExistingOrder && (request.Lines is null || request.Lines.Count == 0))
         {
             return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(InvalidLines);
         }
 
 
-        if (request.Lines.Any(x => (x.LineNote?.Trim().Length ?? 0) > 500))
+        if (request.Lines is { Count: > 0 } &&
+            request.Lines.Any(x => (x.LineNote?.Trim().Length ?? 0) > 500))
             return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(new ApplicationError(
                 "pos_cart.line_note_too_long", "Line note cannot exceed 500 characters."));
 
@@ -292,6 +294,12 @@ public sealed class PosCheckoutService : IPosCheckoutService
                     "pos_checkout.idempotency_conflict" => new ApplicationError(
                         "pos_checkout.idempotency_conflict",
                         "The idempotency key was already used for a different checkout request."),
+                    "pos_checkout.existing_order_not_found" => new ApplicationError(
+                        "pos_checkout.existing_order_not_found",
+                        "The existing sales order was not found for this tenant."),
+                    "pos_checkout.existing_order_no_balance" => new ApplicationError(
+                        "pos_checkout.existing_order_no_balance",
+                        "The existing sales order has no outstanding balance."),
                     "pos_checkout.stock_conflict" => new ApplicationError(
                         "pos_checkout.stock_conflict",
                         "Stock changed while the payment was being completed. Recalculate and retry."),
@@ -340,6 +348,25 @@ public sealed class PosCheckoutService : IPosCheckoutService
 
         return ApplicationResult<PosCheckoutStartPaymentResponseDto>.Success(
             PosSensitiveResponseFilter.FilterStartPayment(context, payment));
+    }
+
+    public async Task<ApplicationResult<PosCheckoutPaymentStatusDto>> GetPaymentStatusAsync(
+        TenantRequestContext context, string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        if (!context.HasPermission(SalesPermissions.Sale.Checkout) ||
+            !context.HasPermission(E_POS.Domain.Modules.Tenant.Payment.Constants.PaymentPermissions.AcceptCash))
+            return ApplicationResult<PosCheckoutPaymentStatusDto>.Failure(PermissionDenied);
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Trim().Length > 100)
+            return ApplicationResult<PosCheckoutPaymentStatusDto>.Failure(new ApplicationError(
+                "pos_checkout.invalid_idempotency_key", "A valid idempotency key is required."));
+
+        var result = await _repository.ReconcileCashPaymentAsync(
+            context.TenantId, context.UserId, idempotencyKey.Trim(), cancellationToken);
+        // not_completed is returned only after the repository fences this key.
+        return ApplicationResult<PosCheckoutPaymentStatusDto>.Success(new(
+            result.Status,
+            result.Payment is null ? null : PosSensitiveResponseFilter.FilterStartPayment(context, result.Payment)));
     }
 
     private static bool IsSupportedSaleType(string? saleType) =>

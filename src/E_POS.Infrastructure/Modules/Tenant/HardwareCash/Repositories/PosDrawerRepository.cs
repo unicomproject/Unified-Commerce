@@ -389,9 +389,12 @@ public sealed class PosDrawerRepository : IPosDrawerRepository
         }
         catch (Exception exception) when (IsIdempotencyRace(exception))
         {
-            if (transaction is not null && !committed)
+            if (transaction is not null)
             {
-                await transaction.RollbackAsync(cancellationToken);
+                // Dispose rolls back pending work and also handles an already-aborted commit.
+                // Release the EF transaction before querying/retrying on this context.
+                await transaction.DisposeAsync();
+                transaction = null;
             }
 
             _db.ChangeTracker.Clear();

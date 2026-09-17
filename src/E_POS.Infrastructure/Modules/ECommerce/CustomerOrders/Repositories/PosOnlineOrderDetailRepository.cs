@@ -1,6 +1,7 @@
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Application.Modules.Shared.Media.Contracts;
+using E_POS.Domain.Modules.ECommerce.FulfilmentPickup;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
@@ -56,19 +57,20 @@ public sealed class PosOnlineOrderDetailRepository : CustomerOrderRepositoryBase
             order.FulfillmentStatus != "COLLECTED" &&
             (order.FulfillmentStatus == "READY" || order.FulfillmentStatus == "READY_FOR_COLLECTION" ||
              order.FulfillmentStatus == "READY_FOR_PICKUP"));
-        var delayed = query.Where(order =>
-            order.Status != "CANCELLED" && order.FulfillmentStatus != "CANCELLED" &&
-            order.Status != "COMPLETED" && order.FulfillmentStatus != "FULFILLED" &&
-            order.FulfillmentStatus != "COLLECTED" && order.FulfillmentStatus != "READY" &&
-            order.FulfillmentStatus != "READY_FOR_COLLECTION" && order.FulfillmentStatus != "READY_FOR_PICKUP" &&
-            (order.RequestedCollectionEndAt ?? order.RequestedCollectionAt) < serverTime);
+        // Active preparing/picking takes precedence over overdue DELAYED.
         var preparing = query.Where(order =>
             order.Status != "CANCELLED" && order.FulfillmentStatus != "CANCELLED" &&
             order.Status != "COMPLETED" && order.FulfillmentStatus != "FULFILLED" &&
             order.FulfillmentStatus != "COLLECTED" && order.FulfillmentStatus != "READY" &&
             order.FulfillmentStatus != "READY_FOR_COLLECTION" && order.FulfillmentStatus != "READY_FOR_PICKUP" &&
-            (order.RequestedCollectionEndAt ?? order.RequestedCollectionAt) >= serverTime &&
             (order.FulfillmentStatus == "PREPARING" || order.FulfillmentStatus == "PARTIALLY_FULFILLED"));
+        var delayed = query.Where(order =>
+            order.Status != "CANCELLED" && order.FulfillmentStatus != "CANCELLED" &&
+            order.Status != "COMPLETED" && order.FulfillmentStatus != "FULFILLED" &&
+            order.FulfillmentStatus != "COLLECTED" && order.FulfillmentStatus != "READY" &&
+            order.FulfillmentStatus != "READY_FOR_COLLECTION" && order.FulfillmentStatus != "READY_FOR_PICKUP" &&
+            order.FulfillmentStatus != "PREPARING" && order.FulfillmentStatus != "PARTIALLY_FULFILLED" &&
+            (order.RequestedCollectionEndAt ?? order.RequestedCollectionAt) < serverTime);
         var newOrders = query.Where(order =>
             order.Status != "CANCELLED" && order.FulfillmentStatus != "CANCELLED" &&
             order.Status != "COMPLETED" && order.FulfillmentStatus != "FULFILLED" &&
@@ -246,7 +248,14 @@ public sealed class PosOnlineOrderDetailRepository : CustomerOrderRepositoryBase
             lines.Select(x => x.ProductId).Distinct().ToList(),
             cancellationToken);
         var fulfillmentLineLookup = fulfillmentLines.ToDictionary(x => x.SalesOrderLineId);
-        var displayStatus = MapUiStatus(order);
+        // POS cashier list and detail share the same projection vocabulary
+        // (NEW / PREPARING / READY / DELAYED / COLLECTED / CANCELLED).
+        var displayStatus = DisplayStatus(order, serverTime);
+        if (fulfillment?.FulfillmentStatus is "PICKING" or "PACKED" &&
+            displayStatus is not ("READY" or "COLLECTED" or "CANCELLED"))
+        {
+            displayStatus = "PREPARING";
+        }
 
         var responseLines = lines.Select(line =>
         {
@@ -286,7 +295,7 @@ public sealed class PosOnlineOrderDetailRepository : CustomerOrderRepositoryBase
             OrderNumber = order.OrderNumber,
             ExternalReference = order.ExternalOrderReference,
             Status = displayStatus,
-            StatusLabel = MapStatusLabel(displayStatus),
+            StatusLabel = DisplayStatusLabel(displayStatus),
             OrderStatus = order.Status,
             FulfillmentStatus = fulfillment?.FulfillmentStatus ?? order.FulfillmentStatus,
             PickupStatus = pickup?.PickupStatus,
@@ -318,6 +327,17 @@ public sealed class PosOnlineOrderDetailRepository : CustomerOrderRepositoryBase
             UnitCount = responseLines.Sum(x => x.Quantity),
             FulfillmentOrderId = fulfillment?.Id,
             FulfillmentVersion = fulfillment?.RowVersion,
+            CanPack = fulfillment is not null && pickup is not null &&
+                      order.CompletedAt is null && order.CancelledAt is null &&
+                      order.Status is not ("CANCELLED" or "COMPLETED" or "COLLECTED" or "FULFILLED" or "VOIDED") &&
+                      pickup.CollectedAt is null && pickup.PickupStatus is not ("COLLECTED" or "CANCELLED" or "EXPIRED") &&
+                      responseLines.All(x => x.FulfillmentOrderLineId.HasValue) &&
+                      CanPackPickingLines(fulfillment.FulfillmentStatus, responseLines.Select(x => x.RemainingQuantity)),
+            IsReadyForCollection = fulfillment is not null && ReadyForCollectionPolicy.IsReady(order, fulfillment, pickup),
+            ReadyAt = fulfillment?.ReadyAt,
+            CollectedAt = pickup?.CollectedAt,
+            CompletedAt = order.CompletedAt,
+            CancelledAt = order.CancelledAt ?? fulfillment?.CancelledAt,
             AssignedToTenantUserId = fulfillment?.AssignedToTenantUserId,
             ServerTime = serverTime,
             Lines = responseLines
@@ -365,8 +385,9 @@ public sealed class PosOnlineOrderDetailRepository : CustomerOrderRepositoryBase
         if (order.Status == "CANCELLED" || order.FulfillmentStatus == "CANCELLED") return "CANCELLED";
         if (order.Status == "COMPLETED" || order.FulfillmentStatus is "FULFILLED" or "COLLECTED") return "COLLECTED";
         if (order.FulfillmentStatus is "READY" or "READY_FOR_COLLECTION" or "READY_FOR_PICKUP") return "READY";
-        if ((order.RequestedCollectionEndAt ?? order.RequestedCollectionAt) < now) return "DELAYED";
+        // Preparing/picking outranks overdue DELAYED for active fulfilment work.
         if (order.FulfillmentStatus is "PREPARING" or "PARTIALLY_FULFILLED") return "PREPARING";
+        if ((order.RequestedCollectionEndAt ?? order.RequestedCollectionAt) < now) return "DELAYED";
         return "NEW";
     }
 

@@ -78,16 +78,6 @@ public class PickupOrder : AuditableEntity
         UpdatedAt = now;
     }
 
-    public void MarkCollected(DateTimeOffset now)
-    {
-        if (PickupStatus != "VERIFIED")
-            throw new InvalidOperationException("PICKUP_NOT_COLLECTIBLE");
-
-        PickupStatus = "COLLECTED";
-        CollectedAt = now;
-        UpdatedAt = now;
-    }
-
     protected PickupOrder() { }
 
     public static PickupOrder Create(
@@ -133,6 +123,50 @@ public class PickupOrder : AuditableEntity
             throw new InvalidOperationException("PICKUP_ALREADY_READY");
 
         PickupStatus = "READY";
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Issues (or re-issues) a collection QR for a READY pickup.
+    /// Token TTL is 7 days from <paramref name="now"/> at issuance time.
+    /// </summary>
+    public void IssueCollectionQr(
+        string tokenHash,
+        int version,
+        DateTimeOffset expiresAt,
+        DateTimeOffset now)
+    {
+        if (PickupStatus != "READY")
+            throw new InvalidOperationException("PICKUP_NOT_READY_FOR_QR");
+
+        if (string.IsNullOrWhiteSpace(tokenHash))
+            throw new ArgumentException("Collection QR token hash is required.", nameof(tokenHash));
+
+        if (version <= 0)
+            throw new ArgumentOutOfRangeException(nameof(version), "Collection QR version must be positive.");
+
+        if (expiresAt <= now)
+            throw new ArgumentOutOfRangeException(nameof(expiresAt), "Collection QR expiry must be in the future.");
+
+        PickupQrTokenHash = tokenHash.Trim();
+        PickupQrVersion = version;
+        PickupQrExpiresAt = expiresAt;
+        UpdatedAt = now;
+    }
+
+    public void MarkCollected(DateTimeOffset now)
+    {
+        if (PickupStatus == "COLLECTED" && CollectedAt.HasValue)
+            return;
+
+        if (PickupStatus is "CANCELLED" or "EXPIRED" or "COMPLETED")
+            throw new InvalidOperationException("PICKUP_NOT_COLLECTABLE");
+
+        if (PickupStatus is not ("READY" or "VERIFIED"))
+            throw new InvalidOperationException("PICKUP_NOT_COLLECTABLE");
+
+        PickupStatus = "COLLECTED";
+        CollectedAt = now;
         UpdatedAt = now;
     }
 }

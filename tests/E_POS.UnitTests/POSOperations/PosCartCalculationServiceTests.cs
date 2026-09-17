@@ -10,6 +10,22 @@ namespace E_POS.UnitTests.POSOperations;
 
 public sealed class PosCartCalculationServiceTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PaymentStatus_RequiresCheckoutAndCashPermissions(bool cashGranted)
+    {
+        var service = new PosCheckoutService(new FakeRepository(), new FakeDateTimeProvider(), null!, null!);
+        var permissions = cashGranted
+            ? new[] { SalesPermissions.Sale.Checkout, E_POS.Domain.Modules.Tenant.Payment.Constants.PaymentPermissions.AcceptCash }
+            : new[] { SalesPermissions.Sale.Checkout };
+        var result = await service.GetPaymentStatusAsync(
+            new(Guid.NewGuid(), Guid.NewGuid(), permissions), "key", CancellationToken.None);
+        Assert.Equal(cashGranted, result.IsSuccess);
+        if (cashGranted) Assert.Equal("unknown", result.Value!.Status);
+        else Assert.Equal("pos_checkout.permission_denied", result.Error.Code);
+    }
+
     [Fact]
     public async Task CalculateCartAsync_WithUpdateItemPermission_UsesCalculationRepository()
     {
@@ -96,6 +112,14 @@ public sealed class PosCartCalculationServiceTests
 
     private sealed class FakeRepository : IPosCheckoutRepository
     {
+        public Task<PosCheckoutPaymentStatusDto> ReconcileCashPaymentAsync(
+            Guid tenantId, Guid tenantUserId, string key, CancellationToken cancellationToken)
+            => Task.FromResult(new PosCheckoutPaymentStatusDto("unknown", null));
+
+        public Task<PosCheckoutStartPaymentResponseDto?> FindCompletedCashPaymentAsync(
+            Guid tenantId, Guid tenantUserId, string key, CancellationToken cancellationToken)
+            => Task.FromResult<PosCheckoutStartPaymentResponseDto?>(null);
+
         public bool CalculateCalled { get; private set; }
 
         public Task<PosCheckoutCalculationResult> CalculateSummaryAsync(
