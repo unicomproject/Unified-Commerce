@@ -164,6 +164,12 @@ public sealed class CatalogMediaBrandLogoControllerTests
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
+        public Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+            TenantRequestContext context,
+            string imageUrl,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
         public Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
             TenantRequestContext context,
             Guid productId,

@@ -20,6 +20,15 @@ public interface ICatalogMediaService
         Guid? uploadSessionId,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Server-side fetch of an external image candidate URL, then stage via the existing media pipeline.
+    /// Failures are returned to the caller; scanner-first Use This Product treats them as non-fatal.
+    /// </summary>
+    Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+        TenantRequestContext context,
+        string imageUrl,
+        CancellationToken cancellationToken);
+
     Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
         TenantRequestContext context,
         Guid productId,

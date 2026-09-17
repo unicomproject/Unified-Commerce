@@ -16,52 +16,81 @@ public sealed class ReturnInspectionMediaStagingCleanupService : BackgroundServi
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(30));
-        do { await CleanupAsync(stoppingToken); }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+        try
+        {
+            do
+            {
+                if (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                await CleanupAsync(stoppingToken);
+            }
+            while (await timer.WaitForNextTickAsync(stoppingToken));
+        }
+        catch (OperationCanceledException)
+        {
+            // Host is shutting down (PeriodicTimer cancel surfaces as TaskCanceledException).
+        }
+        catch (ObjectDisposedException)
+        {
+            // Root IServiceProvider disposed during host teardown.
+        }
     }
 
     private async Task CleanupAsync(CancellationToken cancellationToken)
     {
-        using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EPosDbContext>();
-        var storage = scope.ServiceProvider.GetRequiredService<IReturnInspectionMediaStorage>();
-        var now = DateTimeOffset.UtcNow;
-
-        // Expire drafts past their lifetime.
-        var expiredDrafts = await db.ReturnInspectionDrafts
-            .Where(x => x.Status != "CONSUMED" &&
-                        x.Status != "CANCELLED" &&
-                        x.ExpiresAt < now)
-            .ToListAsync(cancellationToken);
-        foreach (var draft in expiredDrafts)
+        try
         {
-            draft.Cancel();
-        }
+            cancellationToken.ThrowIfCancellationRequested();
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<EPosDbContext>();
+            var storage = scope.ServiceProvider.GetRequiredService<IReturnInspectionMediaStorage>();
+            var now = DateTimeOffset.UtcNow;
 
-        // Expire orphan staging media only when not attached to an active non-expired draft.
-        var expiredMedia = await db.ReturnInspectionMediaStaging
-            .Where(x => x.Status == "STAGED" && x.ExpiresAt < now)
-            .ToListAsync(cancellationToken);
-        foreach (var item in expiredMedia)
-        {
-            if (item.InspectionDraftId.HasValue)
+            // Expire drafts past their lifetime.
+            var expiredDrafts = await db.ReturnInspectionDrafts
+                .Where(x => x.Status != "CONSUMED" &&
+                            x.Status != "CANCELLED" &&
+                            x.ExpiresAt < now)
+                .ToListAsync(cancellationToken);
+            foreach (var draft in expiredDrafts)
             {
-                var draft = await db.ReturnInspectionDrafts.AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.Id == item.InspectionDraftId.Value, cancellationToken);
-                if (draft is not null && !draft.IsExpired(now) &&
-                    !string.Equals(draft.Status, "CONSUMED", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
+                draft.Cancel();
             }
 
-            await storage.DeleteAsync(item.StorageKey, cancellationToken);
-            item.MarkExpired();
-        }
+            // Expire orphan staging media only when not attached to an active non-expired draft.
+            var expiredMedia = await db.ReturnInspectionMediaStaging
+                .Where(x => x.Status == "STAGED" && x.ExpiresAt < now)
+                .ToListAsync(cancellationToken);
+            foreach (var item in expiredMedia)
+            {
+                if (item.InspectionDraftId.HasValue)
+                {
+                    var draft = await db.ReturnInspectionDrafts.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.Id == item.InspectionDraftId.Value, cancellationToken);
+                    if (draft is not null && !draft.IsExpired(now) &&
+                        !string.Equals(draft.Status, "CONSUMED", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                }
 
-        if (expiredDrafts.Count > 0 || expiredMedia.Count > 0)
+                await storage.DeleteAsync(item.StorageKey, cancellationToken);
+                item.MarkExpired();
+            }
+
+            if (expiredDrafts.Count > 0 || expiredMedia.Count > 0)
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
         {
-            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (ObjectDisposedException)
+        {
         }
     }
 }

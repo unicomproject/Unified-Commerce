@@ -163,6 +163,12 @@ public sealed class CatalogMediaCategoryControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(new ApplicationError("media.permission_denied", "denied")));
 
+        public Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+            TenantRequestContext context,
+            string imageUrl,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(new ApplicationError("media.permission_denied", "denied")));
+
         public Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
             TenantRequestContext context,
             Guid productId,

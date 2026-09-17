@@ -36,11 +36,27 @@ public sealed class OutletMediaStagingCleanupService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(PollingInterval);
-        do
+        try
         {
-            await RunCleanupPassAsync(stoppingToken);
+            do
+            {
+                if (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                await RunCleanupPassAsync(stoppingToken);
+            }
+            while (await timer.WaitForNextTickAsync(stoppingToken));
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+        catch (OperationCanceledException)
+        {
+            // Host is shutting down (PeriodicTimer cancel surfaces as TaskCanceledException).
+        }
+        catch (ObjectDisposedException)
+        {
+            // Root IServiceProvider disposed during host teardown.
+        }
     }
 
     private async Task RunCleanupPassAsync(CancellationToken cancellationToken)
@@ -54,6 +70,10 @@ public sealed class OutletMediaStagingCleanupService : BackgroundService
         {
             // Service is stopping — exit cleanly.
         }
+        catch (ObjectDisposedException)
+        {
+            // Root IServiceProvider can be disposed during host shutdown before the worker exits.
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error during outlet media staging cleanup pass.");
@@ -66,6 +86,7 @@ public sealed class OutletMediaStagingCleanupService : BackgroundService
     /// </summary>
     private async Task ClaimOrphansAsDeletePendingAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EPosDbContext>();
         var now = DateTimeOffset.UtcNow;
@@ -109,6 +130,7 @@ public sealed class OutletMediaStagingCleanupService : BackgroundService
     /// </summary>
     private async Task ProcessDeletePendingAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EPosDbContext>();
         var storage = scope.ServiceProvider.GetRequiredService<IMediaObjectStorage>();
@@ -133,6 +155,7 @@ public sealed class OutletMediaStagingCleanupService : BackgroundService
 
         foreach (var asset in retryable)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await DeleteSingleAssetAsync(db, storage, asset, now, cancellationToken);
         }
     }
@@ -164,6 +187,10 @@ public sealed class OutletMediaStagingCleanupService : BackgroundService
                 asset.Id, asset.StorageKey);
         }
         catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (ObjectDisposedException)
         {
             throw;
         }

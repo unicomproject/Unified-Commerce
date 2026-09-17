@@ -30,6 +30,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
     private readonly IMediaReadUrlResolver? _urlResolver;
     private readonly CategoryAccessPolicy? _categoryAccessPolicy;
     private readonly ICategoryAuditLogger? _categoryAuditLogger;
+    private readonly IExternalImageCandidateFetcher? _externalImageFetcher;
     private readonly ILogger<CatalogMediaService>? _logger;
 
     public CatalogMediaService(
@@ -39,6 +40,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
         IMediaReadUrlResolver? urlResolver = null,
         CategoryAccessPolicy? categoryAccessPolicy = null,
         ICategoryAuditLogger? categoryAuditLogger = null,
+        IExternalImageCandidateFetcher? externalImageFetcher = null,
         ILogger<CatalogMediaService>? logger = null)
     {
         _repository = repository;
@@ -47,6 +49,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
         _urlResolver = urlResolver;
         _categoryAccessPolicy = categoryAccessPolicy;
         _categoryAuditLogger = categoryAuditLogger;
+        _externalImageFetcher = externalImageFetcher;
         _logger = logger;
     }
 
@@ -272,6 +275,52 @@ public sealed class CatalogMediaService : ICatalogMediaService
             preparedResult.Image.FileSizeBytes,
             now,
             ProductConstants.StagedMediaStatus));
+    }
+
+    public async Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+        TenantRequestContext context,
+        string imageUrl,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateProductMediaAccess(context);
+        if (accessError is not null)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(accessError);
+        }
+
+        if (_externalImageFetcher is null)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(new ApplicationError(
+                "media.image_fetch_unavailable",
+                "External image fetch is not configured."));
+        }
+
+        if (!_storage.IsConfigured)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(StorageNotConfigured());
+        }
+
+        var fetchResult = await _externalImageFetcher.FetchAsync(imageUrl, cancellationToken);
+        if (fetchResult.IsFailure || fetchResult.Value is null)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(
+                fetchResult.IsFailure
+                    ? fetchResult.Error
+                    : new ApplicationError(
+                        "media.image_fetch_failed",
+                        "Failed to download the product image."));
+        }
+
+        await using var content = fetchResult.Value.Content;
+        return await StageProductImageAsync(
+            context,
+            new MediaUploadFile(
+                content,
+                fetchResult.Value.FileName,
+                fetchResult.Value.ContentType,
+                fetchResult.Value.Length),
+            uploadSessionId: null,
+            cancellationToken);
     }
 
     public async Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(

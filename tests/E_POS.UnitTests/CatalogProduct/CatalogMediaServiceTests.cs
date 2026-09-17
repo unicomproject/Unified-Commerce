@@ -144,6 +144,55 @@ public sealed class CatalogMediaServiceTests
     }
 
     [Fact]
+    public async Task StageProductImageFromUrlAsync_ValidFetch_CreatesStagedAsset()
+    {
+        var repository = new FakeCatalogMediaRepository();
+        var storage = new FakeMediaObjectStorage();
+        var png = CreateOnePixelPng();
+        var fetcher = new FakeExternalImageFetcher(png, "image/png", "candidate.png");
+        var service = new CatalogMediaService(
+            repository,
+            storage,
+            new FakeDateTimeProvider(),
+            externalImageFetcher: fetcher);
+
+        var result = await service.StageProductImageFromUrlAsync(
+            CreateContext([ProductConstants.MediaManagePermission]),
+            "https://cdn.example/product.png",
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(repository.MediaAssets);
+        Assert.Equal("STAGED", repository.MediaAssets.Single().Status);
+        Assert.Equal("image/png", result.Value!.MimeType);
+        Assert.Equal(1, fetcher.CallCount);
+    }
+
+    [Fact]
+    public async Task StageProductImageFromUrlAsync_FetchFailure_IsNonFatalResult()
+    {
+        var repository = new FakeCatalogMediaRepository();
+        var storage = new FakeMediaObjectStorage();
+        var fetcher = new FakeExternalImageFetcher(
+            failure: new ApplicationError("media.image_fetch_failed", "down"));
+        var service = new CatalogMediaService(
+            repository,
+            storage,
+            new FakeDateTimeProvider(),
+            externalImageFetcher: fetcher);
+
+        var result = await service.StageProductImageFromUrlAsync(
+            CreateContext([ProductConstants.MediaManagePermission]),
+            "https://cdn.example/missing.png",
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("media.image_fetch_failed", result.Error.Code);
+        Assert.Empty(repository.MediaAssets);
+        Assert.Empty(storage.Uploads);
+    }
+
+    [Fact]
     public async Task StageProductImageAsync_WithOnlyProductsCreatePermission_ReturnsPermissionDenied()
     {
         var repository = new FakeCatalogMediaRepository();
@@ -591,6 +640,49 @@ public sealed class CatalogMediaServiceTests
     private sealed class FakeDateTimeProvider : IDateTimeProvider
     {
         public DateTimeOffset UtcNow => Now;
+    }
+
+    private sealed class FakeExternalImageFetcher : IExternalImageCandidateFetcher
+    {
+        private readonly byte[]? _bytes;
+        private readonly string _contentType;
+        private readonly string _fileName;
+        private readonly ApplicationError? _failure;
+
+        public FakeExternalImageFetcher(
+            byte[] bytes,
+            string contentType,
+            string fileName)
+        {
+            _bytes = bytes;
+            _contentType = contentType;
+            _fileName = fileName;
+        }
+
+        public FakeExternalImageFetcher(ApplicationError failure)
+        {
+            _failure = failure;
+            _bytes = null;
+            _contentType = string.Empty;
+            _fileName = string.Empty;
+        }
+
+        public int CallCount { get; private set; }
+
+        public Task<ApplicationResult<MediaUploadFile>> FetchAsync(
+            string imageUrl,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            if (_failure is not null)
+            {
+                return Task.FromResult(ApplicationResult<MediaUploadFile>.Failure(_failure));
+            }
+
+            var stream = new MemoryStream(_bytes!);
+            return Task.FromResult(ApplicationResult<MediaUploadFile>.Success(
+                new MediaUploadFile(stream, _fileName, _contentType, stream.Length)));
+        }
     }
 
     private sealed class FakeMediaObjectStorage : IMediaObjectStorage
