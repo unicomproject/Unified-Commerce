@@ -28,7 +28,7 @@ public sealed class PosOnlineOrderCollectionRepository : IPosOnlineOrderCollecti
         Guid tenantId,
         Guid tenantUserId,
         Guid outletId,
-        string tokenHash,
+        string token,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -36,14 +36,14 @@ public sealed class PosOnlineOrderCollectionRepository : IPosOnlineOrderCollecti
         if (accessError is not null)
             return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>.Failure(accessError);
 
-        if (string.IsNullOrWhiteSpace(tokenHash))
+        if (string.IsNullOrWhiteSpace(token))
             return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>
                 .Failure("online_orders.collection.qr_invalid");
 
         var pickup = await _dbContext.PickupOrders.AsNoTracking()
             .FirstOrDefaultAsync(x =>
                 x.TenantId == tenantId &&
-                x.PickupQrTokenHash == tokenHash,
+                x.PickupQrTokenHash == token,
                 cancellationToken);
         if (pickup is null)
             return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>

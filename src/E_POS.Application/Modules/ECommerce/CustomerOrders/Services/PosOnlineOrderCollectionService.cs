@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
@@ -51,12 +49,14 @@ public sealed class PosOnlineOrderCollectionService : IPosOnlineOrderCollectionS
         if (string.IsNullOrWhiteSpace(request.Token))
             return FailureValidate(new("online_orders.collection.qr_invalid", "A collection QR token is required."));
 
-        var tokenHash = HashToken(request.Token.Trim());
+        // Compared as-is against the stored value: the token is never hashed, since
+        // it must match exactly what was issued (see PickupOrder.IssueCollectionQr).
+        var token = request.Token.Trim();
         var result = await _repository.ValidateQrAsync(
             context.TenantId,
             context.UserId,
             outletId,
-            tokenHash,
+            token,
             _clock.UtcNow,
             cancellationToken);
 
@@ -99,9 +99,6 @@ public sealed class PosOnlineOrderCollectionService : IPosOnlineOrderCollectionS
             ? ApplicationResult<PosOnlineOrderCollectionCompleteResponse>.Success(result.Value)
             : FailureComplete(MapRepositoryError(result.ErrorCode));
     }
-
-    public static string HashToken(string token) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
 
     private async Task<ApplicationError?> ValidateBaseAsync(
         TenantRequestContext context,

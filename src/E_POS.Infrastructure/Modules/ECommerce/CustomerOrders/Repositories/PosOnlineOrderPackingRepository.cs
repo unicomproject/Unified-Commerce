@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
@@ -201,14 +200,14 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
                 order.ApplyPosReadyForCollection(tenantUserId, now);
                 pickup.MarkReady(now);
 
-                // One-time reveal in MarkReady response; only the hash is persisted.
+                // Stored as-is (not hashed): the customer's order page must be able to
+                // redisplay this exact value inside the collection QR for as long as it
+                // is valid, which a one-way hash would make impossible. Safety comes from
+                // it being a large random value, single-use, and time-limited.
                 collectionQrToken = CreateCollectionQrToken();
-                var tokenHash = Convert.ToHexString(
-                        SHA256.HashData(Encoding.UTF8.GetBytes(collectionQrToken)))
-                    .ToLowerInvariant();
                 var qrVersion = (pickup.PickupQrVersion ?? 0) + 1;
                 var qrExpiresAt = now.Add(CollectionQrTtl);
-                pickup.IssueCollectionQr(tokenHash, qrVersion, qrExpiresAt, now);
+                pickup.IssueCollectionQr(collectionQrToken, qrVersion, qrExpiresAt, now);
             }
             catch (InvalidOperationException ex) when (ex.Message == "FULFILLMENT_VERSION_CONFLICT")
             {

@@ -75,7 +75,7 @@ public sealed class PosOnlineOrderCollectionServiceTests
     }
 
     [Fact]
-    public async Task Validate_Success_IsReadOnly_PassesHashedToken()
+    public async Task Validate_Success_IsReadOnly_PassesTrimmedTokenUnhashed()
     {
         var repository = new FakeRepository
         {
@@ -87,7 +87,7 @@ public sealed class PosOnlineOrderCollectionServiceTests
                 })
         };
         var service = CreateService(repository);
-        const string raw = "raw-collection-token";
+        const string raw = "  raw-collection-token  ";
 
         var result = await service.ValidateQrAsync(
             AuthorizedValidateContext(),
@@ -98,8 +98,9 @@ public sealed class PosOnlineOrderCollectionServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(1, repository.ValidateCalls);
         Assert.Equal(0, repository.CompleteCalls);
-        Assert.Equal(PosOnlineOrderCollectionService.HashToken(raw), repository.LastTokenHash);
-        Assert.NotEqual(raw, repository.LastTokenHash);
+        // Must match exactly what the customer's QR encodes (see
+        // PickupOrder.IssueCollectionQr) — never hashed, only trimmed.
+        Assert.Equal(raw.Trim(), repository.LastToken);
     }
 
     [Fact]
@@ -142,16 +143,16 @@ public sealed class PosOnlineOrderCollectionServiceTests
     {
         public int ValidateCalls { get; private set; }
         public int CompleteCalls { get; private set; }
-        public string? LastTokenHash { get; private set; }
+        public string? LastToken { get; private set; }
         public PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>? ValidateResult { get; init; }
         public PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionCompleteResponse>? CompleteResult { get; init; }
 
         public Task<PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>> ValidateQrAsync(
-            Guid tenantId, Guid tenantUserId, Guid outletId, string tokenHash, DateTimeOffset now,
+            Guid tenantId, Guid tenantUserId, Guid outletId, string token, DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             ValidateCalls++;
-            LastTokenHash = tokenHash;
+            LastToken = token;
             return Task.FromResult(ValidateResult ??
                 PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>
                     .Failure("online_orders.collection.qr_invalid"));
