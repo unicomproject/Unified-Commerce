@@ -285,6 +285,126 @@ public sealed class OpenFoodFactsProductLookupProviderTests
         Assert.False(outcome.RetryAllowed);
     }
 
+    [Fact]
+    public async Task LookupAsync_CategoriesHierarchyAvailable_DeepestStableTagSelected()
+    {
+        var jsonResponse = """
+        {
+            "code": "5449000000996",
+            "status": 1,
+            "product": {
+                "code": "5449000000996",
+                "product_name": "Coca-Cola",
+                "categories": "Beverages, Carbonated drinks, Colas",
+                "categories_tags": ["en:beverages", "en:carbonated-drinks", "en:colas"],
+                "categories_hierarchy": ["en:beverages", "en:carbonated-drinks", "en:colas"]
+            }
+        }
+        """;
+
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json"),
+        });
+
+        var provider = CreateProvider(handler);
+        var result = await provider.LookupAsync(new ExternalProductLookupRequest(ValidEan13, "EAN13", "EAN_13"), CancellationToken.None);
+
+        Assert.NotNull(result.Suggestion);
+        Assert.Equal("en:colas", result.Suggestion!.ExternalCategoryKey);
+        Assert.Equal("Colas", result.Suggestion.ExternalCategoryName);
+        Assert.Equal(3, result.Suggestion.ExternalCategoryHierarchy?.Count);
+        Assert.Equal("en:beverages", result.Suggestion.ExternalCategoryHierarchy![0]);
+        Assert.Equal("en:colas", result.Suggestion.ExternalCategoryHierarchy![2]);
+    }
+
+    [Fact]
+    public async Task LookupAsync_HierarchyUnavailable_CategoriesTagsAvailable_DeterministicLeafTagSelected()
+    {
+        var jsonResponse = """
+        {
+            "code": "5449000000996",
+            "status": 1,
+            "product": {
+                "code": "5449000000996",
+                "product_name": "Sparkling Water",
+                "categories": "Beverages, Waters, Sparkling waters",
+                "categories_tags": ["en:beverages", "en:waters", "en:sparkling-waters"]
+            }
+        }
+        """;
+
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json"),
+        });
+
+        var provider = CreateProvider(handler);
+        var result = await provider.LookupAsync(new ExternalProductLookupRequest(ValidEan13, "EAN13", "EAN_13"), CancellationToken.None);
+
+        Assert.NotNull(result.Suggestion);
+        Assert.Equal("en:sparkling-waters", result.Suggestion!.ExternalCategoryKey);
+        Assert.Equal("Sparkling waters", result.Suggestion.ExternalCategoryName);
+        Assert.Equal(3, result.Suggestion.ExternalCategoryHierarchy?.Count);
+    }
+
+    [Fact]
+    public async Task LookupAsync_NoTags_FallbackToCategoryText()
+    {
+        var jsonResponse = """
+        {
+            "code": "5449000000996",
+            "status": 1,
+            "product": {
+                "code": "5449000000996",
+                "product_name": "Unknown Item",
+                "categories": "Snacks, Crisps"
+            }
+        }
+        """;
+
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json"),
+        });
+
+        var provider = CreateProvider(handler);
+        var result = await provider.LookupAsync(new ExternalProductLookupRequest(ValidEan13, "EAN13", "EAN_13"), CancellationToken.None);
+
+        Assert.NotNull(result.Suggestion);
+        Assert.Equal("crisps", result.Suggestion!.ExternalCategoryKey);
+        Assert.Equal("Crisps", result.Suggestion.ExternalCategoryName);
+        Assert.Null(result.Suggestion.ExternalCategoryHierarchy);
+    }
+
+    [Fact]
+    public async Task LookupAsync_NoCategories_ReturnsNullExternalCategory()
+    {
+        var jsonResponse = """
+        {
+            "code": "5449000000996",
+            "status": 1,
+            "product": {
+                "code": "5449000000996",
+                "product_name": "No Category Item"
+            }
+        }
+        """;
+
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json"),
+        });
+
+        var provider = CreateProvider(handler);
+        var result = await provider.LookupAsync(new ExternalProductLookupRequest(ValidEan13, "EAN13", "EAN_13"), CancellationToken.None);
+
+        Assert.NotNull(result.Suggestion);
+        Assert.Null(result.Suggestion!.ExternalCategoryKey);
+        Assert.Null(result.Suggestion.ExternalCategoryName);
+        Assert.Null(result.Suggestion.ExternalCategoryHierarchy);
+    }
+
     private static OpenFoodFactsProductLookupProvider CreateProvider(
         HttpMessageHandler handler,
         ExternalProductLookupOptions? options = null)

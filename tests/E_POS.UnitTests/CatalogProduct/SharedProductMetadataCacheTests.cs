@@ -59,6 +59,46 @@ public sealed class SharedProductMetadataCacheTests
     }
 
     [Fact]
+    public async Task SetAsync_ThenGetValidAsync_PreservesExternalCategoryMetadata_AndContainsNoTenantData()
+    {
+        var (repository, dbContext) = CreateRepository();
+        var hierarchy = new[] { "en:beverages", "en:carbonated-drinks", "en:colas" };
+        var suggestion = CreateSuggestion(
+            "Coca Cola Zero",
+            "Coca-Cola",
+            externalCategoryKey: "en:colas",
+            externalCategoryName: "Colas",
+            externalCategoryHierarchy: hierarchy);
+
+        await repository.SetAsync(
+            Barcode,
+            "EAN13",
+            "openfoodfacts",
+            suggestion,
+            rawResponseJson: null,
+            ttl: TimeSpan.FromDays(30),
+            CancellationToken.None);
+
+        var cached = await repository.GetValidAsync(Barcode, CancellationToken.None);
+
+        Assert.NotNull(cached);
+        Assert.Equal("en:colas", cached!.ExternalCategoryKey);
+        Assert.Equal("Colas", cached.ExternalCategoryName);
+        Assert.NotNull(cached.ExternalCategoryHierarchy);
+        Assert.Equal(3, cached.ExternalCategoryHierarchy!.Count);
+        Assert.Equal("en:beverages", cached.ExternalCategoryHierarchy[0]);
+        Assert.Equal("en:carbonated-drinks", cached.ExternalCategoryHierarchy[1]);
+        Assert.Equal("en:colas", cached.ExternalCategoryHierarchy[2]);
+
+        // Verify shared cache contains no tenant data
+        var dbEntry = await dbContext.SharedProductMetadataCaches.SingleAsync();
+        Assert.DoesNotContain("TenantId", dbEntry.NormalizedMetadataJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("TenantCategoryId", dbEntry.NormalizedMetadataJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MappedCategoryId", dbEntry.NormalizedMetadataJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MappingSource", dbEntry.NormalizedMetadataJson, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GetValidAsync_ExpiredEntry_ReturnsNull()
     {
         var timeProvider = new MutableDateTimeProvider(DateTimeOffset.UtcNow);
@@ -270,7 +310,12 @@ public sealed class SharedProductMetadataCacheTests
             ],
         };
 
-    private static ExternalProductSuggestion CreateSuggestion(string name, string brand) =>
+    private static ExternalProductSuggestion CreateSuggestion(
+        string name,
+        string brand,
+        string? externalCategoryKey = null,
+        string? externalCategoryName = null,
+        IReadOnlyList<string>? externalCategoryHierarchy = null) =>
         new(
             ProductName: name,
             ShortName: null,
@@ -282,7 +327,10 @@ public sealed class SharedProductMetadataCacheTests
             LongDescription: null,
             ImageCandidate: "https://example.com/img.jpg",
             PrimaryGtin: Barcode,
-            IdentifierStandard: "EAN13");
+            IdentifierStandard: "EAN13",
+            ExternalCategoryKey: externalCategoryKey,
+            ExternalCategoryName: externalCategoryName,
+            ExternalCategoryHierarchy: externalCategoryHierarchy);
 
     private sealed class MutableDateTimeProvider : IDateTimeProvider
     {

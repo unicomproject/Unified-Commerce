@@ -31,6 +31,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
     private readonly ProductWizardAccessPolicy _accessPolicy;
     private readonly ProductVariantGenerationService _variantGenerationService;
     private readonly IExternalProductLookupCoordinator _externalProductLookupCoordinator;
+    private readonly ITenantExternalCategoryResolver _tenantExternalCategoryResolver;
 
     public TenantAdminProductService(
         IProductRepository productRepository,
@@ -40,7 +41,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         ITenantAdminProductAuditLogger auditLogger,
         ProductWizardAccessPolicy accessPolicy,
         ProductVariantGenerationService variantGenerationService,
-        IExternalProductLookupCoordinator externalProductLookupCoordinator)
+        IExternalProductLookupCoordinator externalProductLookupCoordinator,
+        ITenantExternalCategoryResolver tenantExternalCategoryResolver)
     {
         _productRepository = productRepository;
         _tenantAdminProductRepository = tenantAdminProductRepository;
@@ -50,6 +52,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         _accessPolicy = accessPolicy;
         _variantGenerationService = variantGenerationService;
         _externalProductLookupCoordinator = externalProductLookupCoordinator;
+        _tenantExternalCategoryResolver = tenantExternalCategoryResolver;
     }
 
     public async Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
@@ -108,6 +111,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                     "Barcode already exists."));
             }
         }
+
+        NormalizeExternalCategoryMappingContext(request.ExternalCategoryMappingContext);
 
         var response = await _tenantAdminProductRepository.CreateProductAsync(
             context.TenantId,
@@ -269,6 +274,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                     catalogErrors));
             }
         }
+
+        NormalizeExternalCategoryMappingContext(request.ExternalCategoryMappingContext);
 
         var result = await _tenantAdminProductRepository.CreateProductFromWizardAsync(
             context.TenantId,
@@ -435,7 +442,45 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 "Tracking is disabled for the entered Batch/Expiry/Serial values. These values will be cleared if you continue.");
         }
 
+        var mappingErrors = ExternalCategoryMappingContextValidator.Validate(request.ExternalCategoryMappingContext);
+        if (mappingErrors.Count > 0)
+        {
+            return new ApplicationError(
+                "product.validation_failed",
+                "External category mapping context validation failed.",
+                mappingErrors);
+        }
+
         return null;
+    }
+
+    private static void NormalizeExternalCategoryMappingContext(ExternalCategoryMappingContext? context)
+    {
+        if (context is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.Provider))
+        {
+            context.Provider =
+                ExternalProductSuggestionNormalizer.NormalizeProvider(context.Provider)
+                ?? context.Provider.Trim().ToLowerInvariant();
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.ExternalCategoryKey))
+        {
+            context.ExternalCategoryKey =
+                ExternalProductSuggestionNormalizer.NormalizeExternalCategoryKey(context.ExternalCategoryKey)
+                ?? context.ExternalCategoryKey.Trim().ToLowerInvariant();
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.ExternalCategoryName))
+        {
+            context.ExternalCategoryName =
+                ExternalProductSuggestionNormalizer.NormalizeExternalCategoryName(context.ExternalCategoryName)
+                ?? context.ExternalCategoryName.Trim();
+        }
     }
 
     private static IEnumerable<string> CollectWizardSkuValues(TenantAdminWizardProductCreateRequest request)
@@ -2311,12 +2356,32 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
 
         var lookupResult = await _externalProductLookupCoordinator.LookupAsync(lookupRequest, cancellationToken);
 
+        TenantCategoryResolutionResult? categoryResolution = null;
+        if (lookupResult.Status == ExternalProductLookupStatuses.Found &&
+            lookupResult.Suggestion is not null &&
+            !string.IsNullOrWhiteSpace(lookupResult.Suggestion.ExternalCategoryKey))
+        {
+            var provider = !string.IsNullOrWhiteSpace(lookupResult.SourceReference)
+                ? lookupResult.SourceReference.Trim().ToLowerInvariant()
+                : "openfoodfacts";
+
+            var resolutionRequest = new TenantCategoryResolutionRequest(
+                context.TenantId,
+                provider,
+                lookupResult.Suggestion.ExternalCategoryKey,
+                lookupResult.Suggestion.ExternalCategoryName,
+                lookupResult.Suggestion.ExternalCategoryHierarchy);
+
+            categoryResolution = await _tenantExternalCategoryResolver.ResolveAsync(resolutionRequest, cancellationToken);
+        }
+
         return ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
             new ExternalLookupProductBarcodeResponse(
                 Status: lookupResult.Status,
                 Suggestion: lookupResult.Suggestion,
                 SourceReference: lookupResult.SourceReference,
-                RetryAllowed: lookupResult.RetryAllowed));
+                RetryAllowed: lookupResult.RetryAllowed,
+                CategoryResolution: categoryResolution));
     }
 
     private async Task<IReadOnlyList<ApplicationFieldError>> ValidateBundleConfigurationAsync(

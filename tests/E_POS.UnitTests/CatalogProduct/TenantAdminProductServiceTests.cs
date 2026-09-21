@@ -674,6 +674,208 @@ public sealed partial class TenantAdminProductServiceTests
     }
 
     [Fact]
+    public async Task ExternalLookupBarcodeAsync_FoundWithCategoryKey_InvokesResolverAndPopulatesResolution()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var categoryCandidateId = Guid.NewGuid();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca Cola 330ml", "Cola", "Coca-Cola", "Beverages, Colas", "330ml", "FR",
+            "short", "long", "https://cdn.example/c.png", "5449000000996", "GTIN13",
+            ExternalCategoryKey: "en:colas",
+            ExternalCategoryName: "Colas",
+            ExternalCategoryHierarchy: new[] { "en:beverages", "en:carbonated-drinks", "en:colas" });
+
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found, suggestion, "OpenFoodFacts", false),
+        };
+
+        var resolver = new FakeTenantExternalCategoryResolver
+        {
+            Result = new TenantCategoryResolutionResult(
+                "openfoodfacts",
+                "en:colas",
+                "Colas",
+                new TenantCategoryCandidate(categoryCandidateId, "Soft Drinks", "CAT-SOFT-DRINKS"),
+                Array.Empty<TenantCategorySuggestionItem>()),
+        };
+
+        var service = CreateService(repository, coordinator, tenantExternalCategoryResolver: resolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Value!.Status);
+        Assert.Equal(1, coordinator.CallCount);
+        Assert.Equal(1, resolver.CallCount);
+        Assert.NotNull(resolver.LastRequest);
+        Assert.Equal(TenantId, resolver.LastRequest!.TenantId);
+        Assert.Equal("openfoodfacts", resolver.LastRequest.Provider);
+        Assert.Equal("en:colas", resolver.LastRequest.ExternalCategoryKey);
+        Assert.Equal("Colas", resolver.LastRequest.ExternalCategoryName);
+        Assert.Equal(3, resolver.LastRequest.ExternalCategoryHierarchy!.Count);
+
+        Assert.NotNull(result.Value.CategoryResolution);
+        Assert.Equal("openfoodfacts", result.Value.CategoryResolution!.Provider);
+        Assert.Equal("en:colas", result.Value.CategoryResolution.ExternalCategoryKey);
+        Assert.Equal("Colas", result.Value.CategoryResolution.ExternalCategoryName);
+        Assert.NotNull(result.Value.CategoryResolution.MappedCategory);
+        Assert.Equal(categoryCandidateId, result.Value.CategoryResolution.MappedCategory!.Id);
+        Assert.Equal("Soft Drinks", result.Value.CategoryResolution.MappedCategory.Name);
+        Assert.Equal("CAT-SOFT-DRINKS", result.Value.CategoryResolution.MappedCategory.Code);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_FoundWithoutCategoryKey_DoesNotInvokeResolver_CategoryResolutionNull()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var suggestion = new ExternalProductSuggestion(
+            "Generic Product", null, null, null, null, null,
+            null, null, null, "5449000000996", "GTIN13",
+            ExternalCategoryKey: null,
+            ExternalCategoryName: null,
+            ExternalCategoryHierarchy: null);
+
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found, suggestion, "openfoodfacts", false),
+        };
+
+        var resolver = new FakeTenantExternalCategoryResolver();
+        var service = CreateService(repository, coordinator, tenantExternalCategoryResolver: resolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Value!.Status);
+        Assert.Equal(1, coordinator.CallCount);
+        Assert.Equal(0, resolver.CallCount);
+        Assert.Null(result.Value.CategoryResolution);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_NoMatch_DoesNotInvokeResolver_CategoryResolutionNull()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.NoMatch, null, null, false),
+        };
+
+        var resolver = new FakeTenantExternalCategoryResolver();
+        var service = CreateService(repository, coordinator, tenantExternalCategoryResolver: resolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ExternalProductLookupStatuses.NoMatch, result.Value!.Status);
+        Assert.Equal(1, coordinator.CallCount);
+        Assert.Equal(0, resolver.CallCount);
+        Assert.Null(result.Value.CategoryResolution);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_TemporaryFailure_DoesNotInvokeResolver_CategoryResolutionNull()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.TemporaryFailure, null, null, true),
+        };
+
+        var resolver = new FakeTenantExternalCategoryResolver();
+        var service = CreateService(repository, coordinator, tenantExternalCategoryResolver: resolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ExternalProductLookupStatuses.TemporaryFailure, result.Value!.Status);
+        Assert.Equal(1, coordinator.CallCount);
+        Assert.Equal(0, resolver.CallCount);
+        Assert.Null(result.Value.CategoryResolution);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_MultiTenantResolution_EachTenantReceivesItsOwnResolution()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var suggestion = new ExternalProductSuggestion(
+            "Cola", "C", "Coca-Cola", "Colas", "330ml", "US",
+            null, null, null, "5449000000996", "GTIN13",
+            ExternalCategoryKey: "en:colas",
+            ExternalCategoryName: "Colas");
+
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found, suggestion, "openfoodfacts", false),
+        };
+
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var catA = Guid.NewGuid();
+        var catB = Guid.NewGuid();
+
+        // Custom resolver routing per tenant
+        var resolver = new DelegatingTenantExternalCategoryResolver(req =>
+        {
+            if (req.TenantId == tenantA)
+            {
+                return new TenantCategoryResolutionResult(
+                    req.Provider, req.ExternalCategoryKey, req.ExternalCategoryName,
+                    new TenantCategoryCandidate(catA, "Soft Drinks", "CAT-SD"),
+                    Array.Empty<TenantCategorySuggestionItem>());
+            }
+            if (req.TenantId == tenantB)
+            {
+                return new TenantCategoryResolutionResult(
+                    req.Provider, req.ExternalCategoryKey, req.ExternalCategoryName,
+                    new TenantCategoryCandidate(catB, "Beverages", "CAT-BEV"),
+                    Array.Empty<TenantCategorySuggestionItem>());
+            }
+            return new TenantCategoryResolutionResult(req.Provider, req.ExternalCategoryKey, req.ExternalCategoryName, null, Array.Empty<TenantCategorySuggestionItem>());
+        });
+
+        var service = CreateService(repository, coordinator, tenantExternalCategoryResolver: resolver);
+
+        // Tenant A request
+        var resultA = await service.ExternalLookupBarcodeAsync(
+            new TenantRequestContext(tenantA, Guid.NewGuid(), [ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        // Tenant B request with identical barcode/metadata
+        var resultB = await service.ExternalLookupBarcodeAsync(
+            new TenantRequestContext(tenantB, Guid.NewGuid(), [ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(resultA.IsSuccess);
+        Assert.True(resultB.IsSuccess);
+        Assert.Equal("Soft Drinks", resultA.Value!.CategoryResolution!.MappedCategory!.Name);
+        Assert.Equal(catA, resultA.Value.CategoryResolution.MappedCategory.Id);
+
+        Assert.Equal("Beverages", resultB.Value!.CategoryResolution!.MappedCategory!.Name);
+        Assert.Equal(catB, resultB.Value.CategoryResolution.MappedCategory.Id);
+    }
+
+    [Fact]
     public async Task ResolveBarcodeAsync_NeverInvokesExternalCoordinator()
     {
         var repository = new FakeTenantAdminProductRepository();
@@ -1755,7 +1957,8 @@ public sealed partial class TenantAdminProductServiceTests
         FakeProductRepository? productRepository = null,
         ITenantAdminProductAuditLogger? auditLogger = null,
         FakeEntitlementEvaluator? entitlementEvaluator = null,
-        IExternalProductLookupCoordinator? externalProductLookupCoordinator = null)
+        IExternalProductLookupCoordinator? externalProductLookupCoordinator = null,
+        ITenantExternalCategoryResolver? tenantExternalCategoryResolver = null)
     {
         var clock = new FakeDateTimeProvider();
         var accessPolicy = new ProductWizardAccessPolicy(
@@ -1770,19 +1973,22 @@ public sealed partial class TenantAdminProductServiceTests
             auditLogger ?? new FakeTenantAdminProductAuditLogger(),
             accessPolicy,
             new ProductVariantGenerationService(),
-            externalProductLookupCoordinator ?? new FakeExternalProductLookupCoordinator());
+            externalProductLookupCoordinator ?? new FakeExternalProductLookupCoordinator(),
+            tenantExternalCategoryResolver ?? new FakeTenantExternalCategoryResolver());
     }
 
     private static TenantAdminProductService CreateService(
         ITenantAdminProductRepository tenantAdminProductRepository,
         FakeExternalProductLookupCoordinator externalProductLookupCoordinator,
-        FakeEntitlementEvaluator? entitlementEvaluator = null) =>
+        FakeEntitlementEvaluator? entitlementEvaluator = null,
+        ITenantExternalCategoryResolver? tenantExternalCategoryResolver = null) =>
         CreateService(
             tenantAdminProductRepository,
             productRepository: null,
             auditLogger: null,
             entitlementEvaluator: entitlementEvaluator,
-            externalProductLookupCoordinator: externalProductLookupCoordinator);
+            externalProductLookupCoordinator: externalProductLookupCoordinator,
+            tenantExternalCategoryResolver: tenantExternalCategoryResolver);
 
     private static TenantRequestContext CreateContext(string[] permissions) =>
         new(TenantId, UserId, permissions);
@@ -2207,6 +2413,9 @@ public sealed partial class TenantAdminProductServiceTests
 
         public int CreateProductCallCount { get; private set; }
         public int SaveDraftCallCount { get; private set; }
+        public TenantAdminWizardProductCreateRequest? LastWizardRequest { get; private set; }
+        public SaveProductDraftResult WizardCreateResult { get; set; } =
+            SaveProductDraftResult.Failure(new ApplicationError("not_implemented", "Fake repository"));
 
         public Task<SaveProductDraftResult> CreateProductFromWizardAsync(
             Guid tenantId,
@@ -2216,8 +2425,8 @@ public sealed partial class TenantAdminProductServiceTests
             CancellationToken cancellationToken)
         {
             CreateProductCallCount++;
-            return Task.FromResult(SaveProductDraftResult.Failure(
-                new ApplicationError("not_implemented", "Fake repository")));
+            LastWizardRequest = request;
+            return Task.FromResult(WizardCreateResult);
         }
 
         public Task<SaveProductDraftResult> SaveProductDraftAsync(
@@ -2490,6 +2699,40 @@ public sealed partial class TenantAdminProductServiceTests
             CallCount++;
             LastRequest = request;
             return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class FakeTenantExternalCategoryResolver : ITenantExternalCategoryResolver
+    {
+        public int CallCount { get; private set; }
+        public TenantCategoryResolutionRequest? LastRequest { get; private set; }
+        public TenantCategoryResolutionResult Result { get; set; } =
+            new("openfoodfacts", null, null, null, Array.Empty<TenantCategorySuggestionItem>());
+
+        public Task<TenantCategoryResolutionResult> ResolveAsync(
+            TenantCategoryResolutionRequest request,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            LastRequest = request;
+            return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class DelegatingTenantExternalCategoryResolver : ITenantExternalCategoryResolver
+    {
+        private readonly Func<TenantCategoryResolutionRequest, TenantCategoryResolutionResult> _handler;
+
+        public DelegatingTenantExternalCategoryResolver(Func<TenantCategoryResolutionRequest, TenantCategoryResolutionResult> handler)
+        {
+            _handler = handler;
+        }
+
+        public Task<TenantCategoryResolutionResult> ResolveAsync(
+            TenantCategoryResolutionRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_handler(request));
         }
     }
 }

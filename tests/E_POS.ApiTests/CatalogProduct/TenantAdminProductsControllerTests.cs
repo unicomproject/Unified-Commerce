@@ -669,6 +669,79 @@ public sealed class TenantAdminProductsControllerTests
     }
 
     [Fact]
+    public async Task ExternalLookupBarcode_Found_SerializesCategoryResolution_WithExpectedJsonShape()
+    {
+        var categoryId = Guid.NewGuid();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca-Cola Original Taste", null, "Coca-Cola", "Beverages, Colas", "330ml", "US",
+            null, null, "https://cdn.example/coke.png", "5449000000996", "GTIN13",
+            ExternalCategoryKey: "en:colas",
+            ExternalCategoryName: "Colas",
+            ExternalCategoryHierarchy: new[] { "en:beverages", "en:carbonated-drinks", "en:colas" });
+
+        var categoryResolution = new TenantCategoryResolutionResult(
+            Provider: "openfoodfacts",
+            ExternalCategoryKey: "en:colas",
+            ExternalCategoryName: "Colas",
+            MappedCategory: new TenantCategoryCandidate(categoryId, "Soft Drinks", "CAT-SOFT-DRINKS"),
+            Suggestions: new[]
+            {
+                new TenantCategorySuggestionItem(Guid.NewGuid(), "Cola Drinks", "CAT-COLA", "EXACT"),
+            });
+
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.Found,
+                    suggestion,
+                    "openfoodfacts",
+                    false,
+                    CategoryResolution: categoryResolution)),
+        };
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, body.Status);
+        Assert.NotNull(body.CategoryResolution);
+        Assert.Equal("openfoodfacts", body.CategoryResolution!.Provider);
+        Assert.Equal("en:colas", body.CategoryResolution.ExternalCategoryKey);
+        Assert.Equal("Colas", body.CategoryResolution.ExternalCategoryName);
+        Assert.NotNull(body.CategoryResolution.MappedCategory);
+        Assert.Equal(categoryId, body.CategoryResolution.MappedCategory!.Id);
+        Assert.Equal("Soft Drinks", body.CategoryResolution.MappedCategory.Name);
+        Assert.Equal("CAT-SOFT-DRINKS", body.CategoryResolution.MappedCategory.Code);
+        Assert.Single(body.CategoryResolution.Suggestions);
+
+        var jsonOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        };
+        var json = System.Text.Json.JsonSerializer.Serialize(body, jsonOptions);
+
+        Assert.Contains("\"categoryResolution\"", json);
+        Assert.Contains("\"mappedCategory\"", json);
+        Assert.Contains("\"externalCategoryKey\":\"en:colas\"", json);
+        Assert.Contains("\"name\":\"Soft Drinks\"", json);
+        Assert.Contains("\"code\":\"CAT-SOFT-DRINKS\"", json);
+        Assert.Contains("\"suggestions\"", json);
+        Assert.Contains("\"matchType\":\"EXACT\"", json);
+        // Ensure no internal DB/Tenant fields are exposed
+        Assert.DoesNotContain("TenantId", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CreatedAt", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("UpdatedAt", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExternalLookupBarcode_TemporaryFailure_SerializesRetryAllowed()
     {
         var service = new FakeTenantAdminProductService
@@ -1300,6 +1373,139 @@ public sealed class TenantAdminProductsControllerTests
     }
 
     [Fact]
+    public async Task Create_WithExternalCategoryMappingContext_PassesContextAndReturnsCreated()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, userId, ProductConstants.CreatePermission);
+
+        var request = new TenantAdminProductCreateRequest
+        {
+            ProductName = "Mapped Product",
+            CategoryId = Guid.NewGuid(),
+            Sku = "SKU-MAPPED-01",
+            SellingPrice = 10m,
+            UnitType = "PIECE",
+            ExternalCategoryMappingContext = new ExternalCategoryMappingContext("openfoodfacts", "en:colas", "Colas"),
+        };
+
+        var result = await controller.Create(request, CancellationToken.None);
+
+        var created = Assert.IsType<CreatedResult>(result);
+        Assert.NotNull(created.Value);
+        Assert.NotNull(service.LastCreateRequest);
+        Assert.NotNull(service.LastCreateRequest!.ExternalCategoryMappingContext);
+        Assert.Equal("openfoodfacts", service.LastCreateRequest.ExternalCategoryMappingContext!.Provider);
+        Assert.Equal("en:colas", service.LastCreateRequest.ExternalCategoryMappingContext.ExternalCategoryKey);
+    }
+
+    [Fact]
+    public async Task CreateFromWizard_WithExternalCategoryMappingContext_PassesContextAndReturnsCreated()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, userId, ProductConstants.CreatePermission);
+
+        var request = new TenantAdminWizardProductCreateRequest
+        {
+            ProductName = "Wizard Mapped Product",
+            CategoryId = Guid.NewGuid(),
+            ProductStructure = "SIMPLE",
+            DesiredPublishActive = true,
+            ProductUnitId = Guid.NewGuid(),
+            BaseUnitId = Guid.NewGuid(),
+            UnitModel = "SINGLE_UNIT",
+            PricingTax = new PricingTaxConfigurationDto(10, 15, 12, Guid.NewGuid(), true),
+            ExternalCategoryMappingContext = new ExternalCategoryMappingContext("openfoodfacts", "en:colas", "Colas"),
+        };
+
+        var result = await controller.CreateFromWizard(request, CancellationToken.None);
+
+        var created = Assert.IsType<CreatedResult>(result);
+        Assert.NotNull(created.Value);
+        Assert.NotNull(service.LastWizardCreateRequest);
+        Assert.NotNull(service.LastWizardCreateRequest!.ExternalCategoryMappingContext);
+        Assert.Equal("openfoodfacts", service.LastWizardCreateRequest.ExternalCategoryMappingContext!.Provider);
+        Assert.Equal("en:colas", service.LastWizardCreateRequest.ExternalCategoryMappingContext.ExternalCategoryKey);
+    }
+
+    [Fact]
+    public async Task CreateFromWizard_WithoutContext_Succeeds()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, userId, ProductConstants.CreatePermission);
+
+        var request = new TenantAdminWizardProductCreateRequest
+        {
+            ProductName = "Normal Wizard Product",
+            CategoryId = Guid.NewGuid(),
+            ProductStructure = "SIMPLE",
+            DesiredPublishActive = true,
+            ProductUnitId = Guid.NewGuid(),
+            BaseUnitId = Guid.NewGuid(),
+            UnitModel = "SINGLE_UNIT",
+            PricingTax = new PricingTaxConfigurationDto(10, 15, 12, Guid.NewGuid(), true),
+            ExternalCategoryMappingContext = null,
+        };
+
+        var result = await controller.CreateFromWizard(request, CancellationToken.None);
+
+        var created = Assert.IsType<CreatedResult>(result);
+        Assert.NotNull(created.Value);
+        Assert.NotNull(service.LastWizardCreateRequest);
+        Assert.Null(service.LastWizardCreateRequest!.ExternalCategoryMappingContext);
+    }
+
+    [Fact]
+    public async Task CreateFromWizard_WithoutTenantClaims_ReturnsUnauthorized()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+
+        var request = new TenantAdminWizardProductCreateRequest
+        {
+            ProductName = "Unauthorized Wizard Product",
+            CategoryId = Guid.NewGuid(),
+            ProductStructure = "SIMPLE",
+        };
+
+        var result = await controller.CreateFromWizard(request, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task CreateFromWizard_WhenValidationFails_ReturnsBadRequest()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            CreateResult = ApplicationResult<TenantAdminProductCreateResponse>.Failure(
+                new ApplicationError("product.validation_failed", "Validation failed.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), ProductConstants.CreatePermission);
+
+        var request = new TenantAdminWizardProductCreateRequest
+        {
+            ProductName = "Invalid Wizard Product",
+            CategoryId = Guid.NewGuid(),
+            ProductStructure = "SIMPLE",
+        };
+
+        var result = await controller.CreateFromWizard(request, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.NotNull(badRequest.Value);
+    }
+
+    [Fact]
     public async Task GetDashboard_WithDashboardPermission_ReturnsOk()
     {
         var dashboard = new TenantAdminProductDashboardResponse(
@@ -1345,6 +1551,9 @@ public sealed class TenantAdminProductsControllerTests
 
     private sealed class FakeTenantAdminProductService : ITenantAdminProductService
     {
+        public TenantAdminProductCreateRequest? LastCreateRequest { get; private set; }
+        public TenantAdminWizardProductCreateRequest? LastWizardCreateRequest { get; private set; }
+
         public ApplicationResult<TenantAdminProductSummaryCardsResponse> SummaryResult { get; init; } =
             ApplicationResult<TenantAdminProductSummaryCardsResponse>.Success(
                 new TenantAdminProductSummaryCardsResponse(0, 0, 0, 0));
@@ -1461,14 +1670,20 @@ public sealed class TenantAdminProductsControllerTests
         public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
             TenantRequestContext context,
             TenantAdminProductCreateRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(CreateResult);
+            CancellationToken cancellationToken)
+        {
+            LastCreateRequest = request;
+            return Task.FromResult(CreateResult);
+        }
 
         public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateFromWizardAsync(
             TenantRequestContext context,
             TenantAdminWizardProductCreateRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(CreateResult);
+            CancellationToken cancellationToken)
+        {
+            LastWizardCreateRequest = request;
+            return Task.FromResult(CreateResult);
+        }
 
         public Task<ApplicationResult<TenantAdminProductDetailResponse>> GetByIdAsync(
             TenantRequestContext context,
