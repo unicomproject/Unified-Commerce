@@ -356,6 +356,9 @@ public sealed class OpenFoodFactsProductLookupProvider : IExternalProductLookupP
             ? product.Categories.Trim()
             : null;
 
+        var (externalCategoryKey, externalCategoryName, externalCategoryHierarchy) =
+            ResolveExternalCategory(product.CategoriesHierarchy, product.CategoriesTags, categoryText);
+
         var unitText = !string.IsNullOrWhiteSpace(product.Quantity)
             ? product.Quantity.Trim()
             : null;
@@ -384,7 +387,77 @@ public sealed class OpenFoodFactsProductLookupProvider : IExternalProductLookupP
             LongDescription: longDescription,
             ImageCandidate: imageCandidate,
             PrimaryGtin: barcode,
-            IdentifierStandard: identifierStandard);
+            IdentifierStandard: identifierStandard,
+            ExternalCategoryKey: externalCategoryKey,
+            ExternalCategoryName: externalCategoryName,
+            ExternalCategoryHierarchy: externalCategoryHierarchy);
+    }
+
+    private static (string? Key, string? Name, IReadOnlyList<string>? Hierarchy) ResolveExternalCategory(
+        List<string>? categoriesHierarchy,
+        List<string>? categoriesTags,
+        string? rawCategories)
+    {
+        var validHierarchy = categoriesHierarchy?
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .ToList();
+
+        var validTags = categoriesTags?
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .ToList();
+
+        var hierarchy = (validHierarchy is { Count: > 0 } ? validHierarchy : validTags) as IReadOnlyList<string>;
+
+        string? key = null;
+        if (validHierarchy is { Count: > 0 })
+        {
+            key = validHierarchy[^1];
+        }
+        else if (validTags is { Count: > 0 })
+        {
+            key = validTags[^1];
+        }
+
+        string? name = null;
+        if (!string.IsNullOrWhiteSpace(rawCategories))
+        {
+            var tokens = rawCategories.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (tokens.Length > 0)
+            {
+                name = tokens[^1];
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                key = name.ToLowerInvariant();
+            }
+            else if (!string.IsNullOrWhiteSpace(rawCategories))
+            {
+                key = rawCategories.Trim().ToLowerInvariant();
+                name = rawCategories.Trim();
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(name))
+        {
+            var cleanKey = key;
+            var colonIndex = cleanKey.IndexOf(':');
+            if (colonIndex >= 0 && colonIndex < cleanKey.Length - 1)
+            {
+                cleanKey = cleanKey[(colonIndex + 1)..];
+            }
+            cleanKey = cleanKey.Replace('-', ' ').Trim();
+            if (cleanKey.Length > 0)
+            {
+                name = char.ToUpperInvariant(cleanKey[0]) + cleanKey[1..];
+            }
+        }
+
+        return (key, name, hierarchy is { Count: > 0 } ? hierarchy : null);
     }
 
     private static string? ResolveCountryCode(List<string>? countriesTags)

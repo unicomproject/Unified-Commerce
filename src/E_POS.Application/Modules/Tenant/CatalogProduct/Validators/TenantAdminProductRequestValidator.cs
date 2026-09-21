@@ -534,6 +534,8 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
             }
         }
 
+        fieldErrors.AddRange(ExternalCategoryMappingContextValidator.Validate(request.ExternalCategoryMappingContext));
+
         if (fieldErrors.Count == 0)
         {
             return null;

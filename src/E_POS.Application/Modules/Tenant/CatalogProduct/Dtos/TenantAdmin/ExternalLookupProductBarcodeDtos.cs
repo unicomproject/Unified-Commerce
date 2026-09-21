@@ -22,4 +22,5 @@ public sealed record ExternalLookupProductBarcodeResponse(
     string Status,
     ExternalProductSuggestion? Suggestion,
     string? SourceReference,
-    bool RetryAllowed);
+    bool RetryAllowed,
+    TenantCategoryResolutionResult? CategoryResolution = null);

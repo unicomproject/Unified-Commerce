@@ -58,4 +58,10 @@ public sealed class OpenFoodFactsProduct
 
     [JsonPropertyName("countries_tags")]
     public List<string>? CountriesTags { get; set; }
+
+    [JsonPropertyName("categories_tags")]
+    public List<string>? CategoriesTags { get; set; }
+
+    [JsonPropertyName("categories_hierarchy")]
+    public List<string>? CategoriesHierarchy { get; set; }
 }

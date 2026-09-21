@@ -118,6 +118,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminProductService, TenantAdminProductService>();
         services.AddScoped<ProductWizardAccessPolicy>();
         services.AddScoped<IExternalProductLookupCoordinator, ExternalProductLookupCoordinator>();
+        services.AddScoped<ITenantExternalCategoryResolver, TenantExternalCategoryResolver>();
         services.AddScoped<ITenantAdminProductRequestValidator, TenantAdminProductRequestValidator>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ICurrentStockService, CurrentStockService>();

@@ -54,4 +54,7 @@ public sealed class TenantAdminWizardProductCreateRequest
 
     /// <summary>Optional client idempotency key to prevent double-create.</summary>
     public string? IdempotencyKey { get; set; }
+
+    /// <summary>Optional external category mapping context to persist on successful product create.</summary>
+    public ExternalCategoryMappingContext? ExternalCategoryMappingContext { get; set; }
 }

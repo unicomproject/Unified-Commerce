@@ -30,7 +30,10 @@ public sealed record ExternalProductSuggestion(
     string? LongDescription,
     string? ImageCandidate,
     string? PrimaryGtin,
-    string? IdentifierStandard);
+    string? IdentifierStandard,
+    string? ExternalCategoryKey = null,
+    string? ExternalCategoryName = null,
+    IReadOnlyList<string>? ExternalCategoryHierarchy = null);
 
 public sealed record ExternalProductLookupProviderResult(
     string Status,

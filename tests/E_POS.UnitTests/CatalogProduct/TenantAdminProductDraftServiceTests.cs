@@ -41,7 +41,8 @@ public class TenantAdminProductDraftServiceTests
             new FakeTenantAdminProductAuditLogger(),
             accessPolicy,
             new ProductVariantGenerationService(),
-            new NoOpExternalProductLookupCoordinator());
+            new NoOpExternalProductLookupCoordinator(),
+            new NoOpTenantExternalCategoryResolver());
     }
 
     private sealed class NoOpExternalProductLookupCoordinator : IExternalProductLookupCoordinator
@@ -51,6 +52,19 @@ public class TenantAdminProductDraftServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(new ExternalProductLookupResult(
                 ExternalProductLookupStatuses.NoMatch, null, null, false));
+    }
+
+    private sealed class NoOpTenantExternalCategoryResolver : ITenantExternalCategoryResolver
+    {
+        public Task<TenantCategoryResolutionResult> ResolveAsync(
+            TenantCategoryResolutionRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantCategoryResolutionResult(
+                request.Provider,
+                request.ExternalCategoryKey,
+                request.ExternalCategoryName,
+                null,
+                Array.Empty<TenantCategorySuggestionItem>()));
     }
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string> permissions) =>

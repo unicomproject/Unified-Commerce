@@ -430,6 +430,9 @@ public static class DependencyInjection
         // Shared Product Metadata Cache (Phase 2)
         services.AddScoped<ISharedProductMetadataCacheRepository, E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories.SharedProductMetadataCacheRepository>();
 
+        // Tenant External Category Mapping Repository
+        services.AddScoped<IExternalCategoryMappingRepository, E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories.ExternalCategoryMappingRepository>();
+
         return services;
     }
 }

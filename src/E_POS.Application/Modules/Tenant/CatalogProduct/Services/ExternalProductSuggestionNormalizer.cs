@@ -13,6 +13,11 @@ public static class ExternalProductSuggestionNormalizer
     public const int ShortNameMaxLength = 100;
     public const int BrandTextMaxLength = 200;
     public const int CategoryTextMaxLength = 200;
+    public const int ProviderMaxLength = ExternalCategoryMappingConstants.ProviderMaxLength;
+    public const int ExternalCategoryKeyMaxLength = ExternalCategoryMappingConstants.ExternalCategoryKeyMaxLength;
+    public const int ExternalCategoryNameMaxLength = ExternalCategoryMappingConstants.ExternalCategoryNameMaxLength;
+    public const int ExternalCategoryHierarchyMaxItems = 20;
+    public const int ExternalCategoryHierarchyItemMaxLength = ExternalCategoryMappingConstants.ExternalCategoryKeyMaxLength;
     public const int UnitTextMaxLength = 100;
     public const int CountryCodeMaxLength = 8;
     public const int ImageCandidateMaxLength = 2048;
@@ -72,10 +77,89 @@ public static class ExternalProductSuggestionNormalizer
             LongDescription: Truncate(Clean(raw.LongDescription), ProductConstants.LongDescriptionMaxLength),
             ImageCandidate: imageCandidate,
             PrimaryGtin: primaryGtin,
-            IdentifierStandard: identifierStandard);
+            IdentifierStandard: identifierStandard,
+            ExternalCategoryKey: NormalizeExternalCategoryKey(raw.ExternalCategoryKey),
+            ExternalCategoryName: NormalizeExternalCategoryName(raw.ExternalCategoryName),
+            ExternalCategoryHierarchy: NormalizeExternalCategoryHierarchy(raw.ExternalCategoryHierarchy));
 
         sourceReference = Truncate(Clean(providerResult.ProviderReference), SourceReferenceMaxLength);
         return true;
+    }
+
+    public static string? NormalizeProvider(string? value)
+    {
+        var cleaned = Clean(value);
+        if (string.IsNullOrEmpty(cleaned))
+        {
+            return null;
+        }
+
+        var sanitized = new string(cleaned.Where(c => !char.IsControl(c)).ToArray()).Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(sanitized))
+        {
+            return null;
+        }
+
+        return Truncate(sanitized, ProviderMaxLength);
+    }
+
+    public static string? NormalizeExternalCategoryKey(string? value)
+    {
+        var cleaned = Clean(value);
+        if (string.IsNullOrEmpty(cleaned))
+        {
+            return null;
+        }
+
+        // Remove unsafe control characters, normalize casing to lowercase invariant
+        var sanitized = new string(cleaned.Where(c => !char.IsControl(c)).ToArray()).Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(sanitized))
+        {
+            return null;
+        }
+
+        return Truncate(sanitized, ExternalCategoryKeyMaxLength);
+    }
+
+    public static string? NormalizeExternalCategoryName(string? value)
+    {
+        var cleaned = Clean(value);
+        if (string.IsNullOrEmpty(cleaned))
+        {
+            return null;
+        }
+
+        var sanitized = new string(cleaned.Where(c => !char.IsControl(c)).ToArray()).Trim();
+        if (string.IsNullOrEmpty(sanitized))
+        {
+            return null;
+        }
+
+        return Truncate(sanitized, ExternalCategoryNameMaxLength);
+    }
+
+    public static IReadOnlyList<string>? NormalizeExternalCategoryHierarchy(IReadOnlyList<string>? hierarchy)
+    {
+        if (hierarchy is null || hierarchy.Count == 0)
+        {
+            return null;
+        }
+
+        var list = new List<string>(Math.Min(hierarchy.Count, ExternalCategoryHierarchyMaxItems));
+        foreach (var item in hierarchy)
+        {
+            var normalized = NormalizeExternalCategoryKey(item);
+            if (!string.IsNullOrEmpty(normalized))
+            {
+                list.Add(normalized);
+                if (list.Count >= ExternalCategoryHierarchyMaxItems)
+                {
+                    break;
+                }
+            }
+        }
+
+        return list.Count > 0 ? list : null;
     }
 
     private static string? NormalizeImageCandidate(string? value)
