@@ -282,6 +282,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
     public DbSet<CheckoutSessionAddress> CheckoutSessionAddresses => Set<CheckoutSessionAddress>();
     public DbSet<CheckoutSessionLine> CheckoutSessionLines => Set<CheckoutSessionLine>(); public DbSet<CheckoutSessionLineOption> CheckoutSessionLineOptions => Set<CheckoutSessionLineOption>();
+    public DbSet<PaymentProviderWebhookEvent> PaymentProviderWebhookEvents => Set<PaymentProviderWebhookEvent>();
     public DbSet<ShoppingCart> ShoppingCarts => Set<ShoppingCart>();
     public DbSet<ShoppingCartItem> ShoppingCartItems => Set<ShoppingCartItem>(); public DbSet<ShoppingCartItemOption> ShoppingCartItemOptions => Set<ShoppingCartItemOption>();
 

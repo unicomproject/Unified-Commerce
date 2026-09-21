@@ -381,6 +381,7 @@ public static class DependencyInjection
         services.AddScoped<IOnlineCheckoutPaymentGateway, StripeCheckoutGateway>();
         services.AddScoped<IOnlineCheckoutPaymentConfirmationRepository, OnlineCheckoutPaymentConfirmationRepository>();
         services.AddScoped<IOnlineCheckoutPaymentConfirmationService, OnlineCheckoutPaymentConfirmationService>();
+        services.AddScoped<IPaymentWebhookEventDeduplicator, PaymentWebhookEventDeduplicator>();
         services.AddSingleton<IStorefrontAutocompleteService, StorefrontAutocompleteService>();
         services.AddHostedService<AutocompleteInitializationHostedService>();
         services.AddScoped<ICustomerRegistrationRepository, CustomerRegistrationRepository>();

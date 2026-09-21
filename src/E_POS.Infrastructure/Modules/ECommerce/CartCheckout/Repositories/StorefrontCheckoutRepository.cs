@@ -99,4 +99,17 @@ public sealed class StorefrontCheckoutRepository : IStorefrontCheckoutRepository
             reason,
             now,
             cancellationToken);
+
+    public Task RecordProviderCheckoutSessionAsync(
+        Guid tenantId,
+        Guid salesPaymentId,
+        string providerSessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        _confirmationRepository.RecordProviderCheckoutSessionAsync(
+            tenantId,
+            salesPaymentId,
+            providerSessionId,
+            now,
+            cancellationToken);
 }

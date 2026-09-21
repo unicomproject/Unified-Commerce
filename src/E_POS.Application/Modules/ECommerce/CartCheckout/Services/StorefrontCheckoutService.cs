@@ -180,6 +180,16 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
                     "Online payment could not be started. Please try again."));
             }
 
+            if (!string.IsNullOrWhiteSpace(sessionResult.ProviderSessionId))
+            {
+                await _repository.RecordProviderCheckoutSessionAsync(
+                    tenantId,
+                    result.Value.Order.PaymentId.Value,
+                    sessionResult.ProviderSessionId,
+                    _dateTimeProvider.UtcNow,
+                    cancellationToken);
+            }
+
             result.Value.PaymentRedirectUrl = sessionResult.CheckoutUrl;
             return result;
         }
