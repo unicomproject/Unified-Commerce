@@ -49,9 +49,8 @@ public sealed class PosOnlineOrderCollectionRepository : IPosOnlineOrderCollecti
             return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>
                 .Failure("online_orders.collection.qr_invalid");
 
-        if (pickup.PickupQrExpiresAt is { } expiresAt && expiresAt < now)
-            return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>
-                .Failure("online_orders.collection.qr_expired");
+        // The collection QR never expires on its own — it stays valid until the order is
+        // actually collected (or the pickup is cancelled), regardless of how long that takes.
 
         var fulfillment = await _dbContext.FulfillmentOrders.AsNoTracking()
             .FirstOrDefaultAsync(x =>

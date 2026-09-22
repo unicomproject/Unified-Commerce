@@ -137,7 +137,7 @@ public sealed class CustomerOrderReadRepository : CustomerOrderRepositoryBase, I
                 select pickupOrder)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return BuildDetail(order, lines, imageLookup, statusHistory, pickup, DateTimeOffset.UtcNow);
+        return BuildDetail(order, lines, imageLookup, statusHistory, pickup);
     }
 
 }

@@ -18,8 +18,6 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
     public const string ReadyEvent = "FULFILLMENT_READY_FOR_COLLECTION";
     public const string PickupReadyEvent = "PICKUP_READY_FOR_COLLECTION";
     private const string ClickAndCollectOrderType = "CLICK_AND_COLLECT";
-    /// <summary>Collection QR validity window after MarkReady (Chunk 2 MVP).</summary>
-    public static readonly TimeSpan CollectionQrTtl = TimeSpan.FromDays(7);
 
     private readonly EPosDbContext _dbContext;
 
@@ -203,11 +201,11 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
                 // Stored as-is (not hashed): the customer's order page must be able to
                 // redisplay this exact value inside the collection QR for as long as it
                 // is valid, which a one-way hash would make impossible. Safety comes from
-                // it being a large random value, single-use, and time-limited.
+                // it being a large random value and single-use, not from secrecy or a TTL —
+                // the QR never expires on its own; it stays valid until the order is collected.
                 collectionQrToken = CreateCollectionQrToken();
                 var qrVersion = (pickup.PickupQrVersion ?? 0) + 1;
-                var qrExpiresAt = now.Add(CollectionQrTtl);
-                pickup.IssueCollectionQr(collectionQrToken, qrVersion, qrExpiresAt, now);
+                pickup.IssueCollectionQr(collectionQrToken, qrVersion, expiresAt: null, now);
             }
             catch (InvalidOperationException ex) when (ex.Message == "FULFILLMENT_VERSION_CONFLICT")
             {

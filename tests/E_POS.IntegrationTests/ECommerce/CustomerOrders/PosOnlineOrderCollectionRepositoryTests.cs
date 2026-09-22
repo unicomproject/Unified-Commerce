@@ -143,7 +143,7 @@ public sealed class PosOnlineOrderCollectionRepositoryTests
         Assert.Equal("READY", pickup.PickupStatus);
         Assert.NotNull(pickup.PickupQrTokenHash);
         Assert.Equal(1, pickup.PickupQrVersion);
-        Assert.Equal(Now.AddDays(7), pickup.PickupQrExpiresAt);
+        Assert.Null(pickup.PickupQrExpiresAt);
         // Stored as-is (not hashed): the customer's order page must be able to
         // redisplay this exact value, and validation compares it verbatim.
         Assert.Equal(result.Command.CollectionQrToken, pickup.PickupQrTokenHash);
