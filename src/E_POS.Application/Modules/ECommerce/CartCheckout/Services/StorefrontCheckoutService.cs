@@ -266,6 +266,7 @@ public sealed class StorefrontCheckoutService : IStorefrontCheckoutService
         "storefront_checkout.invalid_state" => Error(code, "The checkout session cannot be confirmed in its current state."),
         "storefront_checkout.uom_not_configured" => Error(code, "A sales unit of measure is not configured for a cart item."),
         "storefront_checkout.sales_channel_not_configured" => Error(code, "The online sales channel is not configured."),
+        "storefront_checkout.barcode_unavailable" => Error(code, "A cart item is missing a barcode and cannot be ordered yet."),
         _ => Error(code, "The checkout operation could not be completed.")
     };
 
