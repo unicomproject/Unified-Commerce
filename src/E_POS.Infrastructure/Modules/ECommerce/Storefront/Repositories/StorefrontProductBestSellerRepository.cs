@@ -36,7 +36,7 @@ public sealed class StorefrontProductBestSellerRepository : StorefrontProductRep
             })
             .OrderByDescending(x => x.SalesCount)
             .ThenByDescending(x => x.Product.CreatedAt)
-            .Take(10)
+            .Take(20)
             .ToListAsync(cancellationToken);
 
         var products = productsWithSales.Select(x => x.Product).ToList();
