@@ -46,45 +46,6 @@ public sealed class ExternalProductLookupCoordinator : IExternalProductLookupCoo
 
         var normalizedIdentifier = request.Identifier.Trim();
 
-        // 1. Check shared product metadata cache
-        if (_cacheRepository is not null && _options.Cache.Enabled)
-        {
-            try
-            {
-                var cachedSuggestion = await _cacheRepository.GetValidAsync(normalizedIdentifier, cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (cachedSuggestion is not null)
-                {
-                    _logger.LogInformation(
-                        "Shared product metadata cache HIT for barcode {Barcode}. Outcome={Outcome}",
-                        normalizedIdentifier,
-                        ExternalProductLookupStatuses.Found);
-
-                    return new ExternalProductLookupResult(
-                        ExternalProductLookupStatuses.Found,
-                        cachedSuggestion,
-                        SourceReference: "cache",
-                        RetryAllowed: false);
-                }
-
-                _logger.LogInformation(
-                    "Shared product metadata cache MISS for barcode {Barcode}.",
-                    normalizedIdentifier);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(
-                    ex,
-                    "Error reading from shared product metadata cache for barcode {Barcode}. Continuing to provider lookup.",
-                    normalizedIdentifier);
-            }
-        }
-
         // Preserve exact identifier string (including leading zeros) — do not parse as numeric.
         var ordered = ResolveEnabledProviders(request);
         if (ordered.Count == 0)
@@ -102,23 +63,70 @@ public sealed class ExternalProductLookupCoordinator : IExternalProductLookupCoo
 
         var sawNoMatch = false;
         var sawTemporaryFailure = false;
+        var cacheEnabled = _cacheRepository is not null && _options.Cache.Enabled;
 
         foreach (var (provider, timeoutSeconds) in ordered)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // 1. Check shared product metadata cache — scoped to THIS provider only. A cache hit
+            // for one provider must never satisfy (or suppress) the lookup for another provider.
+            if (cacheEnabled)
+            {
+                try
+                {
+                    var cached = await _cacheRepository!.GetValidAsync(normalizedIdentifier, provider.Name, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (cached is not null)
+                    {
+                        _logger.LogInformation(
+                            "Shared product metadata cache HIT for barcode {Barcode} Provider={Provider}. Outcome={Outcome}",
+                            normalizedIdentifier,
+                            cached.Provider,
+                            ExternalProductLookupStatuses.Found);
+
+                        return new ExternalProductLookupResult(
+                            ExternalProductLookupStatuses.Found,
+                            cached.Suggestion,
+                            SourceReference: cached.Provider,
+                            RetryAllowed: false,
+                            SourceProvider: cached.Provider,
+                            RetrievalSource: ExternalProductLookupRetrievalSources.Cache);
+                    }
+
+                    _logger.LogInformation(
+                        "Shared product metadata cache MISS for barcode {Barcode} Provider={Provider}.",
+                        normalizedIdentifier,
+                        provider.Name);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Error reading from shared product metadata cache for barcode {Barcode} Provider={Provider}. Continuing to provider lookup.",
+                        normalizedIdentifier,
+                        provider.Name);
+                }
+            }
+
+            // 2. Invoke provider
             var outcome = await InvokeProviderAsync(provider, request, timeoutSeconds, cancellationToken)
                 .ConfigureAwait(false);
 
             if (outcome.Kind == ProviderInvokeKind.Found)
             {
                 // Write normalized result to shared metadata cache
-                if (_cacheRepository is not null && _options.Cache.Enabled && outcome.Suggestion is not null)
+                if (cacheEnabled && outcome.Suggestion is not null)
                 {
                     var ttl = TimeSpan.FromDays(_options.Cache.TtlDays > 0 ? _options.Cache.TtlDays : 30);
                     try
                     {
-                        await _cacheRepository.SetAsync(
+                        await _cacheRepository!.SetAsync(
                             normalizedIdentifier,
                             request.IdentifierStandard,
                             provider.Name,
@@ -135,8 +143,9 @@ public sealed class ExternalProductLookupCoordinator : IExternalProductLookupCoo
                     {
                         _logger.LogWarning(
                             ex,
-                            "Failed to write to cache for barcode {Barcode}. Lookup operation will continue unaffected.",
-                            normalizedIdentifier);
+                            "Failed to write to cache for barcode {Barcode} Provider={Provider}. Lookup operation will continue unaffected.",
+                            normalizedIdentifier,
+                            provider.Name);
                     }
                 }
 
@@ -144,7 +153,9 @@ public sealed class ExternalProductLookupCoordinator : IExternalProductLookupCoo
                     ExternalProductLookupStatuses.Found,
                     outcome.Suggestion,
                     outcome.SourceReference,
-                    RetryAllowed: false);
+                    RetryAllowed: false,
+                    SourceProvider: provider.Name,
+                    RetrievalSource: ExternalProductLookupRetrievalSources.Provider);
             }
 
             if (outcome.Kind == ProviderInvokeKind.NoMatch)

@@ -7,7 +7,18 @@ namespace E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
 
 public static class ExternalCategoryMappingContextValidator
 {
-    public static List<ApplicationFieldError> Validate(ExternalCategoryMappingContext? context)
+    /// <param name="context">The client-submitted external category mapping context, if any.</param>
+    /// <param name="allowedProviders">
+    /// When supplied (non-null), <paramref name="context"/>.Provider must match one of these
+    /// values (case-insensitive) or validation fails. Callers with access to configured/known
+    /// external providers (e.g. via <c>ExternalProductLookupOptions</c>) should always pass this,
+    /// so a value that never came from a real provider — such as the literal "cache" — can never
+    /// be persisted into an external mapping table. Omitted (null) preserves prior behaviour for
+    /// callers that do not yet have an allowlist available.
+    /// </param>
+    public static List<ApplicationFieldError> Validate(
+        ExternalCategoryMappingContext? context,
+        IReadOnlyCollection<string>? allowedProviders = null)
     {
         var fieldErrors = new List<ApplicationFieldError>();
         if (context is null)
@@ -26,6 +37,13 @@ public static class ExternalCategoryMappingContextValidator
             fieldErrors.Add(new ApplicationFieldError(
                 "externalCategoryMappingContext.provider",
                 $"Provider cannot exceed {ExternalCategoryMappingConstants.ProviderMaxLength} characters."));
+        }
+        else if (allowedProviders is { Count: > 0 } &&
+                 !allowedProviders.Contains(context.Provider.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            fieldErrors.Add(new ApplicationFieldError(
+                "externalCategoryMappingContext.provider",
+                "Provider is not a recognized external product-lookup provider."));
         }
 
         if (string.IsNullOrWhiteSpace(context.ExternalCategoryKey))

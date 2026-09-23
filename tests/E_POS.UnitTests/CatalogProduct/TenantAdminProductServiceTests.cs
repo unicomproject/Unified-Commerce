@@ -729,6 +729,262 @@ public sealed partial class TenantAdminProductServiceTests
         Assert.Equal("CAT-SOFT-DRINKS", result.Value.CategoryResolution.MappedCategory.Code);
     }
 
+    // --- External Brand Mapping: brand resolution runs alongside category resolution whenever the
+    // winning provider result carries a meaningful BrandText, using the same SourceProvider. ---
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_FoundWithBrandText_InvokesBrandResolverAndPopulatesResolution()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var brandCandidateId = Guid.NewGuid();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca Cola 330ml", "Cola", "Coca-Cola", "Beverages, Colas", "330ml", "FR",
+            "short", "long", "https://cdn.example/c.png", "5449000000996", "GTIN13");
+
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found, suggestion, "openfoodfacts", false,
+                SourceProvider: "openfoodfacts", RetrievalSource: ExternalProductLookupRetrievalSources.Provider),
+        };
+
+        var brandResolver = new FakeTenantExternalBrandResolver
+        {
+            Result = new TenantBrandResolutionResult(
+                "openfoodfacts",
+                "coca cola",
+                "Coca-Cola",
+                new TenantBrandCandidate(brandCandidateId, "Coca Cola", "COCA_COLA"),
+                Array.Empty<TenantBrandSuggestionItem>()),
+        };
+
+        var service = CreateService(repository, coordinator, tenantExternalBrandResolver: brandResolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, brandResolver.CallCount);
+        Assert.NotNull(brandResolver.LastRequest);
+        Assert.Equal(TenantId, brandResolver.LastRequest!.TenantId);
+        Assert.Equal("openfoodfacts", brandResolver.LastRequest.Provider);
+        Assert.Equal("coca cola", brandResolver.LastRequest.ExternalBrandKey);
+        Assert.Equal("Coca-Cola", brandResolver.LastRequest.ExternalBrandName);
+
+        Assert.NotNull(result.Value!.BrandResolution);
+        Assert.Equal("openfoodfacts", result.Value.BrandResolution!.Provider);
+        Assert.NotNull(result.Value.BrandResolution.MappedBrand);
+        Assert.Equal(brandCandidateId, result.Value.BrandResolution.MappedBrand!.Id);
+        Assert.Equal("Coca Cola", result.Value.BrandResolution.MappedBrand.Name);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_MultiValueBrandText_ExtractsFirstSegmentForResolution()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca Cola 330ml", "Cola", "Coca-Cola, The Coca-Cola Company", "Beverages", "330ml", "FR",
+            "short", "long", null, "5449000000996", "GTIN13");
+
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found, suggestion, "openfoodfacts", false,
+                SourceProvider: "openfoodfacts", RetrievalSource: ExternalProductLookupRetrievalSources.Provider),
+        };
+
+        var brandResolver = new FakeTenantExternalBrandResolver();
+
+        var service = CreateService(repository, coordinator, tenantExternalBrandResolver: brandResolver);
+
+        await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.Equal(1, brandResolver.CallCount);
+        Assert.Equal("coca cola", brandResolver.LastRequest!.ExternalBrandKey);
+        Assert.Equal("Coca-Cola", brandResolver.LastRequest.ExternalBrandName);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_FoundWithoutBrandText_DoesNotInvokeBrandResolver_BrandResolutionNull()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var suggestion = new ExternalProductSuggestion(
+            "Generic Product", null, null, null, null, null, null, null, null, "5449000000996", "GTIN13");
+
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found, suggestion, "openfoodfacts", false,
+                SourceProvider: "openfoodfacts", RetrievalSource: ExternalProductLookupRetrievalSources.Provider),
+        };
+
+        var brandResolver = new FakeTenantExternalBrandResolver();
+
+        var service = CreateService(repository, coordinator, tenantExternalBrandResolver: brandResolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, brandResolver.CallCount);
+        Assert.Null(result.Value!.BrandResolution);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_NoMatch_DoesNotInvokeBrandResolver_BrandResolutionNull()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.NoMatch, null, null, false),
+        };
+
+        var brandResolver = new FakeTenantExternalBrandResolver();
+
+        var service = CreateService(repository, coordinator, tenantExternalBrandResolver: brandResolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, brandResolver.CallCount);
+        Assert.Null(result.Value!.BrandResolution);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_CacheHit_BrandResolutionUsesSourceProvider_NotCacheLiteral()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca Cola 330ml", "Cola", "Coca-Cola", "Beverages", "330ml", "FR",
+            "short", "long", null, "5449000000996", "GTIN13");
+
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found,
+                suggestion,
+                SourceReference: "openfoodfacts",
+                RetryAllowed: false,
+                SourceProvider: "openfoodfacts",
+                RetrievalSource: ExternalProductLookupRetrievalSources.Cache),
+        };
+
+        var brandResolver = new FakeTenantExternalBrandResolver();
+
+        var service = CreateService(repository, coordinator, tenantExternalBrandResolver: brandResolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("openfoodfacts", brandResolver.LastRequest!.Provider);
+        Assert.NotEqual("cache", brandResolver.LastRequest.Provider);
+    }
+
+    // --- Phase A regression: category resolution must use SourceProvider (correct on cache hits),
+    // never RetrievalSource or the literal "cache". This proves the original defect is fixed at
+    // the TenantAdminProductService call site, independent of the coordinator's own cache logic. ---
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_CacheHit_UsesSourceProvider_NotRetrievalSourceOrCacheLiteral()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca Cola 330ml", "Cola", "Coca-Cola", "Beverages, Colas", "330ml", "FR",
+            "short", "long", "https://cdn.example/c.png", "5449000000996", "GTIN13",
+            ExternalCategoryKey: "en:colas",
+            ExternalCategoryName: "Colas");
+
+        // Simulate exactly what a fixed coordinator returns on a CACHE HIT: SourceProvider is the
+        // real provider, RetrievalSource is "CACHE", and SourceReference (legacy) also carries the
+        // real provider — never the literal "cache".
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found,
+                suggestion,
+                SourceReference: "openfoodfacts",
+                RetryAllowed: false,
+                SourceProvider: "openfoodfacts",
+                RetrievalSource: ExternalProductLookupRetrievalSources.Cache),
+        };
+
+        var resolver = new FakeTenantExternalCategoryResolver
+        {
+            Result = new TenantCategoryResolutionResult(
+                "openfoodfacts", "en:colas", "Colas", null, Array.Empty<TenantCategorySuggestionItem>()),
+        };
+
+        var service = CreateService(repository, coordinator, tenantExternalCategoryResolver: resolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(resolver.LastRequest);
+        Assert.Equal("openfoodfacts", resolver.LastRequest!.Provider);
+        Assert.NotEqual("cache", resolver.LastRequest.Provider);
+        Assert.NotEqual(ExternalProductLookupRetrievalSources.Cache, resolver.LastRequest.Provider);
+
+        Assert.Equal(ExternalProductLookupRetrievalSources.Cache, result.Value!.RetrievalSource);
+        Assert.Equal("openfoodfacts", result.Value.SourceProvider);
+        Assert.NotEqual("cache", result.Value.SourceProvider);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcodeAsync_SourceProviderPreferredOverStaleSourceReference()
+    {
+        var repository = new FakeTenantAdminProductRepository();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca Cola 330ml", null, null, null, null, null, null, null, null, "5449000000996", "GTIN13",
+            ExternalCategoryKey: "en:colas",
+            ExternalCategoryName: "Colas");
+
+        // A caller that only populated the legacy field with a mismatched/incorrect value must
+        // still resolve correctly once SourceProvider is authoritative.
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found,
+                suggestion,
+                SourceReference: "stale-or-wrong",
+                RetryAllowed: false,
+                SourceProvider: "openfoodfacts",
+                RetrievalSource: ExternalProductLookupRetrievalSources.Provider),
+        };
+
+        var resolver = new FakeTenantExternalCategoryResolver
+        {
+            Result = new TenantCategoryResolutionResult(
+                "openfoodfacts", "en:colas", "Colas", null, Array.Empty<TenantCategorySuggestionItem>()),
+        };
+
+        var service = CreateService(repository, coordinator, tenantExternalCategoryResolver: resolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("openfoodfacts", resolver.LastRequest!.Provider);
+    }
+
     [Fact]
     public async Task ExternalLookupBarcodeAsync_FoundWithoutCategoryKey_DoesNotInvokeResolver_CategoryResolutionNull()
     {
@@ -1958,37 +2214,47 @@ public sealed partial class TenantAdminProductServiceTests
         ITenantAdminProductAuditLogger? auditLogger = null,
         FakeEntitlementEvaluator? entitlementEvaluator = null,
         IExternalProductLookupCoordinator? externalProductLookupCoordinator = null,
-        ITenantExternalCategoryResolver? tenantExternalCategoryResolver = null)
+        ITenantExternalCategoryResolver? tenantExternalCategoryResolver = null,
+        ITenantExternalBrandResolver? tenantExternalBrandResolver = null,
+        Microsoft.Extensions.Options.IOptions<E_POS.Application.Modules.Tenant.CatalogProduct.Options.ExternalProductLookupOptions>? externalProductLookupOptions = null)
     {
         var clock = new FakeDateTimeProvider();
         var accessPolicy = new ProductWizardAccessPolicy(
             entitlementEvaluator ?? new FakeEntitlementEvaluator(),
             tenantAdminProductRepository,
             clock);
+        // Default: no configured providers -> allowlist enforcement is a no-op (existing tests are
+        // unaffected). Tests exercising the allowlist explicitly pass a populated options instance.
+        var lookupOptions = externalProductLookupOptions
+            ?? Microsoft.Extensions.Options.Options.Create(new E_POS.Application.Modules.Tenant.CatalogProduct.Options.ExternalProductLookupOptions());
         return new TenantAdminProductService(
             productRepository ?? new FakeProductRepository(),
             tenantAdminProductRepository,
-            new TenantAdminProductRequestValidator(),
+            new TenantAdminProductRequestValidator(lookupOptions),
             clock,
             auditLogger ?? new FakeTenantAdminProductAuditLogger(),
             accessPolicy,
             new ProductVariantGenerationService(),
             externalProductLookupCoordinator ?? new FakeExternalProductLookupCoordinator(),
-            tenantExternalCategoryResolver ?? new FakeTenantExternalCategoryResolver());
+            tenantExternalCategoryResolver ?? new FakeTenantExternalCategoryResolver(),
+            tenantExternalBrandResolver ?? new FakeTenantExternalBrandResolver(),
+            lookupOptions);
     }
 
     private static TenantAdminProductService CreateService(
         ITenantAdminProductRepository tenantAdminProductRepository,
         FakeExternalProductLookupCoordinator externalProductLookupCoordinator,
         FakeEntitlementEvaluator? entitlementEvaluator = null,
-        ITenantExternalCategoryResolver? tenantExternalCategoryResolver = null) =>
+        ITenantExternalCategoryResolver? tenantExternalCategoryResolver = null,
+        ITenantExternalBrandResolver? tenantExternalBrandResolver = null) =>
         CreateService(
             tenantAdminProductRepository,
             productRepository: null,
             auditLogger: null,
             entitlementEvaluator: entitlementEvaluator,
             externalProductLookupCoordinator: externalProductLookupCoordinator,
-            tenantExternalCategoryResolver: tenantExternalCategoryResolver);
+            tenantExternalCategoryResolver: tenantExternalCategoryResolver,
+            tenantExternalBrandResolver: tenantExternalBrandResolver);
 
     private static TenantRequestContext CreateContext(string[] permissions) =>
         new(TenantId, UserId, permissions);
@@ -2711,6 +2977,23 @@ public sealed partial class TenantAdminProductServiceTests
 
         public Task<TenantCategoryResolutionResult> ResolveAsync(
             TenantCategoryResolutionRequest request,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            LastRequest = request;
+            return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class FakeTenantExternalBrandResolver : ITenantExternalBrandResolver
+    {
+        public int CallCount { get; private set; }
+        public TenantBrandResolutionRequest? LastRequest { get; private set; }
+        public TenantBrandResolutionResult Result { get; set; } =
+            new("openfoodfacts", null, null, null, Array.Empty<TenantBrandSuggestionItem>());
+
+        public Task<TenantBrandResolutionResult> ResolveAsync(
+            TenantBrandResolutionRequest request,
             CancellationToken cancellationToken)
         {
             CallCount++;

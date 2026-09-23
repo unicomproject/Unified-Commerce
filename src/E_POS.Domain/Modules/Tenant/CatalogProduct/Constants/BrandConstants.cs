@@ -14,6 +14,7 @@ public static class BrandConstants
 
     public static string NormalizeCode(string code) => code.Trim().ToUpperInvariant();
     public static string NormalizeStatus(string status) => status.Trim().ToUpperInvariant();
+    public static string NormalizeNameForComparison(string name) => name.Trim().ToLowerInvariant();
 
     public static bool IsValidWriteStatus(string status)
     {

@@ -158,6 +158,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<ProductSetupScanContext> ProductSetupScanContexts => Set<ProductSetupScanContext>();
     public DbSet<SharedProductMetadataCache> SharedProductMetadataCaches => Set<SharedProductMetadataCache>();
     public DbSet<ExternalCategoryMapping> ExternalCategoryMappings => Set<ExternalCategoryMapping>();
+    public DbSet<ExternalBrandMapping> ExternalBrandMappings => Set<ExternalBrandMapping>();
     public DbSet<ProductSetupInitialTracking> ProductSetupInitialTrackings => Set<ProductSetupInitialTracking>();
     public DbSet<ProductAttributeDefinition> ProductAttributeDefinitions => Set<ProductAttributeDefinition>();
     public DbSet<ProductAttributeOption> ProductAttributeOptions => Set<ProductAttributeOption>();

@@ -444,6 +444,357 @@ public sealed class ExternalProductLookupCoordinatorTests
         Assert.True(result.RetryAllowed);
     }
 
+    // --- Phase A: cache is now checked per-provider inside the priority loop, so it must never
+    // let one provider's cached row satisfy (or suppress) another provider's lookup. ---
+
+    [Fact]
+    public async Task LookupAsync_CacheHitForHigherPriorityProvider_ShortCircuits_LowerPriorityProviderNeverCalled()
+    {
+        var cache = new InMemoryCacheRepository();
+        cache.Seed(Identifier, "high", FoundResult("FromCacheHigh").Suggestion!);
+
+        var low = new FakeExternalProductLookupProvider("low") { Result = FoundResult("FromLow") };
+        var high = new FakeExternalProductLookupProvider("high") { Result = FoundResult("FromHigh") };
+        var options = new ExternalProductLookupOptions
+        {
+            Cache = new ProductMetadataCacheOptions { Enabled = true, TtlDays = 30 },
+            Providers =
+            [
+                new ExternalProductLookupProviderOptions { Name = "high", Enabled = true, Priority = 1 },
+                new ExternalProductLookupProviderOptions { Name = "low", Enabled = true, Priority = 2 },
+            ],
+        };
+        var coordinator = CreateCoordinator([high, low], options, cache);
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Status);
+        Assert.Equal("FromCacheHigh", result.Suggestion!.ProductName);
+        Assert.Equal("high", result.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Cache, result.RetrievalSource);
+        Assert.Equal(0, high.CallCount); // cache satisfied it — provider itself never invoked
+        Assert.Equal(0, low.CallCount); // lower-priority provider never reached
+    }
+
+    [Fact]
+    public async Task LookupAsync_CacheRowForOneProvider_DoesNotSatisfyDifferentProvidersIteration()
+    {
+        var cache = new InMemoryCacheRepository();
+        cache.Seed(Identifier, "openfoodfacts", FoundResult("CachedForOff").Suggestion!);
+
+        // Only "upcitemdb" is enabled — the cache row belongs to "openfoodfacts" and must be
+        // invisible to upcitemdb's cache check, forcing a real provider call.
+        var upcitemdb = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FromUpcItemDb") };
+        var options = new ExternalProductLookupOptions
+        {
+            Cache = new ProductMetadataCacheOptions { Enabled = true, TtlDays = 30 },
+            Providers =
+            [
+                new ExternalProductLookupProviderOptions { Name = "upcitemdb", Enabled = true, Priority = 1 },
+            ],
+        };
+        var coordinator = CreateCoordinator([upcitemdb], options, cache);
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Status);
+        Assert.Equal("FromUpcItemDb", result.Suggestion!.ProductName);
+        Assert.Equal("upcitemdb", result.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Provider, result.RetrievalSource);
+        Assert.Equal(1, upcitemdb.CallCount); // real provider WAS called — cache did not falsely satisfy it
+    }
+
+    [Fact]
+    public async Task LookupAsync_FreshFound_ReportsSourceProviderAndRetrievalSourceProvider()
+    {
+        var provider = new FakeExternalProductLookupProvider("alpha") { Result = FoundResult("Cola") };
+        var coordinator = CreateCoordinator([provider], OptionsWith(("alpha", true, 1)));
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal("alpha", result.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Provider, result.RetrievalSource);
+        Assert.NotEqual("cache", result.SourceProvider);
+    }
+
+    // --- Phase C: OpenFoodFacts (priority 1) -> UPCitemdb (priority 2) fallback scenarios.
+    // These use FakeExternalProductLookupProvider named "openfoodfacts"/"upcitemdb" rather than
+    // the real HTTP adapters — the adapters' own HTTP/JSON behavior is covered by
+    // UpcItemDbProductLookupProviderTests.cs; this file verifies coordinator orchestration only. ---
+
+    private static ExternalProductLookupOptions TwoProviderOptions(bool cacheEnabled = false, bool upcItemDbEnabled = true) => new()
+    {
+        Cache = new ProductMetadataCacheOptions { Enabled = cacheEnabled, TtlDays = 30 },
+        Providers =
+        [
+            new ExternalProductLookupProviderOptions { Name = "openfoodfacts", Enabled = true, Priority = 1 },
+            new ExternalProductLookupProviderOptions { Name = "upcitemdb", Enabled = upcItemDbEnabled, Priority = 2 },
+        ],
+    };
+
+    // --- Config-hardening: upcitemdb.Enabled=false (the production-safe default) must fully
+    // exclude it from the priority loop — never invoked, never contributing to the outcome —
+    // while openfoodfacts keeps working normally at priority 1. ---
+
+    [Fact]
+    public async Task LookupAsync_UpcItemDbDisabled_OpenFoodFactsNoMatch_UpcItemDbNeverCalled_ReturnsNoMatch()
+    {
+        var off = new FakeExternalProductLookupProvider("openfoodfacts")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.NoMatch, null, null, null),
+        };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FromUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions(upcItemDbEnabled: false));
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.NoMatch, result.Status);
+        Assert.Equal(1, off.CallCount);
+        Assert.Equal(0, upc.CallCount);
+    }
+
+    [Fact]
+    public async Task LookupAsync_UpcItemDbDisabled_OpenFoodFactsFound_UpcItemDbNeverCalled()
+    {
+        var off = new FakeExternalProductLookupProvider("openfoodfacts") { Result = FoundResult("FromOff") };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FromUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions(upcItemDbEnabled: false));
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Status);
+        Assert.Equal("openfoodfacts", result.SourceProvider);
+        Assert.Equal(1, off.CallCount);
+        Assert.Equal(0, upc.CallCount);
+    }
+
+    [Fact]
+    public async Task LookupAsync_UpcItemDbEnabled_ParticipatesAsPriorityTwo_AfterOpenFoodFactsNoMatch()
+    {
+        var off = new FakeExternalProductLookupProvider("openfoodfacts")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.NoMatch, null, null, null),
+        };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FromUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions(upcItemDbEnabled: true));
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Status);
+        Assert.Equal("upcitemdb", result.SourceProvider);
+        Assert.Equal(1, off.CallCount);
+        Assert.Equal(1, upc.CallCount);
+    }
+
+    [Fact]
+    public async Task LookupAsync_OpenFoodFactsFound_UpcItemDbNeverCalled()
+    {
+        var off = new FakeExternalProductLookupProvider("openfoodfacts") { Result = FoundResult("FromOff") };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FromUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions());
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Status);
+        Assert.Equal("FromOff", result.Suggestion!.ProductName);
+        Assert.Equal("openfoodfacts", result.SourceProvider);
+        Assert.Equal(1, off.CallCount);
+        Assert.Equal(0, upc.CallCount);
+    }
+
+    [Fact]
+    public async Task LookupAsync_OpenFoodFactsNoMatch_FallsThroughToUpcItemDbFound()
+    {
+        var off = new FakeExternalProductLookupProvider("openfoodfacts")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.NoMatch, null, null, null),
+        };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FromUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions());
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Status);
+        Assert.Equal("FromUpc", result.Suggestion!.ProductName);
+        Assert.Equal("upcitemdb", result.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Provider, result.RetrievalSource);
+        Assert.Equal(1, off.CallCount);
+        Assert.Equal(1, upc.CallCount);
+    }
+
+    [Fact]
+    public async Task LookupAsync_OpenFoodFactsTemporaryFailure_FallsThroughToUpcItemDbFound()
+    {
+        var off = new FakeExternalProductLookupProvider("openfoodfacts")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.TemporaryFailure, null, null, "timeout"),
+        };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FromUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions());
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Status);
+        Assert.Equal("FromUpc", result.Suggestion!.ProductName);
+        Assert.Equal("upcitemdb", result.SourceProvider);
+    }
+
+    [Fact]
+    public async Task LookupAsync_BothNoMatch_ReturnsOverallNoMatch()
+    {
+        var off = new FakeExternalProductLookupProvider("openfoodfacts")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.NoMatch, null, null, null),
+        };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.NoMatch, null, null, null),
+        };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions());
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.NoMatch, result.Status);
+        Assert.False(result.RetryAllowed);
+        Assert.Equal(1, off.CallCount);
+        Assert.Equal(1, upc.CallCount);
+    }
+
+    [Fact]
+    public async Task LookupAsync_OpenFoodFactsTemporaryFailure_UpcItemDbNoMatch_ReturnsOverallTemporaryFailure()
+    {
+        var off = new FakeExternalProductLookupProvider("openfoodfacts")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.TemporaryFailure, null, null, "down"),
+        };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.NoMatch, null, null, null),
+        };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions());
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        // Conservative rule (unchanged from Phase A/pre-existing coordinator logic): any
+        // TEMPORARY_FAILURE without an eventual FOUND wins over a pure NO_MATCH.
+        Assert.Equal(ExternalProductLookupStatuses.TemporaryFailure, result.Status);
+        Assert.True(result.RetryAllowed);
+    }
+
+    [Fact]
+    public async Task LookupAsync_OpenFoodFactsCacheHit_UpcItemDbNeverCalled()
+    {
+        var cache = new InMemoryCacheRepository();
+        cache.Seed(Identifier, "openfoodfacts", FoundResult("CachedOff").Suggestion!);
+
+        var off = new FakeExternalProductLookupProvider("openfoodfacts") { Result = FoundResult("FreshOff") };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FreshUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions(cacheEnabled: true), cache);
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal("CachedOff", result.Suggestion!.ProductName);
+        Assert.Equal("openfoodfacts", result.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Cache, result.RetrievalSource);
+        Assert.Equal(0, off.CallCount);
+        Assert.Equal(0, upc.CallCount);
+    }
+
+    [Fact]
+    public async Task LookupAsync_OpenFoodFactsNoMatch_UpcItemDbCacheHit_ReturnsUpcItemDbCachedResult()
+    {
+        var cache = new InMemoryCacheRepository();
+        cache.Seed(Identifier, "upcitemdb", FoundResult("CachedUpc").Suggestion!);
+
+        var off = new FakeExternalProductLookupProvider("openfoodfacts")
+        {
+            Result = new ExternalProductLookupProviderResult(ExternalProductLookupStatuses.NoMatch, null, null, null),
+        };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FreshUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions(cacheEnabled: true), cache);
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal("CachedUpc", result.Suggestion!.ProductName);
+        Assert.Equal("upcitemdb", result.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Cache, result.RetrievalSource);
+        Assert.Equal(1, off.CallCount); // OFF's own cache missed, so OFF WAS invoked (and returned NoMatch)
+        Assert.Equal(0, upc.CallCount); // UPC's cache hit meant the real UPC provider was never invoked
+    }
+
+    [Fact]
+    public async Task LookupAsync_SameBarcodeCachedForBothProviders_PriorityDecidesWhichIsReturned()
+    {
+        var cache = new InMemoryCacheRepository();
+        cache.Seed(Identifier, "openfoodfacts", FoundResult("CachedOff").Suggestion!);
+        cache.Seed(Identifier, "upcitemdb", FoundResult("CachedUpc").Suggestion!);
+
+        var off = new FakeExternalProductLookupProvider("openfoodfacts");
+        var upc = new FakeExternalProductLookupProvider("upcitemdb");
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions(cacheEnabled: true), cache);
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        // Priority 1 (openfoodfacts) is evaluated first in the loop, so its cache row wins —
+        // the upcitemdb cache row is never even consulted.
+        Assert.Equal("CachedOff", result.Suggestion!.ProductName);
+        Assert.Equal("openfoodfacts", result.SourceProvider);
+        Assert.Equal(0, off.CallCount);
+        Assert.Equal(0, upc.CallCount);
+    }
+
+    [Fact]
+    public async Task LookupAsync_TwoProvidersConfigured_OpenFoodFactsCategoryMappingContextUnaffected()
+    {
+        // Mandatory Phase C regression (per task §21): registering UPCitemdb as a second
+        // provider must not change OpenFoodFacts' own category-key normalization/round-trip.
+        var suggestionWithCategory = new ExternalProductSuggestion(
+            "Coca Cola", ShortName: null, BrandText: "Coca-Cola", CategoryText: "Beverages, Colas",
+            UnitText: null, CountryCode: null, ShortDescription: null, LongDescription: null,
+            ImageCandidate: null, PrimaryGtin: Identifier, IdentifierStandard: "GTIN14",
+            ExternalCategoryKey: "en:colas", ExternalCategoryName: "Colas",
+            ExternalCategoryHierarchy: new[] { "en:beverages", "en:colas" });
+
+        var off = new FakeExternalProductLookupProvider("openfoodfacts")
+        {
+            Result = new ExternalProductLookupProviderResult(
+                ExternalProductLookupStatuses.Found, suggestionWithCategory, "openfoodfacts", null),
+        };
+        var upc = new FakeExternalProductLookupProvider("upcitemdb") { Result = FoundResult("FromUpc") };
+        var coordinator = CreateCoordinator([off, upc], TwoProviderOptions());
+
+        var result = await coordinator.LookupAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Status);
+        Assert.Equal("openfoodfacts", result.SourceProvider);
+        Assert.Equal("en:colas", result.Suggestion!.ExternalCategoryKey);
+        Assert.Equal("Colas", result.Suggestion.ExternalCategoryName);
+        Assert.Equal(2, result.Suggestion.ExternalCategoryHierarchy!.Count);
+        Assert.Equal(0, upc.CallCount);
+    }
+
+    private sealed class InMemoryCacheRepository : ISharedProductMetadataCacheRepository
+    {
+        private readonly Dictionary<(string Barcode, string Provider), ExternalProductSuggestion> _entries = new();
+
+        public void Seed(string barcode, string provider, ExternalProductSuggestion suggestion) =>
+            _entries[(barcode, provider.ToLowerInvariant())] = suggestion;
+
+        public Task<CachedExternalProductLookupResult?> GetValidAsync(string normalizedBarcode, string provider, CancellationToken cancellationToken)
+        {
+            var key = (normalizedBarcode, provider.ToLowerInvariant());
+            return Task.FromResult(_entries.TryGetValue(key, out var suggestion)
+                ? new CachedExternalProductLookupResult(suggestion, provider.ToLowerInvariant())
+                : null);
+        }
+
+        public Task SetAsync(string normalizedBarcode, string? identifierStandard, string provider, ExternalProductSuggestion suggestion, string? rawResponseJson, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            _entries[(normalizedBarcode, provider.ToLowerInvariant())] = suggestion;
+            return Task.CompletedTask;
+        }
+    }
+
     private static ExternalProductLookupRequest CreateRequest() =>
         new(Identifier, "GTIN14", "UNKNOWN");
 

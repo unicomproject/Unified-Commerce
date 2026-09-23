@@ -5,11 +5,13 @@ using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ExternalLookup;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Options;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Domain.Modules.Tenant.Inventory.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
+using Microsoft.Extensions.Options;
 
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 
@@ -32,6 +34,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
     private readonly ProductVariantGenerationService _variantGenerationService;
     private readonly IExternalProductLookupCoordinator _externalProductLookupCoordinator;
     private readonly ITenantExternalCategoryResolver _tenantExternalCategoryResolver;
+    private readonly ITenantExternalBrandResolver? _tenantExternalBrandResolver;
+    private readonly IReadOnlySet<string> _allowedExternalMappingProviders;
 
     public TenantAdminProductService(
         IProductRepository productRepository,
@@ -42,7 +46,9 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         ProductWizardAccessPolicy accessPolicy,
         ProductVariantGenerationService variantGenerationService,
         IExternalProductLookupCoordinator externalProductLookupCoordinator,
-        ITenantExternalCategoryResolver tenantExternalCategoryResolver)
+        ITenantExternalCategoryResolver tenantExternalCategoryResolver,
+        ITenantExternalBrandResolver? tenantExternalBrandResolver = null,
+        IOptions<ExternalProductLookupOptions>? externalProductLookupOptions = null)
     {
         _productRepository = productRepository;
         _tenantAdminProductRepository = tenantAdminProductRepository;
@@ -53,6 +59,9 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         _variantGenerationService = variantGenerationService;
         _externalProductLookupCoordinator = externalProductLookupCoordinator;
         _tenantExternalCategoryResolver = tenantExternalCategoryResolver;
+        _tenantExternalBrandResolver = tenantExternalBrandResolver;
+        _allowedExternalMappingProviders =
+            (externalProductLookupOptions?.Value ?? new ExternalProductLookupOptions()).GetConfiguredProviderNames();
     }
 
     public async Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
@@ -276,6 +285,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         }
 
         NormalizeExternalCategoryMappingContext(request.ExternalCategoryMappingContext);
+        NormalizeExternalBrandMappingContext(request.ExternalBrandMappingContext);
 
         var result = await _tenantAdminProductRepository.CreateProductFromWizardAsync(
             context.TenantId,
@@ -307,7 +317,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         return ApplicationResult<TenantAdminProductCreateResponse>.Success(response);
     }
 
-    private static ApplicationError? ValidateWizardCreateRequest(TenantAdminWizardProductCreateRequest request)
+    private ApplicationError? ValidateWizardCreateRequest(TenantAdminWizardProductCreateRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.ProductName) ||
             request.ProductName.Trim().Equals("untitled product", StringComparison.OrdinalIgnoreCase))
@@ -442,13 +452,26 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 "Tracking is disabled for the entered Batch/Expiry/Serial values. These values will be cleared if you continue.");
         }
 
-        var mappingErrors = ExternalCategoryMappingContextValidator.Validate(request.ExternalCategoryMappingContext);
+        var mappingErrors = ExternalCategoryMappingContextValidator.Validate(
+            request.ExternalCategoryMappingContext,
+            _allowedExternalMappingProviders);
         if (mappingErrors.Count > 0)
         {
             return new ApplicationError(
                 "product.validation_failed",
                 "External category mapping context validation failed.",
                 mappingErrors);
+        }
+
+        var brandMappingErrors = ExternalBrandMappingContextValidator.Validate(
+            request.ExternalBrandMappingContext,
+            _allowedExternalMappingProviders);
+        if (brandMappingErrors.Count > 0)
+        {
+            return new ApplicationError(
+                "product.validation_failed",
+                "External brand mapping context validation failed.",
+                brandMappingErrors);
         }
 
         return null;
@@ -480,6 +503,33 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             context.ExternalCategoryName =
                 ExternalProductSuggestionNormalizer.NormalizeExternalCategoryName(context.ExternalCategoryName)
                 ?? context.ExternalCategoryName.Trim();
+        }
+    }
+
+    private static void NormalizeExternalBrandMappingContext(ExternalBrandMappingContext? context)
+    {
+        if (context is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.Provider))
+        {
+            context.Provider =
+                ExternalProductSuggestionNormalizer.NormalizeProvider(context.Provider)
+                ?? context.Provider.Trim().ToLowerInvariant();
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.ExternalBrandKey))
+        {
+            context.ExternalBrandKey =
+                ExternalBrandKeyDeriver.DeriveExternalBrandKey(context.ExternalBrandKey)
+                ?? context.ExternalBrandKey.Trim().ToLowerInvariant();
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.ExternalBrandName))
+        {
+            context.ExternalBrandName = context.ExternalBrandName.Trim();
         }
     }
 
@@ -2357,22 +2407,51 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         var lookupResult = await _externalProductLookupCoordinator.LookupAsync(lookupRequest, cancellationToken);
 
         TenantCategoryResolutionResult? categoryResolution = null;
+        TenantBrandResolutionResult? brandResolution = null;
         if (lookupResult.Status == ExternalProductLookupStatuses.Found &&
-            lookupResult.Suggestion is not null &&
-            !string.IsNullOrWhiteSpace(lookupResult.Suggestion.ExternalCategoryKey))
+            lookupResult.Suggestion is not null)
         {
-            var provider = !string.IsNullOrWhiteSpace(lookupResult.SourceReference)
-                ? lookupResult.SourceReference.Trim().ToLowerInvariant()
-                : "openfoodfacts";
+            // Prefer the authoritative SourceProvider (correct on both fresh and cache-hit results).
+            // SourceReference is a legacy fallback for any caller that hasn't populated SourceProvider —
+            // it is never derived from RetrievalSource and, post-fix, never carries the literal "cache".
+            var provider = !string.IsNullOrWhiteSpace(lookupResult.SourceProvider)
+                ? lookupResult.SourceProvider.Trim().ToLowerInvariant()
+                : !string.IsNullOrWhiteSpace(lookupResult.SourceReference)
+                    ? lookupResult.SourceReference.Trim().ToLowerInvariant()
+                    : "openfoodfacts";
 
-            var resolutionRequest = new TenantCategoryResolutionRequest(
-                context.TenantId,
-                provider,
-                lookupResult.Suggestion.ExternalCategoryKey,
-                lookupResult.Suggestion.ExternalCategoryName,
-                lookupResult.Suggestion.ExternalCategoryHierarchy);
+            if (!string.IsNullOrWhiteSpace(lookupResult.Suggestion.ExternalCategoryKey))
+            {
+                var categoryResolutionRequest = new TenantCategoryResolutionRequest(
+                    context.TenantId,
+                    provider,
+                    lookupResult.Suggestion.ExternalCategoryKey,
+                    lookupResult.Suggestion.ExternalCategoryName,
+                    lookupResult.Suggestion.ExternalCategoryHierarchy);
 
-            categoryResolution = await _tenantExternalCategoryResolver.ResolveAsync(resolutionRequest, cancellationToken);
+                categoryResolution = await _tenantExternalCategoryResolver.ResolveAsync(categoryResolutionRequest, cancellationToken);
+            }
+
+            // Brand resolution only runs when the winning provider result carries a meaningful
+            // BrandText and we have a known provider identity — never merged from a different
+            // provider's result (see coordinator: only one provider ever wins per lookup).
+            if (_tenantExternalBrandResolver is not null &&
+                !string.IsNullOrWhiteSpace(lookupResult.Suggestion.BrandText))
+            {
+                var primaryBrandSegment = ExternalBrandKeyDeriver.ExtractPrimaryBrandSegment(lookupResult.Suggestion.BrandText);
+                var externalBrandKey = ExternalBrandKeyDeriver.DeriveExternalBrandKey(primaryBrandSegment);
+
+                if (!string.IsNullOrWhiteSpace(externalBrandKey))
+                {
+                    var brandResolutionRequest = new TenantBrandResolutionRequest(
+                        context.TenantId,
+                        provider,
+                        externalBrandKey,
+                        primaryBrandSegment);
+
+                    brandResolution = await _tenantExternalBrandResolver.ResolveAsync(brandResolutionRequest, cancellationToken);
+                }
+            }
         }
 
         return ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
@@ -2381,7 +2460,10 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 Suggestion: lookupResult.Suggestion,
                 SourceReference: lookupResult.SourceReference,
                 RetryAllowed: lookupResult.RetryAllowed,
-                CategoryResolution: categoryResolution));
+                CategoryResolution: categoryResolution,
+                SourceProvider: lookupResult.SourceProvider,
+                RetrievalSource: lookupResult.RetrievalSource,
+                BrandResolution: brandResolution));
     }
 
     private async Task<IReadOnlyList<ApplicationFieldError>> ValidateBundleConfigurationAsync(

@@ -27,12 +27,14 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
     private readonly ICodeSequenceRepository _codeSequenceRepository;
     private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
     private readonly IExternalCategoryMappingRepository _externalCategoryMappingRepository;
+    private readonly IExternalBrandMappingRepository _externalBrandMappingRepository;
 
     public TenantAdminProductRepository(
         EPosDbContext dbContext,
         ICodeSequenceRepository codeSequenceRepository,
         IMediaReadUrlResolver? mediaReadUrlResolver = null,
-        IExternalCategoryMappingRepository? externalCategoryMappingRepository = null)
+        IExternalCategoryMappingRepository? externalCategoryMappingRepository = null,
+        IExternalBrandMappingRepository? externalBrandMappingRepository = null)
     {
         _dbContext = dbContext;
         _codeSequenceRepository = codeSequenceRepository;
@@ -42,6 +44,11 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
                 dbContext,
                 new SystemDateTimeProvider(),
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<ExternalCategoryMappingRepository>.Instance);
+        _externalBrandMappingRepository = externalBrandMappingRepository
+            ?? new ExternalBrandMappingRepository(
+                dbContext,
+                new SystemDateTimeProvider(),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ExternalBrandMappingRepository>.Instance);
     }
 
     public async Task<TenantAdminProductSummaryResponse> GetSummaryAsync(

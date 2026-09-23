@@ -668,6 +668,53 @@ public sealed class TenantAdminProductsControllerTests
         Assert.DoesNotContain("Authorization", json, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("upcitemdb", "PROVIDER")]
+    [InlineData("upcitemdb", "CACHE")]
+    [InlineData("openfoodfacts", "PROVIDER")]
+    public async Task ExternalLookupBarcode_Found_SerializesSourceProviderAndRetrievalSource(
+        string sourceProvider, string retrievalSource)
+    {
+        // Phase C: proves the controller relays the Phase A identity model end-to-end (e.g. a
+        // result the service produced after OpenFoodFacts NO_MATCH -> UPCitemdb FOUND) without
+        // dropping/renaming the new fields, and without leaking any provider request details.
+        var suggestion = new ExternalProductSuggestion(
+            "Widget", null, "BrandCo", "Category", "1 pc", null, null, null,
+            "https://cdn.example/widget.png", "4006381333931", "GTIN13");
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.Found,
+                    suggestion,
+                    SourceReference: sourceProvider,
+                    RetryAllowed: false,
+                    CategoryResolution: null,
+                    SourceProvider: sourceProvider,
+                    RetrievalSource: retrievalSource)),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+
+        Assert.Equal(sourceProvider, body.SourceProvider);
+        Assert.Equal(retrievalSource, body.RetrievalSource);
+        Assert.NotEqual("cache", body.SourceProvider);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(body);
+        Assert.DoesNotContain("BaseUrl", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("user_key", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("api.upcitemdb.com", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Authorization", json, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task ExternalLookupBarcode_Found_SerializesCategoryResolution_WithExpectedJsonShape()
     {
@@ -735,6 +782,76 @@ public sealed class TenantAdminProductsControllerTests
         Assert.Contains("\"code\":\"CAT-SOFT-DRINKS\"", json);
         Assert.Contains("\"suggestions\"", json);
         Assert.Contains("\"matchType\":\"EXACT\"", json);
+        // Ensure no internal DB/Tenant fields are exposed
+        Assert.DoesNotContain("TenantId", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CreatedAt", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("UpdatedAt", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_Found_SerializesBrandResolution_WithExpectedJsonShape()
+    {
+        var brandId = Guid.NewGuid();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca-Cola Original Taste", null, "Coca-Cola", "Beverages, Colas", "330ml", "US",
+            null, null, "https://cdn.example/coke.png", "5449000000996", "GTIN13");
+
+        var brandResolution = new TenantBrandResolutionResult(
+            Provider: "openfoodfacts",
+            ExternalBrandKey: "coca cola",
+            ExternalBrandName: "Coca-Cola",
+            MappedBrand: new TenantBrandCandidate(brandId, "Coca Cola", "COCA_COLA"),
+            Suggestions: new[]
+            {
+                new TenantBrandSuggestionItem(Guid.NewGuid(), "Coca Cola Zero", "COCA_COLA_ZERO", "SIMILARITY"),
+            });
+
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.Found,
+                    suggestion,
+                    "openfoodfacts",
+                    false,
+                    BrandResolution: brandResolution)),
+        };
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, body.Status);
+        Assert.NotNull(body.BrandResolution);
+        Assert.Equal("openfoodfacts", body.BrandResolution!.Provider);
+        Assert.Equal("coca cola", body.BrandResolution.ExternalBrandKey);
+        Assert.Equal("Coca-Cola", body.BrandResolution.ExternalBrandName);
+        Assert.NotNull(body.BrandResolution.MappedBrand);
+        Assert.Equal(brandId, body.BrandResolution.MappedBrand!.Id);
+        Assert.Equal("Coca Cola", body.BrandResolution.MappedBrand.Name);
+        Assert.Equal("COCA_COLA", body.BrandResolution.MappedBrand.Code);
+        Assert.Single(body.BrandResolution.Suggestions);
+
+        var jsonOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        };
+        var json = System.Text.Json.JsonSerializer.Serialize(body, jsonOptions);
+
+        Assert.Contains("\"brandResolution\"", json);
+        Assert.Contains("\"mappedBrand\"", json);
+        Assert.Contains("\"externalBrandKey\":\"coca cola\"", json);
+        Assert.Contains("\"name\":\"Coca Cola\"", json);
+        Assert.Contains("\"code\":\"COCA_COLA\"", json);
+        Assert.Contains("\"suggestions\"", json);
+        Assert.Contains("\"matchType\":\"SIMILARITY\"", json);
         // Ensure no internal DB/Tenant fields are exposed
         Assert.DoesNotContain("TenantId", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("CreatedAt", json, StringComparison.OrdinalIgnoreCase);

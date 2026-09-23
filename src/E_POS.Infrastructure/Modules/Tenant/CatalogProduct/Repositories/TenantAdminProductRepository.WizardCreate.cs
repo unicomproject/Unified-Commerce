@@ -412,6 +412,32 @@ public sealed partial class TenantAdminProductRepository
                     saveChanges: false);
             }
 
+            // External brand mapping only persists when the wizard actually resolved a final
+            // brandId — Brand is optional on the product, unlike Category.
+            if (request.BrandId.HasValue &&
+                request.ExternalBrandMappingContext is not null &&
+                !string.IsNullOrWhiteSpace(request.ExternalBrandMappingContext.Provider) &&
+                !string.IsNullOrWhiteSpace(request.ExternalBrandMappingContext.ExternalBrandKey))
+            {
+                var normBrandProvider = request.ExternalBrandMappingContext.Provider.Trim().ToLowerInvariant();
+                var normBrandKey = ExternalBrandKeyDeriver.DeriveExternalBrandKey(request.ExternalBrandMappingContext.ExternalBrandKey)
+                    ?? request.ExternalBrandMappingContext.ExternalBrandKey.Trim().ToLowerInvariant();
+                var normBrandName = string.IsNullOrWhiteSpace(request.ExternalBrandMappingContext.ExternalBrandName)
+                    ? normBrandKey
+                    : request.ExternalBrandMappingContext.ExternalBrandName.Trim();
+
+                await _externalBrandMappingRepository.UpsertAsync(
+                    tenantId,
+                    normBrandProvider,
+                    normBrandKey,
+                    normBrandName,
+                    request.BrandId.Value,
+                    "PRODUCT_CONFIRMED",
+                    userId,
+                    cancellationToken,
+                    saveChanges: false);
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
