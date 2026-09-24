@@ -295,6 +295,7 @@ public static class DependencyInjection
         services.AddScoped<IPosDrawerRepository, PosDrawerRepository>();
         services.AddScoped<IDiscountPolicyAdminRepository, DiscountPolicyAdminRepository>();
         services.AddScoped<ITenantAdminReportsRepository, TenantAdminReportsRepository>();
+        services.AddScoped<ITenantAdminReportsAuditLogger, E_POS.Infrastructure.Modules.Tenant.Reports.Services.TenantAdminReportsAuditLogger>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IPosNotificationRepository, NotificationRepository>();
         services.AddScoped<ITenantStaffNotificationRecipientRepository, TenantStaffNotificationRecipientRepository>();
@@ -433,4 +434,5 @@ public static class DependencyInjection
         return services;
     }
 }
+
 

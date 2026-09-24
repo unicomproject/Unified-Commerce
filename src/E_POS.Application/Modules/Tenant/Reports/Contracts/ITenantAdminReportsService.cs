@@ -44,4 +44,10 @@ public interface ITenantAdminReportsService
         TenantRequestContext context,
         Guid jobId,
         CancellationToken cancellationToken);
+
+    Task<ApplicationResult<byte[]>> DownloadExportAsync(
+        TenantRequestContext context,
+        Guid jobId,
+        CancellationToken cancellationToken);
 }
+

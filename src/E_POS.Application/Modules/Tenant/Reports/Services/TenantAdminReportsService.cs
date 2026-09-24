@@ -5,7 +5,8 @@ using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Application.Modules.Tenant.Reports.Dtos;
 using E_POS.Domain.Modules.Tenant.Inventory.Constants;
 using E_POS.Domain.Modules.Tenant.Reports.Constants;
-
+using System.Collections.Generic;
+using System.Collections.Concurrent;
 namespace E_POS.Application.Modules.Tenant.Reports.Services;
 
 
@@ -49,17 +50,23 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
         "csv", "xlsx", "pdf"
     };
 
-    private static readonly Dictionary<Guid, ReportExportDto> ExportJobs = new();
+    
 
-    private readonly ITenantAdminReportsRepository _repository;
+        private readonly ITenantAdminReportsRepository _repository;
     private readonly ITenantFeatureEntitlementEvaluator _entitlements;
     private readonly IDateTimeProvider _clock;
+    private readonly ITenantAdminReportsAuditLogger _auditLogger;
+    
+    
 
-    public TenantAdminReportsService(ITenantAdminReportsRepository repository, ITenantFeatureEntitlementEvaluator entitlements, IDateTimeProvider clock)
+    private static readonly ConcurrentDictionary<Guid, ExportJobEntry> ExportJobs = new();
+
+    public TenantAdminReportsService(ITenantAdminReportsRepository repository, ITenantFeatureEntitlementEvaluator entitlements, IDateTimeProvider clock, ITenantAdminReportsAuditLogger auditLogger)
     {
         _repository = repository;
         _entitlements = entitlements;
         _clock = clock;
+        _auditLogger = auditLogger;
     }
 
     public async Task<ApplicationResult<ReportFilterOptionsResponse>> GetFilterOptionsAsync(
@@ -185,7 +192,7 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             await _repository.GetOutletsAsync(context, request with { Section = section }, cancellationToken));
     }
 
-    public async Task<ApplicationResult<ReportExportDto>> CreateExportAsync(
+        public async Task<ApplicationResult<ReportExportDto>> CreateExportAsync(
         TenantRequestContext context,
         ReportExportRequest request,
         CancellationToken cancellationToken)
@@ -193,11 +200,18 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
         var error = ValidateCommonAccess(context);
         if (error is not null) return ApplicationResult<ReportExportDto>.Failure(error);
         if (!await ReportFeaturePolicy.IsExportEnabledAsync(_entitlements, context.TenantId, _clock.UtcNow, cancellationToken) ||
-            !HasAnyPermission(context, TenantAdminReportPermissions.Export) ||
-            !ExportFormats.Contains(request.Format) ||
-            request.Filters.PageSize is not (25 or 50 or 100))
+            !HasAnyPermission(context, TenantAdminReportPermissions.Export))
         {
             return ApplicationResult<ReportExportDto>.Failure(PermissionDenied);
+        }
+        
+        if (request.Format.Equals("xlsx", StringComparison.OrdinalIgnoreCase) || request.Format.Equals("pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplicationResult<ReportExportDto>.Failure(new ApplicationError("reports.format_not_supported", "Format is deferred/unsupported in Release 1."));
+        }
+        if (!request.Format.Equals("csv", StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplicationResult<ReportExportDto>.Failure(new ApplicationError("reports.format_invalid", "Invalid format."));
         }
 
         if (!await CanViewExportTargetAsync(context, request.ReportType, request.Section, cancellationToken))
@@ -205,9 +219,26 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             return ApplicationResult<ReportExportDto>.Failure(PermissionDenied);
         }
 
+        var filters = request.Filters with { Page = 1, PageSize = int.MaxValue };
+        ReportResultDto? reportResult = request.ReportType.ToLowerInvariant() switch
+        {
+            "sales" => await _repository.GetSalesAsync(context, filters, cancellationToken),
+            "stock" => await _repository.GetStockAsync(context, filters, cancellationToken),
+            "outlets" => await _repository.GetOutletsAsync(context, filters, cancellationToken),
+            _ => null
+        };
+
+        if (reportResult == null)
+        {
+            return ApplicationResult<ReportExportDto>.Failure(NotFound);
+        }
+
+        var csvBytes = CsvGenerator.Generate(reportResult.Records, request.ReportType, request.Section);
+
         var now = DateTimeOffset.UtcNow;
+        var jobId = Guid.NewGuid();
         var job = new ReportExportDto(
-            Guid.NewGuid(),
+            jobId,
             request.ReportType.Trim().ToLowerInvariant(),
             request.Section.Trim(),
             request.Format.Trim().ToUpperInvariant(),
@@ -215,31 +246,91 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             now,
             now,
             BuildSafeFileName(request.ReportType, request.Section, request.Format),
-            null,
+            $"/api/v1/tenant-admin/reports/exports/{jobId}/download",
             now.AddMinutes(15),
-            "Release 1 export job metadata is created; binary file storage/download is pending.");
-        lock (ExportJobs)
-        {
-            ExportJobs[job.JobId] = job;
-        }
+            null);
+            
+        var entry = new ExportJobEntry(job, context.TenantId, context.UserId, csvBytes);
+        ExportJobs[jobId] = entry;
+
+        await _auditLogger.LogExportJobCreatedAsync(context.TenantId, context.UserId, jobId, request, cancellationToken);
 
         return ApplicationResult<ReportExportDto>.Success(job);
     }
 
-    public Task<ApplicationResult<ReportExportDto>> GetExportAsync(
+        public async Task<ApplicationResult<ReportExportDto>> GetExportAsync(
         TenantRequestContext context,
         Guid jobId,
         CancellationToken cancellationToken)
     {
         var error = ValidateCommonAccess(context);
-        if (error is not null) return Task.FromResult(ApplicationResult<ReportExportDto>.Failure(error));
-        lock (ExportJobs)
+        if (error is not null) return ApplicationResult<ReportExportDto>.Failure(error);
+        
+        CleanupExpiredJobs();
+        
+        if (ExportJobs.TryGetValue(jobId, out var entry) && entry.TenantId == context.TenantId && entry.UserId == context.UserId)
         {
-            return Task.FromResult(ExportJobs.TryGetValue(jobId, out var job)
-                ? ApplicationResult<ReportExportDto>.Success(job)
-                : ApplicationResult<ReportExportDto>.Failure(NotFound));
+            if (entry.Dto.ExpiresAt.HasValue && entry.Dto.ExpiresAt.Value < _clock.UtcNow)
+            {
+                ExportJobs.TryRemove(jobId, out _);
+                return ApplicationResult<ReportExportDto>.Failure(NotFound);
+            }
+            
+            if (!await ReportFeaturePolicy.IsExportEnabledAsync(_entitlements, context.TenantId, _clock.UtcNow, cancellationToken) ||
+                !HasAnyPermission(context, TenantAdminReportPermissions.Export) ||
+                !await CanViewExportTargetAsync(context, entry.Dto.ReportType, entry.Dto.Section, cancellationToken))
+            {
+                return ApplicationResult<ReportExportDto>.Failure(PermissionDenied);
+            }
+            
+            return ApplicationResult<ReportExportDto>.Success(entry.Dto);
+        }
+        
+        return ApplicationResult<ReportExportDto>.Failure(NotFound);
+    }
+
+        public async Task<ApplicationResult<byte[]>> DownloadExportAsync(
+        TenantRequestContext context,
+        Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        var error = ValidateCommonAccess(context);
+        if (error is not null) return ApplicationResult<byte[]>.Failure(error);
+        
+        CleanupExpiredJobs();
+        
+        if (ExportJobs.TryGetValue(jobId, out var entry) && entry.TenantId == context.TenantId && entry.UserId == context.UserId && entry.Data != null)
+        {
+            if (entry.Dto.ExpiresAt.HasValue && entry.Dto.ExpiresAt.Value < _clock.UtcNow)
+            {
+                ExportJobs.TryRemove(jobId, out _);
+                return ApplicationResult<byte[]>.Failure(NotFound);
+            }
+            
+            if (!await ReportFeaturePolicy.IsExportEnabledAsync(_entitlements, context.TenantId, _clock.UtcNow, cancellationToken) ||
+                !HasAnyPermission(context, TenantAdminReportPermissions.Export) ||
+                !await CanViewExportTargetAsync(context, entry.Dto.ReportType, entry.Dto.Section, cancellationToken))
+            {
+                return ApplicationResult<byte[]>.Failure(PermissionDenied);
+            }
+            
+            await _auditLogger.LogExportDownloadedAsync(context.TenantId, context.UserId, jobId, cancellationToken);
+            return ApplicationResult<byte[]>.Success(entry.Data);
+        }
+        
+        return ApplicationResult<byte[]>.Failure(NotFound);
+    }
+    
+    private void CleanupExpiredJobs()
+    {
+        if (ExportJobs.Count <= 100) return;
+        var expiredKeys = ExportJobs.Where(x => x.Value.Dto.ExpiresAt.HasValue && x.Value.Dto.ExpiresAt.Value < _clock.UtcNow).Select(x => x.Key).ToList();
+        foreach (var key in expiredKeys)
+        {
+            ExportJobs.TryRemove(key, out _);
         }
     }
+
 
     private static ApplicationError? ValidateCommonAccess(TenantRequestContext context) =>
         context.TenantId == Guid.Empty || context.UserId == Guid.Empty ? InvalidContext : null;
@@ -316,6 +407,16 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
     private static bool HasAnyPermission(TenantRequestContext context, params string[] permissions) =>
         permissions.Any(context.HasPermission);
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

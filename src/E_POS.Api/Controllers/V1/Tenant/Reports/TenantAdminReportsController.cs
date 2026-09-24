@@ -179,6 +179,18 @@ public sealed class TenantAdminReportsController : ControllerBase
         return ToActionResult(result);
     }
 
+    [HttpGet("exports/{jobId:guid}/download")]
+    public async Task<IActionResult> DownloadExport(Guid jobId, CancellationToken cancellationToken = default)
+    {
+        if (!TryContext(out var context, out var unauthorized)) return unauthorized;
+        var result = await _reportsService.DownloadExportAsync(context, jobId, cancellationToken);
+        if (!result.IsSuccess) return ToActionResult(result);
+        
+        var jobResult = await _reportsService.GetExportAsync(context, jobId, cancellationToken);
+        var fileName = jobResult.Value?.FileName ?? "export.csv";
+        return File(result.Value!, "text/csv", fileName);
+    }
+
     private bool TryContext(out TenantRequestContext context, out IActionResult unauthorized)
     {
         if (_tenantRequestContextFactory.TryCreate(User, out context!))
@@ -275,3 +287,5 @@ public sealed class TenantAdminReportsController : ControllerBase
     private static DateOnly? GetDate(JsonElement element, string name) =>
         DateOnly.TryParse(GetString(element, name), out var value) ? value : null;
 }
+
+

@@ -131,7 +131,7 @@ public sealed class ReportFoundationTests
                         .ReturnsAsync(true);
         var mockClock = new Moq.Mock<E_POS.Application.Common.Contracts.IDateTimeProvider>();
         mockClock.Setup(c => c.UtcNow).Returns(DateTimeOffset.UtcNow);
-        var service = new TenantAdminReportsService(new FakeReportsRepository(), mockEntitlements.Object, mockClock.Object);
+        var service = new TenantAdminReportsService(new FakeReportsRepository(), mockEntitlements.Object, mockClock.Object, new Mock<E_POS.Application.Modules.Tenant.Reports.Contracts.ITenantAdminReportsAuditLogger>().Object);
         var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [TenantAdminReportPermissions.SalesView]);
 
         var result = await service.CreateExportAsync(context, CreateExportRequest("sales", "transactions", "csv"), CancellationToken.None);
@@ -148,7 +148,7 @@ public sealed class ReportFoundationTests
                         .ReturnsAsync(true);
         var mockClock = new Moq.Mock<E_POS.Application.Common.Contracts.IDateTimeProvider>();
         mockClock.Setup(c => c.UtcNow).Returns(DateTimeOffset.UtcNow);
-        var service = new TenantAdminReportsService(new FakeReportsRepository(), mockEntitlements.Object, mockClock.Object);
+        var service = new TenantAdminReportsService(new FakeReportsRepository(), mockEntitlements.Object, mockClock.Object, new Mock<E_POS.Application.Modules.Tenant.Reports.Contracts.ITenantAdminReportsAuditLogger>().Object);
         var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [TenantAdminReportPermissions.Export, TenantAdminReportPermissions.SalesView]);
 
         var result = await service.CreateExportAsync(context, CreateExportRequest("sales", "transactions", "csv"), CancellationToken.None);
@@ -158,7 +158,8 @@ public sealed class ReportFoundationTests
         Assert.Equal("CSV", result.Value.Format);
         Assert.EndsWith(".csv", result.Value.FileName);
         Assert.DoesNotContain("..", result.Value.FileName);
-        Assert.Null(result.Value.DownloadUrl);
+        Assert.NotNull(result.Value.DownloadUrl);
+        Assert.Contains("/api/v1/tenant-admin/reports/exports/", result.Value.DownloadUrl);
     }
 
     private static ReportExportRequest CreateExportRequest(string reportType, string section, string format) =>
@@ -191,7 +192,7 @@ public sealed class ReportFoundationTests
             throw new NotSupportedException();
 
         public Task<ReportResultDto> GetSalesAsync(TenantRequestContext context, ReportQueryRequest request, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult(new ReportResultDto("transactions", "USD", "UTC", null, null, null, null, new List<IReadOnlyDictionary<string, object?>>(), null, DateTimeOffset.UtcNow));
 
         public Task<ReportResultDto> GetStockAsync(TenantRequestContext context, ReportQueryRequest request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
@@ -203,5 +204,12 @@ public sealed class ReportFoundationTests
             throw new NotSupportedException();
     }
 }
+
+
+
+
+
+
+
 
 

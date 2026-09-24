@@ -28,7 +28,8 @@ namespace E_POS.UnitTests.TenantAdminReports
             var entitlements = new Mock<ITenantFeatureEntitlementEvaluator>();
             var clock = new Mock<IDateTimeProvider>();
             clock.Setup(c => c.UtcNow).Returns(DateTimeOffset.UtcNow);
-            var service = new TenantAdminReportsService(repo.Object, entitlements.Object, clock.Object);
+            var auditMock = new Mock<E_POS.Application.Modules.Tenant.Reports.Contracts.ITenantAdminReportsAuditLogger>();
+            var service = new TenantAdminReportsService(repo.Object, entitlements.Object, clock.Object, auditMock.Object);
             return (service, entitlements, repo);
         }
 
@@ -58,6 +59,8 @@ namespace E_POS.UnitTests.TenantAdminReports
         [Fact] public async Task FilterOptions_YesEntitlement_YesPermission_Allowed() { var (svc, ent, repo) = CreateService(); ent.Setup(e => e.IsEnabledAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>())).ReturnsAsync(true); repo.Setup(r => r.GetFilterOptionsAsync(It.IsAny<TenantRequestContext>(), It.IsAny<ReportFilterOptionsRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(default(ReportFilterOptionsResponse)!); var result = await svc.GetFilterOptionsAsync(CreateContext(true), new ReportFilterOptionsRequest(null, null, null, null, null, "options", false, 1, 25), CancellationToken.None); Assert.True(result.IsSuccess); }
     }
 }
+
+
 
 
 
