@@ -189,7 +189,9 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         {
             "transactions" => await BuildTransactionsResultAsync(tenantInfo, section, request, orders, cancellationToken),
             "products" => await BuildProductSalesResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
-            "categories" => await BuildCategorySalesResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
+            "channels" => await BuildChannelSalesResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
+              "payment-transactions" => await BuildPaymentTransactionsResultAsync(tenantInfo, section, request, context, orderIds, cancellationToken),
+              "categories" => await BuildCategorySalesResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
             "payments" => await BuildPaymentResultAsync(tenantInfo, section, request, context, orderIds, cancellationToken),
             "tax" => await BuildTaxResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
             "discounts" => await BuildDiscountResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
@@ -524,19 +526,20 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         var records = page.Select(x =>
         {
             var lines = lineCounts.FirstOrDefault(l => l.Id == x.Id);
-            return Row(
-                ("orderId", x.Id), ("orderNumber", x.OrderNumber), ("externalReference", x.ExternalOrderReference),
-                ("businessDate", x.BusinessDate), ("placedAt", x.PlacedAt), ("completedAt", x.CompletedAt),
-                ("salesChannelId", x.SalesChannelId), ("salesChannelName", x.SalesChannelName),
-                ("outletId", x.ReportingOutletId), ("outletName", x.OutletName), ("tillId", x.TillId),
-                ("tillCode", x.TillCode), ("tillName", x.TillName), ("tillSessionId", x.TillSessionId),
-                ("cashierId", x.CashierId), ("cashierName", x.CashierName), ("customerId", x.CustomerId),
-                ("customerName", x.CustomerNameSnapshot), ("lineCount", lines?.Count ?? 0), ("totalQuantity", lines?.Qty ?? 0),
-                ("currencyCode", x.CurrencyCode), ("subtotalAmount", x.SubtotalAmount), ("discountAmount", x.DiscountAmount),
-                ("taxAmount", x.TaxAmount), ("chargeAmount", x.ChargeAmount), ("roundingAmount", x.RoundingAmount),
-                ("totalAmount", x.TotalAmount), ("paidAmount", x.PaidAmount), ("refundedAmount", x.RefundedAmount),
-                ("netAmount", x.TotalAmount - x.RefundedAmount), ("paymentMethodNames", paymentNames.GetValueOrDefault(x.Id, "")),
-                ("paymentStatus", x.PaymentStatus), ("fulfilmentStatus", x.FulfillmentStatus), ("orderStatus", x.OrderStatus));
+                        return new Dictionary<string, object?> {
+                { "orderId", x.Id }, { "orderNumber", x.OrderNumber }, { "externalReference", x.ExternalOrderReference },
+                { "businessDate", x.BusinessDate }, { "placedAt", x.PlacedAt }, { "paidAt", x.CompletedAt },
+                { "salesChannelId", x.SalesChannelId }, { "salesChannelName", x.SalesChannelName },
+                { "outletId", x.ReportingOutletId }, { "outletName", x.OutletName }, { "tillId", x.TillId },
+                { "tillCode", x.TillCode }, { "tillName", x.TillName }, { "tillSessionId", x.TillSessionId },
+                { "cashierId", x.CashierId }, { "cashierName", x.CashierName }, { "customerId", x.CustomerId },
+                { "customerName", x.CustomerNameSnapshot }, { "lineCount", lines?.Count ?? 0 }, { "totalQuantity", lines?.Qty ?? 0 },
+                { "currencyCode", x.CurrencyCode }, { "subtotalAmount", x.SubtotalAmount }, { "discountAmount", x.DiscountAmount },
+                { "taxAmount", x.TaxAmount }, { "chargeAmount", x.ChargeAmount }, { "roundingAmount", x.RoundingAmount },
+                { "totalAmount", x.TotalAmount }, { "paidAmount", x.PaidAmount }, { "refundedAmount", x.RefundedAmount },
+                { "netAmount", x.TotalAmount - x.RefundedAmount }, { "paymentMethodNames", paymentNames.GetValueOrDefault(x.Id, "") },
+                { "paymentStatus", x.PaymentStatus }, { "fulfilmentStatus", x.FulfillmentStatus }, { "orderStatus", x.OrderStatus }
+            };
         }).ToList();
         return Result(tenantInfo, section, request, BuildSalesSummary(page), records, total);
     }
@@ -561,6 +564,33 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         return Result(tenantInfo, section, request, new Dictionary<string, object?>(), records, records.Count);
     }
 
+        private async Task<ReportResultDto> BuildChannelSalesResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, Guid tenantId, List<Guid> orderIds, CancellationToken cancellationToken)
+    {
+        var rows = await (from order in _dbContext.SalesOrders.AsNoTracking()
+                          join channel in _dbContext.SalesChannels.AsNoTracking() on order.SalesChannelId equals channel.Id
+                          where order.TenantId == tenantId && orderIds.Contains(order.Id)
+                          group order by new { order.SalesChannelId, channel.CustomName } into g
+                          select new { g.Key, Count = g.Count(), Gross = g.Sum(x => x.SubtotalAmount), Discount = g.Sum(x => x.DiscountAmount), Tax = g.Sum(x => x.TaxAmount), Refund = g.Sum(x => x.RefundedAmount), Total = g.Sum(x => x.TotalAmount) })
+            .ToListAsync(cancellationToken);
+        
+        var total = rows.Sum(x => x.Total - x.Refund);
+        var records = rows.Select(x => Row(("salesChannelName", x.Key.CustomName), ("saleCount", x.Count), ("salesExcludingTax", x.Gross - x.Discount), ("taxAmount", x.Tax), ("salesIncludingTax", x.Total), ("netAmount", x.Total - x.Refund), ("currencyCode", tenantInfo.CurrencyCode))).ToList();
+        
+        return Result(tenantInfo, section, request, new Dictionary<string, object?>(), records, records.Count);
+    }
+    private async Task<ReportResultDto> BuildPaymentTransactionsResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, TenantRequestContext context, List<Guid> orderIds, CancellationToken cancellationToken)
+    {
+        var rows = await (from payment in _dbContext.SalesPayments.AsNoTracking()
+                          join method in _dbContext.PaymentMethods.AsNoTracking() on payment.PaymentMethodId equals method.Id
+                          join order in _dbContext.SalesOrders.AsNoTracking() on payment.SalesOrderId equals order.Id
+                          where payment.TenantId == context.TenantId && orderIds.Contains(payment.SalesOrderId)
+                          select new { payment.Id, order.OrderNumber, method.MethodName, payment.RequestedAmount, payment.TenderedAmount, payment.ChangeAmount, payment.PaidAmount, payment.PaymentStatus, payment.PaidAt })
+            .ToListAsync(cancellationToken);
+        
+        var records = rows.Select(x => new Dictionary<string, object?> { { "paymentId", x.Id }, { "orderNumber", x.OrderNumber }, { "paymentMethodName", x.MethodName }, { "requestedAmount", x.RequestedAmount }, { "tenderedAmount", x.TenderedAmount }, { "changeAmount", x.ChangeAmount }, { "paidAmount", x.PaidAmount }, { "paymentStatus", x.PaymentStatus }, { "paidAt", x.PaidAt }, { "currencyCode", tenantInfo.CurrencyCode } }).ToList();
+        
+        return Result(tenantInfo, section, request, new Dictionary<string, object?>(), records, records.Count);
+    }
     private async Task<ReportResultDto> BuildCategorySalesResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, Guid tenantId, List<Guid> orderIds, CancellationToken cancellationToken)
     {
         var rows = await _dbContext.SalesOrderLines.AsNoTracking()
@@ -926,6 +956,17 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         public string? InternalNote { get; init; }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

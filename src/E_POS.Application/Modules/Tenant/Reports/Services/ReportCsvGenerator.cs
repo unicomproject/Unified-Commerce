@@ -17,9 +17,14 @@ namespace E_POS.Application.Modules.Tenant.Reports.Services
             "orderId", "orderNumber", "externalReference", "businessDate", "placedAt", "completedAt", "salesChannelId", "salesChannelName", "outletId", "outletName", "tillId", "tillCode", "tillName", "tillSessionId", "cashierId", "cashierName", "customerId", "customerName", "lineCount", "totalQuantity", "currencyCode", "subtotalAmount", "discountAmount", "taxAmount", "chargeAmount", "roundingAmount", "totalAmount", "paidAmount", "refundedAmount", "netAmount", "paymentMethodNames", "paymentStatus", "fulfilmentStatus", "orderStatus"
         };
         
-        private static readonly IReadOnlyList<string> SalesByChannelColumns = new[]
+        private static readonly IReadOnlyList<string> CategorySalesColumns = new[]
         {
             "departmentName", "categoryName", "subcategoryName", "quantitySold", "quantityReturned", "grossSalesAmount", "discountAmount", "refundAmount", "netSalesAmount", "transactionCount", "percentageOfTotal", "currencyCode"
+        };
+        
+        private static readonly IReadOnlyList<string> SalesByChannelColumns = new[]
+        {
+            "salesChannelName", "saleCount", "salesExcludingTax", "taxAmount", "salesIncludingTax", "netAmount", "currencyCode"
         };
         
         private static readonly IReadOnlyList<string> TaxBreakdownColumns = new[]
@@ -147,9 +152,11 @@ namespace E_POS.Application.Modules.Tenant.Reports.Services
             if (type == "sales")
             {
                 if (sec == "transactions") return SalesTransactionsColumns;
-                if (sec == "channels" || sec == "categories") return SalesByChannelColumns;
+                if (sec == "channels") return SalesByChannelColumns;
+                if (sec == "categories") return CategorySalesColumns;
                 if (sec == "tax") return TaxBreakdownColumns;
-                if (sec == "payments-method" || sec == "payments") return PaymentsByMethodColumns;
+                if (sec == "payments") return PaymentsByMethodColumns;
+                if (sec == "payment-transactions") return PaymentTransactionsColumns;
                 if (sec == "online") return OnlineOrdersColumns;
                 if (sec == "collections") return OutstandingCollectionsColumns;
                 if (sec == "returns") return ReturnsRefundsColumns;
@@ -188,5 +195,7 @@ namespace E_POS.Application.Modules.Tenant.Reports.Services
         }
     }
 }
+
+
 
 
