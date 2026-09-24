@@ -11,6 +11,7 @@ using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Domain.Modules.Tenant.Inventory.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Services;
@@ -36,6 +37,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
     private readonly ITenantExternalCategoryResolver _tenantExternalCategoryResolver;
     private readonly ITenantExternalBrandResolver? _tenantExternalBrandResolver;
     private readonly IReadOnlySet<string> _allowedExternalMappingProviders;
+    private readonly ILogger<TenantAdminProductService>? _logger;
 
     public TenantAdminProductService(
         IProductRepository productRepository,
@@ -48,7 +50,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         IExternalProductLookupCoordinator externalProductLookupCoordinator,
         ITenantExternalCategoryResolver tenantExternalCategoryResolver,
         ITenantExternalBrandResolver? tenantExternalBrandResolver = null,
-        IOptions<ExternalProductLookupOptions>? externalProductLookupOptions = null)
+        IOptions<ExternalProductLookupOptions>? externalProductLookupOptions = null,
+        ILogger<TenantAdminProductService>? logger = null)
     {
         _productRepository = productRepository;
         _tenantAdminProductRepository = tenantAdminProductRepository;
@@ -62,6 +65,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         _tenantExternalBrandResolver = tenantExternalBrandResolver;
         _allowedExternalMappingProviders =
             (externalProductLookupOptions?.Value ?? new ExternalProductLookupOptions()).GetConfiguredProviderNames();
+        _logger = logger;
     }
 
     public async Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
@@ -2429,7 +2433,22 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                     lookupResult.Suggestion.ExternalCategoryName,
                     lookupResult.Suggestion.ExternalCategoryHierarchy);
 
-                categoryResolution = await _tenantExternalCategoryResolver.ResolveAsync(categoryResolutionRequest, cancellationToken);
+                // Category mapping is a best-effort enrichment of an already-successful external lookup.
+                // A failure here (e.g. schema drift, transient DB issue) must not turn a found product
+                // into a hard error for the caller — fall back to no mapping/suggestions instead.
+                try
+                {
+                    categoryResolution = await _tenantExternalCategoryResolver.ResolveAsync(categoryResolutionRequest, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger?.LogWarning(
+                        ex,
+                        "Tenant category resolution failed for Tenant={TenantId}, Provider={Provider}, Key={Key}. Returning lookup result without category mapping.",
+                        context.TenantId,
+                        provider,
+                        lookupResult.Suggestion.ExternalCategoryKey);
+                }
             }
 
             // Brand resolution only runs when the winning provider result carries a meaningful
@@ -2449,7 +2468,24 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                         externalBrandKey,
                         primaryBrandSegment);
 
-                    brandResolution = await _tenantExternalBrandResolver.ResolveAsync(brandResolutionRequest, cancellationToken);
+                    // Same rationale as category resolution above: brand mapping is best-effort
+                    // enrichment. Notably, this also protects against the external_brand_mappings
+                    // table being absent on an environment where its migration has not yet run —
+                    // the caller still gets the found product with no brand mapping/suggestions
+                    // (Quick Add Brand remains available) instead of an unhandled 500.
+                    try
+                    {
+                        brandResolution = await _tenantExternalBrandResolver.ResolveAsync(brandResolutionRequest, cancellationToken);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger?.LogWarning(
+                            ex,
+                            "Tenant brand resolution failed for Tenant={TenantId}, Provider={Provider}, Key={Key}. Returning lookup result without brand mapping.",
+                            context.TenantId,
+                            provider,
+                            externalBrandKey);
+                    }
                 }
             }
         }

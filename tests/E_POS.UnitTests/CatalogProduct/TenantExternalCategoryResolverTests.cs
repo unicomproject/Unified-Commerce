@@ -111,7 +111,7 @@ public sealed class TenantExternalCategoryResolverTests
         // Active category should be suggested instead
         Assert.Single(result.Suggestions);
         Assert.Equal(activeCategoryId, result.Suggestions[0].Id);
-        Assert.Equal("EXACT", result.Suggestions[0].MatchType);
+        Assert.Equal("LEAF_EXACT", result.Suggestions[0].MatchType);
     }
 
     [Fact]
@@ -147,7 +147,7 @@ public sealed class TenantExternalCategoryResolverTests
         Assert.Null(result.MappedCategory);
         Assert.Single(result.Suggestions);
         Assert.Equal(categoryId, result.Suggestions[0].Id);
-        Assert.Equal("EXACT", result.Suggestions[0].MatchType);
+        Assert.Equal("LEAF_EXACT", result.Suggestions[0].MatchType);
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public sealed class TenantExternalCategoryResolverTests
         Assert.Null(result.MappedCategory);
         Assert.Single(result.Suggestions);
         Assert.Equal(categoryId, result.Suggestions[0].Id);
-        Assert.Equal("NORMALIZED", result.Suggestions[0].MatchType);
+        Assert.Equal("LEAF_NORMALIZED", result.Suggestions[0].MatchType);
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public sealed class TenantExternalCategoryResolverTests
         Assert.Null(result.MappedCategory);
         Assert.Single(result.Suggestions);
         Assert.Equal(categoryId, result.Suggestions[0].Id);
-        Assert.Equal("SIMILARITY", result.Suggestions[0].MatchType);
+        Assert.Equal("LEAF_SIMILARITY", result.Suggestions[0].MatchType);
     }
 
     [Fact]
@@ -312,6 +312,362 @@ public sealed class TenantExternalCategoryResolverTests
 
         Assert.Null(result.MappedCategory);
         Assert.Empty(result.Suggestions);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_AccentedExternalCategoryVsUnaccentedTenantCategory_ReturnsNormalizedSuggestion()
+    {
+        // Regression test mirroring the Brand-side diacritic fix: an accented external category
+        // display name should match an unaccented tenant category name at the NORMALIZED tier.
+        var categoryId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            categoryId, "CAT-CAFE", "Cafe", null, 1, "Cafe", false, 0));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo,
+            productRepo,
+            NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var request = new TenantCategoryResolutionRequest(
+            TenantA,
+            "openfoodfacts",
+            "en:cafe",
+            "Café");
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Null(result.MappedCategory);
+        Assert.Single(result.Suggestions);
+        Assert.Equal(categoryId, result.Suggestions[0].Id);
+        Assert.Equal("LEAF_NORMALIZED", result.Suggestions[0].MatchType);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_RealBarcode7613032655495InstantCoffeeCategory_NoTenantCategoryTextuallyMatches_ReturnsZeroSuggestions()
+    {
+        // Regression fixture for real barcode 7613032655495 (Nestlé Ricoré instant coffee substitute).
+        // OpenFoodFacts' leaf category name/key have no textual/token overlap with a generic grocery
+        // tenant catalogue (Beverages, Groceries, Snacks, ...). This is a genuine weak semantic gap —
+        // not a resolver bug — and the resolver must not force an auto-map in this situation.
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            Guid.NewGuid(), "BEVERAGES", "Beverages", null, 1, "Beverages", false, 0));
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            Guid.NewGuid(), "GROCERIES", "Groceries", null, 1, "Groceries", false, 1));
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            Guid.NewGuid(), "SNACKS", "Snacks", null, 1, "Snacks", false, 2));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo,
+            productRepo,
+            NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var request = new TenantCategoryResolutionRequest(
+            TenantA,
+            "openfoodfacts",
+            "en:instant-mix-of-chicory-and-coffee-powder",
+            "Chicorée et café en poudre soluble");
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Null(result.MappedCategory);
+        Assert.Empty(result.Suggestions);
+    }
+
+    // --- Category hierarchy-aware resolver enhancement ---------------------------------------
+    // Real-shape fixture: OpenFoodFacts Coca-Cola can (barcode 5449000000996).
+    // categories_hierarchy = [en:beverages-and-beverages-preparations, en:beverages,
+    //   en:non-alcoholic-beverages, en:carbonated-drinks, en:soft-drinks, en:sodas, en:colas].
+    // Leaf ExternalCategoryName is "Colas"; tenant only has a generic "Beverages" category, which
+    // has no textual overlap with "Colas" and was therefore never suggested before this enhancement.
+
+    private static readonly IReadOnlyList<string> CocaColaHierarchy = new[]
+    {
+        "en:beverages-and-beverages-preparations",
+        "en:beverages",
+        "en:non-alcoholic-beverages",
+        "en:carbonated-drinks",
+        "en:soft-drinks",
+        "en:sodas",
+        "en:colas",
+    };
+
+    [Fact]
+    public async Task ResolveAsync_RealCocaColaHierarchy_TenantHasOnlyBeverages_ReturnsHierarchyExactSuggestion()
+    {
+        // Required real-shape regression (§24 of the hierarchy-aware resolver spec).
+        var beveragesId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            beveragesId, "BEVERAGES", "Beverages", null, 1, "Beverages", false, 0));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Colas", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        // §6/§10: a hierarchy match is a suggestion only, never auto-selected/persisted.
+        Assert.Null(result.MappedCategory);
+        Assert.Single(result.Suggestions);
+        Assert.Equal(beveragesId, result.Suggestions[0].Id);
+        Assert.Equal("Beverages", result.Suggestions[0].Name);
+        Assert.Equal("HIERARCHY_EXACT", result.Suggestions[0].MatchType);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_HierarchyMatch_DoesNotSuggestUnrelatedBroadCategory()
+    {
+        // §20/§6: textual hierarchy matching only — a tenant category that is broadly related in
+        // meaning ("Food") but never actually appears as hierarchy text must NOT be suggested.
+        var beveragesId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            beveragesId, "BEVERAGES", "Beverages", null, 1, "Beverages", false, 0));
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            Guid.NewGuid(), "FOOD", "Food", null, 1, "Food", false, 1));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Colas", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Single(result.Suggestions);
+        Assert.Equal(beveragesId, result.Suggestions[0].Id);
+        Assert.DoesNotContain(result.Suggestions, s => s.Name == "Food");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_HierarchyNormalizedMatch_PunctuationDifference_ReturnsHierarchyNormalizedSuggestion()
+    {
+        var softDrinksId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        // Tenant category has punctuation the raw hierarchy tag doesn't ("Soft-Drinks" vs "en:soft-drinks"
+        // deriving to "soft drinks" — matches only after StripPunctuation, not raw equality).
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            softDrinksId, "CAT-SOFT-DRINKS", "Soft-Drinks!", null, 1, "Soft-Drinks!", false, 0));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        // Leaf is "Colas" (no textual relation to "Soft-Drinks!"), so only the hierarchy tier can match.
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Colas", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Single(result.Suggestions);
+        Assert.Equal(softDrinksId, result.Suggestions[0].Id);
+        Assert.Equal("HIERARCHY_NORMALIZED", result.Suggestions[0].MatchType);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_HierarchyDiacriticMatch_ReturnsHierarchyNormalizedSuggestion()
+    {
+        // Accent-folding parity for hierarchy nodes (§19), mirroring the Brand/leaf-category fix.
+        var cafeId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            cafeId, "CAT-CAFE", "Cafe", null, 1, "Cafe", false, 0));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var hierarchy = new[] { "en:beverages", "en:café" };
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:instant-coffees", "Instant Coffees", hierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Single(result.Suggestions);
+        Assert.Equal(cafeId, result.Suggestions[0].Id);
+        Assert.Equal("HIERARCHY_NORMALIZED", result.Suggestions[0].MatchType);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_MultipleHierarchyMatches_ReturnsDeepestFirst_UpToMax3()
+    {
+        // §7: deepest/most-specific tenant category match must be returned first.
+        var beveragesId = Guid.NewGuid();
+        var carbonatedId = Guid.NewGuid();
+        var sodasId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            beveragesId, "BEVERAGES", "Beverages", null, 1, "Beverages", false, 0));
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            carbonatedId, "CARBONATED", "Carbonated Drinks", null, 1, "Carbonated Drinks", false, 1));
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            sodasId, "SODAS", "Sodas", null, 1, "Sodas", false, 2));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        // Leaf is "Colas" (no tenant category named Colas), so all 3 matches come from the hierarchy.
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Colas", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Equal(3, result.Suggestions.Count);
+        Assert.Equal(sodasId, result.Suggestions[0].Id);
+        Assert.Equal(carbonatedId, result.Suggestions[1].Id);
+        Assert.Equal(beveragesId, result.Suggestions[2].Id);
+        Assert.All(result.Suggestions, s => Assert.Equal("HIERARCHY_EXACT", s.MatchType));
+    }
+
+    [Fact]
+    public async Task ResolveAsync_HierarchyMatch_ExcludesInactiveCategory()
+    {
+        // §9: only ACTIVE/selectable tenant categories may be suggested via hierarchy matching.
+        var inactiveId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            inactiveId, "BEVERAGES", "Beverages", null, 1, "Beverages", false, 0));
+        productRepo.SetCategorySelectable(TenantA, inactiveId, false);
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Colas", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Empty(result.Suggestions);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SavedMapping_StillWinsOverHierarchyMatch()
+    {
+        // §10: a saved mapping to one category must not be displaced just because a hierarchy node
+        // also matches a different tenant category.
+        var mappedId = Guid.NewGuid();
+        var beveragesId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        mappingRepo.Add(ExternalCategoryMapping.Create(
+            Guid.NewGuid(), TenantA, "openfoodfacts", "en:colas", "Colas",
+            mappedId, "PRODUCT_CONFIRMED", null, DateTimeOffset.UtcNow));
+
+        var productRepo = new FakeProductRepository();
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            mappedId, "CAT-SOFT-DRINKS", "Soft Drinks", null, 1, "Soft Drinks", false, 0));
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            beveragesId, "BEVERAGES", "Beverages", null, 1, "Beverages", false, 1));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Colas", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.NotNull(result.MappedCategory);
+        Assert.Equal(mappedId, result.MappedCategory!.Id);
+        Assert.Empty(result.Suggestions);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_LeafExactMatch_RanksBeforeHierarchyMatch_AndBothAppear()
+    {
+        // §8: leaf tiers are stronger than hierarchy tiers and must be ordered first.
+        var colasId = Guid.NewGuid();
+        var beveragesId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            colasId, "CAT-COLAS", "Colas", null, 1, "Colas", false, 0));
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            beveragesId, "BEVERAGES", "Beverages", null, 1, "Beverages", false, 1));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Colas", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Equal(2, result.Suggestions.Count);
+        Assert.Equal(colasId, result.Suggestions[0].Id);
+        Assert.Equal("LEAF_EXACT", result.Suggestions[0].MatchType);
+        Assert.Equal(beveragesId, result.Suggestions[1].Id);
+        Assert.Equal("HIERARCHY_EXACT", result.Suggestions[1].MatchType);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_HierarchyExactMatch_DedupesAgainstWeakerLeafSimilarityMatch()
+    {
+        // §8: a category matched by both a strong hierarchy tier and a weaker leaf tier must be
+        // returned exactly once, tagged with the stronger match type.
+        var beveragesId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            beveragesId, "BEVERAGES", "Beverages", null, 1, "Beverages", false, 0));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        // Leaf name "Drinks And Beverages" token-overlaps "Beverages" (LEAF_SIMILARITY), while the
+        // hierarchy also contains "en:beverages" (HIERARCHY_EXACT) for the very same tenant category.
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Drinks And Beverages", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Single(result.Suggestions);
+        Assert.Equal(beveragesId, result.Suggestions[0].Id);
+        Assert.Equal("HIERARCHY_EXACT", result.Suggestions[0].MatchType);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_HierarchySimilarityMatch_ConservativeTokenOverlap()
+    {
+        var carbonatedId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        // Tenant's category name is a near-variant ("Carbonated Drink", singular) of the hierarchy
+        // node "en:carbonated-drinks" -> "carbonated drinks" — token overlap, not an exact/normalized match.
+        productRepo.AddSelectableCategory(TenantA, new TenantAdminProductCategoryOptionResponse(
+            carbonatedId, "CAT-CARB", "Carbonated Drink", null, 1, "Carbonated Drink", false, 0));
+
+        var resolver = new TenantExternalCategoryResolver(
+            mappingRepo, productRepo, NullLogger<TenantExternalCategoryResolver>.Instance);
+
+        var request = new TenantCategoryResolutionRequest(
+            TenantA, "openfoodfacts", "en:colas", "Colas", CocaColaHierarchy);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Single(result.Suggestions);
+        Assert.Equal(carbonatedId, result.Suggestions[0].Id);
+        Assert.Equal("HIERARCHY_SIMILARITY", result.Suggestions[0].MatchType);
     }
 
     private sealed class FakeMappingRepository : IExternalCategoryMappingRepository

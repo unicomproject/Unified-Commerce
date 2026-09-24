@@ -223,6 +223,42 @@ public sealed class TenantExternalBrandResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_AccentedExternalBrandVsUnaccentedTenantBrand_ReturnsNormalizedSuggestion()
+    {
+        // Regression test for real barcode 7613032655495 (OpenFoodFacts "Nestlé, Ricore, Ricoré"):
+        // ExternalBrandKeyDeriver takes the primary segment "Nestlé" as-is (accented). Before the
+        // diacritic-folding fix, BrandConstants.NormalizeNameForComparison only lowercased the text,
+        // so "nestlé" never matched a tenant brand stored as "nestle" at any tier (EXACT, NORMALIZED,
+        // or SIMILARITY) even though they are the same brand — Quick Add Brand was shown despite a
+        // real match existing. EXACT intentionally stays byte-for-byte strict; the accent-insensitive
+        // equivalence now surfaces as a NORMALIZED suggestion instead.
+        var brandId = Guid.NewGuid();
+        var mappingRepo = new FakeMappingRepository();
+        var productRepo = new FakeProductRepository();
+
+        productRepo.AddSelectableBrand(TenantA, new TenantAdminProductBrandOptionResponse(
+            brandId, "nestle", "NESTLE- BEVERAGE"));
+
+        var resolver = new TenantExternalBrandResolver(
+            mappingRepo,
+            productRepo,
+            NullLogger<TenantExternalBrandResolver>.Instance);
+
+        var request = new TenantBrandResolutionRequest(
+            TenantA,
+            "openfoodfacts",
+            "nestle",
+            "Nestlé");
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Null(result.MappedBrand);
+        Assert.Single(result.Suggestions);
+        Assert.Equal(brandId, result.Suggestions[0].Id);
+        Assert.Equal("NORMALIZED", result.Suggestions[0].MatchType);
+    }
+
+    [Fact]
     public async Task ResolveAsync_UnrelatedBrands_ReturnsZeroSuggestions()
     {
         var mappingRepo = new FakeMappingRepository();

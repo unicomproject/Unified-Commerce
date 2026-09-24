@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
@@ -202,7 +204,7 @@ public sealed class TenantExternalBrandResolver : ITenantExternalBrandResolver
         var parts = text.Split(new[] { ' ', '-', '_', ',', '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var part in parts)
         {
-            var clean = part.Trim().ToLowerInvariant();
+            var clean = RemoveDiacritics(part.Trim().ToLowerInvariant());
             if (clean.Length >= 3 && !StopWords.Contains(clean))
             {
                 tokens.Add(clean);
@@ -215,7 +217,30 @@ public sealed class TenantExternalBrandResolver : ITenantExternalBrandResolver
     private static string StripPunctuation(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return string.Empty;
-        var chars = text.Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray();
+        var chars = RemoveDiacritics(text).Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray();
         return string.Join(" ", new string(chars).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)).Trim();
+    }
+
+    /// <summary>
+    /// Folds accented/diacritic characters to their base ASCII-ish form (e.g. "Nestlé" -> "Nestle") so
+    /// provider free-text brand names compare equal to tenant brand names that were entered without
+    /// accents. Deliberately applied only at the NORMALIZED/SIMILARITY tiers (not EXACT), so an exact,
+    /// byte-for-byte tenant brand name match is never conflated with an accent-insensitive one.
+    /// </summary>
+    private static string RemoveDiacritics(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+
+        var decomposed = text.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(decomposed.Length);
+        foreach (var c in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(c);
+            }
+        }
+
+        return builder.ToString().Normalize(NormalizationForm.FormC);
     }
 }

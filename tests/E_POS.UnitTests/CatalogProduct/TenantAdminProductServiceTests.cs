@@ -838,6 +838,65 @@ public sealed partial class TenantAdminProductServiceTests
     }
 
     [Fact]
+    public async Task ExternalLookupBarcodeAsync_BrandResolverThrows_ReturnsSuccessWithNullBrandResolution()
+    {
+        // Regression test for Problem B: barcode 7613032655495 (Nestlé Ricoré) previously turned into
+        // an unhandled 500 "An unexpected error occurred." because ExternalBrandMappingRepository.GetAsync
+        // hit external_brand_mappings before its migration was applied to the persistent DB
+        // (Npgsql.PostgresException 42P01: relation "external_brand_mappings" does not exist), and that
+        // exception was never caught inside ExternalLookupBarcodeAsync. Brand mapping is best-effort
+        // enrichment of an already-successful lookup — a resolver failure must not fail the whole
+        // response; the category resolution and product suggestion must still come back to the caller.
+        var repository = new FakeTenantAdminProductRepository();
+        var categoryCandidateId = Guid.NewGuid();
+        var suggestion = new ExternalProductSuggestion(
+            "Chicorée & Café, RICORÉ® L'Original, Boîte de 260g", "Café chicorée solubles et fibres de chicorée",
+            "Nestlé, Ricore, Ricoré", "Chicorée et café en poudre soluble", "260 g", "FRANCE",
+            "short", "long", "https://images.openfoodfacts.org/x.jpg", "7613032655495", "GTIN13",
+            ExternalCategoryKey: "en:instant-mix-of-chicory-and-coffee-powder");
+
+        var coordinator = new FakeExternalProductLookupCoordinator
+        {
+            Result = new ExternalProductLookupResult(
+                ExternalProductLookupStatuses.Found, suggestion, "openfoodfacts", false,
+                SourceProvider: "openfoodfacts", RetrievalSource: ExternalProductLookupRetrievalSources.Provider),
+        };
+
+        var categoryResolver = new FakeTenantExternalCategoryResolver
+        {
+            Result = new TenantCategoryResolutionResult(
+                "openfoodfacts", "en:instant-mix-of-chicory-and-coffee-powder", "Chicorée et café en poudre soluble",
+                new TenantCategoryCandidate(categoryCandidateId, "Beverages", "BEVERAGES"),
+                Array.Empty<TenantCategorySuggestionItem>()),
+        };
+
+        var brandResolver = new FakeTenantExternalBrandResolver
+        {
+            ThrowException = new InvalidOperationException(
+                "42P01: relation \"external_brand_mappings\" does not exist"),
+        };
+
+        var service = CreateService(
+            repository,
+            coordinator,
+            tenantExternalCategoryResolver: categoryResolver,
+            tenantExternalBrandResolver: brandResolver);
+
+        var result = await service.ExternalLookupBarcodeAsync(
+            CreateContext([ProductConstants.CreatePermission]),
+            new ExternalLookupProductBarcodeRequest { Barcode = "7613032655495" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ExternalProductLookupStatuses.Found, result.Value!.Status);
+        Assert.NotNull(result.Value.Suggestion);
+        Assert.NotNull(result.Value.CategoryResolution);
+        Assert.Equal(categoryCandidateId, result.Value.CategoryResolution!.MappedCategory!.Id);
+        Assert.Null(result.Value.BrandResolution);
+        Assert.Equal(1, brandResolver.CallCount);
+    }
+
+    [Fact]
     public async Task ExternalLookupBarcodeAsync_NoMatch_DoesNotInvokeBrandResolver_BrandResolutionNull()
     {
         var repository = new FakeTenantAdminProductRepository();
@@ -2974,6 +3033,7 @@ public sealed partial class TenantAdminProductServiceTests
         public TenantCategoryResolutionRequest? LastRequest { get; private set; }
         public TenantCategoryResolutionResult Result { get; set; } =
             new("openfoodfacts", null, null, null, Array.Empty<TenantCategorySuggestionItem>());
+        public Exception? ThrowException { get; set; }
 
         public Task<TenantCategoryResolutionResult> ResolveAsync(
             TenantCategoryResolutionRequest request,
@@ -2981,6 +3041,10 @@ public sealed partial class TenantAdminProductServiceTests
         {
             CallCount++;
             LastRequest = request;
+            if (ThrowException is not null)
+            {
+                throw ThrowException;
+            }
             return Task.FromResult(Result);
         }
     }
@@ -2991,6 +3055,7 @@ public sealed partial class TenantAdminProductServiceTests
         public TenantBrandResolutionRequest? LastRequest { get; private set; }
         public TenantBrandResolutionResult Result { get; set; } =
             new("openfoodfacts", null, null, null, Array.Empty<TenantBrandSuggestionItem>());
+        public Exception? ThrowException { get; set; }
 
         public Task<TenantBrandResolutionResult> ResolveAsync(
             TenantBrandResolutionRequest request,
@@ -2998,6 +3063,10 @@ public sealed partial class TenantAdminProductServiceTests
         {
             CallCount++;
             LastRequest = request;
+            if (ThrowException is not null)
+            {
+                throw ThrowException;
+            }
             return Task.FromResult(Result);
         }
     }
