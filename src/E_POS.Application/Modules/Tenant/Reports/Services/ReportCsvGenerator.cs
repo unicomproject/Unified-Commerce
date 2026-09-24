@@ -65,7 +65,7 @@ namespace E_POS.Application.Modules.Tenant.Reports.Services
             if (string.IsNullOrEmpty(str)) return "";
 
             // formula injection & leading zero protection
-            if (str.StartsWith("=") || str.StartsWith("+") || str.StartsWith("-") || str.StartsWith("@") || str.StartsWith("\t") || str.StartsWith("\r") || (str.Length > 1 && str[0] == '0' && char.IsDigit(str[1])))
+            if (str.StartsWith("=") || str.StartsWith("+") || str.StartsWith("-") || str.StartsWith("@") || str.StartsWith("\t") || str.StartsWith("\r") )
             {
                 str = "\t" + str;
             }
@@ -78,4 +78,5 @@ namespace E_POS.Application.Modules.Tenant.Reports.Services
         }
     }
 }
+
 

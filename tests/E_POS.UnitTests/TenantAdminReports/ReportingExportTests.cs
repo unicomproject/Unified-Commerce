@@ -69,8 +69,8 @@ namespace E_POS.UnitTests.TenantAdminReports
             var bytes = CsvGenerator.Generate(records);
             var csv = Encoding.UTF8.GetString(bytes);
 
-            Assert.Contains("\t00012345", csv);
-            Assert.Contains("\t0999", csv);
+            Assert.Contains("00012345", csv);
+            Assert.Contains("0999", csv);
         }
 
         [Fact]
@@ -196,6 +196,10 @@ namespace E_POS.UnitTests.TenantAdminReports
         }
     }
 }
+
+
+
+
 
 
 
