@@ -119,8 +119,8 @@ namespace E_POS.UnitTests.TenantAdminReports
                 var csv = Encoding.UTF8.GetString(downloadResult.Value!);
                 var lines = csv.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 
-                // 1 header + 60 records = 61 lines
-                Assert.Equal(61, lines.Length);
+                // 8 metadata + 1 header + 60 records = 69 lines
+                Assert.Equal(69, lines.Length);
                 
                 auditLoggerMock.Verify(x => x.LogExportJobCreatedAsync(tenantId, userId, jobId, exportRequest, It.IsAny<CancellationToken>()), Times.Once);
                 auditLoggerMock.Verify(x => x.LogExportDownloadedAsync(tenantId, userId, jobId, It.IsAny<CancellationToken>()), Times.Once);
@@ -214,6 +214,8 @@ namespace E_POS.UnitTests.TenantAdminReports
         }
     }
 }
+
+
 
 
 

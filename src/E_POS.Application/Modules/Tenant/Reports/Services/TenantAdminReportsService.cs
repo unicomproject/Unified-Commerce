@@ -233,7 +233,15 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             return ApplicationResult<ReportExportDto>.Failure(NotFound);
         }
 
-        var csvBytes = CsvGenerator.Generate(reportResult.Records, request.ReportType, request.Section);
+        byte[] csvBytes;
+        try
+        {
+            csvBytes = CsvGenerator.Generate(request, reportResult, context, _clock);
+        }
+        catch (ApplicationException ex)
+        {
+            return ApplicationResult<ReportExportDto>.Failure(new ApplicationError("reports.unsupported_section", ex.Message));
+        }
 
         var now = DateTimeOffset.UtcNow;
         var jobId = Guid.NewGuid();

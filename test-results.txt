@@ -1,0 +1,15 @@
+13. FOCUSED TESTS (ReportingExport)
+Passed!  - Failed:     0, Passed:    11, Skipped:     0, Total:    11, Duration: 3 s - E_POS.UnitTests.dll (net10.0)
+14. P3-A REGRESSION TESTS
+Passed!  - Failed:     0, Passed:    20, Skipped:     0, Total:    20, Duration: 3 s - E_POS.UnitTests.dll (net10.0)
+Passed!  - Failed:     0, Passed:    15, Skipped:     0, Total:    15, Duration: 169 ms - E_POS.UnitTests.dll (net10.0)
+15. ALL REPORTING TESTS
+Passed!  - Failed:     0, Passed:    46, Skipped:     0, Total:    46, Duration: 3 s - E_POS.UnitTests.dll (net10.0)
+16. FULL UNIT SUITE
+Failed!  - Failed:     4, Passed:  2192, Skipped:     0, Total:  2196, Duration: 5 s - E_POS.UnitTests.dll (net10.0)
+17. BUILD ALL RELEVANT PROJECTS
+Domain: Build succeeded.
+Application: Build succeeded.
+Infrastructure: Build succeeded.
+Api: Build succeeded.
+UnitTests: Build succeeded.

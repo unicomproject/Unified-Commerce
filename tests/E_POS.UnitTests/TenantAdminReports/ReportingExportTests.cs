@@ -91,13 +91,13 @@ namespace E_POS.UnitTests.TenantAdminReports
         public async Task CreateExportAsync_IgnoresPageSizeAndFetchesFullDataset()
         {
             var context = CreateContext(Guid.NewGuid(), Guid.NewGuid(), TenantAdminReportPermissions.Export, TenantAdminReportPermissions.SalesView);
-            var request = new ReportExportRequest("sales", "unknown_section", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 2, 10, null, null));
+            var request = new ReportExportRequest("sales", "transactions", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 2, 10, null, null));
             
             var records = new List<IReadOnlyDictionary<string, object?>>
             {
                 new Dictionary<string, object?> { { "id", "1" } }
             };
-            var reportResult = new ReportResultDto("unknown_section", "USD", "UTC", null, null, null, null, records, null, DateTimeOffset.UtcNow);
+            var reportResult = new ReportResultDto("transactions", "USD", "UTC", null, null, null, null, records, null, DateTimeOffset.UtcNow);
             
             _repository.Setup(x => x.GetSalesAsync(context, It.IsAny<ReportQueryRequest>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(reportResult);
@@ -138,13 +138,14 @@ namespace E_POS.UnitTests.TenantAdminReports
             
             var records = new List<IReadOnlyDictionary<string, object?>> { new Dictionary<string, object?> { { "id", "1" } } };
             _repository.Setup(x => x.GetSalesAsync(ctx1, It.IsAny<ReportQueryRequest>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new ReportResultDto("unknown_section", "USD", "UTC", null, null, null, null, records, null, DateTimeOffset.UtcNow));
+                .ReturnsAsync(new ReportResultDto("transactions", "USD", "UTC", null, null, null, null, records, null, DateTimeOffset.UtcNow));
             
-            var req = new ReportExportRequest("sales", "unknown_section", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 25, null, null));
+            var req = new ReportExportRequest("sales", "transactions", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 25, null, null));
             
             var createRes = await _service.CreateExportAsync(ctx1, req, default);
             Assert.True(createRes.IsSuccess);
-            var jobId = createRes.Value!.JobId;
+            Assert.True(createRes.IsSuccess, createRes.Error?.Message);
+              var jobId = createRes.Value!.JobId;
 
             // user1/tenant1 can get
             var getRes1 = await _service.GetExportAsync(ctx1, jobId, default);
@@ -160,19 +161,20 @@ namespace E_POS.UnitTests.TenantAdminReports
         public async Task DownloadExportAsync_ReturnsCsvData()
         {
             var ctx = CreateContext(Guid.NewGuid(), Guid.NewGuid(), TenantAdminReportPermissions.Export, TenantAdminReportPermissions.SalesView);
-            var records = new List<IReadOnlyDictionary<string, object?>> { new Dictionary<string, object?> { { "Foo", "Bar" } } };
+            var records = new List<IReadOnlyDictionary<string, object?>> { new Dictionary<string, object?> { { "orderId", "Bar" } } };
             _repository.Setup(x => x.GetSalesAsync(ctx, It.IsAny<ReportQueryRequest>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new ReportResultDto("unknown_section", "USD", "UTC", null, null, null, null, records, null, DateTimeOffset.UtcNow));
+                .ReturnsAsync(new ReportResultDto("transactions", "USD", "UTC", null, null, null, null, records, null, DateTimeOffset.UtcNow));
             
-            var req = new ReportExportRequest("sales", "unknown_section", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 25, null, null));
+            var req = new ReportExportRequest("sales", "transactions", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 25, null, null));
             var createRes = await _service.CreateExportAsync(ctx, req, default);
-            var jobId = createRes.Value!.JobId;
+            Assert.True(createRes.IsSuccess, createRes.Error?.Message);
+              var jobId = createRes.Value!.JobId;
             
             var dlRes = await _service.DownloadExportAsync(ctx, jobId, default);
             Assert.True(dlRes.IsSuccess);
             
             var csv = Encoding.UTF8.GetString(dlRes.Value!);
-            Assert.Contains("Foo", csv);
+            Assert.Contains("orderId", csv);
             Assert.Contains("Bar", csv);
         }
         
@@ -182,20 +184,24 @@ namespace E_POS.UnitTests.TenantAdminReports
             var ctx = CreateContext(Guid.NewGuid(), Guid.NewGuid(), TenantAdminReportPermissions.Export, TenantAdminReportPermissions.SalesView);
             var records = new List<IReadOnlyDictionary<string, object?>>();
             _repository.Setup(x => x.GetSalesAsync(ctx, It.IsAny<ReportQueryRequest>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new ReportResultDto("unknown_section", "USD", "UTC", null, null, null, null, records, null, DateTimeOffset.UtcNow));
+                .ReturnsAsync(new ReportResultDto("transactions", "USD", "UTC", null, null, null, null, records, null, DateTimeOffset.UtcNow));
             
-            var req = new ReportExportRequest("sales", "unknown_section", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 25, null, null));
+            var req = new ReportExportRequest("sales", "transactions", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 25, null, null));
             var createRes = await _service.CreateExportAsync(ctx, req, default);
-            var jobId = createRes.Value!.JobId;
+            Assert.True(createRes.IsSuccess, createRes.Error?.Message);
+              var jobId = createRes.Value!.JobId;
             
             var dlRes = await _service.DownloadExportAsync(ctx, jobId, default);
             Assert.True(dlRes.IsSuccess);
             
             var csv = Encoding.UTF8.GetString(dlRes.Value!);
-            Assert.Contains("No Results", csv);
+            Assert.Contains("orderId", csv);
         }
     }
 }
+
+
+
 
 
 
