@@ -38,9 +38,11 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             .Select(x => new ReportFilterOptionDto(x.Id.ToString(), x.OutletCode, x.OutletName, x.Status, null, x.OutletType, x.Status == ActiveStatus))
             .ToListAsync(cancellationToken);
 
+        var (tillsIds, _) = await GetAccessibleTillIdsAsync(context, outletIds, cancellationToken);
+
         var tills = await _dbContext.Tills.AsNoTracking()
             .Where(x => x.TenantId == context.TenantId &&
-                        outletIds.Contains(x.OutletId) &&
+                        tillsIds.Contains(x.Id) &&
                         (!request.OutletId.HasValue || x.OutletId == request.OutletId.Value) &&
                         (includeInactive || x.Status == ActiveStatus))
             .OrderBy(x => x.TillName)
@@ -439,6 +441,7 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
     private async Task<IQueryable<OrderProjection>> BuildOrderQueryAsync(TenantRequestContext context, ReportQueryRequest request, CancellationToken cancellationToken)
     {
         var outletIds = await GetAccessibleOutletIdsAsync(context, cancellationToken);
+        var (tillIds, tillScope) = await GetAccessibleTillIdsAsync(context, outletIds, cancellationToken);
         var query =
             from order in _dbContext.SalesOrders.AsNoTracking()
             join channel in _dbContext.SalesChannels.AsNoTracking() on order.SalesChannelId equals channel.Id
@@ -448,7 +451,8 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             from user in users.DefaultIfEmpty()
             let effectiveOutletId = order.ReportingOutletId ?? (till == null ? null : till.OutletId)
             where order.TenantId == context.TenantId &&
-                  (effectiveOutletId == null || outletIds.Contains(effectiveOutletId.GetValueOrDefault()))
+                  (effectiveOutletId == null || outletIds.Contains(effectiveOutletId.GetValueOrDefault())) &&
+                  ((order.TillId == null && tillScope == E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.AllAccessibleTills) || (order.TillId != null && tillIds.Contains(order.TillId.Value)))
             select new OrderProjection
             {
                 Id = order.Id,
@@ -676,6 +680,7 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         CancellationToken cancellationToken)
     {
         var outletIds = await GetAccessibleOutletIdsAsync(context, cancellationToken);
+        var (tillIds, tillScope) = await GetAccessibleTillIdsAsync(context, outletIds, cancellationToken);
         var query =
             from session in _dbContext.TillSessions.AsNoTracking()
             join outlet in _dbContext.Outlets.AsNoTracking() on session.OutletId equals outlet.Id
@@ -686,6 +691,7 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             from cashier in cashiers.DefaultIfEmpty()
             where session.TenantId == context.TenantId &&
                   outletIds.Contains(session.OutletId) &&
+                  tillIds.Contains(session.TillId) &&
                   (!request.OutletId.HasValue || session.OutletId == request.OutletId.Value) &&
                   (!request.TillId.HasValue || session.TillId == request.TillId.Value) &&
                   (!request.CashierId.HasValue || session.OpenedByTenantUserId == request.CashierId.Value)
@@ -829,11 +835,41 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
 
     private async Task<List<Guid>> GetAccessibleOutletIdsAsync(TenantRequestContext context, CancellationToken cancellationToken)
     {
-        var assigned = await _dbContext.OutletUserRoles.AsNoTracking().Where(x => x.TenantId == context.TenantId && x.TenantUserId == context.UserId && x.RevokedAt == null).Select(x => x.OutletId)
+        var user = await _dbContext.TenantUsers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == context.UserId && x.TenantId == context.TenantId, cancellationToken);
+        if (user == null || user.AccountStatus != ActiveStatus || user.OutletAccessScope == E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.NoOutletAccess)
+        {
+            return new List<Guid>();
+        }
+
+        if (user.OutletAccessScope == E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.AllOutlets)
+        {
+            return await _dbContext.Outlets.AsNoTracking().Where(x => x.TenantId == context.TenantId && x.Status != "DELETED").Select(x => x.Id).ToListAsync(cancellationToken);
+        }
+
+        return await _dbContext.OutletUserRoles.AsNoTracking().Where(x => x.TenantId == context.TenantId && x.TenantUserId == context.UserId && x.RevokedAt == null).Select(x => x.OutletId)
             .Union(_dbContext.OutletUserPermissions.AsNoTracking().Where(x => x.TenantId == context.TenantId && x.TenantUserId == context.UserId && x.RevokedAt == null).Select(x => x.OutletId))
             .Distinct().ToListAsync(cancellationToken);
-        if (assigned.Count > 0) return assigned;
-        return await _dbContext.Outlets.AsNoTracking().Where(x => x.TenantId == context.TenantId && x.Status != "DELETED").Select(x => x.Id).ToListAsync(cancellationToken);
+    }
+
+    private async Task<(List<Guid> TillIds, string Scope)> GetAccessibleTillIdsAsync(TenantRequestContext context, List<Guid> accessibleOutletIds, CancellationToken cancellationToken)
+    {
+        var user = await _dbContext.TenantUsers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == context.UserId && x.TenantId == context.TenantId, cancellationToken);
+        if (user == null || user.AccountStatus != ActiveStatus || user.TillAccessScope == E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.NoTillAccess || accessibleOutletIds.Count == 0)
+        {
+            return (new List<Guid>(), E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.NoTillAccess);
+        }
+
+        var tillsInOutlets = _dbContext.Tills.AsNoTracking().Where(x => x.TenantId == context.TenantId && x.Status != "DELETED" && accessibleOutletIds.Contains(x.OutletId)).Select(x => x.Id);
+
+        if (user.TillAccessScope == E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.AllAccessibleTills)
+        {
+            return (await tillsInOutlets.ToListAsync(cancellationToken), user.TillAccessScope);
+        }
+
+        var assignedTills = await _dbContext.TenantUserTillAccess.AsNoTracking().Where(x => x.TenantId == context.TenantId && x.TenantUserId == context.UserId && x.RevokedAt == null).Select(x => x.TillId)
+            .Distinct().ToListAsync(cancellationToken);
+
+        return (assignedTills.Intersect(await tillsInOutlets.ToListAsync(cancellationToken)).ToList(), user.TillAccessScope);
     }
 
     private async Task<IReadOnlyList<ReportFilterOptionDto>> GetCashierOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
@@ -890,3 +926,6 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         public string? InternalNote { get; init; }
     }
 }
+
+
+

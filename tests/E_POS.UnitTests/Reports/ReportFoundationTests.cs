@@ -1,3 +1,4 @@
+using Moq;
 using E_POS.Application.Modules.Tenant.Reports.Dtos;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
@@ -125,7 +126,12 @@ public sealed class ReportFoundationTests
     [Fact]
     public async Task CreateExportAsync_WithoutExportPermission_ReturnsPermissionDenied()
     {
-        var service = new TenantAdminReportsService(new FakeReportsRepository());
+                var mockEntitlements = new Moq.Mock<E_POS.Application.Modules.Platform.Subscription.Contracts.ITenantFeatureEntitlementEvaluator>();
+        mockEntitlements.Setup(m => m.IsEnabledAsync(Moq.It.IsAny<Guid>(), Moq.It.IsAny<string>(), Moq.It.IsAny<DateTimeOffset>(), Moq.It.IsAny<CancellationToken>()))
+                        .ReturnsAsync(true);
+        var mockClock = new Moq.Mock<E_POS.Application.Common.Contracts.IDateTimeProvider>();
+        mockClock.Setup(c => c.UtcNow).Returns(DateTimeOffset.UtcNow);
+        var service = new TenantAdminReportsService(new FakeReportsRepository(), mockEntitlements.Object, mockClock.Object);
         var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [TenantAdminReportPermissions.SalesView]);
 
         var result = await service.CreateExportAsync(context, CreateExportRequest("sales", "transactions", "csv"), CancellationToken.None);
@@ -137,7 +143,12 @@ public sealed class ReportFoundationTests
     [Fact]
     public async Task CreateExportAsync_WithPermissions_CreatesSafeCompletedJobMetadata()
     {
-        var service = new TenantAdminReportsService(new FakeReportsRepository());
+                var mockEntitlements = new Moq.Mock<E_POS.Application.Modules.Platform.Subscription.Contracts.ITenantFeatureEntitlementEvaluator>();
+        mockEntitlements.Setup(m => m.IsEnabledAsync(Moq.It.IsAny<Guid>(), Moq.It.IsAny<string>(), Moq.It.IsAny<DateTimeOffset>(), Moq.It.IsAny<CancellationToken>()))
+                        .ReturnsAsync(true);
+        var mockClock = new Moq.Mock<E_POS.Application.Common.Contracts.IDateTimeProvider>();
+        mockClock.Setup(c => c.UtcNow).Returns(DateTimeOffset.UtcNow);
+        var service = new TenantAdminReportsService(new FakeReportsRepository(), mockEntitlements.Object, mockClock.Object);
         var context = new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [TenantAdminReportPermissions.Export, TenantAdminReportPermissions.SalesView]);
 
         var result = await service.CreateExportAsync(context, CreateExportRequest("sales", "transactions", "csv"), CancellationToken.None);
@@ -192,3 +203,5 @@ public sealed class ReportFoundationTests
             throw new NotSupportedException();
     }
 }
+
+

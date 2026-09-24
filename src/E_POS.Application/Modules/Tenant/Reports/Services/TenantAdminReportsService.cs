@@ -1,3 +1,5 @@
+using E_POS.Application.Common.Contracts;
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.Reports.Contracts;
 using E_POS.Application.Modules.Tenant.Reports.Dtos;
@@ -5,6 +7,8 @@ using E_POS.Domain.Modules.Tenant.Inventory.Constants;
 using E_POS.Domain.Modules.Tenant.Reports.Constants;
 
 namespace E_POS.Application.Modules.Tenant.Reports.Services;
+
+
 
 public sealed class TenantAdminReportsService : ITenantAdminReportsService
 {
@@ -48,10 +52,14 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
     private static readonly Dictionary<Guid, ReportExportDto> ExportJobs = new();
 
     private readonly ITenantAdminReportsRepository _repository;
+    private readonly ITenantFeatureEntitlementEvaluator _entitlements;
+    private readonly IDateTimeProvider _clock;
 
-    public TenantAdminReportsService(ITenantAdminReportsRepository repository)
+    public TenantAdminReportsService(ITenantAdminReportsRepository repository, ITenantFeatureEntitlementEvaluator entitlements, IDateTimeProvider clock)
     {
         _repository = repository;
+        _entitlements = entitlements;
+        _clock = clock;
     }
 
     public async Task<ApplicationResult<ReportFilterOptionsResponse>> GetFilterOptionsAsync(
@@ -61,6 +69,12 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
     {
         var error = ValidateCommonAccess(context);
         if (error is not null) return ApplicationResult<ReportFilterOptionsResponse>.Failure(error);
+
+        if (!await ReportFeaturePolicy.IsReportsModuleEnabledAsync(_entitlements, context.TenantId, _clock.UtcNow, cancellationToken))
+        {
+            return ApplicationResult<ReportFilterOptionsResponse>.Failure(PermissionDenied);
+        }
+
         if (request.Page < 1 || request.PageSize is not (25 or 50 or 100))
         {
             return ApplicationResult<ReportFilterOptionsResponse>.Failure(ValidationFailed);
@@ -77,7 +91,8 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
     {
         var error = ValidateCommonAccess(context);
         if (error is not null) return ApplicationResult<ReportResultDto>.Failure(error);
-        if (!HasAnyPermission(context, TenantAdminReportPermissions.DashboardView, TenantAdminReportPermissions.SalesView, "reports.sales.view"))
+        if (!await ReportFeaturePolicy.IsSectionEnabledAsync("dashboard", _entitlements, context.TenantId, _clock.UtcNow, cancellationToken) ||
+            !HasAnyPermission(context, TenantAdminReportPermissions.DashboardView, TenantAdminReportPermissions.SalesView, "reports.sales.view"))
         {
             return ApplicationResult<ReportResultDto>.Failure(PermissionDenied);
         }
@@ -99,7 +114,7 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             return ApplicationResult<ReportResultDto>.Failure(ValidationFailed);
         }
 
-        if (!CanViewSalesSection(context, section))
+        if (!await CanViewSalesSectionAsync(context, section, cancellationToken))
         {
             return ApplicationResult<ReportResultDto>.Failure(PermissionDenied);
         }
@@ -115,7 +130,7 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
     {
         var error = ValidateCommonAccess(context);
         if (error is not null) return ApplicationResult<SalesTransactionDetailDto>.Failure(error);
-        if (!CanViewSalesSection(context, "transactions"))
+        if (!await CanViewSalesSectionAsync(context, "transactions", cancellationToken))
         {
             return ApplicationResult<SalesTransactionDetailDto>.Failure(PermissionDenied);
         }
@@ -139,7 +154,7 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             return ApplicationResult<ReportResultDto>.Failure(ValidationFailed);
         }
 
-        if (!CanViewStockSection(context, section))
+        if (!await CanViewStockSectionAsync(context, section, cancellationToken))
         {
             return ApplicationResult<ReportResultDto>.Failure(PermissionDenied);
         }
@@ -161,7 +176,7 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             return ApplicationResult<ReportResultDto>.Failure(ValidationFailed);
         }
 
-        if (!CanViewOutletSection(context, section))
+        if (!await CanViewOutletSectionAsync(context, section, cancellationToken))
         {
             return ApplicationResult<ReportResultDto>.Failure(PermissionDenied);
         }
@@ -170,23 +185,24 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             await _repository.GetOutletsAsync(context, request with { Section = section }, cancellationToken));
     }
 
-    public Task<ApplicationResult<ReportExportDto>> CreateExportAsync(
+    public async Task<ApplicationResult<ReportExportDto>> CreateExportAsync(
         TenantRequestContext context,
         ReportExportRequest request,
         CancellationToken cancellationToken)
     {
         var error = ValidateCommonAccess(context);
-        if (error is not null) return Task.FromResult(ApplicationResult<ReportExportDto>.Failure(error));
-        if (!HasAnyPermission(context, TenantAdminReportPermissions.Export) ||
+        if (error is not null) return ApplicationResult<ReportExportDto>.Failure(error);
+        if (!await ReportFeaturePolicy.IsExportEnabledAsync(_entitlements, context.TenantId, _clock.UtcNow, cancellationToken) ||
+            !HasAnyPermission(context, TenantAdminReportPermissions.Export) ||
             !ExportFormats.Contains(request.Format) ||
             request.Filters.PageSize is not (25 or 50 or 100))
         {
-            return Task.FromResult(ApplicationResult<ReportExportDto>.Failure(PermissionDenied));
+            return ApplicationResult<ReportExportDto>.Failure(PermissionDenied);
         }
 
-        if (!CanViewExportTarget(context, request.ReportType, request.Section))
+        if (!await CanViewExportTargetAsync(context, request.ReportType, request.Section, cancellationToken))
         {
-            return Task.FromResult(ApplicationResult<ReportExportDto>.Failure(PermissionDenied));
+            return ApplicationResult<ReportExportDto>.Failure(PermissionDenied);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -207,7 +223,7 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
             ExportJobs[job.JobId] = job;
         }
 
-        return Task.FromResult(ApplicationResult<ReportExportDto>.Success(job));
+        return ApplicationResult<ReportExportDto>.Success(job);
     }
 
     public Task<ApplicationResult<ReportExportDto>> GetExportAsync(
@@ -231,8 +247,10 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
     private static string NormalizeSection(string? section) =>
         string.IsNullOrWhiteSpace(section) ? "summary" : section.Trim();
 
-    private static bool CanViewSalesSection(TenantRequestContext context, string section)
+    private async Task<bool> CanViewSalesSectionAsync(TenantRequestContext context, string section, CancellationToken ct)
     {
+        if (!await ReportFeaturePolicy.IsSectionEnabledAsync(section, _entitlements, context.TenantId, _clock.UtcNow, ct)) return false;
+
         var sectionPermission = section switch
         {
             "products" or "categories" => TenantAdminReportPermissions.ProductsView,
@@ -248,8 +266,10 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
         return HasAnyPermission(context, sectionPermission, TenantAdminReportPermissions.SalesView, "reports.sales.view");
     }
 
-    private static bool CanViewStockSection(TenantRequestContext context, string section)
+    private async Task<bool> CanViewStockSectionAsync(TenantRequestContext context, string section, CancellationToken ct)
     {
+        if (!await ReportFeaturePolicy.IsSectionEnabledAsync(section, _entitlements, context.TenantId, _clock.UtcNow, ct)) return false;
+
         var sectionPermission = section switch
         {
             "batch-expiry" => StockPermissions.ExpiryView,
@@ -261,8 +281,10 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
         return HasAnyPermission(context, sectionPermission, StockPermissions.View, StockPermissions.LegacyInventoryView);
     }
 
-    private static bool CanViewOutletSection(TenantRequestContext context, string section)
+    private async Task<bool> CanViewOutletSectionAsync(TenantRequestContext context, string section, CancellationToken ct)
     {
+        if (!await ReportFeaturePolicy.IsSectionEnabledAsync(section, _entitlements, context.TenantId, _clock.UtcNow, ct)) return false;
+
         var sectionPermission = section switch
         {
             "tills" => TenantAdminReportPermissions.TillsView,
@@ -273,14 +295,14 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
         return HasAnyPermission(context, sectionPermission, TenantAdminReportPermissions.OutletsView, "tenant.outlets.revenue.view");
     }
 
-    private static bool CanViewExportTarget(TenantRequestContext context, string reportType, string section)
+    private async Task<bool> CanViewExportTargetAsync(TenantRequestContext context, string reportType, string section, CancellationToken ct)
     {
         var normalizedType = reportType.Trim().ToLowerInvariant();
         return normalizedType switch
         {
-            "sales" => CanViewSalesSection(context, section),
-            "stock" => CanViewStockSection(context, section),
-            "outlets" => CanViewOutletSection(context, section),
+            "sales" => await CanViewSalesSectionAsync(context, section, ct),
+            "stock" => await CanViewStockSectionAsync(context, section, ct),
+            "outlets" => await CanViewOutletSectionAsync(context, section, ct),
             _ => false
         };
     }
@@ -294,3 +316,7 @@ public sealed class TenantAdminReportsService : ITenantAdminReportsService
     private static bool HasAnyPermission(TenantRequestContext context, params string[] permissions) =>
         permissions.Any(context.HasPermission);
 }
+
+
+
+

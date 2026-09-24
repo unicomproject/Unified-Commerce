@@ -1,15 +1,32 @@
+using E_POS.Application.Modules.Platform.Subscription.Contracts;
 using E_POS.Domain.Modules.Tenant.Reports.Constants;
 
 namespace E_POS.Application.Modules.Tenant.Reports.Services;
 
 public static class ReportFeaturePolicy
 {
-    public static bool IsReportsModuleEnabled(IReadOnlyCollection<string> featureCodes) =>
-        featureCodes.Any(TenantAdminReportFeatureCodes.ModuleAliases.Contains);
-
-    public static bool IsSectionEnabled(string section, IReadOnlyCollection<string> featureCodes)
+    public static async Task<bool> IsReportsModuleEnabledAsync(
+        ITenantFeatureEntitlementEvaluator evaluator, Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        if (!IsReportsModuleEnabled(featureCodes))
+        foreach (var feature in TenantAdminReportFeatureCodes.ModuleAliases)
+        {
+            if (await evaluator.IsEnabledAsync(tenantId, feature, now, cancellationToken))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static Task<bool> IsExportEnabledAsync(
+        ITenantFeatureEntitlementEvaluator evaluator, Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) =>
+        evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportExport, now, cancellationToken);
+
+    public static async Task<bool> IsSectionEnabledAsync(
+        string section,
+        ITenantFeatureEntitlementEvaluator evaluator, Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (!await IsReportsModuleEnabledAsync(evaluator, tenantId, now, cancellationToken))
         {
             return false;
         }
@@ -17,17 +34,17 @@ public static class ReportFeaturePolicy
         return section switch
         {
             "transactions" or "summary" or "daily" or "payments" or "tax" or "discounts" or "returns" =>
-                featureCodes.Contains(TenantAdminReportFeatureCodes.SalesReports, StringComparer.OrdinalIgnoreCase) ||
-                featureCodes.Contains(TenantAdminReportFeatureCodes.ReportingAnalytics, StringComparer.OrdinalIgnoreCase) ||
-                featureCodes.Contains(TenantAdminReportFeatureCodes.ReportsAnalytics, StringComparer.OrdinalIgnoreCase),
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.SalesReports, now, cancellationToken) ||
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportingAnalytics, now, cancellationToken) ||
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportsAnalytics, now, cancellationToken),
             "current" or "low-stock" or "out-of-stock" or "batch-expiry" or "movements" or "valuation" =>
-                featureCodes.Contains(TenantAdminReportFeatureCodes.InventoryReports, StringComparer.OrdinalIgnoreCase) ||
-                featureCodes.Contains(TenantAdminReportFeatureCodes.ReportingAnalytics, StringComparer.OrdinalIgnoreCase) ||
-                featureCodes.Contains(TenantAdminReportFeatureCodes.ReportsAnalytics, StringComparer.OrdinalIgnoreCase),
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.InventoryReports, now, cancellationToken) ||
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportingAnalytics, now, cancellationToken) ||
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportsAnalytics, now, cancellationToken),
             "cashiers" =>
-                featureCodes.Contains(TenantAdminReportFeatureCodes.StaffPerformanceReports, StringComparer.OrdinalIgnoreCase) ||
-                featureCodes.Contains(TenantAdminReportFeatureCodes.ReportingAnalytics, StringComparer.OrdinalIgnoreCase) ||
-                featureCodes.Contains(TenantAdminReportFeatureCodes.ReportsAnalytics, StringComparer.OrdinalIgnoreCase),
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.StaffPerformanceReports, now, cancellationToken) ||
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportingAnalytics, now, cancellationToken) ||
+                await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportsAnalytics, now, cancellationToken),
             _ => true
         };
     }
