@@ -163,6 +163,12 @@ public sealed class CatalogMediaCategoryControllerTests
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(new ApplicationError("media.permission_denied", "denied")));
 
+        public Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+            TenantRequestContext context,
+            string imageUrl,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(new ApplicationError("media.permission_denied", "denied")));
+
         public Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
             TenantRequestContext context,
             Guid productId,
@@ -224,5 +230,6 @@ public sealed class CatalogMediaCategoryControllerTests
 
         public Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult.Failure(new ApplicationError("brand.not_found", "unused")));
+        public Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Contracts;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
@@ -5,7 +6,6 @@ using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
-using E_POS.Infrastructure.Modules.ECommerce.FulfilmentPickup;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -191,13 +191,21 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
                 return await RollbackFailureAsync(transaction, "online_orders.invalid_pickup", cancellationToken);
 
             var oldPickupStatus = pickup.PickupStatus;
-            var pickupCode = PickupCodeGenerator.Generate();
+            string? collectionQrToken = null;
             try
             {
                 fulfillment.MarkReady(tenantUserId, request.ExpectedVersion, now);
                 order.ApplyPosReadyForCollection(tenantUserId, now);
                 pickup.MarkReady(now);
-                pickup.IssuePickupCode(pickupCode, (pickup.PickupQrVersion ?? 0) + 1, now.AddHours(24), now);
+
+                // Stored as-is (not hashed): the customer's order page must be able to
+                // redisplay this exact value inside the collection QR for as long as it
+                // is valid, which a one-way hash would make impossible. Safety comes from
+                // it being a large random value and single-use, not from secrecy or a TTL —
+                // the QR never expires on its own; it stays valid until the order is collected.
+                collectionQrToken = CreateCollectionQrToken();
+                var qrVersion = (pickup.PickupQrVersion ?? 0) + 1;
+                pickup.IssueCollectionQr(collectionQrToken, qrVersion, expiresAt: null, now);
             }
             catch (InvalidOperationException ex) when (ex.Message == "FULFILLMENT_VERSION_CONFLICT")
             {
@@ -205,6 +213,7 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
             }
             catch (InvalidOperationException ex) when (
                 ex.Message is "FULFILLMENT_NOT_READYABLE" or "PICKUP_NOT_READYABLE" or "PICKUP_ALREADY_READY"
+                or "PICKUP_NOT_READY_FOR_QR"
                 || ex.Message.Contains("ready for collection", StringComparison.OrdinalIgnoreCase))
             {
                 return await RollbackFailureAsync(transaction, "online_orders.invalid_state", cancellationToken);
@@ -225,7 +234,6 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
             pickupEntry.Property(x => x.PickupQrTokenHash).IsModified = true;
             pickupEntry.Property(x => x.PickupQrVersion).IsModified = true;
             pickupEntry.Property(x => x.PickupQrExpiresAt).IsModified = true;
-            pickupEntry.Property(x => x.FailedVerificationAttempts).IsModified = true;
             pickupEntry.Property(x => x.UpdatedAt).IsModified = true;
 
             var fulfillmentSequence = await NextFulfillmentEventSequenceAsync(
@@ -256,7 +264,8 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
                 CompletedLines = lines.Count,
                 CanPack = false,
                 FulfillmentVersion = fulfillment.RowVersion,
-                UpdatedAt = now
+                UpdatedAt = now,
+                CollectionQrToken = collectionQrToken
             });
         }
         catch (DbUpdateConcurrencyException)
@@ -362,6 +371,15 @@ public sealed class PosOnlineOrderPackingRepository : IPosOnlineOrderPackingRepo
         if (transaction is not null)
             await transaction.RollbackAsync(cancellationToken);
         return PosOnlineOrderPackingRepositoryResult.Failure(errorCode);
+    }
+
+    private static string CreateCollectionQrToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 
     private sealed record PackingAggregate(

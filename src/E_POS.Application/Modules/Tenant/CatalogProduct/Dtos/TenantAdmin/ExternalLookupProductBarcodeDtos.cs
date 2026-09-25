@@ -18,8 +18,15 @@ public sealed class ExternalLookupProductBarcodeRequest
 /// <summary>
 /// Public B7 response — status FOUND | NO_MATCH | TEMPORARY_FAILURE.
 /// </summary>
+/// <param name="SourceReference">Legacy field; retained for backward compatibility. Prefer SourceProvider.</param>
+/// <param name="SourceProvider">The real provider identity ("openfoodfacts", etc.), correct on both fresh and cache-hit results. Never "cache".</param>
+/// <param name="RetrievalSource">"PROVIDER" or "CACHE" — how this result was served, independent of which provider produced it.</param>
 public sealed record ExternalLookupProductBarcodeResponse(
     string Status,
     ExternalProductSuggestion? Suggestion,
     string? SourceReference,
-    bool RetryAllowed);
+    bool RetryAllowed,
+    TenantCategoryResolutionResult? CategoryResolution = null,
+    string? SourceProvider = null,
+    string? RetrievalSource = null,
+    TenantBrandResolutionResult? BrandResolution = null);

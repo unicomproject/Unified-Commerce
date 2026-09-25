@@ -9,6 +9,7 @@ using E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.Platform.PlatformAdmin.Repositories;
 using E_POS.Infrastructure.Persistence;
+using E_POS.IntegrationTests.TestSupport;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -156,6 +157,37 @@ public sealed class ManualPaymentPostgreSqlConcurrencyTests
             Assert.False(await cleanDb.SubscriptionPaymentEvidence.AnyAsync());
             var applied = await cleanDb.Database.GetAppliedMigrationsAsync();
             Assert.Contains(applied, migration => migration.EndsWith("_AddFlow4ManualPaymentRuntime", StringComparison.Ordinal));
+
+            var prerequisite = "20260817223125_SeedOneVerzeProductPriceListPrerequisite";
+            var migrationIds = cleanDb.Database.GetMigrations().ToList();
+            Assert.True(migrationIds.IndexOf(prerequisite) <
+                        migrationIds.IndexOf("20260817223126_SeedCustomProducts"));
+            var priceListId = Guid.Parse("cccc0003-0001-4000-8000-000000000002");
+            var priceList = await cleanDb.PriceLists.AsNoTracking().SingleAsync(x => x.Id == priceListId);
+            Assert.Equal(Guid.Parse("08b0c8b0-a5bf-44f0-8814-cb2fe0120000"), priceList.TenantId);
+            Assert.True(await cleanDb.PriceListItems.AnyAsync(x =>
+                x.TenantId == priceList.TenantId && x.PriceListId == priceListId));
+            var locationId = Guid.Parse("33333333-0002-4000-8000-000000000001");
+            var location = await cleanDb.InventoryLocations.AsNoTracking().SingleAsync(x => x.Id == locationId);
+            Assert.Equal(priceList.TenantId, location.TenantId);
+            Assert.Equal(Guid.Parse("22222222-0001-4000-8000-000000000001"), location.OutletId);
+            Assert.True(await cleanDb.InventoryBalances.AnyAsync(x =>
+                x.TenantId == location.TenantId && x.InventoryLocationId == locationId));
+
+            // Upgrade/replay must preserve an existing tenant's configured principal.
+            await cleanDb.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE price_lists SET price_list_name = 'Configured POS list', priority = 17
+                WHERE id = {priceListId}
+                """);
+            var prerequisiteSql = MigrationTestSql.ForMigration(cleanDb, prerequisite);
+            await cleanDb.Database.ExecuteSqlRawAsync(prerequisiteSql);
+            await cleanDb.Database.ExecuteSqlRawAsync(prerequisiteSql);
+            var preserved = await cleanDb.PriceLists.AsNoTracking().SingleAsync(x => x.Id == priceListId);
+            Assert.Equal("Configured POS list", preserved.PriceListName);
+            Assert.Equal(17, preserved.Priority);
+            Assert.Equal(priceList.IsDefaultPriceList, preserved.IsDefaultPriceList);
+            Assert.Equal(location.LocationName, (await cleanDb.InventoryLocations.AsNoTracking()
+                .SingleAsync(x => x.Id == locationId)).LocationName);
         }
         finally
         {

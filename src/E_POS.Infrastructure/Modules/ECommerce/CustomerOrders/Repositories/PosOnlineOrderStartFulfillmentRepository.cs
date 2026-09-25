@@ -107,12 +107,17 @@ public sealed class PosOnlineOrderStartFulfillmentRepository : IPosOnlineOrderSt
             try
             {
                 fulfillment.StartPicking(tenantUserId, expectedVersion, now);
+                aggregate.Order.ApplyPosStartPreparing(tenantUserId, now);
             }
             catch (InvalidOperationException ex) when (ex.Message == "FULFILLMENT_VERSION_CONFLICT")
             {
                 return await RollbackFailureAsync(transaction, "online_orders.concurrency_conflict", cancellationToken);
             }
             catch (InvalidOperationException ex) when (ex.Message == "FULFILLMENT_NOT_STARTABLE")
+            {
+                return await RollbackFailureAsync(transaction, "online_orders.invalid_state", cancellationToken);
+            }
+            catch (InvalidOperationException)
             {
                 return await RollbackFailureAsync(transaction, "online_orders.invalid_state", cancellationToken);
             }

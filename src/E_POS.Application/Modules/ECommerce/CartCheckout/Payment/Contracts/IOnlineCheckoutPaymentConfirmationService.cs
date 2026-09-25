@@ -7,6 +7,8 @@ public interface IOnlineCheckoutPaymentConfirmationService
         Guid salesOrderId,
         Guid salesPaymentId,
         decimal paidAmount,
+        string currencyCode,
+        string? providerSessionId,
         string? externalReference,
         string? providerResponseJson,
         CancellationToken cancellationToken);

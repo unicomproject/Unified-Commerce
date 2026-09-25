@@ -52,6 +52,18 @@ public interface IStorefrontCheckoutConfirmationRepository
         string reason,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Records the payment provider's own checkout session identifier against the pending
+    /// transaction, so a later webhook can be checked against the session it actually belongs
+    /// to instead of being accepted on tenant/order/payment ids alone.
+    /// </summary>
+    Task RecordProviderCheckoutSessionAsync(
+        Guid tenantId,
+        Guid salesPaymentId,
+        string providerSessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }
 
 public sealed record StorefrontCheckoutRepositoryResult(

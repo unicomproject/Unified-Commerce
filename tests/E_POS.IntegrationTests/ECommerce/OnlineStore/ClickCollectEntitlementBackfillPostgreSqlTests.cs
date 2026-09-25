@@ -1,7 +1,6 @@
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
+using E_POS.IntegrationTests.TestSupport;
 using Npgsql;
 using Xunit;
 
@@ -103,8 +102,7 @@ public sealed class ClickCollectEntitlementBackfillPostgreSqlTests
 
             await using var db = new EPosDbContext(
                 new DbContextOptionsBuilder<EPosDbContext>().UseNpgsql(connectionString).Options);
-            var script = db.Database.GetService<IMigrator>().GenerateScript(
-                "20260827120000_HardenTenantAdminOnlineStoreSlugUniqueness",
+            var script = MigrationTestSql.ForMigration(db,
                 "20260902120000_BackfillClickCollectEntitlementForOnlineStoreTenants");
             await using (var migrate = new NpgsqlCommand(script, connection))
             {

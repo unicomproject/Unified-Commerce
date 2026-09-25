@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using E_POS.Api.Common;
+using E_POS.Api.Controllers;
 using E_POS.Api.Controllers.V1.Tenant.CatalogProduct;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Shared.Media.Dtos;
@@ -18,6 +19,64 @@ namespace E_POS.ApiTests.CatalogProduct;
 
 public sealed class TenantAdminProductsControllerTests
 {
+    [Fact]
+    public async Task UploadBrandLogo_WithCreatePermission_PassesCreationContextAndReturnsBrand()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var brandId = Guid.NewGuid();
+        var brand = new BrandResponse(brandId, "ACME", "Acme", "https://cdn/brand.png", Guid.NewGuid(), "ACTIVE", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var mediaService = new FakeCatalogMediaService
+        {
+            BrandLogoResult = ApplicationResult<MediaAssetUploadResponse>.Success(
+                new MediaAssetUploadResponse(Guid.NewGuid(), null, null, null, null, brandId, "media", "key", brand.LogoUrl!, null, brand.LogoUrl!, "brand.png", "image/png", ".png", 68, 1, 1, "hash")),
+        };
+        var brandService = new FakeBrandService
+        {
+            DetailResult = ApplicationResult<BrandResponse>.Success(brand),
+        };
+        var controller = new CatalogMediaController(mediaService, brandService, new TenantRequestContextFactory())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+        SetTenantClaims(controller, tenantId, userId, BrandConstants.CreatePermission);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+        var file = new FormFile(stream, 0, stream.Length, "file", "brand.png") { Headers = new HeaderDictionary(), ContentType = "image/png" };
+
+        var result = await controller.UploadBrandLogo(brandId, file, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(tenantId, mediaService.BrandLogoContext?.TenantId);
+        Assert.Equal(userId, mediaService.BrandLogoContext?.UserId);
+        Assert.Contains(BrandConstants.CreatePermission, mediaService.BrandLogoContext!.Permissions);
+        Assert.Equal(brandId, mediaService.BrandLogoId);
+    }
+
+    [Fact]
+    public async Task UploadBrandLogo_WhenInitialCompletionUnauthorized_ReturnsForbiddenStableCode()
+    {
+        var mediaService = new FakeCatalogMediaService
+        {
+            BrandLogoResult = ApplicationResult<MediaAssetUploadResponse>.Failure(
+                new ApplicationError("media.initial_brand_logo_not_authorized", "Not authorized.")),
+        };
+        var controller = new CatalogMediaController(mediaService, new FakeBrandService(), new TenantRequestContextFactory())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), BrandConstants.CreatePermission);
+        await using var stream = new MemoryStream(CreateOnePixelPng());
+        var file = new FormFile(stream, 0, stream.Length, "file", "brand.png") { Headers = new HeaderDictionary(), ContentType = "image/png" };
+
+        var result = await controller.UploadBrandLogo(Guid.NewGuid(), file, CancellationToken.None);
+
+        var forbidden = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
+        Assert.Contains("media.initial_brand_logo_not_authorized", forbidden.Value!.ToString());
+    }
+
+    private static byte[] CreateOnePixelPng() => Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
     [Fact]
     public async Task GetSummary_WithTenantProductsView_ReturnsOk()
     {
@@ -609,6 +668,196 @@ public sealed class TenantAdminProductsControllerTests
         Assert.DoesNotContain("Authorization", json, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("upcitemdb", "PROVIDER")]
+    [InlineData("upcitemdb", "CACHE")]
+    [InlineData("openfoodfacts", "PROVIDER")]
+    public async Task ExternalLookupBarcode_Found_SerializesSourceProviderAndRetrievalSource(
+        string sourceProvider, string retrievalSource)
+    {
+        // Phase C: proves the controller relays the Phase A identity model end-to-end (e.g. a
+        // result the service produced after OpenFoodFacts NO_MATCH -> UPCitemdb FOUND) without
+        // dropping/renaming the new fields, and without leaking any provider request details.
+        var suggestion = new ExternalProductSuggestion(
+            "Widget", null, "BrandCo", "Category", "1 pc", null, null, null,
+            "https://cdn.example/widget.png", "4006381333931", "GTIN13");
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.Found,
+                    suggestion,
+                    SourceReference: sourceProvider,
+                    RetryAllowed: false,
+                    CategoryResolution: null,
+                    SourceProvider: sourceProvider,
+                    RetrievalSource: retrievalSource)),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "4006381333931" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+
+        Assert.Equal(sourceProvider, body.SourceProvider);
+        Assert.Equal(retrievalSource, body.RetrievalSource);
+        Assert.NotEqual("cache", body.SourceProvider);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(body);
+        Assert.DoesNotContain("BaseUrl", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("user_key", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("api.upcitemdb.com", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Authorization", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_Found_SerializesCategoryResolution_WithExpectedJsonShape()
+    {
+        var categoryId = Guid.NewGuid();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca-Cola Original Taste", null, "Coca-Cola", "Beverages, Colas", "330ml", "US",
+            null, null, "https://cdn.example/coke.png", "5449000000996", "GTIN13",
+            ExternalCategoryKey: "en:colas",
+            ExternalCategoryName: "Colas",
+            ExternalCategoryHierarchy: new[] { "en:beverages", "en:carbonated-drinks", "en:colas" });
+
+        var categoryResolution = new TenantCategoryResolutionResult(
+            Provider: "openfoodfacts",
+            ExternalCategoryKey: "en:colas",
+            ExternalCategoryName: "Colas",
+            MappedCategory: new TenantCategoryCandidate(categoryId, "Soft Drinks", "CAT-SOFT-DRINKS"),
+            Suggestions: new[]
+            {
+                new TenantCategorySuggestionItem(Guid.NewGuid(), "Cola Drinks", "CAT-COLA", "EXACT"),
+            });
+
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.Found,
+                    suggestion,
+                    "openfoodfacts",
+                    false,
+                    CategoryResolution: categoryResolution)),
+        };
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, body.Status);
+        Assert.NotNull(body.CategoryResolution);
+        Assert.Equal("openfoodfacts", body.CategoryResolution!.Provider);
+        Assert.Equal("en:colas", body.CategoryResolution.ExternalCategoryKey);
+        Assert.Equal("Colas", body.CategoryResolution.ExternalCategoryName);
+        Assert.NotNull(body.CategoryResolution.MappedCategory);
+        Assert.Equal(categoryId, body.CategoryResolution.MappedCategory!.Id);
+        Assert.Equal("Soft Drinks", body.CategoryResolution.MappedCategory.Name);
+        Assert.Equal("CAT-SOFT-DRINKS", body.CategoryResolution.MappedCategory.Code);
+        Assert.Single(body.CategoryResolution.Suggestions);
+
+        var jsonOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        };
+        var json = System.Text.Json.JsonSerializer.Serialize(body, jsonOptions);
+
+        Assert.Contains("\"categoryResolution\"", json);
+        Assert.Contains("\"mappedCategory\"", json);
+        Assert.Contains("\"externalCategoryKey\":\"en:colas\"", json);
+        Assert.Contains("\"name\":\"Soft Drinks\"", json);
+        Assert.Contains("\"code\":\"CAT-SOFT-DRINKS\"", json);
+        Assert.Contains("\"suggestions\"", json);
+        Assert.Contains("\"matchType\":\"EXACT\"", json);
+        // Ensure no internal DB/Tenant fields are exposed
+        Assert.DoesNotContain("TenantId", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CreatedAt", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("UpdatedAt", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExternalLookupBarcode_Found_SerializesBrandResolution_WithExpectedJsonShape()
+    {
+        var brandId = Guid.NewGuid();
+        var suggestion = new ExternalProductSuggestion(
+            "Coca-Cola Original Taste", null, "Coca-Cola", "Beverages, Colas", "330ml", "US",
+            null, null, "https://cdn.example/coke.png", "5449000000996", "GTIN13");
+
+        var brandResolution = new TenantBrandResolutionResult(
+            Provider: "openfoodfacts",
+            ExternalBrandKey: "coca cola",
+            ExternalBrandName: "Coca-Cola",
+            MappedBrand: new TenantBrandCandidate(brandId, "Coca Cola", "COCA_COLA"),
+            Suggestions: new[]
+            {
+                new TenantBrandSuggestionItem(Guid.NewGuid(), "Coca Cola Zero", "COCA_COLA_ZERO", "SIMILARITY"),
+            });
+
+        var service = new FakeTenantAdminProductService
+        {
+            ExternalLookupResult = ApplicationResult<ExternalLookupProductBarcodeResponse>.Success(
+                new ExternalLookupProductBarcodeResponse(
+                    ExternalProductLookupStatuses.Found,
+                    suggestion,
+                    "openfoodfacts",
+                    false,
+                    BrandResolution: brandResolution)),
+        };
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, Guid.NewGuid(), "catalog.products.create");
+
+        var result = await controller.ExternalLookupBarcode(
+            new ExternalLookupProductBarcodeRequest { Barcode = "5449000000996" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<ExternalLookupProductBarcodeResponse>(
+            ok.Value!.GetType().GetProperty("data")!.GetValue(ok.Value));
+
+        Assert.Equal(ExternalProductLookupStatuses.Found, body.Status);
+        Assert.NotNull(body.BrandResolution);
+        Assert.Equal("openfoodfacts", body.BrandResolution!.Provider);
+        Assert.Equal("coca cola", body.BrandResolution.ExternalBrandKey);
+        Assert.Equal("Coca-Cola", body.BrandResolution.ExternalBrandName);
+        Assert.NotNull(body.BrandResolution.MappedBrand);
+        Assert.Equal(brandId, body.BrandResolution.MappedBrand!.Id);
+        Assert.Equal("Coca Cola", body.BrandResolution.MappedBrand.Name);
+        Assert.Equal("COCA_COLA", body.BrandResolution.MappedBrand.Code);
+        Assert.Single(body.BrandResolution.Suggestions);
+
+        var jsonOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        };
+        var json = System.Text.Json.JsonSerializer.Serialize(body, jsonOptions);
+
+        Assert.Contains("\"brandResolution\"", json);
+        Assert.Contains("\"mappedBrand\"", json);
+        Assert.Contains("\"externalBrandKey\":\"coca cola\"", json);
+        Assert.Contains("\"name\":\"Coca Cola\"", json);
+        Assert.Contains("\"code\":\"COCA_COLA\"", json);
+        Assert.Contains("\"suggestions\"", json);
+        Assert.Contains("\"matchType\":\"SIMILARITY\"", json);
+        // Ensure no internal DB/Tenant fields are exposed
+        Assert.DoesNotContain("TenantId", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CreatedAt", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("UpdatedAt", json, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task ExternalLookupBarcode_TemporaryFailure_SerializesRetryAllowed()
     {
@@ -1145,7 +1394,7 @@ public sealed class TenantAdminProductsControllerTests
     }
 
     private static void SetTenantClaims(
-        TenantAdminProductsController controller,
+        ControllerBase controller,
         Guid tenantId,
         Guid userId,
         string permission)
@@ -1241,6 +1490,139 @@ public sealed class TenantAdminProductsControllerTests
     }
 
     [Fact]
+    public async Task Create_WithExternalCategoryMappingContext_PassesContextAndReturnsCreated()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, userId, ProductConstants.CreatePermission);
+
+        var request = new TenantAdminProductCreateRequest
+        {
+            ProductName = "Mapped Product",
+            CategoryId = Guid.NewGuid(),
+            Sku = "SKU-MAPPED-01",
+            SellingPrice = 10m,
+            UnitType = "PIECE",
+            ExternalCategoryMappingContext = new ExternalCategoryMappingContext("openfoodfacts", "en:colas", "Colas"),
+        };
+
+        var result = await controller.Create(request, CancellationToken.None);
+
+        var created = Assert.IsType<CreatedResult>(result);
+        Assert.NotNull(created.Value);
+        Assert.NotNull(service.LastCreateRequest);
+        Assert.NotNull(service.LastCreateRequest!.ExternalCategoryMappingContext);
+        Assert.Equal("openfoodfacts", service.LastCreateRequest.ExternalCategoryMappingContext!.Provider);
+        Assert.Equal("en:colas", service.LastCreateRequest.ExternalCategoryMappingContext.ExternalCategoryKey);
+    }
+
+    [Fact]
+    public async Task CreateFromWizard_WithExternalCategoryMappingContext_PassesContextAndReturnsCreated()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, userId, ProductConstants.CreatePermission);
+
+        var request = new TenantAdminWizardProductCreateRequest
+        {
+            ProductName = "Wizard Mapped Product",
+            CategoryId = Guid.NewGuid(),
+            ProductStructure = "SIMPLE",
+            DesiredPublishActive = true,
+            ProductUnitId = Guid.NewGuid(),
+            BaseUnitId = Guid.NewGuid(),
+            UnitModel = "SINGLE_UNIT",
+            PricingTax = new PricingTaxConfigurationDto(10, 15, 12, Guid.NewGuid(), true),
+            ExternalCategoryMappingContext = new ExternalCategoryMappingContext("openfoodfacts", "en:colas", "Colas"),
+        };
+
+        var result = await controller.CreateFromWizard(request, CancellationToken.None);
+
+        var created = Assert.IsType<CreatedResult>(result);
+        Assert.NotNull(created.Value);
+        Assert.NotNull(service.LastWizardCreateRequest);
+        Assert.NotNull(service.LastWizardCreateRequest!.ExternalCategoryMappingContext);
+        Assert.Equal("openfoodfacts", service.LastWizardCreateRequest.ExternalCategoryMappingContext!.Provider);
+        Assert.Equal("en:colas", service.LastWizardCreateRequest.ExternalCategoryMappingContext.ExternalCategoryKey);
+    }
+
+    [Fact]
+    public async Task CreateFromWizard_WithoutContext_Succeeds()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        SetTenantClaims(controller, tenantId, userId, ProductConstants.CreatePermission);
+
+        var request = new TenantAdminWizardProductCreateRequest
+        {
+            ProductName = "Normal Wizard Product",
+            CategoryId = Guid.NewGuid(),
+            ProductStructure = "SIMPLE",
+            DesiredPublishActive = true,
+            ProductUnitId = Guid.NewGuid(),
+            BaseUnitId = Guid.NewGuid(),
+            UnitModel = "SINGLE_UNIT",
+            PricingTax = new PricingTaxConfigurationDto(10, 15, 12, Guid.NewGuid(), true),
+            ExternalCategoryMappingContext = null,
+        };
+
+        var result = await controller.CreateFromWizard(request, CancellationToken.None);
+
+        var created = Assert.IsType<CreatedResult>(result);
+        Assert.NotNull(created.Value);
+        Assert.NotNull(service.LastWizardCreateRequest);
+        Assert.Null(service.LastWizardCreateRequest!.ExternalCategoryMappingContext);
+    }
+
+    [Fact]
+    public async Task CreateFromWizard_WithoutTenantClaims_ReturnsUnauthorized()
+    {
+        var service = new FakeTenantAdminProductService();
+        var controller = CreateController(service);
+
+        var request = new TenantAdminWizardProductCreateRequest
+        {
+            ProductName = "Unauthorized Wizard Product",
+            CategoryId = Guid.NewGuid(),
+            ProductStructure = "SIMPLE",
+        };
+
+        var result = await controller.CreateFromWizard(request, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task CreateFromWizard_WhenValidationFails_ReturnsBadRequest()
+    {
+        var service = new FakeTenantAdminProductService
+        {
+            CreateResult = ApplicationResult<TenantAdminProductCreateResponse>.Failure(
+                new ApplicationError("product.validation_failed", "Validation failed.")),
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), ProductConstants.CreatePermission);
+
+        var request = new TenantAdminWizardProductCreateRequest
+        {
+            ProductName = "Invalid Wizard Product",
+            CategoryId = Guid.NewGuid(),
+            ProductStructure = "SIMPLE",
+        };
+
+        var result = await controller.CreateFromWizard(request, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.NotNull(badRequest.Value);
+    }
+
+    [Fact]
     public async Task GetDashboard_WithDashboardPermission_ReturnsOk()
     {
         var dashboard = new TenantAdminProductDashboardResponse(
@@ -1286,6 +1668,9 @@ public sealed class TenantAdminProductsControllerTests
 
     private sealed class FakeTenantAdminProductService : ITenantAdminProductService
     {
+        public TenantAdminProductCreateRequest? LastCreateRequest { get; private set; }
+        public TenantAdminWizardProductCreateRequest? LastWizardCreateRequest { get; private set; }
+
         public ApplicationResult<TenantAdminProductSummaryCardsResponse> SummaryResult { get; init; } =
             ApplicationResult<TenantAdminProductSummaryCardsResponse>.Success(
                 new TenantAdminProductSummaryCardsResponse(0, 0, 0, 0));
@@ -1402,14 +1787,20 @@ public sealed class TenantAdminProductsControllerTests
         public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
             TenantRequestContext context,
             TenantAdminProductCreateRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(CreateResult);
+            CancellationToken cancellationToken)
+        {
+            LastCreateRequest = request;
+            return Task.FromResult(CreateResult);
+        }
 
         public Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateFromWizardAsync(
             TenantRequestContext context,
             TenantAdminWizardProductCreateRequest request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(CreateResult);
+            CancellationToken cancellationToken)
+        {
+            LastWizardCreateRequest = request;
+            return Task.FromResult(CreateResult);
+        }
 
         public Task<ApplicationResult<TenantAdminProductDetailResponse>> GetByIdAsync(
             TenantRequestContext context,
@@ -1602,6 +1993,10 @@ public sealed class TenantAdminProductsControllerTests
 
     private sealed class FakeCatalogMediaService : ICatalogMediaService
     {
+        public TenantRequestContext? BrandLogoContext { get; private set; }
+        public Guid? BrandLogoId { get; private set; }
+        public ApplicationResult<MediaAssetUploadResponse> BrandLogoResult { get; init; } =
+            ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError("media.permission_denied", "Permission denied for media upload."));
         public Task<ApplicationResult<MediaAssetUploadResponse>> UploadProductImageAsync(
             TenantRequestContext context,
             Guid productId,
@@ -1615,6 +2010,13 @@ public sealed class TenantAdminProductsControllerTests
             TenantRequestContext context,
             MediaUploadFile file,
             Guid? uploadSessionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(
+                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+
+        public Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+            TenantRequestContext context,
+            string imageUrl,
             CancellationToken cancellationToken) =>
             Task.FromResult(ApplicationResult<StagedProductImageResponse>.Failure(
                 new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
@@ -1658,16 +2060,27 @@ public sealed class TenantAdminProductsControllerTests
             TenantRequestContext context,
             Guid brandId,
             MediaUploadFile file,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult<MediaAssetUploadResponse>.Failure(
-                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+            CancellationToken cancellationToken)
+        {
+            BrandLogoContext = context;
+            BrandLogoId = brandId;
+            return Task.FromResult(BrandLogoResult);
+        }
+        public Task<ApplicationResult> RemoveCategoryImageAsync(TenantRequestContext context, Guid categoryId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Failure(new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+    }
 
-        public Task<ApplicationResult> RemoveCategoryImageAsync(
-            TenantRequestContext context,
-            Guid categoryId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(ApplicationResult.Failure(
-                new ApplicationError("media.permission_denied", "Permission denied for media upload.")));
+    private sealed class FakeBrandService : IBrandService
+    {
+        public ApplicationResult<BrandResponse> DetailResult { get; init; } =
+            ApplicationResult<BrandResponse>.Failure(new ApplicationError("brand.not_found", "Brand was not found."));
+
+        public Task<ApplicationResult<BrandResponse>> CreateAsync(TenantRequestContext context, BrandCreateRequest request, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
+        public Task<ApplicationResult<BrandListResponse>> ListAsync(TenantRequestContext context, int pageNumber, int pageSize, string? search, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult<BrandListResponse>.Success(new BrandListResponse([], pageNumber, pageSize, 0)));
+        public Task<ApplicationResult<BrandResponse>> GetByIdAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
+        public Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
+        public Task<ApplicationResult<BrandResponse>> UpdateAsync(TenantRequestContext context, Guid brandId, BrandUpdateRequest request, CancellationToken cancellationToken) => Task.FromResult(DetailResult);
+        public Task<ApplicationResult> DeleteAsync(TenantRequestContext context, Guid brandId, CancellationToken cancellationToken) => Task.FromResult(ApplicationResult.Success());
+
     }
 
     private sealed class FakeTenantRequestContextFactory : ITenantRequestContextFactory

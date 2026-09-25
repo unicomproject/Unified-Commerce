@@ -91,6 +91,10 @@ public sealed class PosCartControllerTests
 
     private sealed class FakePosCheckoutService : IPosCheckoutService
     {
+        public Task<ApplicationResult<PosCheckoutPaymentStatusDto>> GetPaymentStatusAsync(
+            TenantRequestContext context, string key, CancellationToken cancellationToken)
+            => Task.FromResult(ApplicationResult<PosCheckoutPaymentStatusDto>.Success(new("unknown", null)));
+
         private readonly ApplicationResult<PosCheckoutSummaryResponseDto> _result;
 
         public FakePosCheckoutService(ApplicationResult<PosCheckoutSummaryResponseDto> result) =>

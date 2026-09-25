@@ -194,9 +194,10 @@ public sealed class CashierPosCanonicalPermissionCatalogTests
     public void CatalogCounts_MatchTotalAndRoleAssignableCounts()
     {
         var all = CashierPosCanonicalPermissionCatalog.All;
-        Assert.Equal(355, all.Count);
-        Assert.Equal(355, all.Select(d => d.Code).Distinct(StringComparer.Ordinal).Count());
-        Assert.Equal(348, CashierPosCanonicalPermissionCatalog.RoleAssignable.Count());
+        // Chunk 2 collection codes: scan_qr, validate_qr, manual_lookup, verify_items, handover, collect (+6).
+        Assert.Equal(359, all.Count);
+        Assert.Equal(359, all.Select(d => d.Code).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(352, CashierPosCanonicalPermissionCatalog.RoleAssignable.Count());
         Assert.Equal(295, CashierPosCanonicalPermissionCatalog.FineGrained.Count());
     }
 

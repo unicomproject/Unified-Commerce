@@ -149,8 +149,8 @@ public sealed class CustomerOrderRepositoryTests
             Guid.NewGuid(), tenantId, fulfillment.Id, null, "PU-SO-WEB-READY",
             "Test Customer", null, null, null, Now);
         pickup.MarkReady(Now.AddMinutes(3));
-        // GetDetailAsync checks expiry against real wall-clock time (not the fixture's
-        // fixed Now), so the expiry here must be relative to DateTimeOffset.UtcNow.
+        // The collection QR never expires, so GetDetailAsync no longer checks this value
+        // against wall-clock time — it's set here only because IssuePickupCode requires one.
         pickup.IssuePickupCode(
             "test-pickup-code-123", 1, DateTimeOffset.UtcNow.AddHours(24), Now.AddMinutes(3));
         dbContext.AddRange(fulfillment, pickup);

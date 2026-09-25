@@ -81,7 +81,13 @@ public sealed record PosCheckoutStartPaymentRequestDto(
     Guid? DiscountApplicationId = null,
     string? IdempotencyKey = null,
     Guid? CardOperationId = null,
-    IReadOnlyList<PosCheckoutTenderRequestDto>? Tenders = null);
+    IReadOnlyList<PosCheckoutTenderRequestDto>? Tenders = null,
+    Guid? ExistingSalesOrderId = null);
+
+public sealed record PosCheckoutPaymentStatusDto(
+    string Status, PosCheckoutStartPaymentResponseDto? Payment);
+
+public sealed record PosCheckoutPaymentStatusRequestDto(string IdempotencyKey);
 
 public sealed record PosCheckoutTenderRequestDto(
     string MethodCode,

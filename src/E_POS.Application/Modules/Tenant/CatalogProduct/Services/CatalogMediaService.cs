@@ -17,6 +17,7 @@ namespace E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 public sealed class CatalogMediaService : ICatalogMediaService
 {
     private const long MaxImageFileSizeBytes = 5 * 1024 * 1024;
+    private const long MaxBrandLogoFileSizeBytes = 2 * 1024 * 1024;
     private const string AssetTypeImage = "IMAGE";
     private const string ActiveStatus = "ACTIVE";
 
@@ -27,26 +28,32 @@ public sealed class CatalogMediaService : ICatalogMediaService
     private readonly ICatalogMediaRepository _repository;
     private readonly IMediaObjectStorage _storage;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IBrandAuditLogger? _brandAuditLogger;
     private readonly IMediaReadUrlResolver? _urlResolver;
     private readonly CategoryAccessPolicy? _categoryAccessPolicy;
     private readonly ICategoryAuditLogger? _categoryAuditLogger;
+    private readonly IExternalImageCandidateFetcher? _externalImageFetcher;
     private readonly ILogger<CatalogMediaService>? _logger;
 
     public CatalogMediaService(
         ICatalogMediaRepository repository,
         IMediaObjectStorage storage,
         IDateTimeProvider dateTimeProvider,
+        IBrandAuditLogger? brandAuditLogger = null,
         IMediaReadUrlResolver? urlResolver = null,
         CategoryAccessPolicy? categoryAccessPolicy = null,
         ICategoryAuditLogger? categoryAuditLogger = null,
+        IExternalImageCandidateFetcher? externalImageFetcher = null,
         ILogger<CatalogMediaService>? logger = null)
     {
         _repository = repository;
         _storage = storage;
         _dateTimeProvider = dateTimeProvider;
+        _brandAuditLogger = brandAuditLogger;
         _urlResolver = urlResolver;
         _categoryAccessPolicy = categoryAccessPolicy;
         _categoryAuditLogger = categoryAuditLogger;
+        _externalImageFetcher = externalImageFetcher;
         _logger = logger;
     }
 
@@ -272,6 +279,52 @@ public sealed class CatalogMediaService : ICatalogMediaService
             preparedResult.Image.FileSizeBytes,
             now,
             ProductConstants.StagedMediaStatus));
+    }
+
+    public async Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+        TenantRequestContext context,
+        string imageUrl,
+        CancellationToken cancellationToken)
+    {
+        var accessError = ValidateProductMediaAccess(context);
+        if (accessError is not null)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(accessError);
+        }
+
+        if (_externalImageFetcher is null)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(new ApplicationError(
+                "media.image_fetch_unavailable",
+                "External image fetch is not configured."));
+        }
+
+        if (!_storage.IsConfigured)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(StorageNotConfigured());
+        }
+
+        var fetchResult = await _externalImageFetcher.FetchAsync(imageUrl, cancellationToken);
+        if (fetchResult.IsFailure || fetchResult.Value is null)
+        {
+            return ApplicationResult<StagedProductImageResponse>.Failure(
+                fetchResult.IsFailure
+                    ? fetchResult.Error
+                    : new ApplicationError(
+                        "media.image_fetch_failed",
+                        "Failed to download the product image."));
+        }
+
+        await using var content = fetchResult.Value.Content;
+        return await StageProductImageAsync(
+            context,
+            new MediaUploadFile(
+                content,
+                fetchResult.Value.FileName,
+                fetchResult.Value.ContentType,
+                fetchResult.Value.Length),
+            uploadSessionId: null,
+            cancellationToken);
     }
 
     public async Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
@@ -861,7 +914,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
         MediaUploadFile file,
         CancellationToken cancellationToken)
     {
-        var accessError = ValidateBrandAccess(context);
+        var accessError = ValidateBrandLogoContext(context);
         if (accessError is not null)
         {
             return ApplicationResult<MediaAssetUploadResponse>.Failure(accessError);
@@ -883,9 +936,15 @@ public sealed class CatalogMediaService : ICatalogMediaService
                 "Brand was not found."));
         }
 
+        accessError = ValidateBrandLogoAccess(context, brand);
+        if (accessError is not null)
+        {
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(accessError);
+        }
+
         var previousMediaAssetId = brand.LogoMediaAssetId;
 
-        var preparedResult = await PrepareImageAsync(file, cancellationToken);
+        var preparedResult = await PrepareImageAsync(file, cancellationToken, MaxBrandLogoFileSizeBytes, allowWebP: false);
         if (preparedResult.Error is not null)
         {
             return ApplicationResult<MediaAssetUploadResponse>.Failure(preparedResult.Error);
@@ -902,13 +961,23 @@ public sealed class CatalogMediaService : ICatalogMediaService
             mediaAssetId,
             preparedResult.Image.StorageExtension);
 
-        var uploadResult = await UploadToStorageAsync(
-            context,
-            mediaAssetId,
-            storageKey,
-            purpose,
-            preparedResult.Image,
-            cancellationToken);
+        MediaObjectUploadResult uploadResult;
+        try
+        {
+            uploadResult = await UploadToStorageAsync(
+                context,
+                mediaAssetId,
+                storageKey,
+                purpose,
+                preparedResult.Image,
+                cancellationToken);
+        }
+        catch (Exception)
+        {
+            return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
+                "media.storage_unavailable",
+                "Failed to upload Brand logo to media storage."));
+        }
 
         var now = _dateTimeProvider.UtcNow;
         var mediaAsset = CreateMediaAsset(
@@ -921,6 +990,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             now);
 
         brand.UpdateLogo(mediaAssetId, context.UserId, now);
+        brand.IncrementRowVersion();
 
         try
         {
@@ -937,13 +1007,20 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
             await _repository.SaveChangesAsync(cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await TryDeleteUploadedBlobAsync(uploadResult, cancellationToken);
             return ApplicationResult<MediaAssetUploadResponse>.Failure(new ApplicationError(
                 "media.save_failed",
-                "Failed to save brand image record: " + ex.Message));
+                "Failed to save Brand logo metadata."));
         }
+
+        _brandAuditLogger?.LogMutation(
+            previousMediaAssetId.HasValue ? "BrandLogoReplaced" : "InitialBrandLogoAttached",
+            context.TenantId,
+            context.UserId,
+            brandId,
+            brand.RowVersion);
 
         return ApplicationResult<MediaAssetUploadResponse>.Success(new MediaAssetUploadResponse(
             mediaAssetId,
@@ -968,7 +1045,9 @@ public sealed class CatalogMediaService : ICatalogMediaService
 
     private async Task<PrepareImageResult> PrepareImageAsync(
         MediaUploadFile file,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long maxFileSizeBytes = MaxImageFileSizeBytes,
+        bool allowWebP = true)
     {
         var fieldErrors = new List<ApplicationFieldError>();
 
@@ -982,27 +1061,27 @@ public sealed class CatalogMediaService : ICatalogMediaService
             fieldErrors.Add(new ApplicationFieldError("file", "Image file cannot be empty."));
         }
 
-        if (file.Length > MaxImageFileSizeBytes)
+        if (file.Length > maxFileSizeBytes)
         {
             return PrepareImageResult.Failed(new ApplicationError(
                 "media.file_size_exceeded",
                 "Image file size exceeds the allowed limit.",
-                [new ApplicationFieldError("file", "Image file size exceeds the allowed 5 MB limit.")]));
+                [new ApplicationFieldError("file", $"Image file size exceeds the allowed {maxFileSizeBytes / (1024 * 1024)} MB limit.")]));
         }
 
         var declaredContentType = NormalizeContentType(file.ContentType);
-        if (!string.IsNullOrWhiteSpace(declaredContentType) && declaredContentType != "application/octet-stream" && !IsAllowedMimeType(declaredContentType))
+        if (!string.IsNullOrWhiteSpace(declaredContentType) && declaredContentType != "application/octet-stream" && !IsAllowedMimeType(declaredContentType, allowWebP))
         {
             return PrepareImageResult.Failed(new ApplicationError(
                 "media.unsupported_media_type",
-                "Only JPEG, PNG and WebP images are allowed.",
-                [new ApplicationFieldError("contentType", "Only JPEG, PNG and WebP images are allowed.")]));
+                allowWebP ? "Only JPEG, PNG and WebP images are allowed." : "Only JPEG and PNG images are allowed.",
+                [new ApplicationFieldError("contentType", allowWebP ? "Only JPEG, PNG and WebP images are allowed." : "Only JPEG and PNG images are allowed.")]));
         }
 
         var originalFileName = NormalizeFileName(file.FileName);
         var fileExtension = Path.GetExtension(originalFileName).ToLowerInvariant();
 
-        var memory = new MemoryStream(capacity: (int)Math.Min(file.Length, MaxImageFileSizeBytes));
+        var memory = new MemoryStream(capacity: (int)Math.Min(file.Length, maxFileSizeBytes));
         await file.Content.CopyToAsync(memory, cancellationToken);
         if (memory.Length <= 0)
         {
@@ -1012,13 +1091,13 @@ public sealed class CatalogMediaService : ICatalogMediaService
             ]));
         }
 
-        if (memory.Length > MaxImageFileSizeBytes)
+        if (memory.Length > maxFileSizeBytes)
         {
             await memory.DisposeAsync();
             return PrepareImageResult.Failed(new ApplicationError(
                 "media.file_size_exceeded",
                 "Image file size exceeds the allowed limit.",
-                [new ApplicationFieldError("file", "Image file size exceeds the allowed 5 MB limit.")]));
+                [new ApplicationFieldError("file", $"Image file size exceeds the allowed {maxFileSizeBytes / (1024 * 1024)} MB limit.")]));
         }
 
         var bytes = memory.ToArray();
@@ -1032,21 +1111,21 @@ public sealed class CatalogMediaService : ICatalogMediaService
             ]));
         }
 
-        if (!IsAllowedMimeType(mimeType))
+        if (!IsAllowedMimeType(mimeType, allowWebP))
         {
             await memory.DisposeAsync();
             return PrepareImageResult.Failed(new ApplicationError(
                 "media.unsupported_media_type",
-                "Only JPEG, PNG and WebP images are allowed.",
-                [new ApplicationFieldError("contentType", "Only JPEG, PNG and WebP images are allowed.")]));
+                allowWebP ? "Only JPEG, PNG and WebP images are allowed." : "Only JPEG and PNG images are allowed.",
+                [new ApplicationFieldError("contentType", allowWebP ? "Only JPEG, PNG and WebP images are allowed." : "Only JPEG and PNG images are allowed.")]));
         }
 
         // If byte signature auto-detected the true format (e.g. WebP/PNG) or extension is missing/mismatched for auto-probed type, adjust fileExtension
-        if (string.IsNullOrWhiteSpace(fileExtension) || fileExtension == "." || (mimeType != declaredContentType && IsAllowedMimeType(mimeType)))
+        if (string.IsNullOrWhiteSpace(fileExtension) || fileExtension == "." || (mimeType != declaredContentType && IsAllowedMimeType(mimeType, allowWebP)))
         {
             fileExtension = ResolveStorageExtension(mimeType);
         }
-        else if (!IsAllowedExtensionForMimeType(fileExtension, mimeType))
+        else if (!IsAllowedExtensionForMimeType(fileExtension, mimeType, allowWebP))
         {
             await memory.DisposeAsync();
             return PrepareImageResult.Failed(ValidationFailed([
@@ -1174,7 +1253,7 @@ public sealed class CatalogMediaService : ICatalogMediaService
             cancellationToken);
     }
 
-    private static ApplicationError? ValidateBrandAccess(TenantRequestContext context)
+    private static ApplicationError? ValidateBrandLogoContext(TenantRequestContext context)
     {
         if (context.TenantId == Guid.Empty || context.UserId == Guid.Empty)
         {
@@ -1182,9 +1261,30 @@ public sealed class CatalogMediaService : ICatalogMediaService
         }
 
         return context.HasPermission(BrandConstants.UpdatePermission) ||
+               context.HasPermission(BrandConstants.CreatePermission) ||
                context.HasPermission(BrandConstants.ManagePermission)
             ? null
             : PermissionDenied;
+    }
+
+    private static ApplicationError? ValidateBrandLogoAccess(TenantRequestContext context, Brand brand)
+    {
+        if (context.HasPermission(BrandConstants.UpdatePermission) ||
+            context.HasPermission(BrandConstants.ManagePermission))
+        {
+            return null;
+        }
+
+        var isCreatorCompletingInitialLogo =
+            context.HasPermission(BrandConstants.CreatePermission) &&
+            !brand.LogoMediaAssetId.HasValue &&
+            brand.CreatedByTenantUserId == context.UserId;
+
+        return isCreatorCompletingInitialLogo
+            ? null
+            : new ApplicationError(
+                "media.initial_brand_logo_not_authorized",
+                "The initial Brand logo can only be attached by the user who created the Brand.");
     }
 
     private static ApplicationError ValidationFailed(IReadOnlyList<ApplicationFieldError> fieldErrors) =>
@@ -1237,15 +1337,15 @@ public sealed class CatalogMediaService : ICatalogMediaService
         return string.IsNullOrWhiteSpace(name) ? "upload" : name;
     }
 
-    private static bool IsAllowedMimeType(string mimeType) =>
-        mimeType is "image/jpeg" or "image/png" or "image/webp";
+    private static bool IsAllowedMimeType(string mimeType, bool allowWebP = true) =>
+        mimeType is "image/jpeg" or "image/png" || (allowWebP && mimeType == "image/webp");
 
-    private static bool IsAllowedExtensionForMimeType(string extension, string mimeType) =>
+    private static bool IsAllowedExtensionForMimeType(string extension, string mimeType, bool allowWebP = true) =>
         extension switch
         {
             ".jpg" or ".jpeg" or ".jfif" or ".pjpeg" or ".pjp" => mimeType is "image/jpeg" or "image/pjpeg" or "image/jfif",
             ".png" => mimeType == "image/png",
-            ".webp" => mimeType == "image/webp",
+            ".webp" => allowWebP && mimeType == "image/webp",
             _ => true
         };
 

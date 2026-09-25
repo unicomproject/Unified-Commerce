@@ -289,6 +289,14 @@ public sealed class PosDiscountServiceTests
 
     private sealed class FakeCheckoutRepository : IPosCheckoutRepository
     {
+        public Task<PosCheckoutPaymentStatusDto> ReconcileCashPaymentAsync(
+            Guid tenantId, Guid tenantUserId, string key, CancellationToken cancellationToken)
+            => Task.FromResult(new PosCheckoutPaymentStatusDto("unknown", null));
+
+        public Task<PosCheckoutStartPaymentResponseDto?> FindCompletedCashPaymentAsync(
+            Guid tenantId, Guid tenantUserId, string key, CancellationToken cancellationToken)
+            => Task.FromResult<PosCheckoutStartPaymentResponseDto?>(null);
+
         public Task<PosCheckoutCalculationResult> CalculateSummaryAsync(
             Guid tenantId, Guid tenantUserId, IReadOnlyCollection<string> permissions,
             PosCheckoutSummaryRequestDto request, DateTimeOffset now, CancellationToken cancellationToken) =>

@@ -92,6 +92,12 @@ public sealed class PosOnlineOrderDetailResponse
     public decimal UnitCount { get; init; }
     public Guid? FulfillmentOrderId { get; init; }
     public long? FulfillmentVersion { get; init; }
+    public bool CanPack { get; init; }
+    public bool IsReadyForCollection { get; init; }
+    public DateTimeOffset? ReadyAt { get; init; }
+    public DateTimeOffset? CollectedAt { get; init; }
+    public DateTimeOffset? CompletedAt { get; init; }
+    public DateTimeOffset? CancelledAt { get; init; }
     public Guid? AssignedToTenantUserId { get; init; }
     public DateTimeOffset ServerTime { get; init; }
     public IReadOnlyList<PosOnlineOrderDetailLineResponse> Lines { get; init; } = [];

@@ -18,7 +18,7 @@ public sealed class ClickCollectOrdersController : ControllerBase
     private readonly IPosOnlineOrderPickingService _pickingService;
     private readonly IPosOnlineOrderPackingService _packingService;
     private readonly IPosOnlineOrderReadyService _readyService;
-    private readonly IPosOnlineOrderPickupVerificationService _pickupVerificationService;
+    private readonly IPosOnlineOrderCollectionService _collectionService;
     private readonly ITenantRequestContextFactory _tenantRequestContextFactory;
 
     public ClickCollectOrdersController(
@@ -29,7 +29,7 @@ public sealed class ClickCollectOrdersController : ControllerBase
         IPosOnlineOrderPackingService packingService,
         ITenantRequestContextFactory tenantRequestContextFactory,
         IPosOnlineOrderReadyService readyService,
-        IPosOnlineOrderPickupVerificationService pickupVerificationService)
+        IPosOnlineOrderCollectionService collectionService)
     {
         _service = service;
         _detailService = detailService;
@@ -37,7 +37,7 @@ public sealed class ClickCollectOrdersController : ControllerBase
         _pickingService = pickingService;
         _packingService = packingService;
         _readyService = readyService;
-        _pickupVerificationService = pickupVerificationService;
+        _collectionService = collectionService;
         _tenantRequestContextFactory = tenantRequestContextFactory;
     }
 
@@ -207,39 +207,30 @@ public sealed class ClickCollectOrdersController : ControllerBase
             : ToPackingErrorResult(result.Error);
     }
 
-    [HttpPost("{orderId:guid}/pickup/verify")]
+    [HttpPost("/api/v1/tenant/ecommerce/click-collect/collection/qr/validate")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> VerifyPickup(
-        [FromRoute] Guid orderId,
+    public async Task<IActionResult> ValidateCollectionQr(
         [FromQuery] Guid outletId,
-        [FromBody] PosOnlineOrderPickupVerifyRequest request,
+        [FromBody] PosOnlineOrderCollectionValidateRequest request,
         CancellationToken cancellationToken = default)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))
             return Unauthorized(CreateError(new ApplicationError(
                 "online_orders.invalid_tenant_context", "Invalid tenant context.")));
 
-        var result = await _pickupVerificationService.VerifyAsync(
-            context, outletId, orderId, request, cancellationToken);
-        if (result.IsSuccess && result.Value is not null)
-        {
-            return Ok(new
-            {
-                success = true,
-                message = "Pickup code verified successfully.",
-                data = result.Value
-            });
-        }
-
-        return ToPickupErrorResult(result.Error);
+        var result = await _collectionService.ValidateQrAsync(
+            context, outletId, request, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { success = true, message = "Collection QR validated.", data = result.Value })
+            : ToCollectionErrorResult(result.Error);
     }
 
-    [HttpPost("{orderId:guid}/pickup/collect")]
+    [HttpPost("{orderId:guid}/collection/complete")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -249,25 +240,18 @@ public sealed class ClickCollectOrdersController : ControllerBase
     public async Task<IActionResult> CompleteCollection(
         [FromRoute] Guid orderId,
         [FromQuery] Guid outletId,
+        [FromBody] PosOnlineOrderCollectionCompleteRequest request,
         CancellationToken cancellationToken = default)
     {
         if (!_tenantRequestContextFactory.TryCreate(User, out var context))
             return Unauthorized(CreateError(new ApplicationError(
                 "online_orders.invalid_tenant_context", "Invalid tenant context.")));
 
-        var result = await _pickupVerificationService.CollectAsync(
-            context, outletId, orderId, cancellationToken);
-        if (result.IsSuccess && result.Value is not null)
-        {
-            return Ok(new
-            {
-                success = true,
-                message = "Order marked as collected.",
-                data = result.Value
-            });
-        }
-
-        return ToPickupErrorResult(result.Error);
+        var result = await _collectionService.CompleteAsync(
+            context, outletId, orderId, request, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { success = true, message = "Order collected successfully.", data = result.Value })
+            : ToCollectionErrorResult(result.Error);
     }
 
     [HttpGet]
@@ -470,20 +454,6 @@ public sealed class ClickCollectOrdersController : ControllerBase
         _ => BadRequest(CreateError(error))
     };
 
-    private IActionResult ToPickupErrorResult(ApplicationError error) => error.Code switch
-    {
-        "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),
-        "online_orders.permission_denied" or
-        "online_orders.feature_not_entitled" or
-        "online_orders.outlet_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
-        "online_orders.not_found" => NotFound(CreateError(error)),
-        "online_orders.invalid_state" or
-        "online_orders.pickup_code_expired" or
-        "online_orders.pickup_code_mismatch" or
-        "online_orders.pickup_verification_locked" => Conflict(CreateError(error)),
-        _ => BadRequest(CreateError(error))
-    };
-
     private IActionResult ToPackingErrorResult(ApplicationError error) => error.Code switch
     {
         "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),
@@ -496,6 +466,26 @@ public sealed class ClickCollectOrdersController : ControllerBase
         "online_orders.not_packable" or
         "online_orders.not_readyable" or
         "online_orders.invalid_pickup" => Conflict(CreateError(error)),
+        _ => BadRequest(CreateError(error))
+    };
+
+    private IActionResult ToCollectionErrorResult(ApplicationError error) => error.Code switch
+    {
+        "online_orders.invalid_tenant_context" => Unauthorized(CreateError(error)),
+        "online_orders.permission_denied" or
+        "online_orders.feature_not_entitled" or
+        "online_orders.outlet_access_denied" => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
+        "online_orders.not_found" or
+        "online_orders.collection.qr_invalid" => NotFound(CreateError(error)),
+        "online_orders.concurrency_conflict" or
+        "online_orders.invalid_state" or
+        "online_orders.collection.qr_expired" or
+        "online_orders.collection.wrong_outlet" or
+        "online_orders.collection.not_ready" or
+        "online_orders.collection.cancelled" or
+        "online_orders.collection.already_collected" or
+        "online_orders.collection.missing_graph" or
+        "online_orders.collection.payment_required" => Conflict(CreateError(error)),
         _ => BadRequest(CreateError(error))
     };
 

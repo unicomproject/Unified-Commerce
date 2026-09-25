@@ -8,4 +8,5 @@ public sealed record BrandSummaryResponse(
     Guid? LogoMediaAssetId,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+    int ProductCount = 0);

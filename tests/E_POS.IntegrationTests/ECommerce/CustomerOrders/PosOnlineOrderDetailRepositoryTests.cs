@@ -15,6 +15,61 @@ public sealed class PosOnlineOrderDetailRepositoryTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 31, 5, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData("PICKING", 0, 0, false, false)]
+    [InlineData("PICKING", 1, 0, false, false)]
+    [InlineData("PICKING", 2, 0, true, false)]
+    [InlineData("PICKING", 1, 1, true, false)]
+    [InlineData("PACKED", 2, 0, false, false)]
+    [InlineData("READY", 2, 0, false, true)]
+    [InlineData("FULFILLED", 2, 0, false, false)]
+    [InlineData("CANCELLED", 0, 2, false, false)]
+    public async Task Detail_ProjectsCanonicalProgressAndReadiness(
+        string status, int picked, int cancelled, bool canPack, bool ready)
+    {
+        await using var db = CreateDbContext();
+        var tenant = Guid.NewGuid(); var user = Guid.NewGuid(); var outlet = Guid.NewGuid();
+        SeedAccessContext(db, tenant, user, outlet);
+        var order = CreateOrder(tenant, outlet);
+        var line = CreateLine(tenant, order.Id);
+        var fulfillment = CreateFulfillment(tenant, order.Id, Guid.NewGuid(), status, 9);
+        var pickup = CreatePickup(tenant, fulfillment.Id, Guid.NewGuid());
+        if (status == "READY")
+        {
+            Set(fulfillment, nameof(fulfillment.ReadyAt), Now);
+            Set(pickup, nameof(pickup.PickupStatus), "READY");
+        }
+        if (status == "FULFILLED")
+        {
+            Set(pickup, nameof(pickup.PickupStatus), "COLLECTED");
+            Set(pickup, nameof(pickup.CollectedAt), Now);
+        }
+        var fulfillmentLine = (FulfillmentOrderLine)Activator.CreateInstance(typeof(FulfillmentOrderLine), nonPublic: true)!;
+        Set(fulfillmentLine, nameof(fulfillmentLine.Id), Guid.NewGuid());
+        Set(fulfillmentLine, nameof(fulfillmentLine.TenantId), tenant);
+        Set(fulfillmentLine, nameof(fulfillmentLine.FulfillmentOrderId), fulfillment.Id);
+        Set(fulfillmentLine, nameof(fulfillmentLine.SalesOrderLineId), line.Id);
+        Set(fulfillmentLine, nameof(fulfillmentLine.RequestedQuantity), 2m);
+        Set(fulfillmentLine, nameof(fulfillmentLine.PickedQuantity), (decimal)picked);
+        Set(fulfillmentLine, nameof(fulfillmentLine.CancelledQuantity), (decimal)cancelled);
+        Set(fulfillmentLine, nameof(fulfillmentLine.LineStatus), status);
+        Set(fulfillmentLine, nameof(fulfillmentLine.CreatedAt), Now);
+        Set(fulfillmentLine, nameof(fulfillmentLine.UpdatedAt), Now);
+        db.AddRange(order, line, fulfillment, pickup, fulfillmentLine);
+        await db.SaveChangesAsync();
+        var result = await new PosOnlineOrderDetailRepository(db).GetAsync(
+            tenant, user, outlet, order.Id, Now, CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        var detail = result.Detail!;
+        Assert.Equal(status, detail.FulfillmentStatus);
+        Assert.Equal(9, detail.FulfillmentVersion);
+        Assert.Equal(Math.Max(2m - picked - cancelled, 0m), Assert.Single(detail.Lines).RemainingQuantity);
+        Assert.Equal(canPack, detail.CanPack);
+        Assert.Equal(ready, detail.IsReadyForCollection);
+        Assert.Equal(status == "FULFILLED" ? Now : (DateTimeOffset?)null, detail.CollectedAt);
+        Assert.Empty(await db.FulfillmentOrderEvents.ToListAsync());
+    }
+
     [Fact]
     public void Model_FulfillmentOrderRowVersion_IsConcurrencyToken()
     {
@@ -49,7 +104,8 @@ public sealed class PosOnlineOrderDetailRepositoryTests
         Assert.True(result.IsSuccess);
         var detail = result.Detail!;
         Assert.Equal(order.OrderNumber, detail.OrderNumber);
-        Assert.Equal("PENDING_CONFIRMATION", detail.Status);
+        Assert.Equal("NEW", detail.Status);
+        Assert.Equal("New", detail.StatusLabel);
         Assert.Equal("Test Customer", detail.CustomerName);
         Assert.Null(detail.CustomerClassification);
         Assert.Equal("UNPAID", detail.PaymentStatus);
@@ -143,9 +199,106 @@ public sealed class PosOnlineOrderDetailRepositoryTests
         Assert.Equal("PICKING", persisted.FulfillmentStatus);
         Assert.Equal(userA, persisted.AssignedToTenantUserId);
         Assert.Equal(6, persisted.RowVersion);
+        var persistedOrder = await db.SalesOrders.SingleAsync(x => x.Id == order.Id);
+        Assert.Equal("ACCEPTED", persistedOrder.Status);
+        Assert.Equal("PREPARING", persistedOrder.FulfillmentStatus);
         var savedEvent = Assert.Single(await db.FulfillmentOrderEvents.ToListAsync());
         Assert.Equal("FULFILLMENT_STARTED", savedEvent.EventType);
         Assert.Equal(userA, savedEvent.EventByTenantUserId);
+
+        var afterDetail = await detailRepository.GetAsync(
+            tenantId, userA, outletId, order.Id, Now.AddMinutes(3), CancellationToken.None);
+        Assert.True(afterDetail.IsSuccess);
+        Assert.Equal("PREPARING", afterDetail.Detail!.Status);
+        Assert.Equal("Preparing", afterDetail.Detail.StatusLabel);
+        Assert.Equal("PICKING", afterDetail.Detail.FulfillmentStatus);
+    }
+
+    [Fact]
+    public async Task ListAsync_PreparingOutranksOverdueDelayed()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        await using var db = CreateDbContext();
+        SeedAccessContext(db, tenantId, userId, outletId);
+        var order = CreateOrder(tenantId, outletId);
+        Set(order, "FulfillmentStatus", "PREPARING");
+        Set(order, "Status", "ACCEPTED");
+        Set(order, "RequestedCollectionAt", Now.AddHours(-2));
+        Set(order, "RequestedCollectionEndAt", Now.AddHours(-1));
+        db.SalesOrders.Add(order);
+        await db.SaveChangesAsync();
+        var repository = new PosOnlineOrderDetailRepository(db);
+
+        var result = await repository.ListAsync(
+            tenantId,
+            userId,
+            new Application.Modules.ECommerce.CustomerOrders.Dtos.PosOnlineOrderListQuery(
+                outletId, null, null, null, null, 1, 20),
+            Now,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.List!.Summary.PreparingCount);
+        Assert.Equal(0, result.List.Summary.DelayedCount);
+        Assert.Equal(0, result.List.Summary.NewCount);
+        var item = Assert.Single(result.List.Items);
+        Assert.Equal("PREPARING", item.Status);
+        Assert.Equal("Preparing", item.StatusLabel);
+    }
+
+    [Fact]
+    public async Task ListAsync_AfterStart_LeavesNewBucketAndEntersPreparing()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        await using var db = CreateDbContext();
+        SeedAccessContext(db, tenantId, userId, outletId);
+        var order = CreateOrder(tenantId, outletId);
+        var methodOutlet = FulfillmentMethodOutlet.Create(
+            Guid.NewGuid(), tenantId, Guid.NewGuid(), outletId, null, null, null, "ACTIVE", Now);
+        var fulfillment = CreateFulfillment(tenantId, order.Id, methodOutlet.Id, "PENDING", 1);
+        var pickupSlot = CreatePickupSlot(tenantId, methodOutlet.Id);
+        var pickupReservation = PickupSlotReservation.CreatePending(
+            Guid.NewGuid(), tenantId, pickupSlot.Id, Guid.NewGuid(), 1, Now.AddHours(1), Now);
+        pickupReservation.Confirm(order.Id, Now);
+        var pickup = CreatePickup(tenantId, fulfillment.Id, pickupReservation.Id);
+        var inventoryReservation = InventoryReservation.Create(
+            Guid.NewGuid(), tenantId, "RES-START-LIST", "SALES_ORDER", order.Id, order.OrderNumber,
+            order.SalesChannelId, outletId, order.CustomerId, "CONFIRMED", Now, Now.AddHours(1), userId, Now);
+        db.AddRange(order, methodOutlet, fulfillment, pickupSlot, pickupReservation, pickup, inventoryReservation);
+        await db.SaveChangesAsync();
+        var detailRepository = new PosOnlineOrderDetailRepository(db);
+        var startRepository = new PosOnlineOrderStartFulfillmentRepository(db);
+        var listQuery = new Application.Modules.ECommerce.CustomerOrders.Dtos.PosOnlineOrderListQuery(
+            outletId, null, "NEW", null, null, 1, 20);
+
+        var before = await detailRepository.ListAsync(
+            tenantId, userId, listQuery, Now, CancellationToken.None);
+        Assert.True(before.IsSuccess);
+        Assert.Contains(before.List!.Items, x => x.Id == order.Id && x.Status == "NEW");
+
+        var start = await startRepository.StartAsync(
+            tenantId, userId, outletId, order.Id, 1, Now.AddMinutes(1), CancellationToken.None);
+        Assert.True(start.IsSuccess);
+
+        db.ChangeTracker.Clear();
+        var afterNew = await detailRepository.ListAsync(
+            tenantId, userId, listQuery, Now.AddMinutes(2), CancellationToken.None);
+        Assert.True(afterNew.IsSuccess);
+        Assert.DoesNotContain(afterNew.List!.Items, x => x.Id == order.Id);
+
+        var afterPreparing = await detailRepository.ListAsync(
+            tenantId,
+            userId,
+            listQuery with { Status = "PREPARING" },
+            Now.AddMinutes(2),
+            CancellationToken.None);
+        Assert.True(afterPreparing.IsSuccess);
+        var item = Assert.Single(afterPreparing.List!.Items, x => x.Id == order.Id);
+        Assert.Equal("PREPARING", item.Status);
     }
 
     [Fact]

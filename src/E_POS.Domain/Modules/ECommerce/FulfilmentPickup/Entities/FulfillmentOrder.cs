@@ -120,5 +120,20 @@ public class FulfillmentOrder : AuditableEntity
         UpdatedAt = now;
         RowVersion++;
     }
+
+    public void MarkFulfilled(Guid tenantUserId, long expectedVersion, DateTimeOffset now)
+    {
+        if (expectedVersion <= 0 || RowVersion != expectedVersion)
+            throw new InvalidOperationException("FULFILLMENT_VERSION_CONFLICT");
+
+        if (FulfillmentStatus != "READY")
+            throw new InvalidOperationException("FULFILLMENT_NOT_FULFILLABLE");
+
+        FulfillmentStatus = "FULFILLED";
+        FulfilledAt = now;
+        UpdatedByTenantUserId = tenantUserId;
+        UpdatedAt = now;
+        RowVersion++;
+    }
 }
 

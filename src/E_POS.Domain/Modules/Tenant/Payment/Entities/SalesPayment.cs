@@ -27,6 +27,9 @@ public class SalesPayment : AuditableEntity
     public string? CancellationReason { get; protected set; }
     public Guid? CreatedByTenantUserId { get; protected set; }
     public Guid? UpdatedByTenantUserId { get; protected set; }
+    // Concurrency guard for provider webhook confirmation: two concurrent deliveries for the
+    // same payment race to flip PaymentStatus away from PENDING, and only one may win.
+    public long RowVersion { get; protected set; } = 1;
 
     public static SalesPayment CreateCompletedPosPayment(
         Guid id,
@@ -89,6 +92,7 @@ public class SalesPayment : AuditableEntity
         PaymentStatus = RefundedAmount >= PaidAmount ? "REFUNDED" : "PARTIALLY_REFUNDED";
         UpdatedByTenantUserId = tenantUserId;
         UpdatedAt = now;
+        RowVersion++;
     }
 
     public static SalesPayment CreatePendingOnlinePayment(
@@ -136,6 +140,7 @@ public class SalesPayment : AuditableEntity
             ExternalReference = externalReference.Trim();
         }
         UpdatedAt = now;
+        RowVersion++;
     }
 
     public void MarkFailedOrCancelled(string status, string? reason, DateTimeOffset now)
@@ -144,6 +149,7 @@ public class SalesPayment : AuditableEntity
         CancelledAt = now;
         CancellationReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         UpdatedAt = now;
+        RowVersion++;
     }
 }
 

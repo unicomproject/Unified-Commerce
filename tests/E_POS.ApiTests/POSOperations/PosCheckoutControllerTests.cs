@@ -16,6 +16,96 @@ namespace E_POS.ApiTests.POSOperations;
 
 public sealed class PosCheckoutControllerTests
 {
+    [Theory]
+    [InlineData("pos_checkout.permission_denied", 403, 403)]
+    [InlineData("pos_checkout.payment_permission_denied", 400, 403)]
+    [InlineData("pos_checkout.device_not_found", 404, 404)]
+    [InlineData("pos_checkout.customer_not_found", 404, 404)]
+    [InlineData("pos_checkout.variant_not_found", 404, 404)]
+    [InlineData("pos_checkout.customer_inactive", 422, 422)]
+    [InlineData("pos_checkout.customer_blocked", 422, 422)]
+    [InlineData("pos_checkout.customer_deleted", 422, 422)]
+    [InlineData("pos_checkout.customer_not_eligible", 422, 422)]
+    [InlineData("pos_checkout.discount_application_not_found", 404, 404)]
+    [InlineData("pos_checkout.discount_approval_required", 409, 409)]
+    [InlineData("pos_checkout.discount_application_expired", 409, 409)]
+    [InlineData("pos_checkout.discount_application_invalid", 409, 409)]
+    [InlineData("pos_checkout.discount_context_mismatch", 409, 409)]
+    [InlineData("pos_checkout.discount_policy_inactive", 409, 409)]
+    [InlineData("pos_checkout.discount_cart_changed", 409, 409)]
+    [InlineData("pos_checkout.idempotency_conflict", 400, 409)]
+    [InlineData("pos_checkout.stock_conflict", 400, 409)]
+    [InlineData("pos_checkout.persistence_failed", 400, 500)]
+    [InlineData("pos_checkout.till_session_not_open", 400, 400)]
+    [InlineData("pos_checkout.invalid_payment_method", 400, 400)]
+    [InlineData("pos_checkout.cash_received_required", 400, 400)]
+    [InlineData("pos_checkout.insufficient_cash", 400, 400)]
+    [InlineData("pos_checkout.insufficient_stock", 400, 400)]
+    [InlineData("pos_checkout.price_not_configured", 400, 400)]
+    [InlineData("pos_checkout.invalid_lines", 400, 400)]
+    [InlineData("pos_checkout.invalid_idempotency_key", 400, 400)]
+    [InlineData("pos_checkout.payment_provider_required", 400, 400)]
+    [InlineData("pos_checkout.invalid_tenant_context", 401, 401)]
+    [InlineData("pos_checkout.unrecognized", 400, 400)]
+    public async Task ErrorMappings_PreserveEndpointStatusAndEnvelope(string code, int commonStatus, int startStatus)
+    {
+        var error = new ApplicationError(code, "Safe failure");
+        var service = new FakePosCheckoutService
+        {
+            GetSummaryResult = ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(error),
+            StartPaymentResult = ApplicationResult<PosCheckoutStartPaymentResponseDto>.Failure(error),
+            PaymentStatusResult = ApplicationResult<PosCheckoutPaymentStatusDto>.Failure(error)
+        };
+        var controller = CreateController(service);
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), SalesPermissions.Sale.Checkout);
+        controller.HttpContext.TraceIdentifier = "checkout-test";
+        var before = DateTimeOffset.UtcNow;
+        var results = new[]
+        {
+            (await controller.GetSummary(new(Guid.NewGuid(), "NewSale", null, []), CancellationToken.None), commonStatus),
+            (await controller.StartPayment(new(Guid.NewGuid(), "NewSale", null, [], "cash", 0), CancellationToken.None), startStatus),
+            (await controller.GetPaymentStatus(new("key"), CancellationToken.None), commonStatus)
+        };
+        foreach (var (result, status) in results)
+        {
+            var response = Assert.IsAssignableFrom<ObjectResult>(result);
+            Assert.Equal(status, response.StatusCode);
+            var body = System.Text.Json.JsonSerializer.SerializeToElement(response.Value);
+            Assert.Equal(5, body.EnumerateObject().Count());
+            Assert.Equal(code, body.GetProperty("code").GetString());
+            Assert.Equal("Safe failure", body.GetProperty("message").GetString());
+            Assert.Equal(0, body.GetProperty("details").GetArrayLength());
+            Assert.Equal("checkout-test", body.GetProperty("traceId").GetString());
+            Assert.InRange(body.GetProperty("timestamp").GetDateTimeOffset(), before, DateTimeOffset.UtcNow);
+        }
+    }
+
+    [Fact]
+    public void PaymentStatus_DeclaresDocumentedResponses()
+    {
+        var attributes = typeof(PosCheckoutController).GetMethod(nameof(PosCheckoutController.GetPaymentStatus))!
+            .GetCustomAttributes<ProducesResponseTypeAttribute>().ToArray();
+        Assert.Equal(new[] { 200, 400, 401, 403 }, attributes.Select(a => a.StatusCode).OrderBy(s => s));
+        Assert.Equal(typeof(PosCheckoutPaymentStatusDto), attributes.Single(a => a.StatusCode == 200).Type);
+    }
+
+    [Fact]
+    public async Task PaymentStatus_RequiresTenantContext()
+    {
+        var controller = CreateController(new FakePosCheckoutService());
+        Assert.IsType<UnauthorizedObjectResult>(await controller.GetPaymentStatus(new("key"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task PaymentStatus_ReturnsReadOnlyUnknownEnvelope()
+    {
+        var controller = CreateController(new FakePosCheckoutService());
+        SetTenantClaims(controller, Guid.NewGuid(), Guid.NewGuid(), SalesPermissions.Sale.Checkout);
+        var result = await controller.GetPaymentStatus(new("key"), CancellationToken.None);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("unknown", System.Text.Json.JsonSerializer.Serialize(ok.Value));
+    }
+
     [Fact]
     public async Task GetSummary_WithValidClaims_ReturnsOk()
     {
@@ -254,6 +344,13 @@ public sealed class PosCheckoutControllerTests
 
     private sealed class FakePosCheckoutService : IPosCheckoutService
     {
+        public ApplicationResult<PosCheckoutPaymentStatusDto> PaymentStatusResult { get; init; } =
+            ApplicationResult<PosCheckoutPaymentStatusDto>.Success(new("unknown", null));
+
+        public Task<ApplicationResult<PosCheckoutPaymentStatusDto>> GetPaymentStatusAsync(
+            TenantRequestContext context, string key, CancellationToken cancellationToken)
+            => Task.FromResult(PaymentStatusResult);
+
         public ApplicationResult<PosCheckoutSummaryResponseDto> GetSummaryResult { get; init; } =
             ApplicationResult<PosCheckoutSummaryResponseDto>.Failure(
                 new ApplicationError("pos_checkout.summary_failed", "Checkout summary could not be calculated."));

@@ -30,24 +30,27 @@ public sealed class SharedProductMetadataCacheRepository : ISharedProductMetadat
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<ExternalProductSuggestion?> GetValidAsync(
+    public async Task<CachedExternalProductLookupResult?> GetValidAsync(
         string normalizedBarcode,
+        string provider,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(normalizedBarcode))
+        if (string.IsNullOrWhiteSpace(normalizedBarcode) || string.IsNullOrWhiteSpace(provider))
         {
             return null;
         }
 
         var key = normalizedBarcode.Trim();
+        var prov = provider.Trim().ToLowerInvariant();
         var now = _dateTimeProvider.UtcNow;
 
         try
         {
-            // Query latest unexpired cache record for this barcode
+            // Query latest unexpired cache record for this barcode, scoped to this provider only —
+            // a cache row written by one provider must never satisfy a lookup for another.
             var entry = await _dbContext.SharedProductMetadataCaches
                 .AsNoTracking()
-                .Where(x => x.NormalizedBarcode == key && x.ExpiresAt > now)
+                .Where(x => x.NormalizedBarcode == key && x.Provider == prov && x.ExpiresAt > now)
                 .OrderByDescending(x => x.CachedAt)
                 .FirstOrDefaultAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -61,14 +64,15 @@ public sealed class SharedProductMetadataCacheRepository : ISharedProductMetadat
                 entry.NormalizedMetadataJson,
                 JsonOptions);
 
-            return suggestion;
+            return suggestion is null ? null : new CachedExternalProductLookupResult(suggestion, entry.Provider);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(
                 ex,
-                "Failed to read from shared product metadata cache for barcode {Barcode}. Continuing without cache.",
-                key);
+                "Failed to read from shared product metadata cache for barcode {Barcode} Provider={Provider}. Continuing without cache.",
+                key,
+                prov);
             return null;
         }
     }

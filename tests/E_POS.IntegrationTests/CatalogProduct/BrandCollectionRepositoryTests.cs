@@ -32,6 +32,55 @@ public sealed class BrandCollectionRepositoryTests
     }
 
     [Fact]
+    public async Task BrandDetailAsync_ReturnsDescriptionAndSortOrder()
+    {
+        var tenantId = Guid.NewGuid();
+        var brandId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        dbContext.Brands.Add(Brand.Create(brandId, tenantId, "ACME", "Acme", "acme", "Detail", null, BrandConstants.ActiveStatus, null, Now, 7));
+        await dbContext.SaveChangesAsync();
+
+        var result = await new BrandRepository(dbContext).GetByIdAsync(tenantId, brandId, false, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("Detail", result.Description);
+        Assert.Equal(7, result.SortOrder);
+    }
+
+    [Fact]
+    public async Task BrandListAsync_OrdersPaginatesAndCountsLifecycleProductsPerTenant()
+    {
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        dbContext.Brands.AddRange(
+            Brand.Create(firstId, tenantId, "B", "Second", "second", null, null, BrandConstants.ActiveStatus, null, Now, 2),
+            Brand.Create(secondId, tenantId, "A", "First", "first", null, null, BrandConstants.ActiveStatus, null, Now, 1),
+            Brand.Create(Guid.NewGuid(), otherTenantId, "A", "Other", "other", null, null, BrandConstants.ActiveStatus, null, Now, 0));
+        dbContext.Products.AddRange(
+            CreateProduct(Guid.NewGuid(), tenantId, "DRAFT", "Draft", "DRAFT", secondId),
+            CreateProduct(Guid.NewGuid(), tenantId, "ACTIVE", "Active", "ACTIVE", secondId),
+            CreateProduct(Guid.NewGuid(), tenantId, "INACTIVE", "Inactive", "INACTIVE", secondId),
+            CreateProduct(Guid.NewGuid(), tenantId, "ARCHIVED", "Archived", "ARCHIVED", secondId),
+            CreateProduct(Guid.NewGuid(), tenantId, "INDEPENDENT", "Independent", "ACTIVE", firstId),
+            CreateProduct(Guid.NewGuid(), otherTenantId, "OTHER", "Other", "ACTIVE", secondId));
+        await dbContext.SaveChangesAsync();
+        var repository = new BrandRepository(dbContext);
+
+        var firstPage = await repository.ListAsync(tenantId, 1, 1, null, CancellationToken.None);
+        var secondPage = await repository.ListAsync(tenantId, 2, 1, null, CancellationToken.None);
+
+        Assert.Equal(2, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.TotalPages);
+        Assert.Equal("A", Assert.Single(firstPage.Items).BrandCode);
+        Assert.Equal(3, firstPage.Items[0].ProductCount);
+        Assert.Equal("B", Assert.Single(secondPage.Items).BrandCode);
+        Assert.Equal(1, secondPage.Items[0].ProductCount);
+    }
+
+    [Fact]
     public async Task CollectionListAsync_ReturnsCurrentTenantNonDeletedCollectionsOnly()
     {
         var tenantId = Guid.NewGuid();
@@ -68,7 +117,7 @@ public sealed class BrandCollectionRepositoryTests
         Assert.True(result);
     }
 
-    private static Product CreateProduct(Guid productId, Guid tenantId, string code, string name, string status)
+    private static Product CreateProduct(Guid productId, Guid tenantId, string code, string name, string status, Guid? brandId = null)
     {
         return Product.Create(
             id: productId,
@@ -79,7 +128,7 @@ public sealed class BrandCollectionRepositoryTests
             productType: "STANDARD",
             productStructure: "SIMPLE",
             businessTypeId: null,
-            brandId: null,
+            brandId: brandId,
             returnPolicyId: null,
             shortDescription: null,
             longDescription: null,

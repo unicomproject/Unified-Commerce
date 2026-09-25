@@ -127,6 +127,7 @@ public static class TenantAdminBootstrapPermissionCatalog
             // POS checkout lets a Tenant Admin configure the supported Cashier template
             // without bypassing the delegation ceiling; it grants no platform permissions.
             [PlatformTenantFeatureCodes.PosCheckout] = TenantRoleSetupCatalog.CashierAllowedPermissionCodes
+                .Where(permissionCode => permissionCode != WorkspacePermissions.PosAccess)
                 .OrderBy(permissionCode => permissionCode, StringComparer.Ordinal)
                 .ToArray(),
             [PlatformTenantFeatureCodes.OfflineOperationSync] = [],

@@ -306,7 +306,7 @@ public sealed class CatalogMediaController : ControllerBase
             return ToErrorResult(uploadResult.Error);
         }
 
-        var brandResult = await _brandService.GetByIdAsync(context, brandId, cancellationToken);
+        var brandResult = await _brandService.GetByIdAfterMutationAsync(context, brandId, cancellationToken);
         return brandResult.IsSuccess && brandResult.Value is not null
             ? Ok(new { data = brandResult.Value })
             : ToErrorResult(brandResult.Error ?? uploadResult.Error);
@@ -330,6 +330,7 @@ public sealed class CatalogMediaController : ControllerBase
         return error.Code switch
         {
             "media.permission_denied" or
+                "media.initial_brand_logo_not_authorized" or
                 "brand.permission_denied" or
                 "category.permission_denied" or
                 "category.entitlement_denied" =>
@@ -346,6 +347,10 @@ public sealed class CatalogMediaController : ControllerBase
                 StatusCode(StatusCodes.Status409Conflict, CreateError(error)),
             "media.file_size_exceeded" =>
                 StatusCode(StatusCodes.Status413PayloadTooLarge, CreateError(error)),
+            "media.unsupported_media_type" =>
+                StatusCode(StatusCodes.Status415UnsupportedMediaType, CreateError(error)),
+            "media.save_failed" =>
+                StatusCode(StatusCodes.Status500InternalServerError, CreateError(error)),
             "media.max_images_exceeded" => BadRequest(CreateError(error)),
             "media.storage_not_configured" =>
                 StatusCode(StatusCodes.Status503ServiceUnavailable, CreateError(error)),

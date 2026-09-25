@@ -110,6 +110,22 @@ public sealed class PosCheckoutController : ControllerBase
         return Ok(new { data = result.Value });
     }
 
+    [HttpPost("payment-status")]
+    [ProducesResponseType(typeof(PosCheckoutPaymentStatusDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetPaymentStatus(
+        [FromBody] PosCheckoutPaymentStatusRequestDto request, CancellationToken cancellationToken)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+            return Unauthorized(CreateError(new ApplicationError(
+                "pos_checkout.invalid_tenant_context", "Invalid tenant context.")));
+        var result = await _posCheckoutService.GetPaymentStatusAsync(context, request.IdempotencyKey, cancellationToken);
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { data = result.Value }) : ToErrorResult(result.Error);
+    }
+
     private static string Mask(Guid value) => value.ToString("N")[^8..];
 
     private static int StatusCodeOf(IActionResult result) => result switch
@@ -123,37 +139,13 @@ public sealed class PosCheckoutController : ControllerBase
     {
         return error.Code switch
         {
-            "pos_checkout.permission_denied" or "pos_checkout.payment_permission_denied"
+            "pos_checkout.payment_permission_denied"
                 => StatusCode(StatusCodes.Status403Forbidden, CreateError(error)),
-            "pos_checkout.device_not_found" or "pos_checkout.customer_not_found" or "pos_checkout.variant_not_found"
-                => NotFound(CreateError(error)),
-            "pos_checkout.customer_inactive" or "pos_checkout.customer_blocked" or
-            "pos_checkout.customer_deleted" or "pos_checkout.customer_not_eligible"
-                => UnprocessableEntity(CreateError(error)),
-            "pos_checkout.discount_application_not_found" => NotFound(CreateError(error)),
-            "pos_checkout.discount_approval_required" or
-            "pos_checkout.discount_application_expired" or
-            "pos_checkout.discount_application_invalid" or
-            "pos_checkout.discount_context_mismatch" or
-            "pos_checkout.discount_policy_inactive" or
-            "pos_checkout.discount_cart_changed"
-                => Conflict(CreateError(error)),
             "pos_checkout.idempotency_conflict" or "pos_checkout.stock_conflict"
                 => Conflict(CreateError(error)),
             "pos_checkout.persistence_failed"
                 => StatusCode(StatusCodes.Status500InternalServerError, CreateError(error)),
-            "pos_checkout.till_session_not_open" or
-            "pos_checkout.invalid_payment_method" or
-            "pos_checkout.cash_received_required" or
-            "pos_checkout.insufficient_cash" or
-            "pos_checkout.insufficient_stock" or
-            "pos_checkout.price_not_configured" or
-            "pos_checkout.invalid_lines"
-                => BadRequest(CreateError(error)),
-            "pos_checkout.invalid_idempotency_key" or "pos_checkout.payment_provider_required"
-                => BadRequest(CreateError(error)),
-            "pos_checkout.invalid_tenant_context" => Unauthorized(CreateError(error)),
-            _ => BadRequest(CreateError(error))
+            _ => ToErrorResult(error)
         };
     }
 

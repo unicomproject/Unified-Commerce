@@ -105,6 +105,20 @@ public class SalesPaymentTransaction : AuditableEntity
             UpdatedAt = now
         };
 
+    /// <summary>
+    /// Attaches the provider's own checkout/session identifier to a still-pending transaction,
+    /// without changing its status, so a later webhook confirmation can verify it is completing
+    /// the exact session it created rather than any session bearing the same tenant/order ids.
+    /// </summary>
+    public void AttachProviderSessionReference(string providerSessionId, DateTimeOffset now)
+    {
+        if (TransactionStatus != "PENDING")
+            throw new InvalidOperationException("Cannot attach a provider session reference once the transaction is no longer pending.");
+
+        ExternalTransactionReference = providerSessionId.Trim();
+        UpdatedAt = now;
+    }
+
     public void MarkSucceeded(string? externalTransactionReference, string? providerResponseJson, DateTimeOffset now)
     {
         TransactionStatus = "SUCCEEDED";

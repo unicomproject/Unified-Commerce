@@ -1,7 +1,10 @@
+using System.Text.Json;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.POSOperations.Contracts;
+using E_POS.Application.Modules.Tenant.POSOperations.Dtos;
 using E_POS.Application.Modules.Tenant.POSOperations.Services;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
+using E_POS.Domain.Modules.Tenant.AccessControl.Catalog.CashierPos;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Constants;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
 using Xunit;
@@ -131,6 +134,67 @@ public sealed class PosHomeDashboardServiceTests
         Assert.False(result.Value.QuickActions!.CanViewCashDrawer);
     }
 
+    [Fact]
+    public async Task GetPosHomeAsync_WithoutSummarySectionPermission_OmitsSummary()
+    {
+        var result = await CreateService().GetPosHomeAsync(
+            new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(), [PosPermissions.Home.View]),
+            null, null, null, null, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.Summary);
+    }
+
+    [Fact]
+    public async Task GetPosHomeAsync_GranularSummaryPermissionsFilterProtectedFields()
+    {
+        var result = await CreateService().GetPosHomeAsync(
+            new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(),
+            [
+                PosPermissions.Home.View,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryView,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryTotalSales,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryTransactionCount,
+            ]),
+            null, null, null, null, CancellationToken.None);
+
+        var summary = Assert.IsType<PosHomeSummaryDto>(result.Value!.Summary);
+        Assert.Equal(125m, summary.GrossSalesAmount);
+        Assert.Equal(3, summary.TransactionCount);
+        Assert.Null(summary.RefundAmount);
+        Assert.Null(summary.RefundCount);
+        Assert.False(summary.ReturnsApplicable);
+        Assert.Null(summary.DiscountAmount);
+        Assert.False(summary.DiscountsApplicable);
+        Assert.Null(summary.NetSalesAmount);
+    }
+
+    [Fact]
+    public async Task GetPosHomeAsync_AllSummaryPermissions_SerializesTypedApplicabilityContract()
+    {
+        var result = await CreateService().GetPosHomeAsync(
+            new TenantRequestContext(Guid.NewGuid(), Guid.NewGuid(),
+            [
+                PosPermissions.Home.View,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryView,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryTotalSales,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryTransactionCount,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryReturns,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryDiscounts,
+                CashierPosFineGrainedPermissions.PosHomeSessionSummaryNetSales,
+            ]),
+            null, null, null, null, CancellationToken.None);
+
+        var summary = Assert.IsType<PosHomeSummaryDto>(result.Value!.Summary);
+        Assert.True(summary.ReturnsApplicable);
+        Assert.True(summary.DiscountsApplicable);
+        var json = JsonSerializer.Serialize(summary, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Contains("\"scope\":\"CURRENT_TILL_SESSION\"", json);
+        Assert.Contains("\"grossSalesAmount\":125", json);
+        Assert.Contains("\"returnsApplicable\":true", json);
+        Assert.Contains("\"discountsApplicable\":true", json);
+    }
+
     private static PosHomeDashboardService CreateService() =>
         new(new FakePosHomeDashboardRepository());
 
@@ -171,7 +235,13 @@ public sealed class PosHomeDashboardServiceTests
                 ReturnsRefundsCount: 0,
                 CustomersCount: 0,
                 ParkedSalesCount: 0,
-                CashDrawerBalance: 0);
+                CashDrawerBalance: 0,
+                GrossSalesAmount: 125,
+                TransactionCount: 3,
+                RefundAmount: 5,
+                RefundCount: 1,
+                DiscountAmount: 10,
+                NetSalesAmount: 110);
 
             return Task.FromResult(
                 new PosHomeContextResolutionResult(

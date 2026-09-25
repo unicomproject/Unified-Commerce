@@ -157,6 +157,8 @@ public sealed class EPosDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductSetupScanContext> ProductSetupScanContexts => Set<ProductSetupScanContext>();
     public DbSet<SharedProductMetadataCache> SharedProductMetadataCaches => Set<SharedProductMetadataCache>();
+    public DbSet<ExternalCategoryMapping> ExternalCategoryMappings => Set<ExternalCategoryMapping>();
+    public DbSet<ExternalBrandMapping> ExternalBrandMappings => Set<ExternalBrandMapping>();
     public DbSet<ProductSetupInitialTracking> ProductSetupInitialTrackings => Set<ProductSetupInitialTracking>();
     public DbSet<ProductAttributeDefinition> ProductAttributeDefinitions => Set<ProductAttributeDefinition>();
     public DbSet<ProductAttributeOption> ProductAttributeOptions => Set<ProductAttributeOption>();
@@ -281,6 +283,7 @@ public sealed class EPosDbContext : DbContext
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
     public DbSet<CheckoutSessionAddress> CheckoutSessionAddresses => Set<CheckoutSessionAddress>();
     public DbSet<CheckoutSessionLine> CheckoutSessionLines => Set<CheckoutSessionLine>(); public DbSet<CheckoutSessionLineOption> CheckoutSessionLineOptions => Set<CheckoutSessionLineOption>();
+    public DbSet<PaymentProviderWebhookEvent> PaymentProviderWebhookEvents => Set<PaymentProviderWebhookEvent>();
     public DbSet<ShoppingCart> ShoppingCarts => Set<ShoppingCart>();
     public DbSet<ShoppingCartItem> ShoppingCartItems => Set<ShoppingCartItem>(); public DbSet<ShoppingCartItemOption> ShoppingCartItemOptions => Set<ShoppingCartItemOption>();
 

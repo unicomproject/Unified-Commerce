@@ -244,6 +244,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantAdminProductRepository, TenantAdminProductRepository>();
         services.AddScoped<ITenantAdminProductAuditLogger, TenantAdminProductAuditLogger>();
         services.AddScoped<ICategoryAuditLogger, CategoryAuditLogger>();
+        services.AddScoped<IBrandAuditLogger, BrandAuditLogger>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<ICurrentStockRepository, CurrentStockRepository>();
         services.AddScoped<IInventoryAuditLogger, InventoryAuditLogger>();
@@ -300,6 +301,7 @@ public static class DependencyInjection
         services.AddSingleton<TenantNotificationSocketRegistry>();
         services.AddSingleton<ITenantNotificationSocketRegistry>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
         services.AddSingleton<IRealtimeNotificationPublisher>(provider => provider.GetRequiredService<TenantNotificationSocketRegistry>());
+        services.AddSingleton<IWebSocketNotificationTicketService, WebSocketNotificationTicketService>();
         services.AddScoped(static provider =>
         {
             var options = provider.GetRequiredService<IOptions<PlatformJwtOptions>>().Value;
@@ -379,6 +381,7 @@ public static class DependencyInjection
         services.AddScoped<IOnlineCheckoutPaymentGateway, StripeCheckoutGateway>();
         services.AddScoped<IOnlineCheckoutPaymentConfirmationRepository, OnlineCheckoutPaymentConfirmationRepository>();
         services.AddScoped<IOnlineCheckoutPaymentConfirmationService, OnlineCheckoutPaymentConfirmationService>();
+        services.AddScoped<IPaymentWebhookEventDeduplicator, PaymentWebhookEventDeduplicator>();
         services.AddSingleton<IStorefrontAutocompleteService, StorefrontAutocompleteService>();
         services.AddHostedService<AutocompleteInitializationHostedService>();
         services.AddScoped<ICustomerRegistrationRepository, CustomerRegistrationRepository>();
@@ -401,7 +404,7 @@ public static class DependencyInjection
         services.AddScoped<IPosOnlineOrderPickingRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IPosOnlineOrderReadyRepository, PosOnlineOrderPickingRepository>();
         services.AddScoped<IPosOnlineOrderPackingRepository, PosOnlineOrderPackingRepository>();
-        services.AddScoped<IPosOnlineOrderPickupVerificationRepository, PosOnlineOrderPickupVerificationRepository>();
+        services.AddScoped<IPosOnlineOrderCollectionRepository, PosOnlineOrderCollectionRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
         services.AddScoped<IPaymentMethodExecutionCapability, CashPaymentExecutionCapability>();
         services.AddScoped<IPaymentMethodExecutionCapability, CardPaymentExecutionCapability>();
@@ -411,7 +414,9 @@ public static class DependencyInjection
         services.AddSingleton<E_POS.Infrastructure.Integrations.ProductLookup.Resilience.IProductLookupCircuitBreakerRegistry,
             E_POS.Infrastructure.Integrations.ProductLookup.Resilience.ProductLookupCircuitBreakerRegistry>();
 
-        // External Product Lookup providers (Phase 1)
+        // External Product Lookup providers (Phase 1). Registration order here is irrelevant to
+        // business priority — the coordinator orders enabled providers purely by
+        // ExternalProductLookupOptions.Providers[].Priority (config-driven), not by DI order.
         services.AddScoped<IExternalProductLookupProvider>(provider =>
             new E_POS.Infrastructure.Integrations.ProductLookup.OpenFoodFacts.OpenFoodFactsProductLookupProvider(
                 new HttpClient(),
@@ -419,8 +424,29 @@ public static class DependencyInjection
                 provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<E_POS.Infrastructure.Integrations.ProductLookup.OpenFoodFacts.OpenFoodFactsProductLookupProvider>>(),
                 provider.GetRequiredService<E_POS.Infrastructure.Integrations.ProductLookup.Resilience.IProductLookupCircuitBreakerRegistry>()));
 
+        // Phase C: UPCitemdb — second provider, priority is config-driven (see
+        // ExternalProductLookup:Providers in appsettings.json), not registration order.
+        services.AddScoped<IExternalProductLookupProvider>(provider =>
+            new E_POS.Infrastructure.Integrations.ProductLookup.UpcItemDb.UpcItemDbProductLookupProvider(
+                new HttpClient(),
+                provider.GetRequiredService<IOptions<E_POS.Application.Modules.Tenant.CatalogProduct.Options.ExternalProductLookupOptions>>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<E_POS.Infrastructure.Integrations.ProductLookup.UpcItemDb.UpcItemDbProductLookupProvider>>(),
+                provider.GetRequiredService<E_POS.Infrastructure.Integrations.ProductLookup.Resilience.IProductLookupCircuitBreakerRegistry>()));
+
+        // Scanner-first: server-side fetch of external imageCandidate → existing stage pipeline
+        services.AddScoped<IExternalImageCandidateFetcher>(provider =>
+            new E_POS.Infrastructure.Integrations.ProductLookup.ExternalImageCandidateFetcher(
+                new HttpClient { Timeout = TimeSpan.FromSeconds(10) },
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<E_POS.Infrastructure.Integrations.ProductLookup.ExternalImageCandidateFetcher>>()));
+
         // Shared Product Metadata Cache (Phase 2)
         services.AddScoped<ISharedProductMetadataCacheRepository, E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories.SharedProductMetadataCacheRepository>();
+
+        // Tenant External Category Mapping Repository
+        services.AddScoped<IExternalCategoryMappingRepository, E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories.ExternalCategoryMappingRepository>();
+
+        // Tenant External Brand Mapping Repository
+        services.AddScoped<IExternalBrandMappingRepository, E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories.ExternalBrandMappingRepository>();
 
         return services;
     }

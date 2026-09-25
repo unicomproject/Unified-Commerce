@@ -3,9 +3,11 @@ using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
+using E_POS.Application.Modules.Tenant.CatalogProduct.Options;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.Inventory.Services;
+using Microsoft.Extensions.Options;
 
 namespace E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
 
@@ -14,6 +16,14 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
     private static readonly Regex AlphanumericDashRegex = new(
         @"^[A-Za-z0-9\-]+$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private readonly IReadOnlySet<string> _allowedExternalMappingProviders;
+
+    public TenantAdminProductRequestValidator(IOptions<ExternalProductLookupOptions>? externalProductLookupOptions = null)
+    {
+        _allowedExternalMappingProviders =
+            (externalProductLookupOptions?.Value ?? new ExternalProductLookupOptions()).GetConfiguredProviderNames();
+    }
 
     public ApplicationError? ValidateCreate(TenantAdminProductCreateRequest request) =>
         ValidateWrite(request, isCreate: true);
@@ -432,7 +442,7 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         }
     }
 
-    private static ApplicationError? ValidateWrite(TenantAdminProductCreateRequest request, bool isCreate)
+    private ApplicationError? ValidateWrite(TenantAdminProductCreateRequest request, bool isCreate)
     {
         var fieldErrors = new List<ApplicationFieldError>();
 
@@ -605,6 +615,10 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                 fieldErrors.Add(new ApplicationFieldError("expiryDate", "Expiry date is required when expiry tracking is enabled."));
             }
         }
+
+        fieldErrors.AddRange(ExternalCategoryMappingContextValidator.Validate(
+            request.ExternalCategoryMappingContext,
+            _allowedExternalMappingProviders));
 
         if (fieldErrors.Count == 0)
         {

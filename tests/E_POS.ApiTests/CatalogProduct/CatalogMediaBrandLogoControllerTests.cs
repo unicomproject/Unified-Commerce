@@ -164,6 +164,12 @@ public sealed class CatalogMediaBrandLogoControllerTests
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
+        public Task<ApplicationResult<StagedProductImageResponse>> StageProductImageFromUrlAsync(
+            TenantRequestContext context,
+            string imageUrl,
+            CancellationToken cancellationToken) =>
+            throw new NotImplementedException();
+
         public Task<ApplicationResult<ProductImagesMutationResponse>> ReorderProductImagesAsync(
             TenantRequestContext context,
             Guid productId,
@@ -254,5 +260,9 @@ public sealed class CatalogMediaBrandLogoControllerTests
             Guid brandId,
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
+        public Task<ApplicationResult<BrandResponse>> GetByIdAfterMutationAsync(
+            TenantRequestContext context,
+            Guid brandId,
+            CancellationToken cancellationToken) => GetByIdAsync(context, brandId, cancellationToken);
     }
 }

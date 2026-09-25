@@ -119,6 +119,10 @@ public abstract class StorefrontProductRepositoryBase
         var priceRows = await (from item in DbContext.Set<PriceListItem>().AsNoTracking()
                 join priceList in DbContext.Set<PriceList>().AsNoTracking()
                     on new { item.TenantId, item.PriceListId } equals new { priceList.TenantId, PriceListId = priceList.Id }
+                join variant in DbContext.Set<ProductVariant>().AsNoTracking()
+                    on new { item.TenantId, VariantId = item.ProductVariantId } equals new { variant.TenantId, VariantId = (Guid?)variant.Id }
+                    into variantJoin
+                from variant in variantJoin.DefaultIfEmpty()
                 where item.TenantId == tenantId &&
                       productIds.Contains(item.ProductId) &&
                       item.Status == ActiveStatus &&
@@ -129,7 +133,16 @@ public abstract class StorefrontProductRepositoryBase
                       (!priceList.ValidUntil.HasValue || priceList.ValidUntil >= now) &&
                       (!item.ValidFrom.HasValue || item.ValidFrom <= now) &&
                       (!item.ValidUntil.HasValue || item.ValidUntil >= now)
-                orderby item.ProductVariantId.HasValue,
+                // Rank product-level prices first, then the product's default
+                // variant, then any other variant as a last resort -- without
+                // this, a product with only per-variant prices (no product-
+                // level row) has no deterministic tiebreaker between variants
+                // sharing identical price-list metadata, so .First() below
+                // could return any variant's price, not necessarily the one
+                // the storefront card actually displays as "the" price.
+                orderby item.ProductVariantId.HasValue
+                            ? (variant != null && variant.IsDefaultVariant ? 1 : 2)
+                            : 0,
                         priceList.IsDefaultPriceList descending,
                         priceList.Priority descending,
                         item.ValidFrom ?? DateTimeOffset.MinValue descending,

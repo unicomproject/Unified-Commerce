@@ -128,6 +128,11 @@ public sealed class PickupOrderConfiguration : IEntityTypeConfiguration<PickupOr
             .IsUnique()
             .HasDatabaseName("ux_pickup_orders_9c361648");
 
+        builder.HasIndex(x => new { x.TenantId, x.PickupQrTokenHash })
+            .IsUnique()
+            .HasFilter("pickup_qr_token_hash IS NOT NULL")
+            .HasDatabaseName("ux_pickup_orders_qr_token_hash");
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)

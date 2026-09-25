@@ -12,17 +12,22 @@ namespace E_POS.Api.Controllers.V1.ECommerce.Payments;
 [Route("api/v1/ecommerce/payments/stripe/webhook")]
 public sealed class StripeWebhookController : ControllerBase
 {
+    private const string Provider = "STRIPE";
+
     private readonly StripeOptions _options;
     private readonly IOnlineCheckoutPaymentConfirmationService _confirmationService;
+    private readonly IPaymentWebhookEventDeduplicator _deduplicator;
     private readonly ILogger<StripeWebhookController> _logger;
 
     public StripeWebhookController(
         IOptions<StripeOptions> options,
         IOnlineCheckoutPaymentConfirmationService confirmationService,
+        IPaymentWebhookEventDeduplicator deduplicator,
         ILogger<StripeWebhookController> logger)
     {
         _options = options.Value;
         _confirmationService = confirmationService;
+        _deduplicator = deduplicator;
         _logger = logger;
     }
 
@@ -45,6 +50,17 @@ public sealed class StripeWebhookController : ControllerBase
             return BadRequest();
         }
 
+        // Stripe delivers at-least-once: the same event id can arrive again on retry, or two
+        // deliveries can race each other closely enough that a payment-status check alone would
+        // not catch the duplicate. This durable record is the actual tie-breaker.
+        var isNewEvent = await _deduplicator.TryRecordAsync(
+            Provider, stripeEvent.Id, stripeEvent.Type, DateTimeOffset.UtcNow, cancellationToken);
+        if (!isNewEvent)
+        {
+            _logger.LogInformation("Ignoring duplicate Stripe webhook delivery for event {StripeEventId}.", stripeEvent.Id);
+            return Ok();
+        }
+
         switch (stripeEvent.Type)
         {
             case "checkout.session.completed":
@@ -63,6 +79,14 @@ public sealed class StripeWebhookController : ControllerBase
         if (stripeEvent.Data.Object is not Session session) return;
         if (!TryReadMetadata(session.Metadata, out var tenantId, out var salesOrderId, out var salesPaymentId)) return;
 
+        if (!string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Ignoring checkout.session.completed for Stripe session {StripeSessionId} with payment status {PaymentStatus} — not paid.",
+                session.Id, session.PaymentStatus);
+            return;
+        }
+
         var currencyCode = (session.Currency ?? string.Empty).ToUpperInvariant();
         var paidAmount = StripeMoney.FromMinorUnits(session.AmountTotal ?? 0, currencyCode);
 
@@ -71,6 +95,8 @@ public sealed class StripeWebhookController : ControllerBase
             salesOrderId,
             salesPaymentId,
             paidAmount,
+            currencyCode,
+            session.Id,
             session.PaymentIntentId,
             null,
             cancellationToken);

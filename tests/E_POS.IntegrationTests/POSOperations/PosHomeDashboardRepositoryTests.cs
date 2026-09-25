@@ -5,6 +5,8 @@ using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
 using E_POS.Domain.Modules.Tenant.HardwareCash.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.POSOperations.Constants;
+using E_POS.Domain.Modules.Tenant.Orders.Entities;
+using E_POS.Domain.Modules.Shared.Refund.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 using E_POS.Infrastructure.Persistence;
@@ -17,6 +19,72 @@ namespace E_POS.IntegrationTests.POSOperations;
 
 public sealed class PosHomeDashboardRepositoryTests
 {
+    [Fact]
+    public async Task ResolveContextAsync_SummaryUsesCompletedPaidAndRefundedOrdersFromResolvedSession()
+    {
+        await using var dbContext = CreateDbContext();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var outletId = Guid.NewGuid();
+        var tillId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var now = new DateTimeOffset(2026, 7, 8, 10, 0, 0, TimeSpan.Zero);
+        const string fingerprint = "pos-home-summary-session";
+        await SeedResolvedContextAsync(dbContext, tenantId, userId, outletId, tillId, deviceId, now, fingerprint);
+        var sessionId = await dbContext.TillSessions.Select(x => x.Id).SingleAsync();
+
+        SalesOrder CreateOrder(Guid orderTenantId, Guid orderTillId, Guid orderSessionId,
+            Guid reportingOutletId, string number, decimal subtotal, decimal discount,
+            decimal tax, decimal total) =>
+            SalesOrder.CreateCompletedPosSale(
+                Guid.NewGuid(), orderTenantId, number, Guid.NewGuid(), null, null,
+                orderTillId, orderSessionId, null, "LKR", false,
+                subtotal, discount, tax, total, total,
+                DateOnly.FromDateTime(now.UtcDateTime), reportingOutletId,
+                "MAIN-01", "Main Outlet", userId, now);
+
+        var paid = CreateOrder(tenantId, tillId, sessionId, outletId, "PAID", 1000m, 100m, 180m, 1080m);
+        var partiallyRefunded = CreateOrder(tenantId, tillId, sessionId, outletId, "PARTIAL", 600m, 0m, 0m, 600m);
+        var fullyRefunded = CreateOrder(tenantId, tillId, sessionId, outletId, "FULL", 300m, 0m, 0m, 300m);
+        var unpaid = CreateOrder(tenantId, tillId, sessionId, outletId, "UNPAID", 500m, 50m, 90m, 540m);
+        var cancelled = CreateOrder(tenantId, tillId, sessionId, outletId, "CANCELLED", 400m, 40m, 72m, 432m);
+        dbContext.SalesOrders.AddRange(
+            paid,
+            partiallyRefunded,
+            fullyRefunded,
+            unpaid,
+            cancelled,
+            CreateOrder(tenantId, tillId, Guid.NewGuid(), outletId, "OTHER-SESSION", 900m, 90m, 0m, 810m),
+            CreateOrder(tenantId, Guid.NewGuid(), sessionId, outletId, "OTHER-TILL", 800m, 80m, 0m, 720m),
+            CreateOrder(tenantId, tillId, sessionId, Guid.NewGuid(), "OTHER-OUTLET", 700m, 70m, 0m, 630m),
+            CreateOrder(Guid.NewGuid(), tillId, sessionId, outletId, "OTHER-TENANT", 600m, 60m, 0m, 540m));
+        partiallyRefunded.RecordRefund(500m, userId, now);
+        fullyRefunded.RecordRefund(300m, userId, now);
+        dbContext.Entry(unpaid).Property(nameof(SalesOrder.PaymentStatus)).CurrentValue = "UNPAID";
+        dbContext.Entry(cancelled).Property(nameof(SalesOrder.CancelledAt)).CurrentValue = now;
+        dbContext.SalesRefunds.AddRange(
+            SalesRefund.CreateCompleted(
+                Guid.NewGuid(), tenantId, partiallyRefunded.Id, Guid.NewGuid(), "REF-PARTIAL", "CASH",
+                "LKR", 500m, "Partial return", userId, now),
+            SalesRefund.CreateCompleted(
+                Guid.NewGuid(), tenantId, fullyRefunded.Id, Guid.NewGuid(), "REF-FULL", "CASH",
+                "LKR", 300m, "Full return", userId, now));
+        await dbContext.SaveChangesAsync();
+
+        var resolution = await CreateRepository(dbContext).ResolveContextAsync(
+            new TenantRequestContext(tenantId, userId, ["pos.home.view"]),
+            outletId, tillId, deviceId, fingerprint, CancellationToken.None);
+
+        Assert.True(resolution.IsResolved);
+        Assert.NotNull(resolution.Snapshot);
+        Assert.Equal(3, resolution.Snapshot!.TransactionCount);
+        Assert.Equal(1900m, resolution.Snapshot.GrossSalesAmount);
+        Assert.Equal(100m, resolution.Snapshot.DiscountAmount);
+        Assert.Equal(800m, resolution.Snapshot.RefundAmount);
+        Assert.Equal(2, resolution.Snapshot.RefundCount);
+        Assert.Equal(1180m, resolution.Snapshot.NetSalesAmount);
+    }
+
     [Fact]
     public async Task ResolveContextAsync_WhenOutletIdMismatchesTill_StillResolvesContext()
     {

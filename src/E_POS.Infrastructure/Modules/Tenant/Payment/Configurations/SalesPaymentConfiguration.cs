@@ -138,6 +138,12 @@ public sealed class SalesPaymentConfiguration : IEntityTypeConfiguration<SalesPa
             .HasColumnName("updated_by_tenant_user_id")
             .IsRequired(false);
 
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .HasDefaultValue(1L)
+            .IsRequired()
+            .IsConcurrencyToken();
+
         // <second-brain-constraints>
         builder.HasIndex(x => new { x.TenantId, x.PaymentNumber })
             .IsUnique()

@@ -21,6 +21,7 @@ using System.Text;
 using System.Text.Json;
 using E_POS.Application.Common.Models;
 using E_POS.Application.Modules.Tenant.Payment.Services;
+using E_POS.Domain.Modules.Shared.Idempotency.Entities;
 
 namespace E_POS.Infrastructure.Modules.Tenant.POSOperations.Repositories;
 
@@ -279,7 +280,109 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         return new PosCheckoutCalculationResult(null, summary);
     }
 
+    private const string CashClosedAttemptScope = "pos.checkout.cash.closed-attempt";
+
     public async Task<PosCheckoutStartPaymentResult> StartPaymentAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        IReadOnlyCollection<string> permissions,
+        PosCheckoutStartPaymentRequestDto request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        // Keep the existing non-Cash execution path and payment-key semantics.
+        if (!string.Equals(request.PaymentMethod?.Trim(), "cash", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(request.IdempotencyKey))
+            return await StartPaymentCoreAsync(tenantId, tenantUserId, permissions, request, now, cancellationToken);
+
+        await using var attemptLock = await LockCashAttemptAsync(tenantId, request.IdempotencyKey.Trim(), cancellationToken);
+        await using var transaction = _dbContext.Database.IsRelational()
+            ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+        if (await _dbContext.IdempotencyRequests.AsNoTracking().AnyAsync(
+                x => x.TenantId == tenantId && x.Endpoint == CashClosedAttemptScope &&
+                     x.IdempotencyKey == request.IdempotencyKey.Trim(), cancellationToken))
+            return new("pos_checkout.attempt_closed", null);
+
+        var result = await StartPaymentCoreAsync(
+            tenantId, tenantUserId, permissions, request, now, cancellationToken);
+        if (result.IsSuccess && transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    private async Task<IAsyncDisposable?> LockCashAttemptAsync(Guid tenantId, string key, CancellationToken cancellationToken)
+    {
+        if (_dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true)
+        {
+            var scope = $"pos-cash:{tenantId:N}:{key}";
+            // Acquire BEFORE starting Serializable: a snapshot taken while waiting
+            // for the lock could otherwise miss a just-committed safety fence.
+            await _dbContext.Database.OpenConnectionAsync(cancellationToken);
+            try
+            {
+                await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_lock(hashtextextended({scope}, 0))", cancellationToken);
+                return new CashAttemptLock(_dbContext, scope);
+            }
+            catch
+            {
+                await _dbContext.Database.CloseConnectionAsync();
+                throw;
+            }
+        }
+        return null;
+    }
+
+    private sealed class CashAttemptLock(EPosDbContext db, string scope) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_unlock(hashtextextended({scope}, 0))", CancellationToken.None);
+            }
+            finally { await db.Database.CloseConnectionAsync(); }
+        }
+    }
+
+    public async Task<PosCheckoutPaymentStatusDto> ReconcileCashPaymentAsync(
+        Guid tenantId, Guid tenantUserId, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        // The same session lock is held throughout Cash checkout and commit.
+        // A delayed original request cannot commit after a not_completed result.
+        await using var attemptLock = await LockCashAttemptAsync(tenantId, idempotencyKey, cancellationToken);
+        await using var transaction = _dbContext.Database.IsRelational()
+            ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken)
+            : null;
+        var payment = await FindCompletedCashPaymentAsync(tenantId, tenantUserId, idempotencyKey, cancellationToken);
+        if (payment is not null) return new("succeeded", payment);
+        // An existing non-paid/other-actor payment is NOT permission to retry.
+        if (await _dbContext.SalesPayments.AsNoTracking().AnyAsync(
+                x => x.TenantId == tenantId && x.IdempotencyKey == idempotencyKey, cancellationToken))
+            return new("unknown", null);
+
+        var closed = await _dbContext.IdempotencyRequests.AsNoTracking().AnyAsync(
+            x => x.TenantId == tenantId && x.Endpoint == CashClosedAttemptScope &&
+                 x.IdempotencyKey == idempotencyKey, cancellationToken);
+        if (!closed)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(idempotencyKey))).ToLowerInvariant();
+            var fence = IdempotencyRequest.Create(Guid.NewGuid(), tenantId, tenantUserId,
+                CashClosedAttemptScope, idempotencyKey, hash, now);
+            fence.Fail("pos_checkout.attempt_closed", now);
+            // Financial safety fence must not expire and permit a late request.
+            fence.ExpiresAt = DateTimeOffset.MaxValue;
+            _dbContext.IdempotencyRequests.Add(fence);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        return new("not_completed", null);
+    }
+
+    private async Task<PosCheckoutStartPaymentResult> StartPaymentCoreAsync(
         Guid tenantId,
         Guid tenantUserId,
         IReadOnlyCollection<string> permissions,
@@ -318,6 +421,19 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
         if (!HasPaymentPermission(paymentMethodCode, permissions))
         {
             return new PosCheckoutStartPaymentResult("pos_checkout.payment_permission_denied", null);
+        }
+
+        if (request.ExistingSalesOrderId is { } existingSalesOrderId && existingSalesOrderId != Guid.Empty)
+        {
+            return await StartExistingClickCollectPaymentAsync(
+                tenantId,
+                tenantUserId,
+                request,
+                session,
+                paymentMethodCode,
+                existingSalesOrderId,
+                now,
+                cancellationToken);
         }
 
         if (request.CustomerId is { } customerId && customerId != Guid.Empty)
@@ -613,7 +729,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 "pos_checkout.payment_method_not_implemented", null);
         }
 
-        await using var transaction = _dbContext.Database.IsRelational()
+        await using var transaction = _dbContext.Database.IsRelational() && _dbContext.Database.CurrentTransaction is null
             ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             : null;
 
@@ -1876,6 +1992,288 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             row.SourceProductId == line.RecommendationParentProductId && row.VariantId == line.VariantId));
     }
 
+    private async Task<PosCheckoutStartPaymentResult> StartExistingClickCollectPaymentAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        PosCheckoutStartPaymentRequestDto request,
+        CurrentTillSessionDbSnapshot session,
+        string paymentMethodCode,
+        Guid existingSalesOrderId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.IdempotencyKey.Trim().Length > 100)
+            return new PosCheckoutStartPaymentResult("pos_checkout.invalid_idempotency_key", null);
+
+        var idempotencyKey = request.IdempotencyKey.Trim();
+        var emptyLines = Array.Empty<PosCheckoutLineRequestDto>();
+        var requestHash = CreatePaymentRequestHash(request, emptyLines, paymentMethodCode);
+        var replay = await ResolveIdempotentPaymentAsync(
+            tenantId, idempotencyKey, requestHash, cancellationToken);
+        if (replay.Found)
+        {
+            return replay.Payment is null
+                ? new PosCheckoutStartPaymentResult("pos_checkout.idempotency_conflict", null)
+                : new PosCheckoutStartPaymentResult(null, replay.Payment);
+        }
+
+        var order = await _dbContext.SalesOrders.FirstOrDefaultAsync(x =>
+            x.TenantId == tenantId &&
+            x.Id == existingSalesOrderId &&
+            x.OrderType == "CLICK_AND_COLLECT",
+            cancellationToken);
+        if (order is null)
+            return new PosCheckoutStartPaymentResult("pos_checkout.existing_order_not_found", null);
+
+        const decimal epsilon = 0.01m;
+        if (order.BalanceDue <= epsilon)
+            return new PosCheckoutStartPaymentResult("pos_checkout.existing_order_no_balance", null);
+
+        var amountDue = order.BalanceDue;
+        decimal cashReceived;
+        decimal changeDue;
+        if (string.Equals(paymentMethodCode, "CASH", StringComparison.Ordinal))
+        {
+            if (!request.CashReceived.HasValue || request.CashReceived.Value <= 0)
+                return new PosCheckoutStartPaymentResult("pos_checkout.cash_received_required", null);
+
+            cashReceived = request.CashReceived.Value;
+            if (cashReceived + epsilon < amountDue)
+                return new PosCheckoutStartPaymentResult("pos_checkout.insufficient_cash", null);
+
+            changeDue = Math.Max(0m, cashReceived - amountDue);
+        }
+        else if (string.Equals(paymentMethodCode, "CARD", StringComparison.Ordinal))
+        {
+            return new PosCheckoutStartPaymentResult("pos_checkout.payment_method_not_implemented", null);
+        }
+        else
+        {
+            return new PosCheckoutStartPaymentResult("pos_checkout.payment_method_not_implemented", null);
+        }
+
+        var paymentMethod = await _dbContext.PaymentMethods.FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.MethodCode == paymentMethodCode &&
+                 x.IsActiveForPos && x.Status == ActiveStatus,
+            cancellationToken);
+        if (paymentMethod is null)
+            return new PosCheckoutStartPaymentResult("pos_checkout.payment_method_not_found", null);
+
+        await using var transaction = _dbContext.Database.IsRelational() && _dbContext.Database.CurrentTransaction is null
+            ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        try
+        {
+            var paymentId = Guid.NewGuid();
+            var receiptId = Guid.NewGuid();
+            var paymentNumber = await GetNextDocumentNumberAsync(
+                tenantId,
+                _dbContext.SalesPayments.Where(x => x.TenantId == tenantId).Select(x => x.PaymentNumber),
+                "PAY-",
+                6,
+                cancellationToken);
+            var receiptNumber = await GetNextDocumentNumberAsync(
+                tenantId,
+                _dbContext.Receipts.Where(x => x.TenantId == tenantId).Select(x => x.ReceiptNumber),
+                "RCP-",
+                6,
+                cancellationToken);
+
+            try
+            {
+                order.ApplyPosCollectionPayment(amountDue, tenantUserId, now);
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "COLLECTION_PAYMENT_ALREADY_PAID")
+            {
+                if (transaction is not null) await transaction.RollbackAsync(cancellationToken);
+                return new PosCheckoutStartPaymentResult("pos_checkout.existing_order_no_balance", null);
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "COLLECTION_PAYMENT_EXCEEDS_BALANCE")
+            {
+                if (transaction is not null) await transaction.RollbackAsync(cancellationToken);
+                return new PosCheckoutStartPaymentResult("pos_checkout.insufficient_cash", null);
+            }
+
+            var orderEntry = _dbContext.Entry(order);
+            orderEntry.Property(x => x.PaidAmount).IsModified = true;
+            orderEntry.Property(x => x.BalanceDue).IsModified = true;
+            orderEntry.Property(x => x.PaymentStatus).IsModified = true;
+            orderEntry.Property(x => x.UpdatedByTenantUserId).IsModified = true;
+            orderEntry.Property(x => x.UpdatedAt).IsModified = true;
+
+            var salesPaymentRecords = PosCompletedPaymentPersistence.CreateCash(
+                paymentId,
+                tenantId,
+                order.Id,
+                paymentNumber,
+                paymentMethod.Id,
+                session.TillId,
+                session.SessionId,
+                order.CurrencyCode,
+                amountDue,
+                cashReceived,
+                amountDue,
+                changeDue,
+                idempotencyKey,
+                requestHash,
+                tenantUserId,
+                now);
+
+            _dbContext.SalesPayments.Add(salesPaymentRecords.Payment);
+            _dbContext.SalesPaymentTransactions.Add(salesPaymentRecords.Transaction);
+            _dbContext.SalesPaymentEvents.Add(salesPaymentRecords.Event);
+
+            var responseLines = await _dbContext.SalesOrderLines.AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.SalesOrderId == order.Id)
+                .OrderBy(x => x.LineNumber)
+                .Select(x => new PosCheckoutStartPaymentLineResponseDto(
+                    x.ProductNameSnapshot,
+                    (int)x.Quantity,
+                    ToMoney(x.UnitPrice),
+                    ToMoney(x.LineTotalAmount),
+                    x.SkuSnapshot,
+                    x.Id,
+                    ToMoney(x.LineDiscountAmount),
+                    x.LineNote))
+                .ToListAsync(cancellationToken);
+
+            var businessDate = await _dbContext.TillSessions
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.Id == session.SessionId)
+                .Select(x => x.BusinessDate)
+                .FirstAsync(cancellationToken);
+
+            var outletName = await _dbContext.Outlets.AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.Id == session.OutletId)
+                .Select(x => x.OutletName)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var receiptTenders = new[]
+            {
+                new PosReceiptTenderLineDto(
+                    paymentId,
+                    paymentMethod.MethodCode,
+                    paymentMethod.MethodName,
+                    paymentMethod.MethodCode,
+                    ToMoney(amountDue),
+                    ToMoney(cashReceived),
+                    ToMoney(changeDue),
+                    order.CurrencyCode,
+                    "PAID",
+                    now)
+            };
+
+            var receiptDataJson = JsonSerializer.Serialize(new
+            {
+                contractVersion = 2,
+                branding = new { outletName },
+                receiptIdentity = new
+                {
+                    receiptId,
+                    receiptNumber,
+                    saleId = order.Id,
+                    saleNumber = order.OrderNumber,
+                    receiptType = "COLLECTION_PAYMENT",
+                    issuedAt = now,
+                    businessDate
+                },
+                @operator = new
+                {
+                    cashierId = tenantUserId,
+                    tillId = session.TillId,
+                    posDeviceId = request.DeviceId
+                },
+                items = responseLines.Select(item => new
+                {
+                    productName = item.Name,
+                    sku = item.Sku,
+                    quantity = item.Qty,
+                    unitPrice = item.UnitPrice,
+                    discount = item.DiscountAmount,
+                    lineTotal = item.LineTotal
+                }),
+                totals = new
+                {
+                    subtotal = ToMoney(order.SubtotalAmount),
+                    discount = ToMoney(order.DiscountAmount),
+                    tax = ToMoney(order.TaxAmount),
+                    total = ToMoney(order.TotalAmount),
+                    paid = ToMoney(amountDue),
+                    cashReceived = ToMoney(cashReceived),
+                    changeDue = ToMoney(changeDue),
+                    balanceDue = ToMoney(order.BalanceDue)
+                },
+                tenders = receiptTenders
+            });
+
+            var receipt = Receipt.CreateForSale(
+                receiptId,
+                tenantId,
+                receiptNumber,
+                order.Id,
+                session.OutletId,
+                session.TillId,
+                session.SessionId,
+                businessDate,
+                tenantUserId,
+                order.CurrencyCode,
+                order.SubtotalAmount,
+                order.DiscountAmount,
+                order.TaxAmount,
+                order.TotalAmount,
+                amountDue,
+                changeDue,
+                receiptDataJson,
+                now);
+            _dbContext.Receipts.Add(receipt);
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
+
+            return new PosCheckoutStartPaymentResult(null, new PosCheckoutStartPaymentResponseDto(
+                order.Id,
+                order.Id,
+                order.OrderNumber,
+                receiptNumber,
+                receiptNumber,
+                ToMoney(order.SubtotalAmount),
+                ToMoney(order.DiscountAmount),
+                ToMoney(order.TaxAmount),
+                ToMoney(order.TotalAmount),
+                ToMoney(cashReceived),
+                ToMoney(changeDue),
+                request.PaymentMethod.Trim().ToLowerInvariant(),
+                order.CurrencyCode,
+                "completed",
+                "completed",
+                now,
+                paymentId,
+                responseLines,
+                receiptId,
+                OutletName: outletName,
+                TillId: session.TillId,
+                CashierId: tenantUserId,
+                Tenders: receiptTenders,
+                ReceiptDataJson: receiptDataJson,
+                CustomerId: order.CustomerId,
+                CustomerName: order.CustomerNameSnapshot,
+                CustomerPhone: order.CustomerPhoneSnapshot));
+        }
+        catch (DbUpdateException)
+        {
+            if (transaction is not null) await transaction.RollbackAsync(cancellationToken);
+            _dbContext.ChangeTracker.Clear();
+            return new PosCheckoutStartPaymentResult("pos_checkout.idempotency_conflict", null);
+        }
+        catch
+        {
+            if (transaction is not null) await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
     private static string CreatePaymentRequestHash(
         PosCheckoutStartPaymentRequestDto request,
         IReadOnlyList<PosCheckoutLineRequestDto> normalizedLines,
@@ -1890,9 +2288,30 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
                 x.Source, x.RecommendationParentProductId, x.RecommendationRelationshipId }),
             paymentMethod = paymentMethodCode,
             request.CashReceived,
-            request.DiscountApplicationId
+            request.DiscountApplicationId,
+            request.ExistingSalesOrderId
         });
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
+    }
+
+    public async Task<PosCheckoutStartPaymentResponseDto?> FindCompletedCashPaymentAsync(
+        Guid tenantId, Guid tenantUserId, string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var payment = await _dbContext.SalesPayments.AsNoTracking().FirstOrDefaultAsync(
+            x => x.TenantId == tenantId && x.CreatedByTenantUserId == tenantUserId &&
+                 x.IdempotencyKey == idempotencyKey && x.PaymentStatus == "PAID",
+            cancellationToken);
+        const string prefix = "POS_REQUEST_HASH:";
+        if (payment?.PaymentNote?.StartsWith(prefix, StringComparison.Ordinal) != true)
+            return null;
+        var cash = await _dbContext.PaymentMethods.AsNoTracking().AnyAsync(
+            x => x.TenantId == tenantId && x.Id == payment.PaymentMethodId && x.MethodCode == "CASH",
+            cancellationToken);
+        if (!cash) return null;
+        // Read only: never invokes StartPayment or creates a drawer/print operation.
+        return (await ResolveIdempotentPaymentAsync(
+            tenantId, idempotencyKey, payment.PaymentNote[prefix.Length..], cancellationToken)).Payment;
     }
 
     private async Task<IdempotentPaymentResolution> ResolveIdempotentPaymentAsync(
@@ -1910,7 +2329,7 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             x => x.TenantId == tenantId && x.Id == payment.SalesOrderId, cancellationToken);
         var receipt = await _dbContext.Receipts.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.SalesOrderId == order.Id)
-            .Select(x => new { x.ReceiptNumber, x.ReceiptDataJson })
+            .Select(x => new { x.Id, x.ReceiptNumber, x.ReceiptDataJson })
             .FirstAsync(cancellationToken);
         var methodCode = await _dbContext.PaymentMethods.AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.Id == payment.PaymentMethodId)
@@ -1920,8 +2339,17 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             .OrderBy(x => x.LineNumber)
             .Select(x => new PosCheckoutStartPaymentLineResponseDto(
                 x.ProductNameSnapshot, (int)x.Quantity, ToMoney(x.UnitPrice),
-                ToMoney(x.LineTotalAmount), x.SkuSnapshot, x.Id, 0, x.LineNote))
+                ToMoney(x.LineTotalAmount), x.SkuSnapshot, x.Id, ToMoney(x.LineDiscountAmount), x.LineNote))
             .ToListAsync(cancellationToken);
+
+        using var snapshot = JsonDocument.Parse(receipt.ReceiptDataJson);
+        var root = snapshot.RootElement;
+        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        T? Read<T>(string name) => root.TryGetProperty(name, out var value)
+            ? value.Deserialize<T>(jsonOptions) : default;
+        string? Text(string section, string name) =>
+            root.TryGetProperty(section, out var node) && node.TryGetProperty(name, out var value) &&
+            value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
         return new(true, new PosCheckoutStartPaymentResponseDto(
             order.Id, order.Id, order.OrderNumber, receipt.ReceiptNumber, receipt.ReceiptNumber,
@@ -1929,6 +2357,16 @@ public sealed class PosCheckoutRepository : IPosCheckoutRepository
             ToMoney(order.TotalAmount), ToMoney(payment.TenderedAmount ?? payment.PaidAmount),
             ToMoney(payment.ChangeAmount), methodCode.ToLowerInvariant(), order.CurrencyCode,
             "completed", "completed", payment.PaidAt ?? payment.InitiatedAt, payment.Id, lines,
+            ReceiptId: receipt.Id,
+            MerchantName: Text("branding", "merchantName"),
+            OutletName: Text("branding", "outletName"),
+            TillId: order.TillId ?? Guid.Empty,
+            CashierId: order.CreatedByTenantUserId ?? Guid.Empty,
+            CashierName: Text("operator", "cashierName"),
+            Tenders: Read<List<PosReceiptTenderLineDto>>("tenders"),
+            DiscountLines: Read<List<PosReceiptDiscountLineDto>>("discountLines"),
+            TaxLines: Read<List<PosReceiptTaxLineDto>>("taxLines"),
+            CopyPolicy: Read<PosReceiptCopyPolicyDto>("copyPolicy"),
             ReceiptDataJson: receipt.ReceiptDataJson,
             CustomerId: order.CustomerId,
             CustomerName: order.CustomerNameSnapshot,

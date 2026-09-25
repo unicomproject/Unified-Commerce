@@ -26,6 +26,12 @@ public abstract class CustomerOrderRepositoryBase
 
     protected EPosDbContext DbContext { get; }
 
+    protected static bool CanPackPickingLines(string status, IEnumerable<decimal> remainingQuantities)
+    {
+        var remaining = remainingQuantities.ToList();
+        return status == "PICKING" && remaining.Count > 0 && remaining.All(x => x == 0m);
+    }
+
     protected static IQueryable<SalesOrder> ApplyStatusFilter(
         IQueryable<SalesOrder> query,
         string? normalizedStatus) => normalizedStatus switch
@@ -152,17 +158,16 @@ public abstract class CustomerOrderRepositoryBase
         IReadOnlyList<SalesOrderLine> lines,
         IReadOnlyDictionary<Guid, string?> imageLookup,
         IReadOnlyList<SalesOrderStatusHistory> statusHistory,
-        PickupOrder? pickup = null,
-        DateTimeOffset? now = null)
+        PickupOrder? pickup = null)
     {
         var status = MapUiStatus(order);
         // A pickup code is only live once the outlet has issued one (at "ready for
-        // collection") and only until it is spent (verified) or expires — never derived
-        // from order fields, which anyone who knows the order number could reconstruct.
+        // collection") and only until it is spent (verified) — never derived from order
+        // fields, which anyone who knows the order number could reconstruct. It does not
+        // expire on its own; it stays valid until the order is collected or cancelled.
         var hasLiveCode = pickup is not null &&
             !string.IsNullOrEmpty(pickup.PickupQrTokenHash) &&
-            pickup.PickupStatus == "READY" &&
-            (!pickup.PickupQrExpiresAt.HasValue || pickup.PickupQrExpiresAt.Value > (now ?? DateTimeOffset.UtcNow));
+            pickup.PickupStatus == "READY";
         var canShowQr = CanShowCollectionQr(status) && hasLiveCode;
 
         return new CustomerOrderDetailReadModel
@@ -382,7 +387,11 @@ public abstract class CustomerOrderRepositoryBase
             Is(order.FulfillmentStatus, "READY"))
             return "READY_FOR_COLLECTION";
 
-        if ((Is(order.Status, "ACCEPTED") && Is(order.FulfillmentStatus, "PREPARING")) ||
+        // Sales PREPARING (POS Start projection) and partial fulfilment share the
+        // cashier Preparing stage with list bucket PREPARING.
+        if (Is(order.FulfillmentStatus, "PREPARING") ||
+            Is(order.FulfillmentStatus, "PARTIALLY_FULFILLED") ||
+            (Is(order.Status, "ACCEPTED") && Is(order.FulfillmentStatus, "PREPARING")) ||
             (Is(order.Status, "CONFIRMED") && Is(order.FulfillmentStatus, "PARTIALLY_FULFILLED")))
             return "PREPARING";
 

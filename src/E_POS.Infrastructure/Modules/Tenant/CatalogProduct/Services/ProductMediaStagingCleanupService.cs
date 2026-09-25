@@ -37,22 +37,43 @@ public sealed class ProductMediaStagingCleanupService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(PollingInterval);
-        do
+        try
         {
-            await RunCleanupPassAsync(stoppingToken);
+            do
+            {
+                if (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                await RunCleanupPassAsync(stoppingToken);
+            }
+            while (await timer.WaitForNextTickAsync(stoppingToken));
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+        catch (OperationCanceledException)
+        {
+            // Host is shutting down (PeriodicTimer cancel surfaces as TaskCanceledException).
+        }
+        catch (ObjectDisposedException)
+        {
+            // Root IServiceProvider disposed during host teardown.
+        }
     }
 
     private async Task RunCleanupPassAsync(CancellationToken cancellationToken)
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await ClaimOrphansAsDeletePendingAsync(cancellationToken);
             await ProcessDeletePendingAsync(cancellationToken);
         }
         catch (OperationCanceledException)
         {
+        }
+        catch (ObjectDisposedException)
+        {
+            // Root IServiceProvider disposed during host teardown.
         }
         catch (Exception ex)
         {

@@ -445,6 +445,42 @@ public sealed class TenantAdminProductsController : ControllerBase
             : ToMediaErrorResult(result.Error);
     }
 
+    /// <summary>
+    /// Stages an external product image candidate by server-side fetch (scanner-first Use This Product).
+    /// Does not persist a third-party URL as product media.
+    /// </summary>
+    [HttpPost("images/stage-from-url")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> StageImageFromUrl(
+        [FromBody] StageProductImageFromUrlRequest? request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tenantRequestContextFactory.TryCreate(User, out var context))
+        {
+            return Unauthorized(CreateError(new ApplicationError(
+                "product.invalid_tenant_context",
+                "Invalid tenant context.")));
+        }
+
+        if (request is null || string.IsNullOrWhiteSpace(request.ImageUrl))
+        {
+            return BadRequest(CreateError(new ApplicationError(
+                "media.validation_failed",
+                "Image validation failed.",
+                [new ApplicationFieldError("imageUrl", "Image URL is required.")])));
+        }
+
+        var result = await _catalogMediaService.StageProductImageFromUrlAsync(
+            context,
+            request.ImageUrl.Trim(),
+            cancellationToken);
+
+        return result.IsSuccess && result.Value is not null
+            ? Ok(new { data = result.Value })
+            : ToMediaErrorResult(result.Error);
+    }
+
 
     private IActionResult ToActionResult<T>(ApplicationResult<T> result)
     {

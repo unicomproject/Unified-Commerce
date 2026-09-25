@@ -14,8 +14,22 @@ public sealed class ExternalProductLookupOptions
 
     public List<ExternalProductLookupProviderOptions> Providers { get; set; } = [];
     public OpenFoodFactsOptions OpenFoodFacts { get; set; } = new();
+    public UpcItemDbOptions UpcItemDb { get; set; } = new();
     public ProductMetadataCacheOptions Cache { get; set; } = new();
     public ProviderResilienceOptions Resilience { get; set; } = new();
+
+    /// <summary>
+    /// Normalized (trimmed, case-insensitive) set of provider names configured for this
+    /// deployment — regardless of Enabled/Priority. Used to allowlist any provider identity a
+    /// client echoes back on write (e.g. ExternalCategoryMappingContext.Provider), so a value
+    /// that never came from a real, configured provider (like the literal "cache") can never be
+    /// persisted into a mapping table.
+    /// </summary>
+    public IReadOnlySet<string> GetConfiguredProviderNames() =>
+        Providers
+            .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+            .Select(p => p.Name.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class ProductMetadataCacheOptions
@@ -46,6 +60,28 @@ public sealed class OpenFoodFactsOptions
 
     public string BaseUrl { get; set; } = DefaultBaseUrl;
     public string UserAgent { get; set; } = DefaultUserAgent;
+}
+
+/// <summary>
+/// UPCitemdb configuration. "trial" mode (default) uses the free, keyless endpoint and is the
+/// only mode this adapter currently exercises. "paid" mode's UserKey must come from an
+/// environment variable / secret store / secured app configuration at deploy time — never
+/// hardcoded here and never sent to Flutter. No provider-specific cache TTL is introduced; the
+/// shared ProductMetadataCacheOptions.TtlDays applies to every provider uniformly.
+/// </summary>
+public sealed class UpcItemDbOptions
+{
+    public const string DefaultBaseUrl = "https://api.upcitemdb.com";
+    public const string TrialMode = "trial";
+    public const string PaidMode = "paid";
+
+    public string BaseUrl { get; set; } = DefaultBaseUrl;
+
+    /// <summary>"trial" (default, no credentials) or "paid" (requires UserKey).</summary>
+    public string Mode { get; set; } = TrialMode;
+
+    /// <summary>Only read when Mode="paid". Must be supplied via configuration/secret store.</summary>
+    public string? UserKey { get; set; }
 }
 
 public sealed class ExternalProductLookupProviderOptions
