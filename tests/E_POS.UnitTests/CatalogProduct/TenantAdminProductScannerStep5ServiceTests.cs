@@ -9,7 +9,7 @@ namespace E_POS.UnitTests.CatalogProduct;
 public sealed partial class TenantAdminProductServiceTests
 {
     [Fact]
-    public async Task UpdateDraftAsync_ScannerCompositeStep5_SaveAndContinue_PersistsIdentifiersAndAdvancesTo6()
+    public async Task UpdateDraftAsync_ScannerCompositeStep3_SaveAndContinue_PersistsIdentifiersAndAdvancesTo6()
     {
         var productId = Guid.NewGuid();
         var variantId = Guid.NewGuid();
@@ -19,7 +19,7 @@ public sealed partial class TenantAdminProductServiceTests
             GeneratedSkuBase = "TSH-000125",
             SetupDto = CreateSetup(productId, Guid.NewGuid()) with
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 ProductStructure = ProductStructureConstants.Simple,
                 RowVersion = 3
             },
@@ -30,7 +30,7 @@ public sealed partial class TenantAdminProductServiceTests
                 "SCN-1",
                 ProductConstants.DraftStatus,
                 ProductConstants.DesiredPublishActive,
-                6,
+                4,
                 DateTimeOffset.UtcNow,
                 4,
                 Guid.NewGuid(),
@@ -45,8 +45,8 @@ public sealed partial class TenantAdminProductServiceTests
                 ProductStructureConstants.Simple,
                 false,
                 [],
-                TargetSetupStep: 6,
-                LastCompletedSetupStep: 6))
+                TargetSetupStep: 4,
+                LastCompletedSetupStep: 4))
         };
         var service = CreateService(repository);
 
@@ -57,7 +57,7 @@ public sealed partial class TenantAdminProductServiceTests
             productId,
             new SaveProductDraftRequest
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 WizardAction = "SAVE_AND_CONTINUE",
                 ExpectedRowVersion = 3,
                 ProductStructure = ProductStructureConstants.Simple,
@@ -79,12 +79,12 @@ public sealed partial class TenantAdminProductServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.Error?.Message);
-        Assert.Equal(6, result.Value!.CurrentSetupStep);
+        Assert.Equal(4, result.Value!.CurrentSetupStep);
         Assert.Equal(ProductConstants.DraftStatus, result.Value.Status);
         Assert.NotNull(repository.LastSaveDraftCommand);
-        Assert.True(repository.LastSaveDraftCommand!.ApplyCompositeStep5Identifiers);
+        Assert.True(repository.LastSaveDraftCommand!.ApplyCompositeStep3Identifiers);
         Assert.Equal(ProductWizardStage.ProductConfiguration, repository.LastSaveDraftCommand.CurrentStage);
-        Assert.Equal(6, repository.LastSaveDraftCommand.TargetSetupStep);
+        Assert.Equal(4, repository.LastSaveDraftCommand.TargetSetupStep);
         Assert.Equal("SKU-FINAL-1", repository.LastSaveDraftCommand.BarcodeSkuConfiguration!.Assignments![0].Sku);
         Assert.Null(repository.LastSaveDraftCommand.AutoSkuBase);
         Assert.Equal("012345678905", repository.LastSaveDraftCommand.BarcodeSkuConfiguration.Assignments[0].Barcode);
@@ -101,7 +101,7 @@ public sealed partial class TenantAdminProductServiceTests
             GeneratedSkuBase = "BEV-000128",
             SetupDto = CreateSetup(productId, Guid.NewGuid()) with
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 ProductStructure = ProductStructureConstants.Simple,
                 RowVersion = 3
             },
@@ -111,7 +111,7 @@ public sealed partial class TenantAdminProductServiceTests
                 "BEV-P",
                 ProductConstants.DraftStatus,
                 ProductConstants.DesiredPublishActive,
-                6,
+                4,
                 DateTimeOffset.UtcNow,
                 4,
                 Guid.NewGuid(),
@@ -126,8 +126,8 @@ public sealed partial class TenantAdminProductServiceTests
                 ProductStructureConstants.Simple,
                 false,
                 [],
-                TargetSetupStep: 6,
-                LastCompletedSetupStep: 6))
+                TargetSetupStep: 4,
+                LastCompletedSetupStep: 4))
         };
         var service = CreateService(repository);
 
@@ -138,7 +138,7 @@ public sealed partial class TenantAdminProductServiceTests
             productId,
             new SaveProductDraftRequest
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 WizardAction = "SAVE_AND_CONTINUE",
                 ExpectedRowVersion = 3,
                 ProductStructure = ProductStructureConstants.Simple,
@@ -148,11 +148,11 @@ public sealed partial class TenantAdminProductServiceTests
 
         Assert.True(result.IsSuccess, result.Error?.Message);
         Assert.Equal("BEV-000128", repository.LastSaveDraftCommand!.AutoSkuBase);
-        Assert.True(repository.LastSaveDraftCommand.ApplyCompositeStep5Identifiers);
+        Assert.True(repository.LastSaveDraftCommand.ApplyCompositeStep3Identifiers);
     }
 
     [Fact]
-    public async Task UpdateDraftAsync_ScannerCompositeStep5_SaveDraft_StaysAt5()
+    public async Task UpdateDraftAsync_ScannerCompositeStep3_SaveDraft_StaysAt5()
     {
         var productId = Guid.NewGuid();
         var variantId = Guid.NewGuid();
@@ -161,7 +161,7 @@ public sealed partial class TenantAdminProductServiceTests
             HasScanContext = true,
             SetupDto = CreateSetup(productId, Guid.NewGuid()) with
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 ProductStructure = ProductStructureConstants.Simple,
                 RowVersion = 2
             },
@@ -172,7 +172,7 @@ public sealed partial class TenantAdminProductServiceTests
                 "SCN-1",
                 ProductConstants.DraftStatus,
                 ProductConstants.DesiredPublishActive,
-                5,
+                3,
                 DateTimeOffset.UtcNow,
                 3,
                 Guid.NewGuid(),
@@ -187,8 +187,8 @@ public sealed partial class TenantAdminProductServiceTests
                 ProductStructureConstants.Simple,
                 false,
                 [],
-                TargetSetupStep: 5,
-                LastCompletedSetupStep: 5))
+                TargetSetupStep: 3,
+                LastCompletedSetupStep: 3))
         };
         var service = CreateService(repository);
 
@@ -199,7 +199,7 @@ public sealed partial class TenantAdminProductServiceTests
             productId,
             new SaveProductDraftRequest
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 WizardAction = "SAVE_DRAFT",
                 ExpectedRowVersion = 2,
                 ProductStructure = ProductStructureConstants.Simple,
@@ -210,8 +210,8 @@ public sealed partial class TenantAdminProductServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.Error?.Message);
-        Assert.Equal(5, repository.LastSaveDraftCommand!.TargetSetupStep);
-        Assert.True(repository.LastSaveDraftCommand.ApplyCompositeStep5Identifiers);
+        Assert.Equal(3, repository.LastSaveDraftCommand!.TargetSetupStep);
+        Assert.True(repository.LastSaveDraftCommand.ApplyCompositeStep3Identifiers);
     }
 
     [Fact]
@@ -224,7 +224,7 @@ public sealed partial class TenantAdminProductServiceTests
             HasScanContext = false,
             SetupDto = CreateSetup(productId, Guid.NewGuid()) with
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 ProductStructure = ProductStructureConstants.Simple,
                 RowVersion = 2
             },
@@ -235,7 +235,7 @@ public sealed partial class TenantAdminProductServiceTests
                 "LEG-1",
                 ProductConstants.DraftStatus,
                 ProductConstants.DesiredPublishActive,
-                5,
+                3,
                 DateTimeOffset.UtcNow,
                 3,
                 Guid.NewGuid(),
@@ -250,8 +250,8 @@ public sealed partial class TenantAdminProductServiceTests
                 ProductStructureConstants.Simple,
                 false,
                 [],
-                TargetSetupStep: 5,
-                LastCompletedSetupStep: 5))
+                TargetSetupStep: 3,
+                LastCompletedSetupStep: 3))
         };
         var service = CreateService(repository);
 
@@ -273,12 +273,12 @@ public sealed partial class TenantAdminProductServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.Error?.Message);
-        Assert.False(repository.LastSaveDraftCommand!.ApplyCompositeStep5Identifiers);
+        Assert.False(repository.LastSaveDraftCommand!.ApplyCompositeStep3Identifiers);
         Assert.Equal(ProductWizardStage.BarcodeSku, repository.LastSaveDraftCommand.CurrentStage);
     }
 
     [Fact]
-    public async Task UpdateDraftAsync_ScannerCompositeStep5_RejectsDuplicateSkuInRequest()
+    public async Task UpdateDraftAsync_ScannerCompositeStep3_RejectsDuplicateSkuInRequest()
     {
         var productId = Guid.NewGuid();
         var v1 = Guid.NewGuid();
@@ -306,7 +306,7 @@ public sealed partial class TenantAdminProductServiceTests
             productId,
             new SaveProductDraftRequest
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 WizardAction = "SAVE_AND_CONTINUE",
                 ExpectedRowVersion = 1,
                 ProductStructure = ProductStructureConstants.Variant,
@@ -324,7 +324,7 @@ public sealed partial class TenantAdminProductServiceTests
     }
 
     [Fact]
-    public async Task UpdateDraftAsync_ScannerCompositeStep5_DoesNotCallExternalLookupOrResolve()
+    public async Task UpdateDraftAsync_ScannerCompositeStep3_DoesNotCallExternalLookupOrResolve()
     {
         var productId = Guid.NewGuid();
         var variantId = Guid.NewGuid();
@@ -340,7 +340,7 @@ public sealed partial class TenantAdminProductServiceTests
                 "P1",
                 ProductConstants.DraftStatus,
                 ProductConstants.DesiredPublishActive,
-                5,
+                3,
                 DateTimeOffset.UtcNow,
                 2,
                 Guid.NewGuid(),
@@ -355,8 +355,8 @@ public sealed partial class TenantAdminProductServiceTests
                 ProductStructureConstants.Simple,
                 false,
                 [],
-                TargetSetupStep: 5,
-                LastCompletedSetupStep: 5))
+                TargetSetupStep: 3,
+                LastCompletedSetupStep: 3))
         };
         var service = CreateService(repository, coordinator);
 
@@ -367,7 +367,7 @@ public sealed partial class TenantAdminProductServiceTests
             productId,
             new SaveProductDraftRequest
             {
-                CurrentSetupStep = 5,
+                CurrentSetupStep = 3,
                 WizardAction = "SAVE_DRAFT",
                 ExpectedRowVersion = 1,
                 ProductStructure = ProductStructureConstants.Simple,

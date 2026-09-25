@@ -21,7 +21,7 @@ public sealed class TenantAdminWizardProductCreateRequest
     public bool ExpiryTracking { get; set; }
     public bool SerialTracking { get; set; }
 
-    /// <summary>SIMPLE | VARIANT (BUNDLE deferred).</summary>
+    /// <summary>SIMPLE | VARIANT.</summary>
     public string ProductStructure { get; set; } = "SIMPLE";
 
     // SIMPLE — Units & Pack Conversion

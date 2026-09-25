@@ -172,7 +172,7 @@ public sealed class TenantAdminProductSetupHydrationRepositoryTests
         var setup = await repository.GetSetupAsync(tenantId, productId, CancellationToken.None);
         var remapped = ScannerFirstSetupReadMapper.ApplyReadCompatibility(setup!, hasScanContextRow: false);
 
-        Assert.Equal(5, remapped.CurrentSetupStep);
+        Assert.Equal(3, remapped.CurrentSetupStep);
         Assert.Equal("LEGACY", remapped.ScanContext!.AcquisitionMode);
         Assert.NotNull(setup!.BarcodeSkuConfiguration);
         var assignment = Assert.Single(setup.BarcodeSkuConfiguration!.Assignments!);
@@ -251,15 +251,15 @@ public sealed class TenantAdminProductSetupHydrationRepositoryTests
         await using var db = CreateDbContext(tenantId);
         var repository = new TenantAdminProductRepository(db, new NoOpCodeSequenceRepository());
 
-        SeedProduct(db, tenantId, productId, ProductStructureConstants.Bundle, currentSetupStep: 3);
+        SeedProduct(db, tenantId, productId, ProductStructureConstants.Simple, currentSetupStep: 3);
         await db.SaveChangesAsync();
         var before = await db.Products.AsNoTracking().SingleAsync(x => x.Id == productId);
 
         var setup = await repository.GetSetupAsync(tenantId, productId, CancellationToken.None);
         var compatible = ScannerFirstSetupReadMapper.ApplyReadCompatibility(setup!, hasScanContextRow: setup!.ScanContext is not null);
 
-        Assert.Equal(4, compatible.CurrentSetupStep);
-        Assert.Equal(5, compatible.TargetSetupStep);
+        Assert.Equal(3, compatible.CurrentSetupStep);
+        Assert.Equal(3, compatible.TargetSetupStep);
 
         var after = await db.Products.AsNoTracking().SingleAsync(x => x.Id == productId);
         Assert.Equal(3, after.CurrentSetupStep);

@@ -28,6 +28,10 @@ public sealed class SaveProductDraftRequest
     public string? WizardAction { get; set; }
     public long? ExpectedRowVersion { get; set; }
     public IReadOnlyList<Guid>? StagedMediaAssetIds { get; set; }
+    
+    // Target Step 5 - Tracking State
+    public string? TrackingMethod { get; set; }
+    public OpeningStockDraftDto? QuantityDraft { get; set; }
 
     public string? InitialBatchNumber { get; set; }
     public DateOnly? InitialExpiryDate { get; set; }
@@ -81,7 +85,8 @@ public sealed record PricingTaxConfigurationDto(
     decimal? DiscountPrice,
     Guid? TaxClassId,
     bool? TaxExclusive,
-    IReadOnlyList<VariantPriceConfigurationDto>? VariantPrices = null);
+    IReadOnlyList<VariantPriceConfigurationDto>? VariantPrices = null,
+    bool? ApplySamePriceToAllVariants = null);
 
 public sealed record VariantPriceResponseDto(
     Guid ProductVariantId,
@@ -319,8 +324,13 @@ public sealed record ProductSetupWizardDto(
     string? InitialBatchNumber = null,
     DateOnly? InitialExpiryDate = null,
     string? InitialSerialNumber = null,
+    bool ConfirmClearIncompatibleInitialTracking = false,
     Guid? InitialTrackingAssignedVariantId = null,
-    ProductSetupScanContextDto? ScanContext = null);
+    ProductSetupScanContextDto? ScanContext = null,
+    string? TrackingMethod = null,
+    OpeningStockDraftDto? QuantityDraft = null,
+    bool HasLegacySerialTracking = false,
+    bool IsLegacyBundle = false);
 
 /// <summary>
 /// Scanner-first Step 1 acquisition context on GET /setup (B9). LEGACY stub has acquisitionMode only.

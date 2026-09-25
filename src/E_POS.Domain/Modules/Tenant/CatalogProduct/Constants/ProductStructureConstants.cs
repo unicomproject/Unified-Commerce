@@ -4,7 +4,6 @@ public static class ProductStructureConstants
 {
     public const string Simple = "SIMPLE";
     public const string Variant = "VARIANT";
-    public const string Bundle = "BUNDLE";
     public const string DefaultDraftStructure = Simple;
 
     public static bool TryNormalize(string? structure, out string normalized)
@@ -16,7 +15,7 @@ public static class ProductStructureConstants
         }
 
         var candidate = structure.Trim().ToUpperInvariant();
-        if (candidate is Simple or Variant or Bundle)
+        if (candidate is Simple or Variant)
         {
             normalized = candidate;
             return true;

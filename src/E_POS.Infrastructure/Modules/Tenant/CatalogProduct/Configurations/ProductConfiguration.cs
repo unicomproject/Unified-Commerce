@@ -159,6 +159,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasColumnType("numeric(18,4)")
             .IsRequired(false);
 
+        builder.Property(x => x.QuantityDraftPayload)
+            .HasColumnName("quantity_draft_payload")
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
         builder.HasOne<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>()
             .WithMany()
             .HasForeignKey(x => x.TenantId)

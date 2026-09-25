@@ -19,11 +19,6 @@ public static class ProductWizardNextStageResolver
 
         if (currentStage == ProductWizardStage.ProductTypeTracking)
         {
-            // BUNDLE: Units NOT_APPLICABLE → Product Configuration.
-            if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
-            {
-                return ProductWizardStage.ProductConfiguration;
-            }
 
             // SIMPLE / VARIANT: Units required only when Track Inventory ON.
             if (!trackInventory)

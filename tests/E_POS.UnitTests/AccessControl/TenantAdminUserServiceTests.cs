@@ -1918,11 +1918,15 @@ public sealed class TenantAdminUserServiceTests
         public Task<bool> OutletsBelongToTenantAsync(Guid tenantId, IReadOnlyCollection<Guid> outletIds, CancellationToken cancellationToken) =>
             Task.FromResult(outletIds.Count == 0 || OutletValidation.IsValid);
 
-        public Task<TenantAdminUserAccessValidationResult> ValidateOutletSelectionAsync(
-            Guid tenantId,
-            IReadOnlyCollection<Guid> outletIds,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(OutletValidation);
+        public Task<TenantAdminUserAccessValidationResult> ValidateOutletSelectionAsync(Guid tenantId, IReadOnlyCollection<Guid> outletIds, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(OutletValidation);
+        }
+
+        public Task<TenantAdminUserAccessValidationResult> ValidateUserOutletSelectionAsync(Guid tenantId, Guid userId, IReadOnlyCollection<Guid> outletIds, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(TenantAdminUserAccessValidationResult.Valid);
+        }
 
         public Task<TenantAdminUserAccessValidationResult> ValidateTillSelectionAsync(
             Guid tenantId,

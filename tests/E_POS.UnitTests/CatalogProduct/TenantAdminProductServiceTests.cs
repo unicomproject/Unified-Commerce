@@ -1770,7 +1770,9 @@ public sealed partial class TenantAdminProductServiceTests
             auditLogger ?? new FakeTenantAdminProductAuditLogger(),
             accessPolicy,
             new ProductVariantGenerationService(),
-            externalProductLookupCoordinator ?? new FakeExternalProductLookupCoordinator());
+            externalProductLookupCoordinator ?? new FakeExternalProductLookupCoordinator(),
+            new Moq.Mock<E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Contracts.Services.IOpeningStockService>().Object,
+            new Moq.Mock<E_POS.Application.Modules.Tenant.AccessControl.Contracts.ITenantAdminUserRepository>().Object);
     }
 
     private static TenantAdminProductService CreateService(
@@ -2218,6 +2220,11 @@ public sealed partial class TenantAdminProductServiceTests
             CreateProductCallCount++;
             return Task.FromResult(SaveProductDraftResult.Failure(
                 new ApplicationError("not_implemented", "Fake repository")));
+        }
+
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
+        {
+            return operation(cancellationToken);
         }
 
         public Task<SaveProductDraftResult> SaveProductDraftAsync(

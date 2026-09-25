@@ -126,12 +126,6 @@ public sealed partial class TenantAdminProductRepository
         }
 
         var structure = (productStructure ?? "SIMPLE").Trim().ToUpperInvariant();
-        if (structure == ProductStructureConstants.Bundle)
-        {
-            return new ApplicationError(
-                ProductSetupInitialTrackingRules.BundleParentNotSupported,
-                "Bundle parent products cannot publish Initial Batch or Serial identity.");
-        }
 
         if (expiry.HasValue && string.IsNullOrWhiteSpace(batch))
         {

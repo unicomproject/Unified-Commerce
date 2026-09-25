@@ -16,7 +16,7 @@ public sealed class StockInIntegrationTests
         if (!await CanConnectAsync()) return;
 
         await using var db = CreateDb();
-        var repository = new CurrentStockRepository(db);
+        var repository = new CurrentStockRepository(db, null!, null!);
         var tenantId = Guid.NewGuid();
         var outletId = Guid.NewGuid();
 
@@ -31,7 +31,7 @@ public sealed class StockInIntegrationTests
         if (!await CanConnectAsync()) return;
 
         await using var db = CreateDb();
-        var repository = new CurrentStockRepository(db);
+        var repository = new CurrentStockRepository(db, null!, null!);
         var tenantId = Guid.NewGuid();
 
         var result = await repository.IdempotencyKeyExistsAsync(tenantId, Guid.NewGuid().ToString(), CancellationToken.None);

@@ -17,7 +17,7 @@ public sealed class CurrentStockIntegrationTests
         if (!await CanConnectAsync()) return;
 
         await using var db = CreateDb();
-        var repository = new CurrentStockRepository(db);
+        var repository = new CurrentStockRepository(db, null!, null!);
         var tenantId = Guid.NewGuid();
 
         var result = await repository.GetCurrentStockAsync(tenantId, new CurrentStockQuery(), CancellationToken.None);
@@ -32,7 +32,7 @@ public sealed class CurrentStockIntegrationTests
         if (!await CanConnectAsync()) return;
 
         await using var db = CreateDb();
-        var repository = new CurrentStockRepository(db);
+        var repository = new CurrentStockRepository(db, null!, null!);
         var tenantId = Guid.NewGuid();
 
         var result = await repository.GetCurrentStockSummaryAsync(tenantId, null, CancellationToken.None);
