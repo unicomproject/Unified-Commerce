@@ -8,10 +8,9 @@ public sealed class ScannerFirstWizardStageMapperTests
 {
     [Theory]
     [InlineData(2, ProductWizardStage.BasicDetails, false)]
-    [InlineData(3, ProductWizardStage.ProductTypeTracking, false)]
-    [InlineData(4, ProductWizardStage.UnitsPackConversion, false)]
-    [InlineData(6, ProductWizardStage.PricingTax, false)]
-    [InlineData(7, ProductWizardStage.ReviewCreate, false)]
+    [InlineData(4, ProductWizardStage.PricingTax, false)]
+    [InlineData(5, 0, false)] // ProductTracking has no legacy processor yet
+    [InlineData(6, ProductWizardStage.ReviewCreate, false)]
     public void TryMapToProcessorStage_NonAmbiguousSteps_MapsSemantically(
         int scannerStep,
         int expectedProcessor,
@@ -28,23 +27,22 @@ public sealed class ScannerFirstWizardStageMapperTests
     }
 
     [Fact]
-    public void TryMapToProcessorStage_Step5_IsSpecialComposite_NotArithmetic()
+    public void TryMapToProcessorStage_Step3_IsSpecialComposite_NotArithmetic()
     {
         var ok = ScannerFirstWizardStageMapper.TryMapToProcessorStage(
-            5,
+            3,
             out var processor,
             out var special);
 
         Assert.True(ok);
         Assert.True(special);
-        Assert.True(ScannerFirstWizardStageMapper.IsSpecialCompositeStep(5));
-        // Semantic composite: configuration processor — NOT scannerStep-1 (=4) alone as the rule,
-        // and NOT scannerStep+1. Legacy BarcodeSku (5) also converges to public 5.
+        Assert.True(ScannerFirstWizardStageMapper.IsSpecialCompositeStep(3));
         Assert.Equal(ProductWizardStage.ProductConfiguration, processor);
-        // Blind ±1 would claim barcode processor owns Step 5 exclusively; both 4 and 5 map to public 5.
-        Assert.Equal(5, ScannerFirstWizardStageMapper.MapProcessorToPublicStep(ProductWizardStage.BarcodeSku));
-        Assert.Equal(5, ScannerFirstWizardStageMapper.MapProcessorToPublicStep(ProductWizardStage.ProductConfiguration));
-        Assert.NotEqual(5 - 1, ProductWizardStage.BarcodeSku);
+        
+        Assert.Equal(3, ScannerFirstWizardStageMapper.MapProcessorToPublicStep(ProductWizardStage.BarcodeSku));
+        Assert.Equal(3, ScannerFirstWizardStageMapper.MapProcessorToPublicStep(ProductWizardStage.ProductConfiguration));
+        Assert.Equal(3, ScannerFirstWizardStageMapper.MapProcessorToPublicStep(ProductWizardStage.UnitsPackConversion));
+        Assert.Equal(3, ScannerFirstWizardStageMapper.MapProcessorToPublicStep(ProductWizardStage.ProductTypeTracking));
     }
 
     [Fact]

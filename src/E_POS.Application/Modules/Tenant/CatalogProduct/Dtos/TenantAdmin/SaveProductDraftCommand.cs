@@ -42,6 +42,7 @@ public sealed record SaveProductDraftCommand(
     Guid? InitialTrackingAssignedVariantId = null,
     bool ApplyChannelMutation = true,
     ProductSetupScanBootstrapPersistence? ScanBootstrap = null,
-    bool ApplyCompositeStep5Identifiers = false,
-    string? AutoSkuBase = null);
+    bool ApplyCompositeStep3Identifiers = false,
+    string? AutoSkuBase = null,
+    string? QuantityDraftPayload = null);
 

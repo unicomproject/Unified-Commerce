@@ -2295,9 +2295,8 @@ public sealed partial class TenantAdminProductServiceTests
             accessPolicy,
             new ProductVariantGenerationService(),
             externalProductLookupCoordinator ?? new FakeExternalProductLookupCoordinator(),
-            tenantExternalCategoryResolver ?? new FakeTenantExternalCategoryResolver(),
-            tenantExternalBrandResolver ?? new FakeTenantExternalBrandResolver(),
-            lookupOptions);
+            new Moq.Mock<E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Contracts.Services.IOpeningStockService>().Object,
+            new Moq.Mock<E_POS.Application.Modules.Tenant.AccessControl.Contracts.ITenantAdminUserRepository>().Object);
     }
 
     private static TenantAdminProductService CreateService(
@@ -2752,6 +2751,11 @@ public sealed partial class TenantAdminProductServiceTests
             CreateProductCallCount++;
             LastWizardRequest = request;
             return Task.FromResult(WizardCreateResult);
+        }
+
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
+        {
+            return operation(cancellationToken);
         }
 
         public Task<SaveProductDraftResult> SaveProductDraftAsync(

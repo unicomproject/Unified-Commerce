@@ -195,12 +195,6 @@ public sealed class ProductWizardAccessPolicy
             return PermissionDenied;
         }
 
-        if (HasBundleMutation(request) &&
-            !context.HasPermission(ProductConstants.ComboComponentsManagePermission))
-        {
-            return PermissionDenied;
-        }
-
         if (HasBarcodeMutation(request) &&
             !context.HasPermission(ProductConstants.BarcodesManagePermission))
         {
@@ -270,12 +264,6 @@ public sealed class ProductWizardAccessPolicy
             return PermissionDenied;
         }
 
-        if (string.Equals(structure, "BUNDLE", StringComparison.OrdinalIgnoreCase) &&
-            !context.HasPermission(ProductConstants.ComboComponentsManagePermission))
-        {
-            return PermissionDenied;
-        }
-
         var hasBarcodes = request?.BarcodeSkuConfiguration is not null ||
                           existing?.BarcodeSkuConfiguration is not null;
         if (hasBarcodes && !context.HasPermission(ProductConstants.BarcodesManagePermission))
@@ -325,11 +313,6 @@ public sealed class ProductWizardAccessPolicy
         request.VariantConfiguration is not null ||
         (request.CurrentSetupStep == ProductWizardStage.ProductConfiguration &&
          string.Equals(request.ProductStructure, "VARIANT", StringComparison.OrdinalIgnoreCase));
-
-    private static bool HasBundleMutation(SaveProductDraftRequest request) =>
-        request.BundleConfiguration is not null ||
-        (request.CurrentSetupStep == ProductWizardStage.ProductConfiguration &&
-         string.Equals(request.ProductStructure, "BUNDLE", StringComparison.OrdinalIgnoreCase));
 
     private static bool HasBarcodeMutation(SaveProductDraftRequest request) =>
         request.BarcodeSkuConfiguration is not null ||

@@ -174,7 +174,7 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         }
 
         ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);
-        if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedStructure, "BUNDLE", StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
@@ -188,6 +188,13 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         if (!isValid)
         {
             return new ApplicationError(errorCode!, errorMessage!);
+        }
+
+        var trackingMethod = ProductSetupCompatibilityHelper.MapPolicyToTrackingMethod(request.TrackInventory, request.BatchTracking, request.ExpiryTracking);
+        if (trackingMethod == TrackingMethodConstants.Quantity)
+        {
+            var quantityError = ValidateQuantityTracking(request, isContinue: false);
+            if (quantityError != null) return quantityError;
         }
 
         return null;
@@ -203,7 +210,7 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
                 "Selected product structure is invalid. Allowed values: SIMPLE, VARIANT, BUNDLE.");
         }
 
-        if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedStructure, "BUNDLE", StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
@@ -217,6 +224,71 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
         if (!isValid)
         {
             return new ApplicationError(errorCode!, errorMessage!);
+        }
+
+        var trackingMethod = ProductSetupCompatibilityHelper.MapPolicyToTrackingMethod(request.TrackInventory, request.BatchTracking, request.ExpiryTracking);
+        if (trackingMethod == TrackingMethodConstants.Quantity)
+        {
+            var quantityError = ValidateQuantityTracking(request, isContinue: true);
+            if (quantityError != null) return quantityError;
+        }
+
+        return null;
+    }
+
+    private static ApplicationError? ValidateQuantityTracking(SaveProductDraftRequest request, bool isContinue)
+    {
+        if (request.QuantityDraft?.StockOwners == null)
+            return null;
+
+        var fieldErrors = new List<ApplicationFieldError>();
+
+        foreach (var owner in request.QuantityDraft.StockOwners)
+        {
+            if (owner.OpeningQuantity < 0)
+            {
+                fieldErrors.Add(new ApplicationFieldError("quantityDraft.openingQuantity", "Opening Quantity cannot be negative."));
+            }
+
+            var allocations = owner.Allocations ?? new List<OutletAllocationDraftDto>();
+            
+            if (owner.OpeningQuantity == 0 && allocations.Any())
+            {
+                fieldErrors.Add(new ApplicationFieldError("quantityDraft.allocations", "Outlet allocations are not permitted when Opening Quantity is zero."));
+            }
+
+            if (owner.OpeningQuantity >= 0)
+            {
+                foreach (var alloc in allocations)
+                {
+                    if (alloc.Quantity <= 0)
+                    {
+                        fieldErrors.Add(new ApplicationFieldError("quantityDraft.allocations", "Allocated Quantity must be greater than zero."));
+                    }
+                }
+
+                if (allocations.GroupBy(a => a.OutletId).Any(g => g.Count() > 1))
+                {
+                    fieldErrors.Add(new ApplicationFieldError("quantityDraft.allocations", "Duplicate outlet IDs are not allowed."));
+                }
+
+                var allocatedTotal = allocations.Sum(a => a.Quantity);
+
+                if (allocatedTotal > owner.OpeningQuantity)
+                {
+                    fieldErrors.Add(new ApplicationFieldError("quantityDraft.allocations", "Allocated quantity exceeds Opening Quantity."));
+                }
+
+                if (isContinue && owner.OpeningQuantity > 0 && allocatedTotal != owner.OpeningQuantity)
+                {
+                    fieldErrors.Add(new ApplicationFieldError("quantityDraft.allocations", "Sum of allocated quantities must exactly equal the Opening Quantity."));
+                }
+            }
+        }
+
+        if (fieldErrors.Any())
+        {
+            return new ApplicationError("product.validation_failed", "Product validation failed.", fieldErrors);
         }
 
         return null;
@@ -709,7 +781,7 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
     {
         ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);
 
-        if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedStructure, "BUNDLE", StringComparison.OrdinalIgnoreCase))
         {
             return ValidateBundleConfigurationDraft(request);
         }
@@ -727,7 +799,7 @@ public sealed class TenantAdminProductRequestValidator : ITenantAdminProductRequ
     {
         ProductStructureConstants.TryNormalize(request.ProductStructure, out var normalizedStructure);
 
-        if (string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedStructure, "BUNDLE", StringComparison.OrdinalIgnoreCase))
         {
             return ValidateBundleConfigurationContinue(request);
         }

@@ -2601,4 +2601,22 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             sortOrder: 0,
             userId,
             now);
+
+    public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken)
+    {
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = _dbContext.Database.CurrentTransaction == null
+                ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+
+            await action(cancellationToken);
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        });
+    }
 }

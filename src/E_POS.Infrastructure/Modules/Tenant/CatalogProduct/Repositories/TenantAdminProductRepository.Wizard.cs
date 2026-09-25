@@ -314,7 +314,9 @@ public sealed partial class TenantAdminProductRepository
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = _dbContext.Database.CurrentTransaction == null
+            ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
 
         try
         {
@@ -630,13 +632,6 @@ public sealed partial class TenantAdminProductRepository
                         "Product was modified by another user. Refresh and try again."));
                 }
 
-                if (string.Equals(product.ProductStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
-                {
-                    return SaveProductDraftResult.Failure(new ApplicationError(
-                        "product.units_pack_not_applicable",
-                        "Unit & Pack Conversion is not applicable for BUNDLE products."));
-                }
-
                 oldStructure = product.ProductStructure;
                 var oldSetting = await _dbContext.ProductInventorySettings
                     .AsNoTracking()
@@ -752,7 +747,7 @@ public sealed partial class TenantAdminProductRepository
 
                 // B10: scanner-first composite Step 5 — persist identifiers in the same transaction
                 // as Product Configuration (single SaveWizardDraft / single rowVersion bump).
-                if (command.ApplyCompositeStep5Identifiers)
+                if (command.ApplyCompositeStep3Identifiers)
                 {
                     var autoApplied = false;
                     if (!string.IsNullOrWhiteSpace(command.AutoSkuBase))
@@ -931,33 +926,14 @@ public sealed partial class TenantAdminProductRepository
                     }
                 }
 
-                if (string.Equals(oldStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
-                {
-                    var comboDefs = await _dbContext.ComboDefinitions
-                        .Where(x => x.TenantId == tenantId && x.ProductId == product.Id)
-                        .Select(x => x.Id)
-                        .ToListAsync(cancellationToken);
-
-                    if (comboDefs.Count > 0)
-                    {
-                        var comboComponents = _dbContext.ComboComponents
-                            .Where(x => x.TenantId == tenantId && comboDefs.Contains(x.ComboDefinitionId));
-                        _dbContext.ComboComponents.RemoveRange(comboComponents);
-
-                        var comboDefinitions = _dbContext.ComboDefinitions
-                            .Where(x => x.TenantId == tenantId && x.ProductId == product.Id);
-                        _dbContext.ComboDefinitions.RemoveRange(comboDefinitions);
-                    }
-                }
             }
 
             if (command.CurrentStage == ProductWizardStage.ProductTypeTracking || command.CurrentStage == ProductWizardStage.BasicDetails)
             {
-                var isBundle = string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase);
-                var trackStock = isBundle ? false : command.TrackInventory;
-                var reqBatch = isBundle ? false : command.BatchTracking;
-                var reqExpiry = isBundle ? false : command.ExpiryTracking;
-                var reqSerial = isBundle ? false : command.SerialTracking;
+                var trackStock = command.TrackInventory;
+                var reqBatch = command.BatchTracking;
+                var reqExpiry = command.ExpiryTracking;
+                var reqSerial = command.SerialTracking;
 
                 var inventoryError = await UpsertInventorySettingAsync(
                     tenantId,
@@ -1047,18 +1023,21 @@ public sealed partial class TenantAdminProductRepository
                 NewValues = System.Text.Json.JsonSerializer.Serialize(new
                 {
                     productStructure = normalizedStructure,
-                    trackInventory = string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase) ? false : command.TrackInventory,
-                    batchTracking = string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase) ? false : command.BatchTracking,
-                    expiryTracking = string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase) ? false : command.ExpiryTracking,
-                    serialTracking = string.Equals(normalizedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase) ? false : command.SerialTracking
+                    trackInventory = command.TrackInventory,
+                    batchTracking = command.BatchTracking,
+                    expiryTracking = command.ExpiryTracking,
+                    serialTracking = command.SerialTracking
                 }),
                 CreatedAt = now
             };
             await _dbContext.AuditLogs.AddAsync(auditLog, cancellationToken);
 
             await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
 
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
             var images = await ProjectProductImagesAsync(tenantId, product.Id, cancellationToken);
             var categoryId = await GetPrimaryCategoryIdAsync(tenantId, product.Id, cancellationToken);
             var trackingFlags = await GetInventoryTrackingFlagsAsync(tenantId, product.Id, cancellationToken);
@@ -1098,7 +1077,6 @@ public sealed partial class TenantAdminProductRepository
             var inventoryMethod = product.ProductStructure switch
             {
                 ProductStructureConstants.Variant => "VARIANT_BASED",
-                ProductStructureConstants.Bundle => "COMPONENT_BASED",
                 _ => "PRODUCT_BASED"
             };
 
@@ -1111,6 +1089,45 @@ public sealed partial class TenantAdminProductRepository
             var componentsConfigured = componentCount >= 2;
             var unitProjection = await ProjectProductUnitSettingsAsync(tenantId, product.Id, cancellationToken);
             var trackingValues = await LoadInitialTrackingValuesAsync(tenantId, product.Id, cancellationToken);
+
+            // Hydrate persisted variant SKUs back to response for frontend
+            BarcodeSkuConfigurationDto? barcodeSkuConfig = null;
+            if (product.ProductStructure == ProductStructureConstants.Variant && command.VariantConfiguration?.Variants != null)
+            {
+                var variants = await _dbContext.ProductVariants
+                    .AsNoTracking()
+                    .Where(v => v.TenantId == tenantId && v.ProductId == product.Id && v.Status != ProductConstants.ArchivedStatus)
+                    .ToListAsync(cancellationToken);
+
+                var variantsByHash = variants
+                    .Where(v => v.OptionCombinationHash != null)
+                    .ToDictionary(v => v.OptionCombinationHash!, v => v);
+
+                var assignments = new List<BarcodeSkuAssignmentDto>();
+                foreach (var variantDto in command.VariantConfiguration.Variants)
+                {
+                    var hash = variantDto.OptionCombinationHash;
+                    if (!string.IsNullOrWhiteSpace(hash) &&
+                        variantsByHash.TryGetValue(hash, out var variant) &&
+                        !string.IsNullOrWhiteSpace(variant.Sku))
+                    {
+                        assignments.Add(new BarcodeSkuAssignmentDto(
+                            ProductVariantId: variant.Id,
+                            DisplayName: variantDto.DisplayLabel ?? variant.VariantName,
+                            Sku: variant.Sku,
+                            Barcode: null,
+                            Status: null,
+                            ClientCombinationKey: variantDto.ClientCombinationKey));
+                    }
+                }
+
+                if (assignments.Count > 0)
+                {
+                    barcodeSkuConfig = new BarcodeSkuConfigurationDto(
+                        IdentifierTargets: null,
+                        Assignments: assignments);
+                }
+            }
 
             return SaveProductDraftResult.Success(new ProductDraftResponse(
                 product.Id,
@@ -1158,6 +1175,7 @@ public sealed partial class TenantAdminProductRepository
                 PurchaseUnitsPerOuterPack: unitProjection.PurchaseUnitsPerOuterPack,
                 AllowDecimalQuantity: unitProjection.AllowDecimalQuantity,
                 UnitConversions: unitProjection.UnitConversions,
+                BarcodeSkuConfiguration: barcodeSkuConfig,
                 PricingTax: await ProjectPricingTaxAsync(tenantId, product.Id, cancellationToken),
                 VariantConfiguration: command.VariantConfiguration,
                 InitialBatchNumber: trackingValues.Batch,
@@ -1167,14 +1185,14 @@ public sealed partial class TenantAdminProductRepository
         }
         catch (DbUpdateConcurrencyException)
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (transaction != null) await transaction.RollbackAsync(cancellationToken);
             return SaveProductDraftResult.Failure(new ApplicationError(
                 "product.concurrency_conflict",
                 "Product was modified by another user. Refresh and try again."));
         }
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (transaction != null) await transaction.RollbackAsync(cancellationToken);
             var message = ex.GetBaseException().Message;
             if (message.Contains("sku", StringComparison.OrdinalIgnoreCase) ||
                 message.Contains("product_variants", StringComparison.OrdinalIgnoreCase))
@@ -1190,7 +1208,7 @@ public sealed partial class TenantAdminProductRepository
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (transaction != null) await transaction.RollbackAsync(cancellationToken);
             throw;
         }
     }
@@ -1276,7 +1294,6 @@ public sealed partial class TenantAdminProductRepository
         var inventoryMethod = product.ProductStructure switch
         {
             ProductStructureConstants.Variant => "VARIANT_BASED",
-            ProductStructureConstants.Bundle => "COMPONENT_BASED",
             _ => "PRODUCT_BASED"
         };
 
@@ -1377,8 +1394,13 @@ public sealed partial class TenantAdminProductRepository
             InitialBatchNumber: trackingValues.Batch,
             InitialExpiryDate: trackingValues.Expiry,
             InitialSerialNumber: trackingValues.Serial,
+            ConfirmClearIncompatibleInitialTracking: false,
             InitialTrackingAssignedVariantId: trackingValues.AssignedVariantId,
-            ScanContext: scanContext);
+            ScanContext: scanContext,
+            TrackingMethod: E_POS.Application.Modules.Tenant.CatalogProduct.Services.ProductSetupCompatibilityHelper.MapPolicyToTrackingMethod(trackingFlags.TrackInventory, trackingFlags.BatchTracking, trackingFlags.ExpiryTracking),
+            QuantityDraft: E_POS.Application.Modules.Tenant.CatalogProduct.Services.ProductSetupCompatibilityHelper.DeserializeQuantityDraft(product.QuantityDraftPayload),
+            HasLegacySerialTracking: trackingFlags.SerialTracking,
+            IsLegacyBundle: string.Equals(product.ProductStructure, "BUNDLE", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<ProductSetupScanContextDto?> ProjectScanContextAsync(
@@ -2368,15 +2390,15 @@ public sealed partial class TenantAdminProductRepository
                     cancellationToken);
             if (!hasDefaultIdentity)
             {
-                var ensureError = await EnsureDefaultSellableVariantAsync(
+                var ensureResult = await EnsureDefaultSellableVariantAsync(
                     tenantId,
                     userId,
                     product,
                     now,
                     cancellationToken);
-                if (ensureError is not null)
+                if (ensureResult.Error is not null)
                 {
-                    return ensureError;
+                    return ensureResult.Error;
                 }
             }
         }
@@ -2553,24 +2575,21 @@ public sealed partial class TenantAdminProductRepository
 
         if (variants.Count == 0)
         {
-            var ensureError = await EnsureDefaultSellableVariantAsync(
+            var ensureResult = await EnsureDefaultSellableVariantAsync(
                 tenantId,
                 userId,
                 product,
                 now,
                 cancellationToken);
-            if (ensureError is not null)
+            if (ensureResult.Error is not null)
             {
-                return ensureError;
+                return ensureResult.Error;
             }
 
-            variants = await _dbContext.ProductVariants
-                .Where(v =>
-                    v.TenantId == tenantId &&
-                    v.ProductId == productId &&
-                    v.Status != ProductConstants.ArchivedStatus &&
-                    v.Status != ProductConstants.DeletedStatus)
-                .ToListAsync(cancellationToken);
+            if (ensureResult.Variant is not null)
+            {
+                variants.Add(ensureResult.Variant);
+            }
         }
 
         var variantById = variants.ToDictionary(v => v.Id);
@@ -2710,7 +2729,7 @@ public sealed partial class TenantAdminProductRepository
         return null;
     }
 
-    private async Task<ApplicationError?> EnsureDefaultSellableVariantAsync(
+    private async Task<(ApplicationError? Error, ProductVariant? Variant)> EnsureDefaultSellableVariantAsync(
         Guid tenantId,
         Guid userId,
         Product product,
@@ -2718,15 +2737,14 @@ public sealed partial class TenantAdminProductRepository
         CancellationToken cancellationToken)
     {
         var structure = ProductStructureConstants.Normalize(product.ProductStructure);
-        if (!string.Equals(structure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(structure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(structure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase))
         {
-            return new ApplicationError(
+            return (new ApplicationError(
                 "product.validation_failed",
                 "Product validation failed.",
                 [new ApplicationFieldError(
                     "barcodeSkuConfiguration.assignments",
-                    "No applicable variant found for identifier assignment.")]);
+                    "No applicable variant found for identifier assignment.")]), null);
         }
 
         var uomId = await GetDefaultInventoryUomIdAsync(tenantId, cancellationToken);
@@ -2740,9 +2758,9 @@ public sealed partial class TenantAdminProductRepository
 
         if (!uomId.HasValue)
         {
-            return new ApplicationError(
+            return (new ApplicationError(
                 "product.validation_failed",
-                "A default unit of measure is required before assigning SKU/barcode.");
+                "A default unit of measure is required before assigning SKU/barcode."), null);
         }
 
         var defaultVariant = ProductVariant.Create(
@@ -2761,7 +2779,7 @@ public sealed partial class TenantAdminProductRepository
             userId,
             now);
         await _dbContext.ProductVariants.AddAsync(defaultVariant, cancellationToken);
-        return null;
+        return (null, defaultVariant);
     }
 
     private async Task<ApplicationError?> ApplyPricingTaxConfigurationAsync(
@@ -2879,7 +2897,7 @@ public sealed partial class TenantAdminProductRepository
 
     private static List<Guid?> BuildSimpleTaxVariantIds(IReadOnlyList<ProductVariant> includedVariants)
     {
-        // SIMPLE/BUNDLE wizard creates a default variant; tax assignment follows that identity.
+        // SIMPLE wizard creates a default variant; tax assignment follows that identity.
         if (includedVariants.Count > 0)
         {
             return includedVariants.Select(v => (Guid?)v.Id).ToList();

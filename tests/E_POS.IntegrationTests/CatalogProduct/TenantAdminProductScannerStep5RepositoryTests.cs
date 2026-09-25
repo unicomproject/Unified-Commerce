@@ -426,7 +426,7 @@ public sealed class TenantAdminProductScannerStep5RepositoryTests
             WizardAction: isContinue ? "SAVE_AND_CONTINUE" : "SAVE_DRAFT",
             VariantConfiguration: variantConfiguration,
             BarcodeSkuConfiguration: new BarcodeSkuConfigurationDto(null, assignments),
-            ApplyCompositeStep5Identifiers: true,
+            ApplyCompositeStep3Identifiers: true,
             AutoSkuBase: autoSkuBase);
 
     private static VariantConfigurationDto BuildTShirtVariantConfiguration()

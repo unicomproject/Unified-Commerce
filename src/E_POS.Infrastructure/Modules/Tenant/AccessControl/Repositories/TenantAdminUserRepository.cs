@@ -371,6 +371,34 @@ public sealed class TenantAdminUserRepository : ITenantAdminUserRepository
         return TenantAdminUserAccessValidationResult.Valid;
     }
 
+    public async Task<TenantAdminUserAccessValidationResult> ValidateUserOutletSelectionAsync(
+        Guid tenantId,
+        Guid userId,
+        IReadOnlyCollection<Guid> outletIds,
+        CancellationToken cancellationToken)
+    {
+        if (outletIds.Count == 0)
+        {
+            return TenantAdminUserAccessValidationResult.Valid;
+        }
+
+        var baseValidation = await ValidateOutletSelectionAsync(tenantId, outletIds, cancellationToken);
+        if (!baseValidation.IsValid)
+        {
+            return baseValidation;
+        }
+
+        var effectiveOutletIds = await GetEffectiveOutletIdsAsync(tenantId, userId, cancellationToken);
+        var effectiveSet = effectiveOutletIds.ToHashSet();
+
+        if (outletIds.Any(id => !effectiveSet.Contains(id)))
+        {
+            return TenantAdminUserAccessValidationResult.Invalid(TenantAdminUserAccessValidationFailure.OutletWrongTenant);
+        }
+
+        return TenantAdminUserAccessValidationResult.Valid;
+    }
+
     public async Task<TenantAdminUserAccessValidationResult> ValidateTillSelectionAsync(
         Guid tenantId,
         IReadOnlyCollection<Guid> tillIds,

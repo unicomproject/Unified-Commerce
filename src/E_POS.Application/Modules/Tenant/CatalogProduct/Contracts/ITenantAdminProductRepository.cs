@@ -291,4 +291,8 @@ public interface ITenantAdminProductRepository
         Guid tenantId,
         string normalizedBarcode,
         CancellationToken cancellationToken);
+
+    Task ExecuteInTransactionAsync(
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken);
 }

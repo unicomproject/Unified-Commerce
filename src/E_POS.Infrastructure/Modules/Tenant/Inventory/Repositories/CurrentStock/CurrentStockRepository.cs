@@ -1,12 +1,16 @@
 using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Contracts.Repositories;
 using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Contracts.Services;
 using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Dtos;
+using E_POS.Application.Modules.Tenant.Inventory.CurrentStock.Services;
 using E_POS.Application.Modules.Tenant.Inventory.StockIn.Dtos;
 using E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Dtos;
+using E_POS.Domain.Modules.Tenant.Inventory.Constants;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Shared.Media.Entities;
+using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Persistence;
+using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 using E_POS.Application.Modules.Shared.Media.Contracts;
@@ -17,10 +21,15 @@ internal sealed class CurrentStockRepository : ICurrentStockRepository
 {
     private readonly EPosDbContext _dbContext;
     private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
+    private readonly ICodeSequenceRepository _codeSequenceRepository;
 
-    public CurrentStockRepository(EPosDbContext dbContext, IMediaReadUrlResolver? mediaReadUrlResolver = null)
+    public CurrentStockRepository(
+        EPosDbContext dbContext,
+        ICodeSequenceRepository codeSequenceRepository,
+        IMediaReadUrlResolver? mediaReadUrlResolver = null)
     {
         _dbContext = dbContext;
+        _codeSequenceRepository = codeSequenceRepository;
         _mediaReadUrlResolver = mediaReadUrlResolver;
     }
 
@@ -186,14 +195,94 @@ internal sealed class CurrentStockRepository : ICurrentStockRepository
         return Task.FromResult(new StockTransferResponse { StockMovementId = Guid.NewGuid(), SourceOutletId = request.SourceOutletId, DestinationOutletId = request.DestinationOutletId, CreatedAt = now });
     }
 
-    public Task<OpeningStockResponse> AddOpeningStockAsync(
+    public async Task<OpeningStockResponse> AddOpeningStockAsync(
         Guid tenantId,
         Guid userId,
         OpeningStockRequest request,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        return Task.FromResult(new OpeningStockResponse(Guid.NewGuid(), request.OutletId, "OpeningStock", request.Items.Count, now));
+        var inventoryLocation = await _dbContext.Set<InventoryLocation>()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.OutletId == request.OutletId, cancellationToken);
+            
+        if (inventoryLocation == null)
+        {
+            throw new InvalidOperationException($"Active inventory location not found for outlet {request.OutletId}");
+        }
+
+        foreach (var item in request.Items)
+        {
+            var balance = await _dbContext.Set<InventoryBalance>()
+                .FirstOrDefaultAsync(x =>
+                    x.TenantId == tenantId &&
+                    x.InventoryLocationId == inventoryLocation.Id &&
+                    x.ProductId == item.ProductId &&
+                    x.ProductVariantId == item.VariantId, cancellationToken);
+
+            if (balance == null)
+            {
+                balance = InventoryBalance.Create(
+                    Guid.NewGuid(),
+                    tenantId,
+                    inventoryLocation.Id,
+                    item.ProductId,
+                    item.VariantId,
+                    null, // TODO: batch id if supported
+                    now);
+                await _dbContext.Set<InventoryBalance>().AddAsync(balance, cancellationToken);
+            }
+
+            var quantityBefore = balance.OnHandQuantity;
+            
+            balance.AdjustQuantities(
+                item.Quantity,
+                reservedDelta: 0,
+                damagedDelta: 0,
+                quarantineDelta: 0,
+                now);
+
+            var movementNumber = await _codeSequenceRepository.GetNextCodeAsync(
+                tenantId,
+                InventoryConstants.StockMovementSequenceKey,
+                InventoryConstants.StockMovementPrefix,
+                InventoryConstants.StockMovementPadding,
+                now,
+                cancellationToken);
+
+            var movementId = Guid.NewGuid();
+            var movement = StockMovement.Create(
+                movementId,
+                tenantId,
+                movementNumber,
+                balance.Id,
+                StockMovementConstants.StockIn,
+                quantityBefore,
+                item.Quantity,
+                item.UnitCost,
+                item.UnitCost * item.Quantity,
+                InventoryConstants.OpeningStockReason,
+                null,
+                request.IdempotencyKey,
+                request.Notes ?? "Product opening stock",
+                now,
+                userId,
+                now);
+
+            await _dbContext.Set<StockMovement>().AddAsync(movement, cancellationToken);
+
+            var reference = StockMovementReference.Create(
+                Guid.NewGuid(),
+                tenantId,
+                movementId,
+                InventoryConstants.ProductOpeningStockReferenceType,
+                item.ProductId,
+                null,
+                now);
+
+            await _dbContext.Set<StockMovementReference>().AddAsync(reference, cancellationToken);
+        }
+
+        return new OpeningStockResponse(Guid.NewGuid(), request.OutletId, "OpeningStock", request.Items.Count, now);
     }
 
     public async Task<bool> OutletExistsAsync(

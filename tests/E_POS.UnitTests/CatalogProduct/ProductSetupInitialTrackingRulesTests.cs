@@ -105,21 +105,4 @@ public sealed class ProductSetupInitialTrackingRulesTests
         Assert.Null(plan.ExpiryDate);
         Assert.Equal("SN-1", plan.SerialNumber);
     }
-
-    [Fact]
-    public void EvaluateClear_Bundle_RequiresConfirmation()
-    {
-        var plan = ProductSetupInitialTrackingRules.EvaluateClear(
-            "BUNDLE",
-            true,
-            true,
-            false,
-            false,
-            "BAT-1",
-            null,
-            null);
-
-        Assert.True(plan.RequiresConfirmation);
-        Assert.Null(plan.BatchNumber);
-    }
 }

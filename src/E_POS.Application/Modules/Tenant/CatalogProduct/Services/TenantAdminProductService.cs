@@ -1,12 +1,14 @@
-
 using E_POS.Application.Common.Contracts;
 using E_POS.Application.Common.Models;
+using E_POS.Application.Modules.Tenant.AccessControl.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Contracts;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.ExternalLookup;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Options;
 using E_POS.Application.Modules.Tenant.CatalogProduct.Validators;
+using E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Contracts.Services;
+using E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Dtos;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Domain.Modules.Tenant.Inventory.Constants;
@@ -34,10 +36,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
     private readonly ProductWizardAccessPolicy _accessPolicy;
     private readonly ProductVariantGenerationService _variantGenerationService;
     private readonly IExternalProductLookupCoordinator _externalProductLookupCoordinator;
-    private readonly ITenantExternalCategoryResolver _tenantExternalCategoryResolver;
-    private readonly ITenantExternalBrandResolver? _tenantExternalBrandResolver;
-    private readonly IReadOnlySet<string> _allowedExternalMappingProviders;
-    private readonly ILogger<TenantAdminProductService>? _logger;
+    private readonly IOpeningStockService _openingStockService;
+    private readonly ITenantAdminUserRepository _tenantAdminUserRepository;
 
     public TenantAdminProductService(
         IProductRepository productRepository,
@@ -48,10 +48,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         ProductWizardAccessPolicy accessPolicy,
         ProductVariantGenerationService variantGenerationService,
         IExternalProductLookupCoordinator externalProductLookupCoordinator,
-        ITenantExternalCategoryResolver tenantExternalCategoryResolver,
-        ITenantExternalBrandResolver? tenantExternalBrandResolver = null,
-        IOptions<ExternalProductLookupOptions>? externalProductLookupOptions = null,
-        ILogger<TenantAdminProductService>? logger = null)
+        IOpeningStockService openingStockService,
+        ITenantAdminUserRepository tenantAdminUserRepository)
     {
         _productRepository = productRepository;
         _tenantAdminProductRepository = tenantAdminProductRepository;
@@ -61,11 +59,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         _accessPolicy = accessPolicy;
         _variantGenerationService = variantGenerationService;
         _externalProductLookupCoordinator = externalProductLookupCoordinator;
-        _tenantExternalCategoryResolver = tenantExternalCategoryResolver;
-        _tenantExternalBrandResolver = tenantExternalBrandResolver;
-        _allowedExternalMappingProviders =
-            (externalProductLookupOptions?.Value ?? new ExternalProductLookupOptions()).GetConfiguredProviderNames();
-        _logger = logger;
+        _openingStockService = openingStockService;
+        _tenantAdminUserRepository = tenantAdminUserRepository;
     }
 
     public async Task<ApplicationResult<TenantAdminProductCreateResponse>> CreateAsync(
@@ -218,6 +213,8 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
         var wizardStructure = (request.ProductStructure ?? string.Empty).Trim().ToUpperInvariant();
         if (string.Equals(wizardStructure, ProductStructureConstants.Variant, StringComparison.OrdinalIgnoreCase))
         {
+            ExpandScalarPricingToVariantsIfRequested(request);
+
             var variantPriceError = ValidateWizardCreateVariantPrices(request);
             if (variantPriceError is not null)
             {
@@ -595,7 +592,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
 
         return response is null
             ? ApplicationResult<TenantAdminProductDetailResponse>.Failure(NotFound)
-            : ApplicationResult<TenantAdminProductDetailResponse>.Success(response);
+            : ApplicationResult<TenantAdminProductDetailResponse>.Success(RedactDetailResponse(context, response));
     }
 
     public async Task<ApplicationResult<TenantAdminProductDetailResponse>> UpdateAsync(
@@ -680,7 +677,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
 
         return response is null
             ? ApplicationResult<TenantAdminProductDetailResponse>.Failure(NotFound)
-            : ApplicationResult<TenantAdminProductDetailResponse>.Success(response);
+            : ApplicationResult<TenantAdminProductDetailResponse>.Success(RedactDetailResponse(context, response));
     }
 
     public async Task<ApplicationResult<TenantAdminProductStatusUpdateResponse>> UpdateStatusAsync(
@@ -977,6 +974,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
 
         var hasScanContextRow = response.ScanContext is not null;
         var compatible = ScannerFirstSetupReadMapper.ApplyReadCompatibility(response, hasScanContextRow);
+
         return ApplicationResult<ProductSetupWizardDto>.Success(RedactSetup(context, compatible));
     }
 
@@ -1080,7 +1078,119 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             return ApplicationResult<ProductDraftResponse>.Failure(identifierError);
         }
 
-        return await SaveOrUpdateDraftAsync(context, productId, draftRequest, cancellationToken);
+        ApplicationResult<ProductDraftResponse> draftResult = null!;
+        ApplicationError? openingStockError = null;
+
+        await _tenantAdminProductRepository.ExecuteInTransactionAsync(async ct =>
+        {
+            draftResult = await SaveOrUpdateDraftAsync(context, productId, draftRequest, ct);
+
+            if (draftResult.IsSuccess && existing.TrackInventory && existing.InventoryMethod == "QUANTITY" && existing.QuantityDraft?.StockOwners != null)
+            {
+                var hasPositiveOpeningQuantity = existing.QuantityDraft.StockOwners.Any(o => o.OpeningQuantity > 0);
+                if (hasPositiveOpeningQuantity)
+                {
+                    if (!context.HasPermission(StockPermissions.OpeningStock))
+                    {
+                        openingStockError = new ApplicationError(
+                            "product.permission_denied",
+                            "Insufficient permission to post opening stock.");
+                        return;
+                    }
+                }
+
+                foreach (var owner in existing.QuantityDraft.StockOwners)
+                {
+                    if (owner.OpeningQuantity > 0)
+                    {
+                        var allocations = owner.Allocations ?? new System.Collections.Generic.List<E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin.OutletAllocationDraftDto>();
+                        if (allocations.Count == 0 || allocations.Sum(a => a.Quantity) != owner.OpeningQuantity)
+                        {
+                            openingStockError = new ApplicationError(
+                                "product_setup.outlet_allocation_mismatch",
+                                "Total allocations must exactly equal the Opening Quantity on publish.");
+                            return;
+                        }
+                    }
+                }
+
+                // Group by Outlet
+                var allocationsByOutlet = existing.QuantityDraft.StockOwners
+                    .SelectMany(owner => owner.Allocations.Select(allocation => new
+                    {
+                        OutletId = allocation.OutletId,
+                        VariantId = owner.VariantId,
+                        Quantity = allocation.Quantity
+                    }))
+                    .GroupBy(a => a.OutletId)
+                    .ToList();
+
+                foreach (var outletGroup in allocationsByOutlet)
+                {
+                    var outletId = outletGroup.Key;
+                    
+                    var outletAccessResult = await _tenantAdminUserRepository.ValidateUserOutletSelectionAsync(
+                        context.TenantId,
+                        context.UserId,
+                        new[] { outletId },
+                        ct);
+
+                    if (!outletAccessResult.IsValid)
+                    {
+                        openingStockError = new ApplicationError(
+                            "product.outlet_validation_failed",
+                            $"Outlet validation failed: {outletAccessResult.Failure}");
+                        return;
+                    }
+
+                    foreach (var alloc in outletGroup)
+                    {
+                        if (alloc.Quantity > 0)
+                        {
+                            var variantIdStr = alloc.VariantId?.ToString() ?? "default";
+                            var idempotencyKey = $"PUBLISH-OPENING-STOCK-{productId}-{variantIdStr}-{outletId}";
+                            
+                            var openingStockRequest = new OpeningStockRequest
+                            {
+                                OutletId = outletId,
+                                Notes = "Initial product quantity",
+                                Items = new List<OpeningStockLineRequest>
+                                {
+                                    new()
+                                    {
+                                        ProductId = productId,
+                                        VariantId = alloc.VariantId,
+                                        Quantity = alloc.Quantity,
+                                        UnitCost = existing.PricingTax?.CostPrice ?? 0,
+                                        BatchNumber = null,
+                                        ExpiryDate = null
+                                    }
+                                },
+                                IdempotencyKey = idempotencyKey
+                            };
+
+                            var openingStockResult = await _openingStockService.AddOpeningStockAsync(
+                                context,
+                                openingStockRequest,
+                                ct);
+                                
+                            if (openingStockResult.Error != null)
+                            {
+                                openingStockError = openingStockResult.Error;
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }, cancellationToken);
+
+        if (openingStockError != null)
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(openingStockError);
+        }
+
+        return draftResult;
     }
 
     private async Task<ApplicationResult<ProductDraftResponse>> SaveOrUpdateDraftAsync(
@@ -1212,14 +1322,68 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
 
         SanitizeUnauthorizedDraftFields(context, request, existingSetup);
 
-        if (currentStage == ProductWizardStage.ProductTypeTracking)
+        var trackInventory = request.TrackInventory;
+        var batchTracking = request.BatchTracking;
+        var expiryTracking = request.ExpiryTracking;
+        var serialTracking = request.SerialTracking;
+
+        if (isScannerFirst)
+        {
+            if (isSkip)
+            {
+                trackInventory = false;
+                batchTracking = false;
+                expiryTracking = false;
+                serialTracking = existingSetup?.HasLegacySerialTracking ?? false;
+            }
+            else if (request.TrackingMethod != null)
+            {
+                ProductSetupCompatibilityHelper.ApplyTrackingMethod(
+                    request.TrackingMethod, 
+                    ref trackInventory, 
+                    ref batchTracking, 
+                    ref expiryTracking, 
+                    ref serialTracking);
+                
+                serialTracking = serialTracking || (existingSetup?.HasLegacySerialTracking ?? false);
+            }
+            else
+            {
+                trackInventory = existingSetup?.TrackInventory ?? false;
+                batchTracking = existingSetup?.BatchTracking ?? false;
+                expiryTracking = existingSetup?.ExpiryTracking ?? false;
+                serialTracking = existingSetup?.HasLegacySerialTracking ?? false;
+            }
+        }
+        else
+        {
+            if (!isSkip && request.TrackingMethod != null)
+            {
+                ProductSetupCompatibilityHelper.ApplyTrackingMethod(
+                    request.TrackingMethod, 
+                    ref trackInventory, 
+                    ref batchTracking, 
+                    ref expiryTracking, 
+                    ref serialTracking);
+            }
+            
+            if (isSkip)
+            {
+                trackInventory = false;
+                batchTracking = false;
+                expiryTracking = false;
+                serialTracking = existingSetup?.HasLegacySerialTracking ?? false;
+            }
+        }
+
+        if (currentStage == ProductWizardStage.ProductTypeTracking || (isScannerFirst && currentStage == 0))
         {
             var plan = ProductSetupInitialTrackingRules.EvaluateClear(
                 request.ProductStructure ?? existingSetup?.ProductStructure ?? "SIMPLE",
-                request.TrackInventory,
-                request.BatchTracking,
-                request.ExpiryTracking,
-                request.SerialTracking,
+                trackInventory,
+                batchTracking,
+                expiryTracking,
+                serialTracking,
                 existingSetup?.InitialBatchNumber ?? request.InitialBatchNumber,
                 existingSetup?.InitialExpiryDate ?? request.InitialExpiryDate,
                 existingSetup?.InitialSerialNumber ?? request.InitialSerialNumber);
@@ -1315,6 +1479,14 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             resolvedStructure = ProductStructureConstants.DefaultDraftStructure;
         }
 
+        if (isCreate && string.Equals(resolvedStructure, "BUNDLE", StringComparison.OrdinalIgnoreCase))
+        {
+            return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
+                "product.validation_failed",
+                "New Bundle creations are not supported via the scanner-first setup wizard.",
+                [new ApplicationFieldError("productStructure", "BUNDLE is not a supported structure for new creations.")]));
+        }
+
         if (currentStage == ProductWizardStage.ProductTypeTracking && productId.HasValue && existingSetup != null)
         {
             var oldStructure = existingSetup.ProductStructure;
@@ -1331,25 +1503,6 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                         "product.structure_change_prohibited_has_history",
                         "Product structure cannot be changed because operational inventory movements or sales history exist."));
                 }
-            }
-        }
-
-        if (currentStage == ProductWizardStage.ProductConfiguration && 
-            string.Equals(resolvedStructure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase) && 
-            request.BundleConfiguration != null)
-        {
-            var bundleErrors = await ValidateBundleConfigurationAsync(
-                context.TenantId,
-                productId,
-                request.BundleConfiguration,
-                cancellationToken);
-
-            if (bundleErrors.Count > 0)
-            {
-                return ApplicationResult<ProductDraftResponse>.Failure(new ApplicationError(
-                    "product.bundle.validation_failed",
-                    "Bundle configuration validation failed.",
-                    bundleErrors));
             }
         }
 
@@ -1437,6 +1590,12 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             productId.HasValue &&
             productId.Value != Guid.Empty)
         {
+            await ExpandScalarPricingToVariantsIfRequestedAsync(
+                context.TenantId,
+                productId.Value,
+                request,
+                cancellationToken);
+
             var pricingCoverageError = await ValidateVariantPricingContinueCoverageAsync(
                 context.TenantId,
                 productId.Value,
@@ -1448,18 +1607,45 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             }
         }
 
-        var trackInventory = isSkip ? false : request.TrackInventory;
-        var batchTracking = isSkip ? false : request.BatchTracking;
-        var expiryTracking = isSkip ? false : request.ExpiryTracking;
-        var serialTracking = isSkip ? false : request.SerialTracking;
+        string? quantityDraftPayload = existingSetup?.QuantityDraft != null 
+            ? ProductSetupCompatibilityHelper.SerializeQuantityDraft(existingSetup.QuantityDraft) 
+            : null;
+
+        if (trackInventory && !batchTracking && !expiryTracking)
+        {
+            if (request.QuantityDraft != null)
+            {
+                var draftError = await ValidateQuantityDraftAsync(
+                    context.TenantId,
+                    context.UserId,
+                    productId,
+                    resolvedStructure,
+                    request.QuantityDraft,
+                    existingSetup,
+                    cancellationToken);
+                if (draftError != null)
+                {
+                    return ApplicationResult<ProductDraftResponse>.Failure(draftError);
+                }
+                quantityDraftPayload = ProductSetupCompatibilityHelper.SerializeQuantityDraft(request.QuantityDraft);
+            }
+        }
+        else
+        {
+            quantityDraftPayload = null;
+        }
 
         int targetSetupStep;
         if (isSaveAndContinue || isSkip)
         {
             if (isScannerFirst && isSpecialComposite)
             {
-                // Composite Step 5 complete → scanner Pricing & Tax (public 6).
+                // Composite Step 5 complete → scanner Pricing & Tax (public 4).
                 targetSetupStep = ScannerFirstWizardStageMapper.PublicPricingTax;
+            }
+            else if (isScannerFirst && publicSetupStep == ScannerFirstWizardStageMapper.PublicProductTracking)
+            {
+                targetSetupStep = ScannerFirstWizardStageMapper.PublicReviewCreate;
             }
             else
             {
@@ -1545,9 +1731,10 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             request.ConfirmClearIncompatibleInitialTracking,
             assignedVariantId,
             context.HasPermission(ProductConstants.ChannelManagePermission),
-            scanBootstrapPersistence,
-            ApplyCompositeStep5Identifiers: isSpecialComposite,
-            AutoSkuBase: autoSkuBase);
+            ScanBootstrap: scanBootstrapPersistence,
+            ApplyCompositeStep3Identifiers: isSpecialComposite,
+            AutoSkuBase: autoSkuBase,
+            QuantityDraftPayload: quantityDraftPayload);
 
         var result = await _tenantAdminProductRepository.SaveProductDraftAsync(
             context.TenantId,
@@ -1938,6 +2125,16 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
 
         var pricing = setup.PricingTax with { CostPrice = null };
         return setup with { PricingTax = pricing };
+    }
+
+    private static TenantAdminProductDetailResponse RedactDetailResponse(TenantRequestContext context, TenantAdminProductDetailResponse response)
+    {
+        if (context.HasPermission(ProductConstants.ProductCostViewPermission) || response.CostPrice is null)
+        {
+            return response;
+        }
+
+        return response with { CostPrice = null };
     }
 
     private static ApplicationError? ValidateAccess(TenantRequestContext context)
@@ -2544,10 +2741,7 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
                 errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.self_reference_not_allowed"));
             }
 
-            if (compProduct.ProductStructure == ProductStructureConstants.Bundle)
-            {
-                errors.Add(new ApplicationFieldError($"bundleConfiguration.components[{i}].componentProductId", "product.bundle.nested_bundle_not_allowed"));
-            }
+            // BUNDLE removed from MVP - this method is dead code
 
             if (compProduct.Status == ProductConstants.InactiveStatus)
             {
@@ -3236,5 +3430,193 @@ public sealed class TenantAdminProductService : ITenantAdminProductService
             "product.validation_failed",
             "Variant pricing validation failed.",
             fieldErrors);
+    }
+
+    private async Task ExpandScalarPricingToVariantsIfRequestedAsync(
+        Guid tenantId,
+        Guid productId,
+        SaveProductDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        var pricing = request.PricingTax;
+        if (pricing == null || pricing.ApplySamePriceToAllVariants != true)
+        {
+            return;
+        }
+
+        var targets = await _tenantAdminProductRepository.GetStep5SellableVariantTargetsAsync(
+            tenantId,
+            productId,
+            cancellationToken);
+
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var targetPrice = pricing.DiscountPrice ?? pricing.StandardSellingPrice;
+        var expandedPrices = new List<VariantPriceConfigurationDto>();
+
+        foreach (var target in targets)
+        {
+            expandedPrices.Add(new VariantPriceConfigurationDto(
+                target.ProductVariantId,
+                target.OptionCombinationHash,
+                targetPrice));
+        }
+
+        request.PricingTax = pricing with { VariantPrices = expandedPrices };
+    }
+
+    private static void ExpandScalarPricingToVariantsIfRequested(TenantAdminWizardProductCreateRequest request)
+    {
+        var pricing = request.PricingTax;
+        if (pricing == null || pricing.ApplySamePriceToAllVariants != true)
+        {
+            return;
+        }
+
+        var included = request.VariantConfiguration?.Variants?
+            .Where(v => v.Included)
+            .ToList() ?? [];
+
+        if (included.Count == 0)
+        {
+            return;
+        }
+
+        var targetPrice = pricing.DiscountPrice ?? pricing.StandardSellingPrice;
+        var expandedPrices = new List<VariantPriceConfigurationDto>();
+
+        foreach (var variant in included)
+        {
+            expandedPrices.Add(new VariantPriceConfigurationDto(
+                null,
+                variant.ClientCombinationKey ?? variant.OptionCombinationHash,
+                targetPrice));
+        }
+
+        request.PricingTax = pricing with { VariantPrices = expandedPrices };
+    }
+
+    private async Task<ApplicationError?> ValidateQuantityDraftAsync(
+        Guid tenantId,
+        Guid tenantUserId,
+        Guid? productId,
+        string resolvedStructure,
+        OpeningStockDraftDto draft,
+        ProductSetupWizardDto? existingSetup,
+        CancellationToken cancellationToken)
+    {
+        if (!productId.HasValue || existingSetup == null)
+        {
+            return new ApplicationError("product_setup.opening_quantity_invalid", "Product draft must be saved first.");
+        }
+
+        if (draft.StockOwners == null || draft.StockOwners.Count == 0)
+        {
+            return new ApplicationError("product_setup.opening_quantity_invalid", "At least one stock owner is required.");
+        }
+
+        var isSimple = string.Equals(resolvedStructure, ProductStructureConstants.Simple, StringComparison.OrdinalIgnoreCase);
+        var sellableVariants = existingSetup.VariantConfiguration?.Variants?
+            .Where(v => v.Included)
+            .ToList() ?? [];
+
+        if (isSimple)
+        {
+            var defaultVariant = sellableVariants.FirstOrDefault();
+            if (defaultVariant == null || !defaultVariant.ProductVariantId.HasValue)
+            {
+                return new ApplicationError("product.validation_failed", "Canonical simple variant not found. Please complete Step 3 first.");
+            }
+
+            foreach (var owner in draft.StockOwners)
+            {
+                if (owner.VariantId.HasValue && owner.VariantId.Value != defaultVariant.ProductVariantId.Value)
+                {
+                    return new ApplicationError("product_setup.opening_quantity_invalid", "Invalid variant ID for SIMPLE product.");
+                }
+                owner.VariantId = defaultVariant.ProductVariantId.Value;
+            }
+        }
+        else
+        {
+            var validVariantIds = sellableVariants
+                .Where(v => v.ProductVariantId.HasValue)
+                .Select(v => v.ProductVariantId!.Value)
+                .ToHashSet();
+
+            foreach (var owner in draft.StockOwners)
+            {
+                if (!owner.VariantId.HasValue || !validVariantIds.Contains(owner.VariantId.Value))
+                {
+                    return new ApplicationError("product_setup.opening_quantity_invalid", $"Variant {owner.VariantId} is not a valid sellable variant for this product.");
+                }
+            }
+        }
+
+        var allOutletIds = new HashSet<Guid>();
+
+        foreach (var owner in draft.StockOwners)
+        {
+            if (owner.OpeningQuantity < 0)
+            {
+                return new ApplicationError("product_setup.opening_quantity_invalid", "Opening quantity cannot be negative.");
+            }
+
+            var allocations = owner.Allocations ?? new List<OutletAllocationDraftDto>();
+            if (owner.OpeningQuantity == 0 && allocations.Count > 0)
+            {
+                return new ApplicationError("product_setup.opening_quantity_invalid", "Outlet allocations are not permitted when Opening Quantity is zero.");
+            }
+
+            var uniqueOutlets = new HashSet<Guid>();
+            decimal totalAllocation = 0;
+            foreach (var allocation in allocations)
+            {
+                if (allocation.Quantity <= 0)
+                {
+                    return new ApplicationError("product_setup.opening_quantity_invalid", "Allocation quantity must be greater than zero.");
+                }
+                
+                if (!uniqueOutlets.Add(allocation.OutletId))
+                {
+                    return new ApplicationError("product_setup.opening_quantity_invalid", "Duplicate outlet allocations are not allowed.");
+                }
+
+                allOutletIds.Add(allocation.OutletId);
+                totalAllocation += allocation.Quantity;
+            }
+
+            if (totalAllocation > owner.OpeningQuantity)
+            {
+                return new ApplicationError("product_setup.outlet_allocation_mismatch", "Total allocations cannot exceed opening quantity.");
+            }
+        }
+
+        if (allOutletIds.Count > 0)
+        {
+            var outletsBelong = await _tenantAdminProductRepository.OutletsBelongToTenantAsync(tenantId, allOutletIds, cancellationToken);
+            if (!outletsBelong)
+            {
+                return new ApplicationError("product_setup.opening_quantity_invalid", "One or more requested outlets do not belong to the tenant.");
+            }
+
+            var outletAccessResult = await _tenantAdminUserRepository.ValidateUserOutletSelectionAsync(
+                tenantId,
+                tenantUserId,
+                allOutletIds.ToArray(),
+                cancellationToken);
+
+            if (!outletAccessResult.IsValid)
+            {
+                return new ApplicationError(
+                    "product.outlet_validation_failed",
+                    $"Outlet validation failed: {outletAccessResult.Failure}");
+            }
+        }
+
+        return null;
     }
 }

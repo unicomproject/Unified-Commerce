@@ -1,10 +1,12 @@
 using E_POS.Application.Modules.Tenant.CatalogProduct.Dtos.TenantAdmin;
 using E_POS.Application.Modules.Tenant.OutletTillDevice.Contracts;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Constants;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.CatalogProduct.Services;
 using E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 using E_POS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Xunit;
 
 namespace E_POS.IntegrationTests.CatalogProduct;
@@ -12,11 +14,48 @@ namespace E_POS.IntegrationTests.CatalogProduct;
 /// <summary>
 /// Live PostgreSQL verification for Chunk 6 wizard-create.
 /// Soft-skips when DB/seed prerequisites are unavailable.
+/// Implements IAsyncLifetime to auto-clean E2E test products after every run.
 /// </summary>
-public sealed class WizardProductCreatePostgreSqlTests
+public sealed class WizardProductCreatePostgreSqlTests : IAsyncLifetime
 {
     private const string ConnectionString =
         "Host=localhost;Port=5434;Database=UnifiedCommerceDb;Username=postgres;Password=Nive@123";
+
+    // Tracks every productId created during this test instance so DisposeAsync can clean them up.
+    private readonly List<Guid> _createdProductIds = [];
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Runs after every [Fact] completes (pass or fail).
+    /// Deletes all E2E products created during this test run from the dev DB.
+    /// </summary>
+    public async Task DisposeAsync()
+    {
+        if (_createdProductIds.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = CreateDb();
+            if (!await db.Database.CanConnectAsync())
+            {
+                return;
+            }
+
+            // Delete via raw SQL for reliability (avoids EF cascade issues).
+            var ids = string.Join(",", _createdProductIds.Select(id => $"'{id}'::uuid"));
+            await db.Database.ExecuteSqlRawAsync($"""
+                DELETE FROM products WHERE id IN ({ids});
+                """);
+        }
+        catch
+        {
+            // Best-effort cleanup — never fail the test run due to cleanup errors.
+        }
+    }
 
     [Fact]
     public async Task CreateProductFromWizard_Simple_SingleUnit_Persists_Complete_Graph()
@@ -44,13 +83,22 @@ public sealed class WizardProductCreatePostgreSqlTests
         var repo = new TenantAdminProductRepository(db, new NoOpCodeSequenceRepository());
         var request = BuildSimpleRequest(ctx, name, $"E2ES{unique}", sku, barcode, "SINGLE_UNIT", null, null);
 
+        var balancesBefore = await db.InventoryBalances.AsNoTracking()
+            .Where(b => b.TenantId == ctx.TenantId)
+            .CountAsync();
+            
+        var movementsBefore = await db.StockMovements.AsNoTracking()
+            .Where(m => m.TenantId == ctx.TenantId)
+            .CountAsync();
+
         var result = await repo.CreateProductFromWizardAsync(
             ctx.TenantId, ctx.UserId, request, DateTimeOffset.UtcNow, CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.Error?.Message);
         Assert.NotNull(result.Response);
-
+        
         var productId = result.Response!.ProductId;
+        _createdProductIds.Add(productId);
 
         var afterCount = await db.Products.CountAsync(p =>
             p.TenantId == ctx.TenantId && p.ProductName == name);
@@ -89,7 +137,6 @@ public sealed class WizardProductCreatePostgreSqlTests
             .Where(u => u.TenantId == ctx.TenantId && u.ProductId == productId)
             .ToListAsync());
 
-        // Product List query must include the newly created ACTIVE product.
         var list = await repo.GetPagedListAsync(
             ctx.TenantId,
             search: name,
@@ -104,6 +151,140 @@ public sealed class WizardProductCreatePostgreSqlTests
             canViewStock: false,
             cancellationToken: CancellationToken.None);
         Assert.Contains(list.Items, i => i.Id == productId && i.Name == name);
+
+        var targetBalances = await db.InventoryBalances.AsNoTracking()
+            .Where(b => b.TenantId == ctx.TenantId && b.ProductVariantId == variants[0].Id)
+            .ToListAsync();
+            
+        var movementsAfter = await db.StockMovements.AsNoTracking()
+            .Where(m => m.TenantId == ctx.TenantId)
+            .CountAsync();
+            
+        Assert.Empty(targetBalances);
+        Assert.Equal(0, movementsAfter - movementsBefore);
+    }
+
+    [Fact]
+    public async Task CreateProductFromWizard_ScannerFirst_Simple_Reuses_PrimaryBarcode()
+    {
+        if (!await CanConnectAsync())
+        {
+            return;
+        }
+
+        await using var db = CreateDb();
+        var ctx = await LoadSeedContextAsync(db);
+        if (ctx is null)
+        {
+            return;
+        }
+
+        var unique = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 99;
+        var sku = $"E2E-SCAN-{unique}";
+        var barcode = $"89{unique % 10000000000:D10}";
+        var name = $"E2E Scan Product {unique}";
+        var productId = Guid.NewGuid();
+
+        // 1. Create scanner-first draft
+        var product = Product.Create(
+            productId, ctx.TenantId, $"P-{productId.ToString()[..8]}", name, $"scan-{unique}", "GOODS", 
+            ProductStructureConstants.Simple, null, null, null, null, null, true, true, "DRAFT", ctx.UserId, DateTimeOffset.UtcNow, false);
+        product.SetDraftSaved(2, DateTimeOffset.UtcNow); // Simulating draft state
+
+        db.Products.Add(product);
+        
+        // 2. Persist Step 1 Primary Barcode (Scan Context)
+        db.ProductSetupScanContexts.Add(ProductSetupScanContext.Create(
+            Guid.NewGuid(), ctx.TenantId, productId, "SCAN", barcode, "GTIN12", 
+            "UNKNOWN", null, "FOUND", null, null, null, null, DateTimeOffset.UtcNow));
+
+        await db.SaveChangesAsync();
+
+        var repo = new TenantAdminProductRepository(db, new NoOpCodeSequenceRepository());
+        
+        var request = new SaveProductDraftCommand(
+            productId,
+            name,
+            $"E2ESCAN{unique}",
+            $"scan-{unique}",
+            ProductStructureConstants.Simple,
+            null,
+            null,
+            null,
+            null,
+            "ACTIVE",
+            true,
+            false,
+            false,
+            false,
+            false,
+            true,
+            4,
+            4,
+            product.RowVersion,
+            Array.Empty<Guid>(),
+            "SINGLE_UNIT",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            "PUBLISH",
+            null,
+            null,
+            new BarcodeSkuConfigurationDto(
+                Array.Empty<Step5IdentifierTargetDto>(),
+                [new BarcodeSkuAssignmentDto(null, "BASE", sku, barcode, null, "BASE", "UPCA")]),
+            null, // PricingTax
+            null, // InitialBatchNumber
+            null, // InitialExpiryDate
+            null, // InitialSerialNumber
+            false, // ConfirmClearIncompatibleInitialTracking
+            null, // InitialTrackingAssignedVariantId
+            true, // ApplyChannelMutation
+            null, // ScanBootstrap
+            true, // ApplyCompositeStep5Identifiers
+            null, // AutoSkuBase
+            $$"""
+            {
+                "units": [{"type": "BASE", "uomId": null}],
+                "variants": [],
+                "identifiers": [
+                    {"clientCombinationKey": "BASE", "barcode": "{{barcode}}", "sku": "{{sku}}"}
+                ]
+            }
+            """
+        );
+
+        var result = await repo.SaveProductDraftAsync(
+            ctx.TenantId, ctx.UserId, request, DateTimeOffset.UtcNow, CancellationToken.None);
+
+        var errorMessage = result.Error?.Message;
+        if (result.Error?.FieldErrors != null)
+        {
+            errorMessage += " " + string.Join(", ", result.Error.FieldErrors.Select(f => $"{f.Field}: {f.Message}"));
+        }
+
+        Assert.True(result.IsSuccess, errorMessage);
+
+        await db.SaveChangesAsync();
+
+        // 4. Reload persisted identifier state
+        var barcodes = await db.ProductBarcodes.AsNoTracking()
+            .Where(b => b.TenantId == ctx.TenantId && b.ProductId == productId)
+            .ToListAsync();
+
+        // 5. Assert same barcode value
+        // 6. Assert exactly one active/canonical primary barcode record
+        Assert.Single(barcodes);
+        Assert.Equal(barcode, barcodes[0].Barcode);
+        
+        // 7. Assert no duplicate barcode entity was created (Total barcodes for this product globally)
+        var count = await db.ProductBarcodes.CountAsync(b => b.TenantId == ctx.TenantId && b.ProductId == productId);
+        Assert.Equal(1, count);
     }
 
     [Fact]
@@ -145,6 +326,7 @@ public sealed class WizardProductCreatePostgreSqlTests
 
         Assert.True(result.IsSuccess, result.Error?.Message);
         var productId = result.Response!.ProductId;
+        _createdProductIds.Add(productId);
 
         var settings = await db.ProductUnitSettings.AsNoTracking()
             .Where(u => u.TenantId == ctx.TenantId && u.ProductId == productId)
@@ -255,6 +437,7 @@ public sealed class WizardProductCreatePostgreSqlTests
 
         Assert.True(result.IsSuccess, result.Error?.Message);
         var productId = result.Response!.ProductId;
+        _createdProductIds.Add(productId);
 
         var product = await db.Products.AsNoTracking()
             .FirstAsync(p => p.TenantId == ctx.TenantId && p.Id == productId);

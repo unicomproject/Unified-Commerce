@@ -11,15 +11,13 @@ public static class ScannerFirstWizardStageMapper
 {
     public const int PublicBasicDetails = 2;
     public const int PublicProductTypeTracking = 3;
-    public const int PublicUnitsPackConversion = 4;
-    public const int PublicProductConfiguration = 5;
-    public const int PublicPricingTax = 6;
-    public const int PublicReviewCreate = 7;
+    public const int PublicPricingTax = 4;
+    public const int PublicProductTracking = 5;
+    public const int PublicReviewCreate = 6;
 
     /// <summary>
     /// Maps a scanner-first public/API step to the legacy processor stage that owns the write.
-    /// Step 5 is SPECIAL/COMPOSITE — routes to Product Configuration processor for existing handlers;
-    /// final identifier section behavior remains B10.
+    /// Step 3 is SPECIAL/COMPOSITE — routes to Product Configuration processor for existing handlers.
     /// </summary>
     public static bool TryMapToProcessorStage(
         int scannerApiStep,
@@ -33,19 +31,15 @@ public static class ScannerFirstWizardStageMapper
                 processorStage = ProductWizardStage.BasicDetails;
                 return true;
             case PublicProductTypeTracking:
-                processorStage = ProductWizardStage.ProductTypeTracking;
-                return true;
-            case PublicUnitsPackConversion:
-                processorStage = ProductWizardStage.UnitsPackConversion;
-                return true;
-            case PublicProductConfiguration:
                 isSpecialComposite = true;
-                // Semantic (not arithmetic): Step 5 absorbs legacy config (4) + barcode/SKU (5).
-                // B10: service validates + repository persists both in one atomic save.
+                // Semantic (not arithmetic): Step 3 absorbs legacy config (4), units (3), barcode/SKU (5).
                 processorStage = ProductWizardStage.ProductConfiguration;
                 return true;
             case PublicPricingTax:
                 processorStage = ProductWizardStage.PricingTax;
+                return true;
+            case PublicProductTracking:
+                processorStage = 0; // Handled in future Phase E
                 return true;
             case PublicReviewCreate:
                 processorStage = ProductWizardStage.ReviewCreate;
@@ -58,24 +52,24 @@ public static class ScannerFirstWizardStageMapper
 
     /// <summary>
     /// Maps a legacy processor stage (including ResolveNext results) back to scanner-first public step
-    /// for persistence. Legacy BarcodeSku (5) and ProductConfiguration (4) both map to public Step 5.
+    /// for persistence.
     /// </summary>
     public static int MapProcessorToPublicStep(int processorStage) =>
         processorStage switch
         {
             ProductWizardStage.BasicDetails => PublicBasicDetails,
             ProductWizardStage.ProductTypeTracking => PublicProductTypeTracking,
-            ProductWizardStage.UnitsPackConversion => PublicUnitsPackConversion,
-            ProductWizardStage.ProductConfiguration => PublicProductConfiguration,
-            ProductWizardStage.BarcodeSku => PublicProductConfiguration,
+            ProductWizardStage.UnitsPackConversion => PublicProductTypeTracking,
+            ProductWizardStage.ProductConfiguration => PublicProductTypeTracking,
+            ProductWizardStage.BarcodeSku => PublicProductTypeTracking,
             ProductWizardStage.PricingTax => PublicPricingTax,
             ProductWizardStage.ReviewCreate => PublicReviewCreate,
             _ => processorStage
         };
 
     /// <summary>
-    /// True when <paramref name="scannerApiStep"/> is the SPECIAL/COMPOSITE Step 5.
+    /// True when <paramref name="scannerApiStep"/> is the SPECIAL/COMPOSITE Step 3.
     /// </summary>
     public static bool IsSpecialCompositeStep(int scannerApiStep) =>
-        scannerApiStep == PublicProductConfiguration;
+        scannerApiStep == PublicProductTypeTracking;
 }

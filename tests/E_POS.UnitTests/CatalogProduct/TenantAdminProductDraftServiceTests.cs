@@ -44,9 +44,8 @@ public class TenantAdminProductDraftServiceTests
             accessPolicy,
             new ProductVariantGenerationService(),
             new NoOpExternalProductLookupCoordinator(),
-            new NoOpTenantExternalCategoryResolver(),
-            new NoOpTenantExternalBrandResolver(),
-            lookupOptions);
+            new Moq.Mock<E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Contracts.Services.IOpeningStockService>().Object,
+            new Moq.Mock<E_POS.Application.Modules.Tenant.AccessControl.Contracts.ITenantAdminUserRepository>().Object);
     }
 
     private sealed class NoOpExternalProductLookupCoordinator : IExternalProductLookupCoordinator
@@ -189,6 +188,11 @@ public class TenantAdminProductDraftServiceTests
         {
             return Task.FromResult(SaveProductDraftResult.Failure(
                 new ApplicationError("not_implemented", "Fake repository")));
+        }
+
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
+        {
+            return operation(cancellationToken);
         }
 
         public Task<SaveProductDraftResult> SaveProductDraftAsync(
