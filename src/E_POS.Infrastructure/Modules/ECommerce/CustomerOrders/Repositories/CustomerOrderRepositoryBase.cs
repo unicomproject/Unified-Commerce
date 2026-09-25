@@ -158,17 +158,16 @@ public abstract class CustomerOrderRepositoryBase
         IReadOnlyList<SalesOrderLine> lines,
         IReadOnlyDictionary<Guid, string?> imageLookup,
         IReadOnlyList<SalesOrderStatusHistory> statusHistory,
-        PickupOrder? pickup = null,
-        DateTimeOffset? now = null)
+        PickupOrder? pickup = null)
     {
         var status = MapUiStatus(order);
         // A pickup code is only live once the outlet has issued one (at "ready for
-        // collection") and only until it is spent (verified) or expires — never derived
-        // from order fields, which anyone who knows the order number could reconstruct.
+        // collection") and only until it is spent (verified) — never derived from order
+        // fields, which anyone who knows the order number could reconstruct. It does not
+        // expire on its own; it stays valid until the order is collected or cancelled.
         var hasLiveCode = pickup is not null &&
             !string.IsNullOrEmpty(pickup.PickupQrTokenHash) &&
-            pickup.PickupStatus == "READY" &&
-            (!pickup.PickupQrExpiresAt.HasValue || pickup.PickupQrExpiresAt.Value > (now ?? DateTimeOffset.UtcNow));
+            pickup.PickupStatus == "READY";
         var canShowQr = CanShowCollectionQr(status) && hasLiveCode;
 
         return new CustomerOrderDetailReadModel

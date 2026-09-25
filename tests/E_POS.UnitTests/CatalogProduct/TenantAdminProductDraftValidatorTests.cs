@@ -240,6 +240,31 @@ public sealed class TenantAdminProductDraftValidatorTests
     }
 
     [Fact]
+    public void PricingTaxContinue_SamePriceExplicitIntent_RequiresFlag()
+    {
+        var request = new SaveProductDraftRequest
+        {
+            CurrentSetupStep = 6,
+            AdvanceStep = true,
+            ProductStructure = "VARIANT",
+            PricingTax = new PricingTaxConfigurationDto(
+                CostPrice: null,
+                StandardSellingPrice: 750m,
+                DiscountPrice: null,
+                TaxClassId: Guid.NewGuid(),
+                TaxExclusive: true,
+                VariantPrices: null,
+                ApplySamePriceToAllVariants: false) // Explicitly false
+        };
+
+        var error = _validator.ValidateStepSaveAndContinue(request);
+
+        // Expected: NO implicit same-price expansion, standard variant validation fails
+        Assert.NotNull(error);
+        Assert.Contains(error!.FieldErrors!, e => e.Field == "pricingTax.variantPrices");
+    }
+
+    [Fact]
     public void PricingTaxContinue_Simple_RequiresSellingPriceAndTaxClass()
     {
         var request = new SaveProductDraftRequest

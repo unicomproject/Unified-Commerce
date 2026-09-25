@@ -148,6 +148,7 @@ public sealed class TenantAdminProductCreateRequest
     public int? ExpiryAlertDays { get; set; }
     public string Status { get; set; } = string.Empty;
     public bool SaveAsDraft { get; set; }
+    public ExternalCategoryMappingContext? ExternalCategoryMappingContext { get; set; }
 }
 
 public sealed record TenantAdminProductCreateResponse(

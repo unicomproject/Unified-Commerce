@@ -20,8 +20,6 @@ public static class ProductSetupInitialTrackingRules
         "product.initial_tracking.variant_assignment_required";
     public const string InvalidVariantAssignment =
         "product.initial_tracking.invalid_variant_assignment";
-    public const string BundleParentNotSupported =
-        "product.initial_tracking.bundle_parent_not_supported";
 
     public static string? NormalizeBatch(string? value) =>
         Normalize(value, ProductConstants.InitialBatchNumberMaxLength);
@@ -71,8 +69,7 @@ public static class ProductSetupInitialTrackingRules
         var keepExpiry = expiry;
         var keepSerial = NormalizeSerial(serial);
 
-        var isBundle = structure == "BUNDLE";
-        var quantityOnly = !trackInventory || isBundle;
+        var quantityOnly = !trackInventory;
 
         if (quantityOnly)
         {

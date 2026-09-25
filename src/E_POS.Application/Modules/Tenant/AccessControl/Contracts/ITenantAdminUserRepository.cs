@@ -61,6 +61,12 @@ public interface ITenantAdminUserRepository
         IReadOnlyCollection<Guid> outletIds,
         CancellationToken cancellationToken);
 
+    Task<TenantAdminUserAccessValidationResult> ValidateUserOutletSelectionAsync(
+        Guid tenantId,
+        Guid userId,
+        IReadOnlyCollection<Guid> outletIds,
+        CancellationToken cancellationToken);
+
     Task<TenantAdminUserAccessValidationResult> ValidateTillSelectionAsync(
         Guid tenantId,
         IReadOnlyCollection<Guid> tillIds,

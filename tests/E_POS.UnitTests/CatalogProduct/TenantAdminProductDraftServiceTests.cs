@@ -33,15 +33,19 @@ public class TenantAdminProductDraftServiceTests
     {
         var clock = new FakeDateTimeProvider { UtcNow = FixedNow };
         var accessPolicy = new ProductWizardAccessPolicy(new FakeEntitlementEvaluator(), repository, clock);
+        var lookupOptions = Microsoft.Extensions.Options.Options.Create(
+            new E_POS.Application.Modules.Tenant.CatalogProduct.Options.ExternalProductLookupOptions());
         return new TenantAdminProductService(
             new FakeProductRepository(),
             repository,
-            new TenantAdminProductRequestValidator(),
+            new TenantAdminProductRequestValidator(lookupOptions),
             clock,
             new FakeTenantAdminProductAuditLogger(),
             accessPolicy,
             new ProductVariantGenerationService(),
-            new NoOpExternalProductLookupCoordinator());
+            new NoOpExternalProductLookupCoordinator(),
+            new Moq.Mock<E_POS.Application.Modules.Tenant.Inventory.OpeningStock.Contracts.Services.IOpeningStockService>().Object,
+            new Moq.Mock<E_POS.Application.Modules.Tenant.AccessControl.Contracts.ITenantAdminUserRepository>().Object);
     }
 
     private sealed class NoOpExternalProductLookupCoordinator : IExternalProductLookupCoordinator
@@ -51,6 +55,32 @@ public class TenantAdminProductDraftServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(new ExternalProductLookupResult(
                 ExternalProductLookupStatuses.NoMatch, null, null, false));
+    }
+
+    private sealed class NoOpTenantExternalCategoryResolver : ITenantExternalCategoryResolver
+    {
+        public Task<TenantCategoryResolutionResult> ResolveAsync(
+            TenantCategoryResolutionRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantCategoryResolutionResult(
+                request.Provider,
+                request.ExternalCategoryKey,
+                request.ExternalCategoryName,
+                null,
+                Array.Empty<TenantCategorySuggestionItem>()));
+    }
+
+    private sealed class NoOpTenantExternalBrandResolver : ITenantExternalBrandResolver
+    {
+        public Task<TenantBrandResolutionResult> ResolveAsync(
+            TenantBrandResolutionRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new TenantBrandResolutionResult(
+                request.Provider,
+                request.ExternalBrandKey,
+                request.ExternalBrandName,
+                null,
+                Array.Empty<TenantBrandSuggestionItem>()));
     }
 
     private static TenantRequestContext CreateContext(IReadOnlyCollection<string> permissions) =>
@@ -158,6 +188,11 @@ public class TenantAdminProductDraftServiceTests
         {
             return Task.FromResult(SaveProductDraftResult.Failure(
                 new ApplicationError("not_implemented", "Fake repository")));
+        }
+
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
+        {
+            return operation(cancellationToken);
         }
 
         public Task<SaveProductDraftResult> SaveProductDraftAsync(

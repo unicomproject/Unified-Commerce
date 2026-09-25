@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using E_POS.Application.Modules.ECommerce.CustomerOrders.Dtos;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Entities;
 using E_POS.Domain.Modules.Tenant.AccessControl.Entities;
@@ -28,7 +26,7 @@ public sealed class PosOnlineOrderCollectionRepositoryTests
 
         var repository = new PosOnlineOrderCollectionRepository(db);
         var result = await repository.ValidateQrAsync(
-            fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.TokenHash,
+            fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.Token,
             Now.AddMinutes(1), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -125,7 +123,7 @@ public sealed class PosOnlineOrderCollectionRepositoryTests
     }
 
     [Fact]
-    public async Task MarkReady_IssuesQrHashAndOneTimeToken()
+    public async Task MarkReady_IssuesOneTimeTokenStoredVerbatimForRedisplay()
     {
         await using var db = CreateDbContext();
         var fixture = SeedPackableForReady(db);
@@ -145,11 +143,10 @@ public sealed class PosOnlineOrderCollectionRepositoryTests
         Assert.Equal("READY", pickup.PickupStatus);
         Assert.NotNull(pickup.PickupQrTokenHash);
         Assert.Equal(1, pickup.PickupQrVersion);
-        Assert.Equal(Now.AddDays(7), pickup.PickupQrExpiresAt);
-        Assert.Equal(
-            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(result.Command.CollectionQrToken!)))
-                .ToLowerInvariant(),
-            pickup.PickupQrTokenHash);
+        Assert.Null(pickup.PickupQrExpiresAt);
+        // Stored as-is (not hashed): the customer's order page must be able to
+        // redisplay this exact value, and validation compares it verbatim.
+        Assert.Equal(result.Command.CollectionQrToken, pickup.PickupQrTokenHash);
         Assert.Null(pickup.CollectedAt);
     }
 
@@ -160,16 +157,15 @@ public sealed class PosOnlineOrderCollectionRepositoryTests
         baseFixture.Order.ApplyPosReadyForCollection(baseFixture.UserId, Now);
         baseFixture.Pickup.MarkReady(Now);
 
-        const string rawToken = "test-collection-token-chunk2";
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken))).ToLowerInvariant();
-        baseFixture.Pickup.IssueCollectionQr(hash, 1, Now.AddDays(7), Now);
+        const string token = "test-collection-token-chunk2";
+        baseFixture.Pickup.IssueCollectionQr(token, 1, Now.AddDays(7), Now);
 
         if (paid)
             baseFixture.Order.ApplyPosCollectionPayment(baseFixture.Order.BalanceDue, baseFixture.UserId, Now);
 
         return new CollectionFixture(
             baseFixture.TenantId, baseFixture.UserId, baseFixture.OutletId,
-            baseFixture.Order, baseFixture.Fulfillment, baseFixture.Pickup, hash, rawToken);
+            baseFixture.Order, baseFixture.Fulfillment, baseFixture.Pickup, token);
     }
 
     private static PackingReadyFixture SeedPackableForReady(EPosDbContext db)
@@ -258,5 +254,5 @@ public sealed class PosOnlineOrderCollectionRepositoryTests
     private sealed record CollectionFixture(
         Guid TenantId, Guid UserId, Guid OutletId,
         SalesOrder Order, FulfillmentOrder Fulfillment, PickupOrder Pickup,
-        string TokenHash, string RawToken);
+        string Token);
 }

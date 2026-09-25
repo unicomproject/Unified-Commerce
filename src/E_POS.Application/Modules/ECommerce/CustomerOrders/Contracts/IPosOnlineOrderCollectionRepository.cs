@@ -8,7 +8,7 @@ public interface IPosOnlineOrderCollectionRepository
         Guid tenantId,
         Guid tenantUserId,
         Guid outletId,
-        string tokenHash,
+        string token,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 

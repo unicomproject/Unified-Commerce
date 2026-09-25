@@ -57,9 +57,6 @@ public sealed class PosOnlineOrderPickupVerificationRepository : IPosOnlineOrder
             if (pickup.IsLockedOut)
                 return await RollbackVerifyFailureAsync(
                     transaction, "online_orders.pickup_verification_locked", cancellationToken);
-            if (pickup.IsPickupCodeExpired(now))
-                return await RollbackVerifyFailureAsync(
-                    transaction, "online_orders.pickup_code_expired", cancellationToken);
 
             var matched = PickupCodeGenerator.Matches(pickup.PickupQrTokenHash, pickupCode);
             var sequence = await NextPickupEventSequenceAsync(tenantId, pickup.Id, cancellationToken);

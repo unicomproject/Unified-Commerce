@@ -327,6 +327,24 @@ public sealed class StorefrontCheckoutConfirmationRepository : StorefrontCheckou
         return true;
     }
 
+    public async Task RecordProviderCheckoutSessionAsync(
+        Guid tenantId,
+        Guid salesPaymentId,
+        string providerSessionId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var transaction = await DbContext.SalesPaymentTransactions.FirstOrDefaultAsync(
+            x => x.TenantId == tenantId &&
+                 x.SalesPaymentId == salesPaymentId &&
+                 x.TransactionStatus == "PENDING",
+            cancellationToken);
+        if (transaction is null) return;
+
+        transaction.AttachProviderSessionReference(providerSessionId, now);
+        await DbContext.SaveChangesAsync(cancellationToken);
+    }
+
     // Builds the full POS fulfilment graph (FulfillmentOrder -> FulfillmentOrderLines ->
     // PickupOrder -> PickupSlot/PickupSlotReservation) for a confirmed e-commerce order in
     // the same transaction as SalesOrder/SalesOrderLine creation, so an order can never be

@@ -516,6 +516,45 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.PaymentProviderWebhookEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("ExternalEventId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("external_event_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_provider_webhook_events");
+
+                    b.HasIndex("Provider", "ExternalEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payment_provider_webhook_events_provider_event_id");
+
+                    b.ToTable("payment_provider_webhook_events", (string)null);
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.ECommerce.CartCheckout.Entities.ShoppingCart", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12219,6 +12258,154 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ExternalBrandMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_tenant_user_id");
+
+                    b.Property<string>("ExternalBrandKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("external_brand_key");
+
+                    b.Property<string>("ExternalBrandName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("external_brand_name");
+
+                    b.Property<string>("MappingSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("PRODUCT_CONFIRMED")
+                        .HasColumnName("mapping_source");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("TenantBrandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_brand_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_tenant_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_external_brand_mappings");
+
+                    b.HasIndex("CreatedByTenantUserId");
+
+                    b.HasIndex("UpdatedByTenantUserId");
+
+                    b.HasIndex("TenantId", "TenantBrandId")
+                        .HasDatabaseName("ix_external_brand_mappings_tenant_tenant_brand_id");
+
+                    b.HasIndex("TenantId", "Provider", "ExternalBrandKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_external_brand_mappings_tenant_provider_key");
+
+                    b.ToTable("external_brand_mappings", (string)null);
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ExternalCategoryMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_tenant_user_id");
+
+                    b.Property<string>("ExternalCategoryKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("external_category_key");
+
+                    b.Property<string>("ExternalCategoryName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("external_category_name");
+
+                    b.Property<string>("MappingSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("PRODUCT_CONFIRMED")
+                        .HasColumnName("mapping_source");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("TenantCategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_category_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedByTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_tenant_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_external_category_mappings");
+
+                    b.HasIndex("CreatedByTenantUserId");
+
+                    b.HasIndex("UpdatedByTenantUserId");
+
+                    b.HasIndex("TenantId", "TenantCategoryId")
+                        .HasDatabaseName("ix_external_category_mappings_tenant_tenant_category_id");
+
+                    b.HasIndex("TenantId", "Provider", "ExternalCategoryKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_external_category_mappings_tenant_provider_key");
+
+                    b.ToTable("external_category_mappings", (string)null);
+                });
+
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12324,6 +12511,10 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("PublishedByTenantUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("published_by_tenant_user_id");
+
+                    b.Property<string>("QuantityDraftPayload")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("quantity_draft_payload");
 
                     b.Property<decimal?>("ReferenceCostPrice")
                         .HasColumnType("numeric(18,4)")
@@ -23656,6 +23847,13 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("requested_amount");
 
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("row_version");
+
                     b.Property<Guid>("SalesOrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("sales_order_id");
@@ -29266,6 +29464,66 @@ namespace E_POS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedByTenantUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_departments_updated_by_tenant_user_id_tenant_users");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ExternalBrandMapping", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_external_brand_mappings_created_by_tenant_user_id");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_external_brand_mappings_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_external_brand_mappings_updated_by_tenant_user_id");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Brand", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TenantBrandId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_external_brand_mappings_tenant_brand");
+                });
+
+            modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.ExternalCategoryMapping", b =>
+                {
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_external_category_mappings_created_by_tenant_user_id");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_external_category_mappings_tenant_id_tenants");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.AccessControl.Entities.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_external_category_mappings_updated_by_tenant_user_id");
+
+                    b.HasOne("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "TenantCategoryId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_external_category_mappings_tenant_category");
                 });
 
             modelBuilder.Entity("E_POS.Domain.Modules.Tenant.CatalogProduct.Entities.Product", b =>

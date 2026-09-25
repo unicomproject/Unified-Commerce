@@ -49,7 +49,6 @@ public sealed partial class TenantAdminProductServiceTests
     [InlineData(4)]
     [InlineData(5)]
     [InlineData(6)]
-    [InlineData(7)]
     public async Task GetSetupAsync_ScannerFirst_DoesNotLegacyRemap(int persistedStep)
     {
         var productId = Guid.NewGuid();
@@ -82,33 +81,6 @@ public sealed partial class TenantAdminProductServiceTests
         Assert.Equal(persistedStep, result.Value!.CurrentSetupStep);
         Assert.Equal("SCAN", result.Value.ScanContext!.AcquisitionMode);
         Assert.Equal("012345678905", result.Value.ScanContext.CandidateIdentifier);
-    }
-
-    [Fact]
-    public async Task GetSetupAsync_LegacyBundleOldStep3_MapsTo4_Target5()
-    {
-        var productId = Guid.NewGuid();
-        var repository = new FakeTenantAdminProductRepository
-        {
-            SetupDto = CreateSetup(productId, Guid.NewGuid()) with
-            {
-                ProductStructure = ProductStructureConstants.Bundle,
-                CurrentSetupStep = 3,
-                TargetSetupStep = 3,
-                ScanContext = null
-            }
-        };
-        var service = CreateService(repository);
-
-        var result = await service.GetSetupAsync(
-            CreateContext([ProductConstants.ViewPermission]),
-            productId,
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(4, result.Value!.CurrentSetupStep);
-        Assert.Equal(5, result.Value.TargetSetupStep);
-        Assert.Equal("LEGACY", result.Value.ScanContext!.AcquisitionMode);
     }
 
     [Fact]

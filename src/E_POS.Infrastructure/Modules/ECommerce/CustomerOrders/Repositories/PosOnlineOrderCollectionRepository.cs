@@ -28,7 +28,7 @@ public sealed class PosOnlineOrderCollectionRepository : IPosOnlineOrderCollecti
         Guid tenantId,
         Guid tenantUserId,
         Guid outletId,
-        string tokenHash,
+        string token,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -36,22 +36,21 @@ public sealed class PosOnlineOrderCollectionRepository : IPosOnlineOrderCollecti
         if (accessError is not null)
             return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>.Failure(accessError);
 
-        if (string.IsNullOrWhiteSpace(tokenHash))
+        if (string.IsNullOrWhiteSpace(token))
             return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>
                 .Failure("online_orders.collection.qr_invalid");
 
         var pickup = await _dbContext.PickupOrders.AsNoTracking()
             .FirstOrDefaultAsync(x =>
                 x.TenantId == tenantId &&
-                x.PickupQrTokenHash == tokenHash,
+                x.PickupQrTokenHash == token,
                 cancellationToken);
         if (pickup is null)
             return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>
                 .Failure("online_orders.collection.qr_invalid");
 
-        if (pickup.PickupQrExpiresAt is { } expiresAt && expiresAt < now)
-            return PosOnlineOrderCollectionRepositoryResult<PosOnlineOrderCollectionValidateResponse>
-                .Failure("online_orders.collection.qr_expired");
+        // The collection QR never expires on its own — it stays valid until the order is
+        // actually collected (or the pickup is cancelled), regardless of how long that takes.
 
         var fulfillment = await _dbContext.FulfillmentOrders.AsNoTracking()
             .FirstOrDefaultAsync(x =>

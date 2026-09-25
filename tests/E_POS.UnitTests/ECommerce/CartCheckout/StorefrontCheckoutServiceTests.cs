@@ -196,6 +196,13 @@ public sealed class StorefrontCheckoutServiceTests
             DateTimeOffset now,
             CancellationToken cancellationToken) => Task.FromResult(true);
 
+        public Task RecordProviderCheckoutSessionAsync(
+            Guid tenantId,
+            Guid salesPaymentId,
+            string providerSessionId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) => Task.CompletedTask;
+
         private Task<StorefrontCheckoutRepositoryResult> Result() =>
             Task.FromResult(ErrorCode is null
                 ? StorefrontCheckoutRepositoryResult.Success(new StorefrontCheckoutReadModel())

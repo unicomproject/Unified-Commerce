@@ -22,6 +22,18 @@ public sealed class ClickCollectCollectionDomainTests
     }
 
     [Fact]
+    public void Pickup_IssueCollectionQr_WithNoExpiry_StaysValidIndefinitely()
+    {
+        var pickup = CreatePickup("READY");
+
+        pickup.IssueCollectionQr("abc123hash", 1, expiresAt: null, Now);
+
+        Assert.Equal("abc123hash", pickup.PickupQrTokenHash);
+        Assert.Equal(1, pickup.PickupQrVersion);
+        Assert.Null(pickup.PickupQrExpiresAt);
+    }
+
+    [Fact]
     public void Pickup_IssueCollectionQr_WhenPending_Throws()
     {
         var pickup = CreatePickup("PENDING");

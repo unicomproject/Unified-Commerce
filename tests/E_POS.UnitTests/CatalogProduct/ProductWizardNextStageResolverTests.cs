@@ -12,8 +12,6 @@ public sealed class ProductWizardNextStageResolverTests
     [InlineData(ProductStructureConstants.Variant, true, ProductWizardStage.UnitsPackConversion)]
     [InlineData(ProductStructureConstants.Simple, false, ProductWizardStage.BarcodeSku)]
     [InlineData(ProductStructureConstants.Variant, false, ProductWizardStage.ProductConfiguration)]
-    [InlineData(ProductStructureConstants.Bundle, true, ProductWizardStage.ProductConfiguration)]
-    [InlineData(ProductStructureConstants.Bundle, false, ProductWizardStage.ProductConfiguration)]
     public void FromProductTypeTracking_FollowsSevenStepUnitsMatrix(
         string structure,
         bool trackInventory,
@@ -43,7 +41,7 @@ public sealed class ProductWizardNextStageResolverTests
     }
 
     [Fact]
-    public void ScannerFirst_VariantTrackOn_MapsPublicStep4()
+    public void ScannerFirst_VariantTrackOn_MapsPublicStep3()
     {
         var processor = ProductWizardNextStageResolver.ResolveNextApplicableStage(
             ProductStructureConstants.Variant,
@@ -51,20 +49,8 @@ public sealed class ProductWizardNextStageResolverTests
             ProductWizardStage.ProductTypeTracking);
 
         Assert.Equal(
-            ScannerFirstWizardStageMapper.PublicUnitsPackConversion,
+            ScannerFirstWizardStageMapper.PublicProductTypeTracking,
             ScannerFirstWizardStageMapper.MapProcessorToPublicStep(processor));
     }
 
-    [Fact]
-    public void ScannerFirst_Bundle_MapsPublicStep5()
-    {
-        var processor = ProductWizardNextStageResolver.ResolveNextApplicableStage(
-            ProductStructureConstants.Bundle,
-            trackInventory: false,
-            ProductWizardStage.ProductTypeTracking);
-
-        Assert.Equal(
-            ScannerFirstWizardStageMapper.PublicProductConfiguration,
-            ScannerFirstWizardStageMapper.MapProcessorToPublicStep(processor));
-    }
 }

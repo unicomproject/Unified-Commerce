@@ -16,6 +16,9 @@ using E_POS.Infrastructure.Persistence.Seed;
 using E_POS.Application.Modules.Shared.Media.Contracts;
 using Microsoft.EntityFrameworkCore;
 
+using E_POS.Application.Modules.Tenant.CatalogProduct.Services;
+using E_POS.Infrastructure.Common;
+
 namespace E_POS.Infrastructure.Modules.Tenant.CatalogProduct.Repositories;
 
 public sealed partial class TenantAdminProductRepository : ITenantAdminProductRepository
@@ -23,15 +26,29 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
     private readonly EPosDbContext _dbContext;
     private readonly ICodeSequenceRepository _codeSequenceRepository;
     private readonly IMediaReadUrlResolver? _mediaReadUrlResolver;
+    private readonly IExternalCategoryMappingRepository _externalCategoryMappingRepository;
+    private readonly IExternalBrandMappingRepository _externalBrandMappingRepository;
 
     public TenantAdminProductRepository(
         EPosDbContext dbContext,
         ICodeSequenceRepository codeSequenceRepository,
-        IMediaReadUrlResolver? mediaReadUrlResolver = null)
+        IMediaReadUrlResolver? mediaReadUrlResolver = null,
+        IExternalCategoryMappingRepository? externalCategoryMappingRepository = null,
+        IExternalBrandMappingRepository? externalBrandMappingRepository = null)
     {
         _dbContext = dbContext;
         _codeSequenceRepository = codeSequenceRepository;
         _mediaReadUrlResolver = mediaReadUrlResolver;
+        _externalCategoryMappingRepository = externalCategoryMappingRepository
+            ?? new ExternalCategoryMappingRepository(
+                dbContext,
+                new SystemDateTimeProvider(),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ExternalCategoryMappingRepository>.Instance);
+        _externalBrandMappingRepository = externalBrandMappingRepository
+            ?? new ExternalBrandMappingRepository(
+                dbContext,
+                new SystemDateTimeProvider(),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ExternalBrandMappingRepository>.Instance);
     }
 
     public async Task<TenantAdminProductSummaryResponse> GetSummaryAsync(
@@ -1655,6 +1672,28 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             }
         }
 
+        if (request.ExternalCategoryMappingContext is not null &&
+            !string.IsNullOrWhiteSpace(request.ExternalCategoryMappingContext.Provider) &&
+            !string.IsNullOrWhiteSpace(request.ExternalCategoryMappingContext.ExternalCategoryKey))
+        {
+            var normProvider = request.ExternalCategoryMappingContext.Provider.Trim().ToLowerInvariant();
+            var normKey = ExternalProductSuggestionNormalizer.NormalizeExternalCategoryKey(request.ExternalCategoryMappingContext.ExternalCategoryKey)
+                ?? request.ExternalCategoryMappingContext.ExternalCategoryKey.Trim().ToLowerInvariant();
+            var normName = ExternalProductSuggestionNormalizer.NormalizeExternalCategoryName(request.ExternalCategoryMappingContext.ExternalCategoryName)
+                ?? normKey;
+
+            await _externalCategoryMappingRepository.UpsertAsync(
+                tenantId,
+                normProvider,
+                normKey,
+                normName,
+                request.ResolveSelectedCategoryId(),
+                "PRODUCT_CONFIRMED",
+                userId,
+                cancellationToken,
+                saveChanges: false);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return new TenantAdminProductCreateResponse(
@@ -2562,4 +2601,22 @@ public sealed partial class TenantAdminProductRepository : ITenantAdminProductRe
             sortOrder: 0,
             userId,
             now);
+
+    public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken)
+    {
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = _dbContext.Database.CurrentTransaction == null
+                ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+
+            await action(cancellationToken);
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        });
+    }
 }

@@ -12,7 +12,7 @@ public sealed class PosOnlineOrderPickupVerificationRepositoryTests
     private static readonly DateTimeOffset Now = new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task MarkReady_IssuesASingleUsePickupCodeValidForTwentyFourHours()
+    public async Task MarkReady_IssuesASingleUsePickupCodeThatNeverExpires()
     {
         await using var db = CreateDbContext();
         var fixture = PosOnlineOrderPackingRepositoryTests.SeedPackableAggregate(
@@ -37,7 +37,7 @@ public sealed class PosOnlineOrderPickupVerificationRepositoryTests
         var pickup = await db.PickupOrders.SingleAsync();
         Assert.False(string.IsNullOrEmpty(pickup.PickupQrTokenHash));
         Assert.Equal(1, pickup.PickupQrVersion);
-        Assert.Equal(readyAt.AddHours(24), pickup.PickupQrExpiresAt);
+        Assert.Null(pickup.PickupQrExpiresAt);
         Assert.Equal(0, pickup.FailedVerificationAttempts);
     }
 
@@ -115,20 +115,21 @@ public sealed class PosOnlineOrderPickupVerificationRepositoryTests
     }
 
     [Fact]
-    public async Task Verify_ExpiredCode_Rejected()
+    public async Task Verify_LongAfterReady_StillAccepted()
     {
         await using var db = CreateDbContext();
-        var fixture = await SeedReadyOrderAsync(db, readyAt: Now.AddHours(-25));
+        // Issued (and never expires) long before this verification attempt — a customer taking
+        // days or weeks to collect must not find their code stale when they finally show up.
+        var fixture = await SeedReadyOrderAsync(db, readyAt: Now.AddDays(-30));
         var repository = new PosOnlineOrderPickupVerificationRepository(db);
 
         var result = await repository.VerifyAsync(
             fixture.TenantId, fixture.UserId, fixture.OutletId, fixture.OrderId,
             fixture.PickupCode, Now, CancellationToken.None);
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal("online_orders.pickup_code_expired", result.ErrorCode);
+        Assert.True(result.IsSuccess, result.ErrorCode);
         db.ChangeTracker.Clear();
-        Assert.Equal("READY", (await db.PickupOrders.SingleAsync()).PickupStatus);
+        Assert.Equal("VERIFIED", (await db.PickupOrders.SingleAsync()).PickupStatus);
     }
 
     [Fact]

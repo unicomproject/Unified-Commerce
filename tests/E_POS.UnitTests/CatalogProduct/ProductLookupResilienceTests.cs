@@ -308,7 +308,10 @@ public sealed class ProductLookupResilienceTests
 
         Assert.Equal(ExternalProductLookupStatuses.Found, outcome.Status);
         Assert.Equal("Cached Cola", outcome.Suggestion!.ProductName);
-        Assert.Equal("cache", outcome.SourceReference);
+        // Phase A fix: a cache hit must report the REAL provider, never the literal "cache".
+        Assert.Equal("openfoodfacts", outcome.SourceReference);
+        Assert.Equal("openfoodfacts", outcome.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Cache, outcome.RetrievalSource);
     }
 
     [Fact]
@@ -417,10 +420,17 @@ public sealed class ProductLookupResilienceTests
     private sealed class StubCacheRepository : ISharedProductMetadataCacheRepository
     {
         private readonly ExternalProductSuggestion? _suggestion;
-        public StubCacheRepository(ExternalProductSuggestion? suggestion) => _suggestion = suggestion;
+        private readonly string _provider;
+        public StubCacheRepository(ExternalProductSuggestion? suggestion, string provider = "openfoodfacts")
+        {
+            _suggestion = suggestion;
+            _provider = provider;
+        }
 
-        public Task<ExternalProductSuggestion?> GetValidAsync(string normalizedBarcode, CancellationToken cancellationToken) =>
-            Task.FromResult(_suggestion);
+        public Task<CachedExternalProductLookupResult?> GetValidAsync(string normalizedBarcode, string provider, CancellationToken cancellationToken) =>
+            Task.FromResult(_suggestion is null
+                ? null
+                : new CachedExternalProductLookupResult(_suggestion, _provider));
 
         public Task SetAsync(string normalizedBarcode, string? identifierStandard, string provider, ExternalProductSuggestion suggestion, string? rawResponseJson, TimeSpan ttl, CancellationToken cancellationToken) =>
             Task.CompletedTask;

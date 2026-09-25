@@ -32,6 +32,7 @@ public class Product : AuditableEntity
     public long RowVersion { get; protected set; } = 1;
     public string? DesiredPublishStatus { get; protected set; }
     public decimal? ReferenceCostPrice { get; protected set; }
+    public string? QuantityDraftPayload { get; protected set; }
 
     public static Product Create(
         Guid id,
@@ -171,6 +172,14 @@ public class Product : AuditableEntity
         UpdatedAt = now;
         UpdatedBy = updatedBy;
         UpdatedByTenantUserId = updatedBy;
+        IncrementRowVersion();
+    }
+
+    public void UpdateQuantityDraftPayload(string? payload, Guid? updatedByTenantUserId, DateTimeOffset now)
+    {
+        QuantityDraftPayload = payload;
+        UpdatedByTenantUserId = updatedByTenantUserId;
+        UpdatedAt = now;
         IncrementRowVersion();
     }
 

@@ -57,9 +57,6 @@ public class PickupOrder : AuditableEntity
 
     public bool IsLockedOut => FailedVerificationAttempts >= MaxVerificationAttempts;
 
-    public bool IsPickupCodeExpired(DateTimeOffset now) =>
-        !PickupQrExpiresAt.HasValue || PickupQrExpiresAt.Value <= now;
-
     public void Verify(Guid tenantUserId, string verificationMethod, DateTimeOffset now)
     {
         if (PickupStatus != "READY")
@@ -127,13 +124,15 @@ public class PickupOrder : AuditableEntity
     }
 
     /// <summary>
-    /// Issues (or re-issues) a collection QR for a READY pickup.
-    /// Token TTL is 7 days from <paramref name="now"/> at issuance time.
+    /// Issues (or re-issues) a collection QR for a READY pickup. The QR never expires on its
+    /// own — it stays valid until the order is actually collected (or the pickup is cancelled),
+    /// regardless of how long that takes. <paramref name="expiresAt"/> is accepted only for
+    /// backward compatibility with historical rows; pass null for the current no-expiry policy.
     /// </summary>
     public void IssueCollectionQr(
         string tokenHash,
         int version,
-        DateTimeOffset expiresAt,
+        DateTimeOffset? expiresAt,
         DateTimeOffset now)
     {
         if (PickupStatus != "READY")
@@ -145,7 +144,7 @@ public class PickupOrder : AuditableEntity
         if (version <= 0)
             throw new ArgumentOutOfRangeException(nameof(version), "Collection QR version must be positive.");
 
-        if (expiresAt <= now)
+        if (expiresAt is { } value && value <= now)
             throw new ArgumentOutOfRangeException(nameof(expiresAt), "Collection QR expiry must be in the future.");
 
         PickupQrTokenHash = tokenHash.Trim();

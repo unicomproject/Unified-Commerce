@@ -13,33 +13,26 @@ public static class ScannerFirstSetupReadMapper
     public const string AcquisitionLegacy = "LEGACY";
 
     /// <summary>
-    /// Explicit semantic map (D11). Not arithmetic — old 4 and old 5 both become public 5.
+    /// Explicit semantic map (D11).
     /// </summary>
     public static int MapLegacyPersistedStepToPublic(int legacyPersistedStep) =>
         legacyPersistedStep switch
         {
             1 => 2,
             2 => 3,
-            3 => 4,
-            4 => 5,
-            5 => 5,
-            6 => 6,
-            7 => 7,
-            _ => Math.Clamp(legacyPersistedStep, 1, 7)
+            3 => 3,
+            4 => 3,
+            5 => 3,
+            6 => 4,
+            7 => 6,
+            _ => Math.Clamp(legacyPersistedStep, 1, 6)
         };
 
     /// <summary>
-    /// Preserve documented BUNDLE Units skip: public Units (4) → navigate to Product Configuration (5).
+    /// Map public wizard steps to internal steps.
     /// </summary>
     public static int ResolveTargetSetupStep(string? productStructure, int publicCurrentSetupStep)
     {
-        var structure = ProductStructureConstants.Normalize(productStructure ?? ProductStructureConstants.Simple);
-        if (string.Equals(structure, ProductStructureConstants.Bundle, StringComparison.OrdinalIgnoreCase) &&
-            publicCurrentSetupStep == ScannerFirstWizardStageMapper.PublicUnitsPackConversion)
-        {
-            return ScannerFirstWizardStageMapper.PublicProductConfiguration;
-        }
-
         return publicCurrentSetupStep;
     }
 
@@ -56,7 +49,7 @@ public static class ScannerFirstSetupReadMapper
 
         if (hasScanContextRow)
         {
-            publicCurrent = Math.Clamp(setup.CurrentSetupStep, 1, 7);
+            publicCurrent = Math.Clamp(setup.CurrentSetupStep, 1, 6);
             scanContext = setup.ScanContext;
         }
         else

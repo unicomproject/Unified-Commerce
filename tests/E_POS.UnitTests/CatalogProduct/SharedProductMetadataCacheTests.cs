@@ -23,7 +23,7 @@ public sealed class SharedProductMetadataCacheTests
     {
         var (repository, _) = CreateRepository();
 
-        var result = await repository.GetValidAsync(Barcode, CancellationToken.None);
+        var result = await repository.GetValidAsync(Barcode, "openfoodfacts", CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -43,12 +43,13 @@ public sealed class SharedProductMetadataCacheTests
             ttl: TimeSpan.FromDays(30),
             CancellationToken.None);
 
-        var cached = await repository.GetValidAsync(Barcode, CancellationToken.None);
+        var cached = await repository.GetValidAsync(Barcode, "openfoodfacts", CancellationToken.None);
 
         Assert.NotNull(cached);
-        Assert.Equal("Diet Coke", cached!.ProductName);
-        Assert.Equal("Coca-Cola", cached.BrandText);
-        Assert.Equal(Barcode, cached.PrimaryGtin);
+        Assert.Equal("openfoodfacts", cached!.Provider);
+        Assert.Equal("Diet Coke", cached.Suggestion.ProductName);
+        Assert.Equal("Coca-Cola", cached.Suggestion.BrandText);
+        Assert.Equal(Barcode, cached.Suggestion.PrimaryGtin);
 
         var dbEntry = await dbContext.SharedProductMetadataCaches.SingleAsync();
         Assert.Equal(Barcode, dbEntry.NormalizedBarcode);
@@ -56,6 +57,46 @@ public sealed class SharedProductMetadataCacheTests
         Assert.Equal("EAN13", dbEntry.IdentifierStandard);
         Assert.Contains("Diet Coke", dbEntry.NormalizedMetadataJson);
         Assert.Contains("raw", dbEntry.RawResponseJson);
+    }
+
+    [Fact]
+    public async Task SetAsync_ThenGetValidAsync_PreservesExternalCategoryMetadata_AndContainsNoTenantData()
+    {
+        var (repository, dbContext) = CreateRepository();
+        var hierarchy = new[] { "en:beverages", "en:carbonated-drinks", "en:colas" };
+        var suggestion = CreateSuggestion(
+            "Coca Cola Zero",
+            "Coca-Cola",
+            externalCategoryKey: "en:colas",
+            externalCategoryName: "Colas",
+            externalCategoryHierarchy: hierarchy);
+
+        await repository.SetAsync(
+            Barcode,
+            "EAN13",
+            "openfoodfacts",
+            suggestion,
+            rawResponseJson: null,
+            ttl: TimeSpan.FromDays(30),
+            CancellationToken.None);
+
+        var cached = await repository.GetValidAsync(Barcode, "openfoodfacts", CancellationToken.None);
+
+        Assert.NotNull(cached);
+        Assert.Equal("en:colas", cached!.Suggestion.ExternalCategoryKey);
+        Assert.Equal("Colas", cached.Suggestion.ExternalCategoryName);
+        Assert.NotNull(cached.Suggestion.ExternalCategoryHierarchy);
+        Assert.Equal(3, cached.Suggestion.ExternalCategoryHierarchy!.Count);
+        Assert.Equal("en:beverages", cached.Suggestion.ExternalCategoryHierarchy[0]);
+        Assert.Equal("en:carbonated-drinks", cached.Suggestion.ExternalCategoryHierarchy[1]);
+        Assert.Equal("en:colas", cached.Suggestion.ExternalCategoryHierarchy[2]);
+
+        // Verify shared cache contains no tenant data
+        var dbEntry = await dbContext.SharedProductMetadataCaches.SingleAsync();
+        Assert.DoesNotContain("TenantId", dbEntry.NormalizedMetadataJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("TenantCategoryId", dbEntry.NormalizedMetadataJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MappedCategoryId", dbEntry.NormalizedMetadataJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MappingSource", dbEntry.NormalizedMetadataJson, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -77,7 +118,7 @@ public sealed class SharedProductMetadataCacheTests
         // Fast forward 31 days into future
         timeProvider.UtcNow = timeProvider.UtcNow.AddDays(31);
 
-        var cached = await repository.GetValidAsync(Barcode, CancellationToken.None);
+        var cached = await repository.GetValidAsync(Barcode, "openfoodfacts", CancellationToken.None);
 
         Assert.Null(cached);
     }
@@ -95,9 +136,27 @@ public sealed class SharedProductMetadataCacheTests
         var count = await dbContext.SharedProductMetadataCaches.CountAsync();
         Assert.Equal(1, count);
 
-        var cached = await repository.GetValidAsync(Barcode, CancellationToken.None);
+        var cached = await repository.GetValidAsync(Barcode, "openfoodfacts", CancellationToken.None);
         Assert.NotNull(cached);
-        Assert.Equal("Diet Coke v2", cached!.ProductName);
+        Assert.Equal("Diet Coke v2", cached!.Suggestion.ProductName);
+    }
+
+    [Fact]
+    public async Task GetValidAsync_DifferentProvider_DoesNotReturnAnotherProvidersCacheRow()
+    {
+        var (repository, _) = CreateRepository();
+        var suggestion = CreateSuggestion("Own Brand Cola", "House");
+
+        await repository.SetAsync(Barcode, "EAN13", "openfoodfacts", suggestion, null, TimeSpan.FromDays(30), CancellationToken.None);
+
+        // A row cached under "openfoodfacts" must be invisible to a lookup for "upcitemdb" —
+        // one provider's cached data must never masquerade as another's.
+        var cachedForOtherProvider = await repository.GetValidAsync(Barcode, "upcitemdb", CancellationToken.None);
+
+        Assert.Null(cachedForOtherProvider);
+
+        var cachedForRealProvider = await repository.GetValidAsync(Barcode, "openfoodfacts", CancellationToken.None);
+        Assert.NotNull(cachedForRealProvider);
     }
 
     [Fact]
@@ -123,7 +182,12 @@ public sealed class SharedProductMetadataCacheTests
 
         Assert.Equal(ExternalProductLookupStatuses.Found, outcome.Status);
         Assert.Equal("Mineral Water", outcome.Suggestion!.ProductName);
-        Assert.Equal("cache", outcome.SourceReference);
+        // Phase A fix: a cache hit must report the REAL provider, never the literal "cache".
+        Assert.Equal("openfoodfacts", outcome.SourceReference);
+        Assert.Equal("openfoodfacts", outcome.SourceProvider);
+        Assert.NotEqual("cache", outcome.SourceReference);
+        Assert.NotEqual("cache", outcome.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Cache, outcome.RetrievalSource);
         Assert.Equal(0, fakeProvider.CallCount); // Provider was never invoked!
     }
 
@@ -147,13 +211,20 @@ public sealed class SharedProductMetadataCacheTests
         Assert.Equal(ExternalProductLookupStatuses.Found, outcome1.Status);
         Assert.Equal("Walkers", outcome1.Suggestion!.BrandText);
         Assert.Equal("openfoodfacts", outcome1.SourceReference);
+        Assert.Equal("openfoodfacts", outcome1.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Provider, outcome1.RetrievalSource);
         Assert.Equal(1, fakeProvider.CallCount);
 
-        // 2. Second request -> Cache HIT -> returns cached result -> provider NOT called again
+        // 2. Second request -> Cache HIT -> returns cached result -> provider NOT called again.
+        // Phase A fix: sourceProvider/sourceReference must still be "openfoodfacts" — the same
+        // saved-mapping-relevant identity as the fresh lookup above — only retrievalSource differs.
         var outcome2 = await coordinator.LookupAsync(request, CancellationToken.None);
         Assert.Equal(ExternalProductLookupStatuses.Found, outcome2.Status);
         Assert.Equal("Walkers", outcome2.Suggestion!.BrandText);
-        Assert.Equal("cache", outcome2.SourceReference);
+        Assert.Equal("openfoodfacts", outcome2.SourceReference);
+        Assert.Equal("openfoodfacts", outcome2.SourceProvider);
+        Assert.Equal(outcome1.SourceProvider, outcome2.SourceProvider);
+        Assert.Equal(ExternalProductLookupRetrievalSources.Cache, outcome2.RetrievalSource);
         Assert.Equal(1, fakeProvider.CallCount); // Still exactly 1 call!
     }
 
@@ -270,7 +341,12 @@ public sealed class SharedProductMetadataCacheTests
             ],
         };
 
-    private static ExternalProductSuggestion CreateSuggestion(string name, string brand) =>
+    private static ExternalProductSuggestion CreateSuggestion(
+        string name,
+        string brand,
+        string? externalCategoryKey = null,
+        string? externalCategoryName = null,
+        IReadOnlyList<string>? externalCategoryHierarchy = null) =>
         new(
             ProductName: name,
             ShortName: null,
@@ -282,7 +358,10 @@ public sealed class SharedProductMetadataCacheTests
             LongDescription: null,
             ImageCandidate: "https://example.com/img.jpg",
             PrimaryGtin: Barcode,
-            IdentifierStandard: "EAN13");
+            IdentifierStandard: "EAN13",
+            ExternalCategoryKey: externalCategoryKey,
+            ExternalCategoryName: externalCategoryName,
+            ExternalCategoryHierarchy: externalCategoryHierarchy);
 
     private sealed class MutableDateTimeProvider : IDateTimeProvider
     {
@@ -333,13 +412,13 @@ public sealed class SharedProductMetadataCacheTests
             _throwOnWrite = throwOnWrite;
         }
 
-        public Task<ExternalProductSuggestion?> GetValidAsync(string normalizedBarcode, CancellationToken cancellationToken)
+        public Task<CachedExternalProductLookupResult?> GetValidAsync(string normalizedBarcode, string provider, CancellationToken cancellationToken)
         {
             if (_throwOnRead)
             {
                 throw new InvalidOperationException("Simulated cache read error");
             }
-            return Task.FromResult<ExternalProductSuggestion?>(null);
+            return Task.FromResult<CachedExternalProductLookupResult?>(null);
         }
 
         public Task SetAsync(string normalizedBarcode, string? identifierStandard, string provider, ExternalProductSuggestion suggestion, string? rawResponseJson, TimeSpan ttl, CancellationToken cancellationToken)
