@@ -14,7 +14,7 @@ using E_POS.Domain.Modules.Tenant.Orders.Entities;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Entities;
 using E_POS.Domain.Modules.Tenant.Payment.Entities;
 using E_POS.Domain.Modules.Tenant.Inventory.Entities;
-using E_POS.Domain.Modules.Tenant.Catalog.Entities;
+using E_POS.Domain.Modules.Tenant.CatalogProduct.Entities;
 using E_POS.Domain.Modules.Tenant.TenantFoundation.Entities;
 using E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
 using E_POS.Infrastructure.Persistence;
