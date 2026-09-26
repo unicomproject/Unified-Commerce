@@ -743,7 +743,55 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             ("referenceType", null), ("referenceNumber", x.movement.ReferenceNumberSnapshot), ("reasonCode", x.movement.ReasonCode),
             ("reason", x.movement.MovementNote), ("notes", x.movement.MovementNote), ("performedByUserId", x.movement.CreatedByTenantUserId),
             ("performedByUserName", x.user == null ? null : x.user.DisplayName ?? x.user.FullName), ("currencyCode", tenantInfo.CurrencyCode))).ToList();
-        return Result(tenantInfo, "movements", request, new Dictionary<string, object?> { ["movementCount"] = total }, records, total);
+            
+        // Calculate Reconciliation
+        var allMovements = await query.ToListAsync(cancellationToken);
+        
+        var openingQuantity = 0m;
+        if (request.From.HasValue)
+        {
+            var range = ReportBusinessDateCalculator.ToUtcRange(request.From.Value, request.From.Value, tenantInfo.Timezone);
+            var openingQuery =
+                from movement in _dbContext.StockMovements.AsNoTracking()
+                join balance in _dbContext.InventoryBalances.AsNoTracking() on movement.InventoryBalanceId equals balance.Id
+                join location in _dbContext.InventoryLocations.AsNoTracking() on balance.InventoryLocationId equals location.Id
+                where movement.TenantId == context.TenantId &&
+                      outletIds.Contains(location.OutletId) &&
+                      (!request.OutletId.HasValue || location.OutletId == request.OutletId.Value) &&
+                      (!request.InventoryLocationId.HasValue || location.Id == request.InventoryLocationId.Value) &&
+                      (!request.ProductId.HasValue || balance.ProductId == request.ProductId.Value) &&
+                      (!request.ProductVariantId.HasValue || balance.ProductVariantId == request.ProductVariantId.Value) &&
+                      movement.OccurredAt < range.FromUtc
+                select movement;
+            openingQuantity = await openingQuery.SumAsync(x => x.QuantityChange, cancellationToken);
+        }
+        else 
+        {
+            // If no from date is specified, opening is 0 (beginning of time)
+            openingQuantity = 0m;
+        }
+        var receipts = allMovements.Where(x => x.movement.MovementType == "STOCK_IN").Sum(x => x.movement.QuantityChange);
+        var stockIssues = allMovements.Where(x => x.movement.MovementType == "STOCK_OUT").Sum(x => -x.movement.QuantityChange);
+        var restockableReturns = allMovements.Where(x => x.movement.MovementType == "RETURN").Sum(x => x.movement.QuantityChange);
+        var signedAdjustments = allMovements.Where(x => x.movement.MovementType == "ADJUSTMENT").Sum(x => x.movement.QuantityChange);
+        var transferIn = allMovements.Where(x => x.movement.MovementType == "TRANSFER" && x.movement.QuantityChange > 0).Sum(x => x.movement.QuantityChange);
+        var transferOut = allMovements.Where(x => x.movement.MovementType == "TRANSFER" && x.movement.QuantityChange < 0).Sum(x => -x.movement.QuantityChange);
+        
+        var netMovement = receipts + transferIn + restockableReturns - stockIssues - transferOut + signedAdjustments;
+        var closingQuantity = openingQuantity + netMovement;
+
+        return Result(tenantInfo, "movements", request, new Dictionary<string, object?> { 
+            ["movementCount"] = total,
+            ["openingQuantity"] = openingQuantity,
+            ["receipts"] = receipts,
+            ["stockIssues"] = stockIssues,
+            ["restockableReturns"] = restockableReturns,
+            ["signedAdjustments"] = signedAdjustments,
+            ["transferIn"] = transferIn,
+            ["transferOut"] = transferOut,
+            ["netMovement"] = netMovement,
+            ["closingQuantity"] = closingQuantity
+        }, records, total);
     }
 
     private async Task<ReportResultDto> BuildTillSummaryResultAsync(

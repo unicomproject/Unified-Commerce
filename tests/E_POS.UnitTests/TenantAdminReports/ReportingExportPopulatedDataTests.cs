@@ -134,7 +134,11 @@ namespace E_POS.UnitTests.TenantAdminReports
                 {
                     try
                     {
-                        var req = new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, section, 1, 100, null, null);
+                        var req = new ReportQueryRequest(
+                            From: null, To: null, OutletId: null, TillId: null, CashierId: null, CustomerId: null,
+                            DepartmentId: null, CategoryId: null, SubcategoryId: null, BrandId: null, ProductId: null,
+                            ProductVariantId: null, SalesChannelId: null, PaymentMethodId: null, OrderStatus: null,
+                            PaymentStatus: null, Search: null, Section: section, Page: 1, PageSize: 100);
                         ReportResultDto res;
                         if (type == "sales") res = await repo.GetSalesAsync(context, req, CancellationToken.None);
                         else if (type == "stock") res = await repo.GetStockAsync(context, req, CancellationToken.None);
@@ -175,6 +179,129 @@ namespace E_POS.UnitTests.TenantAdminReports
                 {
                     throw new Exception("Populated data check failed:\n" + string.Join("\n", failures));
                 }
+            }
+        }
+
+        [Fact]
+        public async Task REP07A_CurrentStock_Returns_OnHand_Reserved_Available()
+        {
+            var tenantId = Guid.NewGuid();
+            var userId = Guid.NewGuid();
+            var outletId = Guid.NewGuid();
+            var locationId = Guid.NewGuid();
+            var productId = Guid.NewGuid();
+            var balanceId = Guid.NewGuid();
+            var options = CreateOptions(Guid.NewGuid().ToString());
+
+            await using (var db = new EPosDbContext(options))
+            {
+                var tenant = Create<Tenant>(("Id", tenantId), ("Name", "Test"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow), ("BaseCurrencyCode", "USD"), ("DefaultTimezone", "UTC"), ("DisplayName", "Test"), ("Status", "ACTIVE"), ("TenantCode", "T-001"), ("TenantSlug", "test"));
+                db.Tenants.Add(tenant);
+                db.TenantUsers.Add(Create<TenantUser>(("Id", userId), ("TenantId", tenantId), ("AccountStatus", "ACTIVE"), ("OutletAccessScope", "ALL_OUTLETS"), ("TillAccessScope", "ALL_ACCESSIBLE_TILLS"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow), ("StaffCode", "TEST"), ("AcceptedTermsVersion", "1.0"), ("Email", "test@test.com"), ("FullName", "Test User"), ("SourceUserType", "INTERNAL"), ("UserType", "OWNER")));
+                db.Outlets.Add(Create<Outlet>(("Id", outletId), ("TenantId", tenantId), ("OutletName", "Test Outlet"), ("Status", "ACTIVE"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow), ("OutletCode", "O-001"), ("Timezone", "UTC"), ("CurrencyCode", "USD"), ("OutletType", "STORE")));
+                db.InventoryLocations.Add(Create<InventoryLocation>(("Id", locationId), ("TenantId", tenantId), ("OutletId", outletId), ("LocationName", "Storefront"), ("LocationCode", "L-001"), ("LocationType", "STOREFRONT"), ("Status", "ACTIVE"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                db.Products.Add(Create<Product>(("Id", productId), ("TenantId", tenantId), ("ProductName", "Test Product"), ("ProductCode", "P-001"), ("ProductType", "STANDARD"), ("Status", "ACTIVE"), ("PricingType", "FIXED"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow), ("ProductSlug", "test-product"), ("ProductStructure", "STANDALONE")));
+                
+                db.InventoryBalances.Add(Create<InventoryBalance>(("Id", balanceId), ("TenantId", tenantId), ("InventoryLocationId", locationId), ("ProductId", productId), ("AvailableQuantity", 17m), ("OnHandQuantity", 20m), ("ReservedQuantity", 3m), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                await db.SaveChangesAsync();
+            }
+
+            await using (var db = new EPosDbContext(options))
+            {
+                var repo = new TenantAdminReportsRepository(db);
+                var context = new TenantRequestContext(tenantId, userId, new List<string> { "tenant.reports.stock.view" });
+                var req = new ReportQueryRequest(
+                    From: null, To: null, OutletId: null, TillId: null, CashierId: null, CustomerId: null,
+                    DepartmentId: null, CategoryId: null, SubcategoryId: null, BrandId: null, ProductId: null,
+                    ProductVariantId: null, SalesChannelId: null, PaymentMethodId: null, OrderStatus: null,
+                    PaymentStatus: null, Search: null, Section: "current", Page: 1, PageSize: 100);
+                
+                var res = await repo.GetStockAsync(context, req, CancellationToken.None);
+                
+                var row = res.Records[0];
+                Assert.Equal(20m, Convert.ToDecimal(row["onHandQuantity"]));
+                Assert.Equal(3m, Convert.ToDecimal(row["reservedQuantity"]));
+                Assert.Equal(17m, Convert.ToDecimal(row["availableQuantity"]));
+            }
+        }
+
+        [Fact]
+        public async Task AC08_StockLedger_Reconciles_20_To_24()
+        {
+            var tenantId = Guid.NewGuid();
+            var userId = Guid.NewGuid();
+            var outletId = Guid.NewGuid();
+            var locationId = Guid.NewGuid();
+            var productId = Guid.NewGuid();
+            var balanceId = Guid.NewGuid();
+            var options = CreateOptions(Guid.NewGuid().ToString());
+
+            var fromDate = new DateOnly(2026, 9, 14);
+            var toDate = new DateOnly(2026, 9, 14);
+            var fromUtc = new DateTimeOffset(2026, 9, 14, 0, 0, 0, TimeSpan.Zero);
+            
+            await using (var db = new EPosDbContext(options))
+            {
+                var tenant = Create<Tenant>(("Id", tenantId), ("Name", "Test"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow), ("BaseCurrencyCode", "USD"), ("DefaultTimezone", "UTC"), ("DisplayName", "Test"), ("Status", "ACTIVE"), ("TenantCode", "T-001"), ("TenantSlug", "test"));
+                db.Tenants.Add(tenant);
+                db.TenantUsers.Add(Create<TenantUser>(("Id", userId), ("TenantId", tenantId), ("AccountStatus", "ACTIVE"), ("OutletAccessScope", "ALL_OUTLETS"), ("TillAccessScope", "ALL_ACCESSIBLE_TILLS"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow), ("StaffCode", "TEST"), ("AcceptedTermsVersion", "1.0"), ("Email", "test@test.com"), ("FullName", "Test User"), ("SourceUserType", "INTERNAL"), ("UserType", "OWNER")));
+                db.Outlets.Add(Create<Outlet>(("Id", outletId), ("TenantId", tenantId), ("OutletName", "Test Outlet"), ("Status", "ACTIVE"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow), ("OutletCode", "O-001"), ("Timezone", "UTC"), ("CurrencyCode", "USD"), ("OutletType", "STORE")));
+                db.InventoryLocations.Add(Create<InventoryLocation>(("Id", locationId), ("TenantId", tenantId), ("OutletId", outletId), ("LocationName", "Storefront"), ("LocationCode", "L-001"), ("LocationType", "STOREFRONT"), ("Status", "ACTIVE"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                db.Products.Add(Create<Product>(("Id", productId), ("TenantId", tenantId), ("ProductName", "Test Product"), ("ProductCode", "P-001"), ("ProductType", "STANDARD"), ("Status", "ACTIVE"), ("PricingType", "FIXED"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow), ("ProductSlug", "test-product"), ("ProductStructure", "STANDALONE")));
+                db.InventoryBalances.Add(Create<InventoryBalance>(("Id", balanceId), ("TenantId", tenantId), ("InventoryLocationId", locationId), ("ProductId", productId), ("AvailableQuantity", 24m), ("OnHandQuantity", 24m), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+
+                // 1. Before period
+                db.StockMovements.Add(Create<StockMovement>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("InventoryBalanceId", balanceId), ("MovementType", "STOCK_IN"), ("QuantityChange", 20m), ("QuantityBefore", 0m), ("OccurredAt", fromUtc.AddDays(-1)), ("MovementNumber", "M1"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                
+                // 2. Inside period
+                db.StockMovements.Add(Create<StockMovement>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("InventoryBalanceId", balanceId), ("MovementType", "STOCK_IN"), ("QuantityChange", 10m), ("QuantityBefore", 20m), ("OccurredAt", fromUtc.AddHours(1)), ("MovementNumber", "M2"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                db.StockMovements.Add(Create<StockMovement>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("InventoryBalanceId", balanceId), ("MovementType", "STOCK_OUT"), ("QuantityChange", -5m), ("QuantityBefore", 30m), ("OccurredAt", fromUtc.AddHours(2)), ("MovementNumber", "M3"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                db.StockMovements.Add(Create<StockMovement>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("InventoryBalanceId", balanceId), ("MovementType", "RETURN"), ("QuantityChange", 1m), ("QuantityBefore", 25m), ("OccurredAt", fromUtc.AddHours(3)), ("MovementNumber", "M4"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                db.StockMovements.Add(Create<StockMovement>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("InventoryBalanceId", balanceId), ("MovementType", "ADJUSTMENT"), ("QuantityChange", -2m), ("QuantityBefore", 26m), ("OccurredAt", fromUtc.AddHours(4)), ("MovementNumber", "M5"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                
+                // 3. After period
+                db.StockMovements.Add(Create<StockMovement>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("InventoryBalanceId", balanceId), ("MovementType", "STOCK_IN"), ("QuantityChange", 100m), ("QuantityBefore", 24m), ("OccurredAt", fromUtc.AddDays(1)), ("MovementNumber", "M6"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CreatedAt", DateTimeOffset.UtcNow)));
+                
+                await db.SaveChangesAsync();
+            }
+
+            await using (var db = new EPosDbContext(options))
+            {
+                var repo = new TenantAdminReportsRepository(db);
+                var context = new TenantRequestContext(tenantId, userId, new List<string> { "tenant.reports.stock.view" });
+                var req = new ReportQueryRequest(
+                    From: fromDate,
+                    To: toDate,
+                    OutletId: null,
+                    TillId: null,
+                    CashierId: null,
+                    CustomerId: null,
+                    DepartmentId: null,
+                    CategoryId: null,
+                    SubcategoryId: null,
+                    BrandId: null,
+                    ProductId: null,
+                    ProductVariantId: null,
+                    SalesChannelId: null,
+                    PaymentMethodId: null,
+                    OrderStatus: null,
+                    PaymentStatus: null,
+                    Search: null,
+                    Section: "movements",
+                    Page: 1,
+                    PageSize: 100);
+                
+                var res = await repo.GetStockAsync(context, req, CancellationToken.None);
+                
+                Assert.Equal(20m, res.Summary["openingQuantity"]);
+                Assert.Equal(10m, res.Summary["receipts"]);
+                Assert.Equal(5m, res.Summary["stockIssues"]);
+                Assert.Equal(1m, res.Summary["restockableReturns"]);
+                Assert.Equal(-2m, res.Summary["signedAdjustments"]);
+                Assert.Equal(4m, res.Summary["netMovement"]);
+                Assert.Equal(24m, res.Summary["closingQuantity"]);
+                
+                Assert.Equal(4, res.Records.Count);
             }
         }
     }
