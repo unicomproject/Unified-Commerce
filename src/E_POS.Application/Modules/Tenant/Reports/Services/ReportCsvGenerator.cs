@@ -39,7 +39,7 @@ namespace E_POS.Application.Modules.Tenant.Reports.Services
         
         private static readonly IReadOnlyList<string> PaymentTransactionsColumns = new[]
         {
-            "paymentMethodId", "paymentMethodCode", "paymentMethodName", "paymentType", "transactionCount", "requestedAmount", "tenderedAmount", "paidAmount", "changeAmount", "refundedAmount", "netCollectedAmount", "percentage", "currencyCode"
+            "paymentId", "orderNumber", "paymentMethodName", "requestedAmount", "tenderedAmount", "changeAmount", "paidAmount", "paymentStatus", "paidAt", "currencyCode"
         };
         
         private static readonly IReadOnlyList<string> TillShiftClosingColumns = new[]
