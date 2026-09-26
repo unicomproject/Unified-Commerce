@@ -745,6 +745,29 @@ public sealed class ReportingAcceptanceTests
     }
 
     [Fact]
+    public async Task REP06_CategoryFilterUsesProductAssignment_IncludingSubcategories_AndSortsByNetValue()
+    {
+        await using var f = new Fixture(); await f.SeedAsync();
+        Guid parent = Guid.NewGuid(), child = Guid.NewGuid(), other = Guid.NewGuid();
+        foreach (var (id, parentId, name) in new[] { (parent, (Guid?)null, "Drinks"), (child, (Guid?)parent, "Tea"), (other, (Guid?)null, "Food") })
+            f.Db.Categories.Add(Entity<Category>(("Id", id), ("TenantId", f.Tenant), ("ParentCategoryId", parentId), ("CategoryName", name),
+                ("CategoryCode", name), ("CategorySlug", name), ("Status", "ACTIVE")));
+        Guid tea = f.Product("Tea"), juice = f.Product("Juice"), bread = f.Product("Bread");
+        foreach (var (product, category) in new[] { (tea, child), (juice, parent), (bread, other) })
+            f.Db.ProductCategories.Add(Entity<ProductCategory>(("Id", Guid.NewGuid()), ("TenantId", f.Tenant), ("ProductId", product), ("CategoryId", category)));
+        var order = f.Order(90m, 0m);
+        f.Line(order, 1m, 20m, 0m, "Tea", tea); f.Line(order, 1m, 40m, 0m, "Juice", juice); f.Line(order, 1m, 30m, 0m, "Bread", bread);
+        await f.Db.SaveChangesAsync();
+
+        var drinks = await f.Repository.GetSalesAsync(f.Context(), Fixture.Query("products") with { CategoryId = parent, SortBy = "netValueExTax", SortDirection = "desc" }, default);
+        var teaOnly = await f.Repository.GetSalesAsync(f.Context(), Fixture.Query("products") with { SubcategoryId = child }, default);
+
+        Assert.Equal(new[] { "Juice", "Tea" }, drinks.Records.Select(x => (string)x["productName"]!));
+        Assert.Equal(60m, D(drinks.Summary, "netValueExTax"));
+        Assert.Equal("Tea", Assert.Single(teaOnly.Records)["productName"]);
+    }
+
+    [Fact]
     public async Task REP01B_ReturnAdjustmentIsAllocatedToTheOriginalSaleChannel()
     {
         await using var f = new Fixture(); await f.SeedAsync();
