@@ -57,7 +57,7 @@ namespace E_POS.UnitTests.TenantAdminReports
             Create<Till>(("Id", id), ("TenantId", tenantId), ("OutletId", outletId), ("Name", "Test"), ("Status", "ACTIVE"), ("UpdatedAt", DateTimeOffset.UtcNow));
 
         private SalesOrder CreateOrder(Guid id, Guid tenantId, Guid outletId, Guid? tillId = null, string status = "COMPLETED") =>
-            Create<SalesOrder>(("Id", id), ("TenantId", tenantId), ("ReportingOutletId", outletId), ("TillId", (object)tillId), ("OrderNumber", id.ToString()), ("OrderStatus", status), ("UpdatedAt", DateTimeOffset.UtcNow), ("SalesChannelId", tenantId));
+            Create<SalesOrder>(("Id", id), ("TenantId", tenantId), ("ReportingOutletId", outletId), ("TillId", (object)tillId), ("OrderNumber", id.ToString()), ("Status", status), ("PaymentStatus", "PAID"), ("CompletedAt", DateTimeOffset.UtcNow), ("UpdatedAt", DateTimeOffset.UtcNow), ("SalesChannelId", tenantId));
 
         // Test 1
         [Fact]

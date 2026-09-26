@@ -185,6 +185,8 @@ public sealed class ReportFoundationTests
 
     private sealed class FakeReportsRepository : ITenantAdminReportsRepository
     {
+        public Task<string> GetScopeStampAsync(TenantRequestContext context, CancellationToken ct) => Task.FromResult("test-scope");
+        public Task<bool> CanAccessAsync(TenantRequestContext context, Guid? outletId, Guid? tillId, CancellationToken ct) => Task.FromResult(true);
         public Task<ReportFilterOptionsResponse> GetFilterOptionsAsync(TenantRequestContext context, ReportFilterOptionsRequest request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 

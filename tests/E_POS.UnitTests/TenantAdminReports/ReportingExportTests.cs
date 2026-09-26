@@ -26,6 +26,7 @@ namespace E_POS.UnitTests.TenantAdminReports
         public ReportingExportTests()
         {
             _repository = new Mock<ITenantAdminReportsRepository>();
+            _repository.Setup(r => r.CanAccessAsync(It.IsAny<TenantRequestContext>(), It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _entitlements = new Mock<ITenantFeatureEntitlementEvaluator>();
             _clock = new Mock<IDateTimeProvider>();
             
@@ -40,6 +41,18 @@ namespace E_POS.UnitTests.TenantAdminReports
         private TenantRequestContext CreateContext(Guid tenantId, Guid userId, params string[] permissions)
         {
             return new TenantRequestContext(tenantId, userId, permissions.ToList());
+        }
+
+        [Fact]
+        public async Task Export_ExecutesAuthorizedSection_NotNestedFilterSection()
+        {
+            var context = CreateContext(Guid.NewGuid(), Guid.NewGuid(), TenantAdminReportPermissions.Export, TenantAdminReportPermissions.PaymentsView);
+            var filters = new ReportQueryRequest(null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"transactions");
+            _repository.Setup(x => x.GetSalesAsync(context, It.IsAny<ReportQueryRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ReportResultDto("payments", "LKR", "UTC", null,null,new Dictionary<string,object?>(),new Dictionary<string,object?>(),[],null,DateTimeOffset.UtcNow));
+            var result = await _service.CreateExportAsync(context, new("sales","payments","csv",filters), default);
+            Assert.True(result.IsSuccess);
+            _repository.Verify(x => x.GetSalesAsync(context, It.Is<ReportQueryRequest>(q => q.Section == "payments"), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -106,7 +119,7 @@ namespace E_POS.UnitTests.TenantAdminReports
             
             Assert.True(result.IsSuccess);
             
-            _repository.Verify(x => x.GetSalesAsync(context, It.Is<ReportQueryRequest>(req => req.Page == 1 && req.PageSize == int.MaxValue), It.IsAny<CancellationToken>()), Times.Once);
+            _repository.Verify(x => x.GetSalesAsync(context, It.Is<ReportQueryRequest>(req => req.Page == 1 && req.PageSize == 50001), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]

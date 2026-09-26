@@ -78,7 +78,7 @@ namespace E_POS.UnitTests.TenantAdminReports
                 for (int i = 0; i < 60; i++)
                 {
                     db.SalesOrders.Add(Create<SalesOrder>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("OrderNumber", $"ORD-{i:D3}"),
-                        ("ReportingOutletId", outletId), ("OrderStatus", "COMPLETED"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CompletedAt", DateTimeOffset.UtcNow), ("SalesChannelId", tenantId)));
+                        ("ReportingOutletId", outletId), ("Status", "COMPLETED"), ("PaymentStatus", "PAID"), ("UpdatedAt", DateTimeOffset.UtcNow), ("CompletedAt", DateTimeOffset.UtcNow), ("SalesChannelId", tenantId)));
                 }
                 
                 await db.SaveChangesAsync();
@@ -111,6 +111,7 @@ namespace E_POS.UnitTests.TenantAdminReports
                 var createResult = await service.CreateExportAsync(context, exportRequest, CancellationToken.None);
                 
                 Assert.True(createResult.IsSuccess);
+                Assert.True(createResult.IsSuccess, createResult.Error?.Message);
                 var jobId = createResult.Value!.JobId;
                 
                 var downloadResult = await service.DownloadExportAsync(context, jobId, CancellationToken.None);
@@ -119,8 +120,11 @@ namespace E_POS.UnitTests.TenantAdminReports
                 var csv = Encoding.UTF8.GetString(downloadResult.Value!);
                 var lines = csv.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 
-                // 8 metadata + 1 header + 60 records = 69 lines
-                Assert.Equal(69, lines.Length);
+                // Metadata block, then the column header, then every filtered record (not just the 25 on screen).
+                var header = Array.FindIndex(lines, l => l.StartsWith("rowType,orderId,"));
+                Assert.True(header > 0, "CSV column header not found");
+                Assert.Equal(60, lines.Length - header - 1);
+                Assert.Contains("Row Count,60", lines);
                 
                 auditLoggerMock.Verify(x => x.LogExportJobCreatedAsync(tenantId, userId, jobId, exportRequest, It.IsAny<CancellationToken>()), Times.Once);
                 auditLoggerMock.Verify(x => x.LogExportDownloadedAsync(tenantId, userId, jobId, It.IsAny<CancellationToken>()), Times.Once);
@@ -138,6 +142,7 @@ namespace E_POS.UnitTests.TenantAdminReports
             {
                 db.Tenants.Add(Create<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>(("Id", tenantId), ("Name", "Test"), ("UpdatedAt", DateTimeOffset.UtcNow)));
                 db.TenantUsers.Add(CreateUser(userId, tenantId, "ACTIVE", "ALL_OUTLETS", "ALL_ACCESSIBLE_TILLS"));
+                db.Outlets.Add(Create<Outlet>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("OutletName", "Store"), ("Status", "ACTIVE"), ("UpdatedAt", DateTimeOffset.UtcNow)));
                 await db.SaveChangesAsync();
             }
             
@@ -159,6 +164,7 @@ namespace E_POS.UnitTests.TenantAdminReports
                 var request = new ReportExportRequest("sales", "transactions", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, "transactions"));
                 var createResult = await service.CreateExportAsync(context, request, CancellationToken.None);
                 
+                Assert.True(createResult.IsSuccess, createResult.Error?.Message);
                 var jobId = createResult.Value!.JobId;
                 
                 // Advance time by 16 minutes
@@ -181,6 +187,7 @@ namespace E_POS.UnitTests.TenantAdminReports
             {
                 db.Tenants.Add(Create<E_POS.Domain.Modules.Tenant.TenantFoundation.Entities.Tenant>(("Id", tenantId), ("Name", "Test"), ("UpdatedAt", DateTimeOffset.UtcNow)));
                 db.TenantUsers.Add(CreateUser(userId, tenantId, "ACTIVE", "ALL_OUTLETS", "ALL_ACCESSIBLE_TILLS"));
+                db.Outlets.Add(Create<Outlet>(("Id", Guid.NewGuid()), ("TenantId", tenantId), ("OutletName", "Store"), ("Status", "ACTIVE"), ("UpdatedAt", DateTimeOffset.UtcNow)));
                 await db.SaveChangesAsync();
             }
             
@@ -199,6 +206,7 @@ namespace E_POS.UnitTests.TenantAdminReports
                 var request = new ReportExportRequest("sales", "transactions", "csv", new ReportQueryRequest(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, "transactions"));
                 var createResult = await service.CreateExportAsync(context, request, CancellationToken.None);
                 
+                Assert.True(createResult.IsSuccess, createResult.Error?.Message);
                 var jobId = createResult.Value!.JobId;
                 
                 // Different user, same tenant
