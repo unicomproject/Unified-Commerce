@@ -24,6 +24,17 @@ public static class ReportBusinessDateCalculator
             new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(toLocalExclusive, timezone), TimeSpan.Zero));
     }
 
+    /// <summary>
+    /// Shared REP date boundary: inclusive business-local From/To dates become
+    /// [local midnight of From, local midnight after To) in UTC. Either side may be open.
+    /// </summary>
+    public static (DateTimeOffset? FromUtc, DateTimeOffset? ToUtcExclusive) ResolveBusinessDateRange(
+        DateOnly? from,
+        DateOnly? to,
+        string? tenantTimezone) =>
+        (from.HasValue ? ToUtcRange(from.Value, from.Value, tenantTimezone).FromUtc : null,
+         to.HasValue ? ToUtcRange(to.Value, to.Value, tenantTimezone).ToUtcExclusive : null);
+
     private static TimeZoneInfo ResolveTimezone(string? timezone)
     {
         if (string.IsNullOrWhiteSpace(timezone))

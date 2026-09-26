@@ -85,6 +85,9 @@ public sealed class TenantAdminReportsController : ControllerBase
         [FromQuery] int pageSize = 25,
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc",
+        [FromQuery] Guid? snapshotId = null,
+        [FromQuery] string? returnStatus = null,
+        [FromQuery] string? fulfilmentStatus = null,
         CancellationToken cancellationToken = default)
     {
         if (!TryContext(out var context, out var unauthorized)) return unauthorized;
@@ -92,7 +95,8 @@ public sealed class TenantAdminReportsController : ControllerBase
             context,
             new ReportQueryRequest(from, to, outletId, tillId, cashierId, customerId, departmentId, categoryId, subcategoryId,
                 brandId, productId, productVariantId, salesChannelId, paymentMethodId, orderStatus, paymentStatus, search,
-                section, page, pageSize, sortBy, sortDirection),
+                section, page, pageSize, sortBy, sortDirection, SnapshotId: snapshotId,
+                ReturnStatus: returnStatus, FulfilmentStatus: fulfilmentStatus),
             cancellationToken);
         return ToActionResult(result);
     }
@@ -127,6 +131,7 @@ public sealed class TenantAdminReportsController : ControllerBase
         [FromQuery] int pageSize = 25,
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc",
+        [FromQuery] Guid? snapshotId = null,
         CancellationToken cancellationToken = default)
     {
         if (!TryContext(out var context, out var unauthorized)) return unauthorized;
@@ -134,7 +139,7 @@ public sealed class TenantAdminReportsController : ControllerBase
             context,
             new ReportQueryRequest(from, to, outletId, null, null, null, departmentId, categoryId, subcategoryId,
                 brandId, productId, productVariantId, null, null, null, null, search, section, page, pageSize,
-                sortBy, sortDirection, inventoryLocationId, stockStatus, expiryStatus, batchNumber, movementType),
+                sortBy, sortDirection, inventoryLocationId, stockStatus, expiryStatus, batchNumber, movementType, snapshotId),
             cancellationToken);
         return ToActionResult(result);
     }
@@ -151,13 +156,16 @@ public sealed class TenantAdminReportsController : ControllerBase
         [FromQuery] int pageSize = 25,
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc",
+        [FromQuery] Guid? snapshotId = null,
+        [FromQuery] Guid? tillId = null,
+        [FromQuery] Guid? cashierId = null,
         CancellationToken cancellationToken = default)
     {
         if (!TryContext(out var context, out var unauthorized)) return unauthorized;
         var result = await _reportsService.GetOutletsAsync(
             context,
-            new ReportQueryRequest(from, to, outletId, null, null, null, null, null, null, null, null, null,
-                salesChannelId, paymentMethodId, null, null, null, section, page, pageSize, sortBy, sortDirection),
+            new ReportQueryRequest(from, to, outletId, tillId, cashierId, null, null, null, null, null, null, null,
+                salesChannelId, paymentMethodId, null, null, null, section, page, pageSize, sortBy, sortDirection, SnapshotId: snapshotId),
             cancellationToken);
         return ToActionResult(result);
     }
@@ -265,7 +273,10 @@ public sealed class TenantAdminReportsController : ControllerBase
                 GetString(filters, "stockStatus"),
                 GetString(filters, "expiryStatus"),
                 GetString(filters, "batchNumber"),
-                GetString(filters, "movementType")));
+                GetString(filters, "movementType"),
+                GetGuid(filters, "snapshotId"),
+                GetString(filters, "returnStatus"),
+                GetString(filters, "fulfilmentStatus") ?? GetString(filters, "fulfillmentStatus")));
     }
 
     private static string? GetString(JsonElement element, string name)

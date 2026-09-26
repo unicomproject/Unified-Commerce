@@ -33,7 +33,7 @@ public static class ReportFeaturePolicy
 
         return section switch
         {
-            "transactions" or "summary" or "daily" or "payments" or "tax" or "discounts" or "returns" =>
+            "transactions" or "summary" or "daily" or "payments" or "payment-transactions" or "channels" or "online" or "collections" or "products" or "categories" or "tax" or "discounts" or "returns" =>
                 await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.SalesReports, now, cancellationToken) ||
                 await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportingAnalytics, now, cancellationToken) ||
                 await evaluator.IsEnabledAsync(tenantId, TenantAdminReportFeatureCodes.ReportsAnalytics, now, cancellationToken),

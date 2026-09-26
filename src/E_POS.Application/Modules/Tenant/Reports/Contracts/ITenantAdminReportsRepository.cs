@@ -5,6 +5,9 @@ namespace E_POS.Application.Modules.Tenant.Reports.Contracts;
 
 public interface ITenantAdminReportsRepository
 {
+    Task<string> GetScopeStampAsync(TenantRequestContext context, CancellationToken cancellationToken);
+    Task<bool> CanAccessAsync(TenantRequestContext context, Guid? outletId, Guid? tillId, CancellationToken cancellationToken);
+
     Task<ReportFilterOptionsResponse> GetFilterOptionsAsync(
         TenantRequestContext context,
         ReportFilterOptionsRequest request,

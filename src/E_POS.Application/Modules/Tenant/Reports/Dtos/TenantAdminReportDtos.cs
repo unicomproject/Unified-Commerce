@@ -27,7 +27,10 @@ public sealed record ReportQueryRequest(
     string? StockStatus = null,
     string? ExpiryStatus = null,
     string? BatchNumber = null,
-    string? MovementType = null);
+    string? MovementType = null,
+    Guid? SnapshotId = null,
+    string? ReturnStatus = null,
+    string? FulfilmentStatus = null);
 
 public sealed record ReportFilterOptionsRequest(
     Guid? OutletId,
@@ -60,7 +63,11 @@ public sealed record ReportPageDto(
     int Page,
     int PageSize,
     int TotalCount,
-    int TotalPages);
+    int TotalPages)
+{
+    public bool HasMore => Page < TotalPages;
+    public int? NextPage => HasMore ? Page + 1 : null;
+}
 
 public sealed record ReportResultDto(
     string Section,
@@ -72,7 +79,16 @@ public sealed record ReportResultDto(
     IReadOnlyDictionary<string, object?> Sections,
     IReadOnlyList<IReadOnlyDictionary<string, object?>> Records,
     ReportPageDto? Pagination,
-    DateTimeOffset GeneratedAt);
+    DateTimeOffset GeneratedAt,
+    Guid? SnapshotId = null,
+    bool? IsProvisional = null,
+    int? KnownPendingSyncCount = null,
+    string Completeness = "UNKNOWN",
+    ReportQueryRequest? FiltersApplied = null,
+    string? ReportId = null,
+    string? ReportName = null,
+    DateTimeOffset? AsOf = null,
+    DateTimeOffset? LastUpdatedAt = null);
 
 public sealed record SalesTransactionDetailDto(
     Guid OrderId,

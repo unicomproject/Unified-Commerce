@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace E_POS.Infrastructure.Modules.Tenant.Reports.Repositories;
 
-public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
+public sealed partial class TenantAdminReportsRepository : ITenantAdminReportsRepository
 {
     private const string ActiveStatus = "ACTIVE";
     private const string CompletedStatus = "COMPLETED";
@@ -17,6 +17,23 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
     public TenantAdminReportsRepository(EPosDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public async Task<string> GetScopeStampAsync(TenantRequestContext context, CancellationToken ct)
+    {
+        var outlets = await GetAccessibleOutletIdsAsync(context, ct);
+        var (tills, scope) = await GetAccessibleTillIdsAsync(context, outlets, ct);
+        return string.Join(",", outlets.Order()) + ":" + scope + ":" + string.Join(",", tills.Order()) + ":" + string.Join(",", context.Permissions.Order());
+    }
+
+    public async Task<bool> CanAccessAsync(TenantRequestContext context, Guid? outletId, Guid? tillId, CancellationToken ct)
+    {
+        var outlets = await GetAccessibleOutletIdsAsync(context, ct);
+        if (outlets.Count == 0 || (outletId.HasValue && !outlets.Contains(outletId.Value))) return false;
+        if (!tillId.HasValue) return true;
+        var (tills, _) = await GetAccessibleTillIdsAsync(context, outlets, ct);
+        return tills.Contains(tillId.Value) && await _dbContext.Tills.AnyAsync(t => t.Id == tillId.Value
+            && t.TenantId == context.TenantId && (!outletId.HasValue || t.OutletId == outletId.Value), ct);
     }
 
     public async Task<ReportFilterOptionsResponse> GetFilterOptionsAsync(
@@ -117,7 +134,7 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         {
             ["outlets"] = outlets,
             ["tills"] = tills,
-            ["cashiers"] = await GetCashierOptionsAsync(context.TenantId, cancellationToken),
+            ["cashiers"] = await GetCashierOptionsAsync(context, outletIds, request.OutletId, cancellationToken),
             ["customers"] = [],
             ["departments"] = departments,
             ["categories"] = categories,
@@ -128,11 +145,22 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             ["productVariants"] = variants,
             ["salesChannels"] = channels,
             ["paymentMethods"] = paymentMethods,
-            ["orderStatuses"] = StaticOptions("COMPLETED", "DRAFT", "CANCELLED", "VOIDED"),
-            ["paymentStatuses"] = StaticOptions("PAID", "PARTIALLY_REFUNDED", "REFUNDED", "UNPAID"),
+            ["orderStatuses"] = StaticOptions("COMPLETED", "CONFIRMED", "ACCEPTED", "DRAFT", "CANCELLED", "VOIDED"),
+            // Values written by SalesPayment / SalesOrder; PENDING and FAILED never count as receipts.
+            ["paymentStatuses"] = StaticOptions("PAID", "PARTIALLY_REFUNDED", "REFUNDED", "PENDING", "PAYMENT_SUBMITTED", "UNPAID", "FAILED", "CANCELLED"),
+            ["refundStatuses"] = StaticOptions("COMPLETED"),
+            ["returnStatuses"] = StaticOptions("COMPLETED"),
+            ["fulfilmentStatuses"] = StaticOptions("PENDING", "ACCEPTED", "PREPARING", "READY_FOR_COLLECTION", "COLLECTED", "CANCELLED"),
             ["stockStatuses"] = StaticOptions("IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK"),
             ["expiryStatuses"] = StaticOptions("VALID", "EXPIRING_SOON", "EXPIRED", "NOT_APPLICABLE"),
-            ["movementTypes"] = StaticOptions("SALE", "RETURN", "ADJUSTMENT", "TRANSFER")
+            // Movement types written to the stock ledger by opening stock, POS sale, return and inventory flows.
+            ["movementTypes"] = StaticOptions(StockMovementConstants.StockIn, ReportRules.SaleMovementType, StockMovementConstants.StockOut,
+                ReportRules.ReturnMovementType, StockMovementConstants.Adjustment, StockMovementConstants.Transfer),
+            ["returnReasons"] = await _dbContext.ReturnReasons.AsNoTracking()
+                .Where(x => x.TenantId == context.TenantId && (includeInactive || x.IsActive))
+                .OrderBy(x => x.SortOrder).ThenBy(x => x.ReasonName)
+                .Select(x => new ReportFilterOptionDto(x.Id.ToString(), x.ReasonCode, x.ReasonName, x.IsActive ? ActiveStatus : "INACTIVE", null, x.AppliesTo, x.IsActive))
+                .ToListAsync(cancellationToken)
         };
 
         return new ReportFilterOptionsResponse(
@@ -143,15 +171,15 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             groups);
     }
 
-    public async Task<ReportResultDto> GetDashboardAsync(
+    private async Task<ReportResultDto> GetDashboardCoreAsync(
         TenantRequestContext context,
         ReportQueryRequest request,
         CancellationToken cancellationToken)
     {
         var tenantInfo = await GetTenantInfoAsync(context.TenantId, cancellationToken);
-        var orders = ApplySalesFilters(await BuildOrderQueryAsync(context, request, cancellationToken), request);
+        var orders = ApplyPostedSalesFilters(await BuildOrderQueryAsync(context, request, cancellationToken), request, tenantInfo.Timezone);
         var currentOrders = await orders.ToListAsync(cancellationToken);
-        var summary = BuildSalesSummary(currentOrders);
+        var summary = await ReconciledSalesSummaryAsync(tenantInfo, context, request, currentOrders, cancellationToken);
         var paymentBreakdown = await BuildPaymentBreakdownAsync(context, request, currentOrders.Select(x => x.Id).ToList(), cancellationToken);
         var topProducts = await BuildTopProductsAsync(context.TenantId, currentOrders.Select(x => x.Id).ToList(), cancellationToken);
 
@@ -174,7 +202,7 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             DateTimeOffset.UtcNow);
     }
 
-    public async Task<ReportResultDto> GetSalesAsync(
+    private async Task<ReportResultDto> GetSalesCoreAsync(
         TenantRequestContext context,
         ReportQueryRequest request,
         CancellationToken cancellationToken)
@@ -182,33 +210,32 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         var tenantInfo = await GetTenantInfoAsync(context.TenantId, cancellationToken);
         var section = request.Section ?? "summary";
 
+        if (section is "payments" or "payment-transactions") return await BuildPaymentEventsAsync(tenantInfo, section, request, context, cancellationToken);
         if (section == "returns") return await BuildReturnsResultAsync(tenantInfo, section, request, context, cancellationToken);
         if (section == "online") return await BuildOnlineOrdersResultAsync(tenantInfo, section, request, context, cancellationToken);
         if (section == "collections") return await BuildCollectionsResultAsync(tenantInfo, section, request, context, cancellationToken);
 
-        var orders = ApplySalesFilters(await BuildOrderQueryAsync(context, request, cancellationToken), request);
+        var orders = ApplyPostedSalesFilters(await BuildOrderQueryAsync(context, request, cancellationToken), section == "products" ? request with { Search = null } : request, tenantInfo.Timezone);
         var orderRows = await orders.ToListAsync(cancellationToken);
         var orderIds = orderRows.Select(x => x.Id).ToList();
 
         return section switch
         {
-            "transactions" => await BuildTransactionsResultAsync(tenantInfo, section, request, orders, cancellationToken),
-            "products" => await BuildProductSalesResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
-            "channels" => await BuildChannelSalesResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
-            "payment-transactions" => await BuildPaymentTransactionsResultAsync(tenantInfo, section, request, context, orderIds, cancellationToken),
+            "transactions" => await BuildTransactionsResultAsync(tenantInfo, section, request, orders, context, cancellationToken),
+            "products" => await BuildProductSalesResultAsync(tenantInfo, section, request, context, orderIds, cancellationToken),
+            "channels" => await BuildChannelSalesResultAsync(tenantInfo, section, request, context, orderIds, cancellationToken),
             "categories" => await BuildCategorySalesResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
-            "payments" => await BuildPaymentResultAsync(tenantInfo, section, request, context, orderIds, cancellationToken),
-            "tax" => await BuildTaxResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
+            "tax" => await BuildTaxResultAsync(tenantInfo, section, request, context, orderIds, cancellationToken),
             "discounts" => await BuildDiscountResultAsync(tenantInfo, section, request, context.TenantId, orderIds, cancellationToken),
             "cashiers" => BuildDictionaryResult(tenantInfo, section, request, BuildCashierRows(orderRows)),
             "daily" => BuildDictionaryResult(tenantInfo, section, request, BuildDailyRows(orderRows)),
-            _ => new ReportResultDto(section, tenantInfo.CurrencyCode, tenantInfo.Timezone, request.From, request.To, BuildSalesSummary(orderRows),
+            _ => new ReportResultDto(section, tenantInfo.CurrencyCode, tenantInfo.Timezone, request.From, request.To, await ReconciledSalesSummaryAsync(tenantInfo, context, request, orderRows, cancellationToken),
                 new Dictionary<string, object?> { ["salesTrend"] = BuildDailyTrend(orderRows), ["paymentBreakdown"] = await BuildPaymentBreakdownAsync(context, request, orderIds, cancellationToken), ["topSellingProducts"] = await BuildTopProductsAsync(context.TenantId, orderIds, cancellationToken) },
                 [], null, DateTimeOffset.UtcNow)
         };
     }
 
-    public async Task<ReportResultDto> GetStockAsync(
+    private async Task<ReportResultDto> GetStockCoreAsync(
         TenantRequestContext context,
         ReportQueryRequest request,
         CancellationToken cancellationToken)
@@ -250,8 +277,8 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
                   (!request.ProductVariantId.HasValue || balance.ProductVariantId == request.ProductVariantId.Value)
             let reorderPoint = reorder == null ? 0 : reorder.ReorderPointQuantity
             let expiryStatus = batch == null || batch.ExpiryDate == null ? "NOT_APPLICABLE" :
-                batch.ExpiryDate.GetValueOrDefault() < tenantToday ? "EXPIRED" :
-                batch.ExpiryDate.GetValueOrDefault() <= tenantToday.AddDays(30) ? "EXPIRING_SOON" : "VALID"
+                batch.ExpiryDate.Value < tenantToday ? "EXPIRED" :
+                batch.ExpiryDate.Value <= tenantToday.AddDays(30) ? "EXPIRING_SOON" : "VALID"
             let stockStatus = balance.AvailableQuantity <= 0 ? "OUT_OF_STOCK" :
                 balance.AvailableQuantity <= reorderPoint ? "LOW_STOCK" : "IN_STOCK"
             where (section != "low-stock" || (balance.AvailableQuantity > 0 && balance.AvailableQuantity <= reorderPoint)) &&
@@ -309,22 +336,33 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             };
         }).ToList();
 
+        // KPIs cover the entire authorized filtered set, independently of the visible page.
+        var totals = await query.GroupBy(x => 1).Select(g => new {
+            OnHand = g.Sum(x => x.balance.OnHandQuantity), Available = g.Sum(x => x.balance.AvailableQuantity),
+            Reserved = g.Sum(x => x.balance.ReservedQuantity), Damaged = g.Sum(x => x.balance.DamagedQuantity),
+            Quarantine = g.Sum(x => x.balance.QuarantineQuantity),
+            Low = g.Count(x => x.stockStatus == "LOW_STOCK"), Out = g.Count(x => x.stockStatus == "OUT_OF_STOCK"),
+            Expiring = g.Count(x => x.expiryStatus == "EXPIRING_SOON")
+        }).SingleOrDefaultAsync(cancellationToken);
+        var matchingBalances = query.Select(x => x.balance.Id);
+        decimal? totalValue = canViewValue ? await _dbContext.InventoryCostLayers.AsNoTracking()
+            .Where(x => x.TenantId == context.TenantId && matchingBalances.Contains(x.InventoryBalanceId) && x.Status != "DELETED")
+            .SumAsync(x => (decimal?)(x.RemainingQuantity * x.UnitCost), cancellationToken) ?? 0m : null;
         var summary = new Dictionary<string, object?>
         {
-            ["totalStockQuantity"] = page.Sum(x => x.balance.OnHandQuantity),
-            ["availableQuantity"] = page.Sum(x => x.balance.AvailableQuantity),
-            ["reservedQuantity"] = page.Sum(x => x.balance.ReservedQuantity),
-            ["damagedQuantity"] = page.Sum(x => x.balance.DamagedQuantity),
-            ["quarantineQuantity"] = page.Sum(x => x.balance.QuarantineQuantity),
-            ["lowStockItemCount"] = page.Count(x => x.stockStatus == "LOW_STOCK"),
-            ["outOfStockItemCount"] = page.Count(x => x.stockStatus == "OUT_OF_STOCK"),
-            ["expiringSoonItemCount"] = page.Count(x => x.expiryStatus == "EXPIRING_SOON"),
-            ["totalStockValue"] = canViewValue ? costByBalance.Values.Sum(x => x.Value) : null
+            ["totalStockQuantity"] = totals?.OnHand ?? 0m, ["availableQuantity"] = totals?.Available ?? 0m,
+            ["reservedQuantity"] = totals?.Reserved ?? 0m, ["damagedQuantity"] = totals?.Damaged ?? 0m,
+            ["quarantineQuantity"] = totals?.Quarantine ?? 0m, ["lowStockItemCount"] = totals?.Low ?? 0,
+            ["outOfStockItemCount"] = totals?.Out ?? 0, ["expiringSoonItemCount"] = totals?.Expiring ?? 0,
+            ["totalStockValue"] = totalValue, ["dateBasis"] = "CURRENT AS-OF (NOT HISTORICAL)",
+            ["asOf"] = DateTimeOffset.UtcNow, ["balanceRowCount"] = total,
+            ["inventoryScope"] = "TRACKED PRODUCTS WITH AN INVENTORY BALANCE ONLY",
+            ["availableQuantityFormula"] = "onHand - reserved - damaged - quarantine"
         };
         return Result(tenantInfo, section, request, summary, records, total);
     }
 
-    public async Task<ReportResultDto> GetOutletsAsync(
+    private async Task<ReportResultDto> GetOutletsCoreAsync(
         TenantRequestContext context,
         ReportQueryRequest request,
         CancellationToken cancellationToken)
@@ -448,16 +486,20 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
     {
         var outletIds = await GetAccessibleOutletIdsAsync(context, cancellationToken);
         var (tillIds, tillScope) = await GetAccessibleTillIdsAsync(context, outletIds, cancellationToken);
+        var successfulPaymentStatuses = ReportRules.SuccessfulPaymentStatuses;
+        const string clickAndCollect = ReportRules.ClickAndCollectOrderType;
         var query =
             from order in _dbContext.SalesOrders.AsNoTracking()
             join channel in _dbContext.SalesChannels.AsNoTracking() on order.SalesChannelId equals channel.Id
+            join platformChannel in _dbContext.PlatformSalesChannels.AsNoTracking() on channel.PlatformSalesChannelId equals platformChannel.Id into platformChannels
+            from platformChannel in platformChannels.DefaultIfEmpty()
             join till in _dbContext.Tills.AsNoTracking() on order.TillId equals till.Id into tills
             from till in tills.DefaultIfEmpty()
             join user in _dbContext.TenantUsers.AsNoTracking() on order.CreatedByTenantUserId equals user.Id into users
             from user in users.DefaultIfEmpty()
             let effectiveOutletId = order.ReportingOutletId ?? (till == null ? null : till.OutletId)
             where order.TenantId == context.TenantId &&
-                  (effectiveOutletId == null || outletIds.Contains(effectiveOutletId.GetValueOrDefault())) &&
+                  (effectiveOutletId != null && outletIds.Contains(effectiveOutletId.Value)) &&
                   ((order.TillId == null && tillScope == E_POS.Domain.Modules.Tenant.AccessControl.Constants.TenantUserAccessScopes.AllAccessibleTills) || (order.TillId != null && tillIds.Contains(order.TillId.Value)))
             select new OrderProjection
             {
@@ -468,6 +510,16 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
                 BusinessDate = order.BusinessDate,
                 PlacedAt = order.PlacedAt,
                 CompletedAt = order.CompletedAt,
+                // A click-and-collect sale posts when it is paid; collection later only changes fulfilment.
+                PostingAt = order.OrderType == clickAndCollect
+                    ? _dbContext.SalesPayments.Where(p => p.TenantId == context.TenantId && p.SalesOrderId == order.Id && successfulPaymentStatuses.Contains(p.PaymentStatus)).Max(p => p.PaidAt)
+                    : order.CompletedAt,
+                OrderType = order.OrderType,
+                RequestedCollectionAt = order.RequestedCollectionAt,
+                CancelledAt = order.CancelledAt,
+                UpdatedByUserId = order.UpdatedByTenantUserId,
+                ChannelCode = platformChannel == null ? null : platformChannel.ChannelCode,
+                TillType = till == null ? null : till.TillType,
                 SalesChannelId = order.SalesChannelId,
                 SalesChannelName = channel.CustomName,
                 ReportingOutletId = effectiveOutletId,
@@ -519,11 +571,11 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         return query;
     }
 
-    private async Task<ReportResultDto> BuildTransactionsResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, IQueryable<OrderProjection> query, CancellationToken cancellationToken)
+    private async Task<ReportResultDto> BuildTransactionsResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, IQueryable<OrderProjection> query, TenantRequestContext context, CancellationToken cancellationToken)
     {
         query = ApplyOrderSort(query, request.SortBy, request.SortDirection);
         var total = await query.CountAsync(cancellationToken);
-        var page = await query.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToListAsync(cancellationToken);
+        var page = await query.ToListAsync(cancellationToken);
         var orderIds = page.Select(x => x.Id).ToList();
         var lineCounts = await _dbContext.SalesOrderLines.AsNoTracking().Where(x => x.TenantId == tenantInfo.TenantId && x.SalesOrderId.HasValue && orderIds.Contains(x.SalesOrderId.Value)).GroupBy(x => x.SalesOrderId!.Value).Select(g => new { Id = g.Key, Count = g.Count(), Qty = g.Sum(x => x.Quantity) }).ToListAsync(cancellationToken);
         var paymentNames = await GetPaymentMethodNamesAsync(tenantInfo.TenantId, orderIds, cancellationToken);
@@ -532,8 +584,10 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
             var lines = lineCounts.FirstOrDefault(l => l.Id == x.Id);
                         return new Dictionary<string, object?> {
                 { "orderId", x.Id }, { "orderNumber", x.OrderNumber }, { "externalReference", x.ExternalOrderReference },
-                { "businessDate", x.BusinessDate }, { "placedAt", x.PlacedAt }, { "paidAt", x.CompletedAt },
-                { "salesChannelId", x.SalesChannelId }, { "salesChannelName", x.SalesChannelName },
+                { "businessDate", x.BusinessDate }, { "placedAt", x.PlacedAt }, { "paidAt", x.PostingAt }, { "postedAt", x.PostingAt },
+                { "completedAt", x.CompletedAt }, { "rowType", "SALE" }, { "orderType", x.OrderType },
+                { "salesChannelId", x.SalesChannelId }, { "salesChannelName", x.SalesChannelName }, { "channelCode", x.ChannelCode },
+                { "salesExcludingTax", x.TotalAmount - x.TaxAmount },
                 { "outletId", x.ReportingOutletId }, { "outletName", x.OutletName }, { "tillId", x.TillId },
                 { "tillCode", x.TillCode }, { "tillName", x.TillName }, { "tillSessionId", x.TillSessionId },
                 { "cashierId", x.CashierId }, { "cashierName", x.CashierName }, { "customerId", x.CustomerId },
@@ -541,59 +595,118 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
                 { "currencyCode", x.CurrencyCode }, { "subtotalAmount", x.SubtotalAmount }, { "discountAmount", x.DiscountAmount },
                 { "taxAmount", x.TaxAmount }, { "chargeAmount", x.ChargeAmount }, { "roundingAmount", x.RoundingAmount },
                 { "totalAmount", x.TotalAmount }, { "paidAmount", x.PaidAmount }, { "refundedAmount", x.RefundedAmount },
-                { "netAmount", x.TotalAmount - x.RefundedAmount }, { "paymentMethodNames", paymentNames.GetValueOrDefault(x.Id, "") },
+                { "netAmount", x.TotalAmount }, { "paymentMethodNames", paymentNames.GetValueOrDefault(x.Id, "") },
                 { "paymentStatus", x.PaymentStatus }, { "fulfilmentStatus", x.FulfillmentStatus }, { "orderStatus", x.OrderStatus }
             };
         }).ToList();
-        return Result(tenantInfo, section, request, BuildSalesSummary(page), records, total);
+        var adjustments = await ReturnAdjustmentsAsync(tenantInfo, context, request, cancellationToken);
+        // Return adjustments post on their own date and link back to the original sale.
+        foreach (var group in adjustments.GroupBy(x => new { x.ReturnId, x.OrderId, x.ReturnNumber, x.OriginalOrderNumber, x.PostedAt, x.ChannelId, x.ChannelName, x.OutletId }))
+            records.Add(new Dictionary<string, object?> {
+                ["rowType"] = "RETURN", ["returnId"] = group.Key.ReturnId, ["returnNumber"] = group.Key.ReturnNumber,
+                ["orderId"] = group.Key.OrderId, ["originalOrderId"] = group.Key.OrderId, ["orderNumber"] = group.Key.ReturnNumber,
+                ["originalOrderNumber"] = group.Key.OriginalOrderNumber, ["paidAt"] = group.Key.PostedAt, ["postedAt"] = group.Key.PostedAt,
+                ["salesChannelId"] = group.Key.ChannelId, ["salesChannelName"] = group.Key.ChannelName, ["outletId"] = group.Key.OutletId,
+                ["totalQuantity"] = -group.Sum(x => x.Quantity), ["subtotalAmount"] = -group.Sum(x => x.Base),
+                ["salesExcludingTax"] = -group.Sum(x => x.Base),
+                ["taxAmount"] = -group.Sum(x => x.Tax), ["totalAmount"] = -group.Sum(x => x.Base + x.Tax),
+                ["netAmount"] = -group.Sum(x => x.Base + x.Tax), ["currencyCode"] = tenantInfo.CurrencyCode,
+                ["orderStatus"] = "COMPLETED", ["paymentStatus"] = null
+            });
+        return Result(tenantInfo, section, request, await ReconciledSalesSummaryAsync(tenantInfo, context, request, page, cancellationToken),
+            records.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList(), records.Count);
     }
 
-    private async Task<ReportResultDto> BuildProductSalesResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, Guid tenantId, List<Guid> orderIds, CancellationToken cancellationToken)
+    private async Task<ReportResultDto> BuildProductSalesResultAsync(TenantInfo tenantInfo, string section,
+        ReportQueryRequest request, TenantRequestContext context, List<Guid> orderIds, CancellationToken cancellationToken)
     {
-        var rows = await _dbContext.SalesOrderLines.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.SalesOrderId.HasValue && orderIds.Contains(x.SalesOrderId.Value))
-            .GroupBy(x => new { x.ProductId, x.ProductVariantId, x.ProductNameSnapshot, x.VariantNameSnapshot, x.SkuSnapshot, x.BarcodeSnapshot, x.BrandNameSnapshot, x.DepartmentNameSnapshot, x.CategoryNameSnapshot, x.SubcategoryNameSnapshot })
-            .Select(g => new
-            {
-                g.Key,
-                QuantitySold = g.Sum(x => x.Quantity),
-                QuantityReturned = g.Sum(x => x.ReturnedQuantity),
-                Gross = g.Sum(x => x.LineSubtotalAmount),
-                Discount = g.Sum(x => x.LineDiscountAmount),
-                Tax = g.Sum(x => x.LineTaxAmount),
-                Transactions = g.Select(x => x.SalesOrderId).Distinct().Count()
-            })
+        var lines = await _dbContext.SalesOrderLines.AsNoTracking()
+            .Where(x => x.TenantId == context.TenantId && x.SalesOrderId.HasValue && orderIds.Contains(x.SalesOrderId.Value))
             .ToListAsync(cancellationToken);
-        var records = rows.Select(x => Row(("productId", x.Key.ProductId), ("productName", x.Key.ProductNameSnapshot), ("productVariantId", x.Key.ProductVariantId), ("variantName", x.Key.VariantNameSnapshot), ("sku", x.Key.SkuSnapshot), ("barcode", x.Key.BarcodeSnapshot), ("brandName", x.Key.BrandNameSnapshot), ("departmentName", x.Key.DepartmentNameSnapshot), ("categoryName", x.Key.CategoryNameSnapshot), ("subcategoryName", x.Key.SubcategoryNameSnapshot), ("quantitySold", x.QuantitySold), ("quantityReturned", x.QuantityReturned), ("netQuantity", x.QuantitySold - x.QuantityReturned), ("grossSalesAmount", x.Gross), ("discountAmount", x.Discount), ("taxAmount", x.Tax), ("refundAmount", 0m), ("netSalesAmount", x.Gross - x.Discount + x.Tax), ("transactionCount", x.Transactions), ("averageSellingPrice", x.QuantitySold - x.QuantityReturned == 0 ? 0 : (x.Gross - x.Discount + x.Tax) / (x.QuantitySold - x.QuantityReturned)), ("currencyCode", tenantInfo.CurrencyCode))).ToList();
-        return Result(tenantInfo, section, request, new Dictionary<string, object?>(), records, records.Count);
+        var returns = await ReturnAdjustmentsAsync(tenantInfo, context, request with { Search = null }, cancellationToken);
+        var events = lines.Select(x => new { Line = x, Sold = x.Quantity, Returned = 0m,
+            Sales = x.LineTotalAmount - x.LineTaxAmount, Return = 0m }).Concat(
+            returns.Select(x => new { Line = x.Line, Sold = 0m, Returned = x.Quantity, Sales = 0m, Return = x.Base }));
+        if (request.ProductId.HasValue) events = events.Where(x => x.Line.ProductId == request.ProductId);
+        if (request.ProductVariantId.HasValue) events = events.Where(x => x.Line.ProductVariantId == request.ProductVariantId);
+        var categoryId = request.SubcategoryId ?? request.CategoryId;
+        if (categoryId.HasValue)
+        {
+            // Lines store category names only; the category identity comes from the product's category assignment
+            // (a parent category also matches products assigned to its subcategories).
+            var categoryIds = await _dbContext.Categories.AsNoTracking()
+                .Where(x => x.TenantId == context.TenantId && (x.Id == categoryId.Value || x.ParentCategoryId == categoryId.Value))
+                .Select(x => x.Id).ToListAsync(cancellationToken);
+            var productIds = (await _dbContext.ProductCategories.AsNoTracking()
+                .Where(x => x.TenantId == context.TenantId && categoryIds.Contains(x.CategoryId))
+                .Select(x => x.ProductId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+            events = events.Where(x => productIds.Contains(x.Line.ProductId));
+        }
+        if (!string.IsNullOrWhiteSpace(request.Search))
+            events = events.Where(x => x.Line.ProductNameSnapshot.Contains(request.Search, StringComparison.OrdinalIgnoreCase)
+                || (x.Line.VariantNameSnapshot?.Contains(request.Search, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (x.Line.SkuSnapshot?.Contains(request.Search, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (x.Line.BarcodeSnapshot?.Contains(request.Search, StringComparison.OrdinalIgnoreCase) ?? false));
+        var records = events.GroupBy(x => new { x.Line.ProductId, x.Line.ProductVariantId, x.Line.UomId }).Select(g => {
+            var line = g.First().Line;
+            return Row(("productId", line.ProductId), ("productVariantId", line.ProductVariantId),
+                ("productName", line.ProductNameSnapshot), ("variantName", line.VariantNameSnapshot),
+                ("sku", line.SkuSnapshot), ("barcode", line.BarcodeSnapshot), ("unit", line.UomCodeSnapshot),
+                ("quantitySold", g.Sum(x => x.Sold)), ("quantityReturned", g.Sum(x => x.Returned)),
+                ("netQuantity", g.Sum(x => x.Sold - x.Returned)), ("salesValueExTax", g.Sum(x => x.Sales)),
+                ("returnValueExTax", g.Sum(x => x.Return)), ("netValueExTax", g.Sum(x => x.Sales - x.Return)),
+                ("grossSalesAmount", g.Sum(x => x.Sales)), ("refundAmount", g.Sum(x => x.Return)),
+                ("netSalesAmount", g.Sum(x => x.Sales - x.Return)), ("currencyCode", tenantInfo.CurrencyCode));
+        }).ToList();
+        var sort = request.SortBy == "netQuantity" ? "netQuantity" : "netValueExTax";
+        records = (request.SortDirection == "desc" ? records.OrderByDescending(x => (decimal)x[sort]!)
+            : records.OrderBy(x => (decimal)x[sort]!)).ThenBy(x => (string?)x["productName"]).ThenBy(x => (string?)x["variantName"]).ToList();
+        // Quantities are only meaningful per unit, so the summary totals values and reports quantity per unit.
+        var quantityByUnit = records.GroupBy(x => (string?)x["unit"] ?? string.Empty)
+            .Select(g => (IReadOnlyDictionary<string, object?>)Row(("unit", g.Key), ("quantitySold", g.Sum(x => (decimal)x["quantitySold"]!)),
+                ("quantityReturned", g.Sum(x => (decimal)x["quantityReturned"]!)), ("netQuantity", g.Sum(x => (decimal)x["netQuantity"]!)))).ToList();
+        return Result(tenantInfo, section, request, Row(("salesValueExTax", records.Sum(x => (decimal)x["salesValueExTax"]!)),
+                ("returnValueExTax", records.Sum(x => (decimal)x["returnValueExTax"]!)),
+                ("netValueExTax", records.Sum(x => (decimal)x["netValueExTax"]!)), ("variantCount", records.Count),
+                ("quantityByUnit", quantityByUnit), ("dateBasis", "SALE POSTING DATE / RETURN POSTING DATE")),
+            records.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList(), records.Count);
     }
 
-        private async Task<ReportResultDto> BuildChannelSalesResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, Guid tenantId, List<Guid> orderIds, CancellationToken cancellationToken)
+    private async Task<ReportResultDto> BuildChannelSalesResultAsync(TenantInfo tenantInfo, string section,
+        ReportQueryRequest request, TenantRequestContext context, List<Guid> orderIds, CancellationToken cancellationToken)
     {
-        var rows = await (from order in _dbContext.SalesOrders.AsNoTracking()
-                          join channel in _dbContext.SalesChannels.AsNoTracking() on order.SalesChannelId equals channel.Id
-                          where order.TenantId == tenantId && orderIds.Contains(order.Id)
-                          group order by new { order.SalesChannelId, channel.CustomName } into g
-                          select new { g.Key, Count = g.Count(), Gross = g.Sum(x => x.SubtotalAmount), Discount = g.Sum(x => x.DiscountAmount), Tax = g.Sum(x => x.TaxAmount), Refund = g.Sum(x => x.RefundedAmount), Total = g.Sum(x => x.TotalAmount) })
-            .ToListAsync(cancellationToken);
-        
-        var total = rows.Sum(x => x.Total - x.Refund);
-        var records = rows.Select(x => Row(("salesChannelName", x.Key.CustomName), ("saleCount", x.Count), ("salesExcludingTax", x.Gross - x.Discount), ("taxAmount", x.Tax), ("salesIncludingTax", x.Total), ("netAmount", x.Total - x.Refund), ("currencyCode", tenantInfo.CurrencyCode))).ToList();
-        
-        return Result(tenantInfo, section, request, new Dictionary<string, object?>(), records, records.Count);
-    }
-    private async Task<ReportResultDto> BuildPaymentTransactionsResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, TenantRequestContext context, List<Guid> orderIds, CancellationToken cancellationToken)
-    {
-        var rows = await (from payment in _dbContext.SalesPayments.AsNoTracking()
-                          join method in _dbContext.PaymentMethods.AsNoTracking() on payment.PaymentMethodId equals method.Id
-                          join order in _dbContext.SalesOrders.AsNoTracking() on payment.SalesOrderId equals order.Id
-                          where payment.TenantId == context.TenantId && orderIds.Contains(payment.SalesOrderId)
-                          select new { payment.Id, order.OrderNumber, method.MethodName, payment.RequestedAmount, payment.TenderedAmount, payment.ChangeAmount, payment.PaidAmount, payment.PaymentStatus, payment.PaidAt })
-            .ToListAsync(cancellationToken);
-        
-        var records = rows.Select(x => new Dictionary<string, object?> { { "paymentId", x.Id }, { "orderNumber", x.OrderNumber }, { "paymentMethodName", x.MethodName }, { "requestedAmount", x.RequestedAmount }, { "tenderedAmount", x.TenderedAmount }, { "changeAmount", x.ChangeAmount }, { "paidAmount", x.PaidAmount }, { "paymentStatus", x.PaymentStatus }, { "paidAt", x.PaidAt }, { "currencyCode", tenantInfo.CurrencyCode } }).ToList();
-        
-        return Result(tenantInfo, section, request, new Dictionary<string, object?>(), records, records.Count);
+        var sales = await (from o in _dbContext.SalesOrders.AsNoTracking()
+                           join c in _dbContext.SalesChannels.AsNoTracking() on o.SalesChannelId equals c.Id
+                           where o.TenantId == context.TenantId && orderIds.Contains(o.Id)
+                           select new { o.SalesChannelId, c.CustomName, Base = o.TotalAmount - o.TaxAmount, o.TaxAmount }).ToListAsync(cancellationToken);
+        // Return adjustments are allocated to the ORIGINAL sale's channel on the return posting date.
+        var returns = await ReturnAdjustmentsAsync(tenantInfo, context, request, cancellationToken);
+        var channels = sales.Select(x => x.SalesChannelId).Union(returns.Select(x => x.ChannelId)).ToList();
+        var channelCodes = await (from c in _dbContext.SalesChannels.AsNoTracking()
+                                  join p in _dbContext.PlatformSalesChannels.AsNoTracking() on c.PlatformSalesChannelId equals p.Id
+                                  where c.TenantId == context.TenantId && channels.Contains(c.Id)
+                                  select new { c.Id, p.ChannelCode, p.ChannelType }).ToDictionaryAsync(x => x.Id, cancellationToken);
+        var rows = channels.Select(id => {
+            var posted = sales.Where(x => x.SalesChannelId == id).ToList();
+            var returned = returns.Where(x => x.ChannelId == id).ToList();
+            var saleBase = posted.Sum(x => x.Base); var returnBase = returned.Sum(x => x.Base);
+            var saleTax = posted.Sum(x => x.TaxAmount); var returnTax = returned.Sum(x => x.Tax);
+            var netTax = saleTax - returnTax;
+            var netSales = ReportRules.CalculateNetSales(saleBase, returnBase);
+            channelCodes.TryGetValue(id, out var code);
+            return Row(("salesChannelId", id), ("salesChannelName", posted.FirstOrDefault()?.CustomName ?? returned.First().ChannelName),
+                ("channelCode", code?.ChannelCode), ("channelType", code?.ChannelType),
+                ("saleCount", posted.Count), ("salesExcludingTax", saleBase), ("returnAdjustment", returnBase),
+                ("netSalesExcludingTax", netSales), ("saleTax", saleTax), ("returnTax", returnTax), ("taxAmount", netTax),
+                ("salesIncludingTax", posted.Sum(x => x.Base + x.TaxAmount)), ("netAmount", netSales + netTax),
+                ("currencyCode", tenantInfo.CurrencyCode));
+        }).OrderBy(x => (string?)x["salesChannelName"]).ToList();
+        return Result(tenantInfo, section, request, Row(("salesExcludingTax", rows.Sum(x => (decimal)x["salesExcludingTax"]!)),
+            ("returnAdjustment", rows.Sum(x => (decimal)x["returnAdjustment"]!)),
+            ("netSalesExcludingTax", rows.Sum(x => (decimal)x["netSalesExcludingTax"]!)),
+            ("netTax", rows.Sum(x => (decimal)x["taxAmount"]!)), ("saleCount", rows.Sum(x => (int)x["saleCount"]!)),
+            ("netSalesIncludingTax", rows.Sum(x => (decimal)x["netAmount"]!)),
+            ("dateBasis", "SALE POSTING DATE / RETURN POSTING DATE")), rows, rows.Count);
     }
     private async Task<ReportResultDto> BuildCategorySalesResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, Guid tenantId, List<Guid> orderIds, CancellationToken cancellationToken)
     {
@@ -607,29 +720,42 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         return Result(tenantInfo, section, request, new Dictionary<string, object?>(), records, records.Count);
     }
 
-    private async Task<ReportResultDto> BuildPaymentResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, TenantRequestContext context, List<Guid> orderIds, CancellationToken cancellationToken)
+    private async Task<ReportResultDto> BuildTaxResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request,
+        TenantRequestContext context, List<Guid> orderIds, CancellationToken cancellationToken)
     {
-        var rows = await (from payment in _dbContext.SalesPayments.AsNoTracking()
-                          join method in _dbContext.PaymentMethods.AsNoTracking() on payment.PaymentMethodId equals method.Id
-                          where payment.TenantId == context.TenantId && orderIds.Contains(payment.SalesOrderId) && payment.PaymentStatus != "FAILED"
-                          group new { payment, method } by new { payment.PaymentMethodId, method.MethodCode, method.MethodName, method.MethodType } into g
-                          select new { g.Key, Count = g.Count(), Requested = g.Sum(x => x.payment.RequestedAmount), Tendered = g.Sum(x => x.payment.TenderedAmount ?? 0), Paid = g.Sum(x => x.payment.PaidAmount), Change = g.Sum(x => x.payment.ChangeAmount), Refunded = g.Sum(x => x.payment.RefundedAmount) })
-            .ToListAsync(cancellationToken);
-        var total = rows.Sum(x => x.Paid - x.Refunded - x.Change);
-        var records = rows.Select(x => Row(("paymentMethodId", x.Key.PaymentMethodId), ("paymentMethodCode", x.Key.MethodCode), ("paymentMethodName", x.Key.MethodName), ("paymentType", x.Key.MethodType), ("transactionCount", x.Count), ("requestedAmount", x.Requested), ("tenderedAmount", x.Tendered), ("paidAmount", x.Paid), ("changeAmount", x.Change), ("refundedAmount", x.Refunded), ("netCollectedAmount", x.Paid - x.Refunded - x.Change), ("percentage", total == 0 ? 0 : (x.Paid - x.Refunded - x.Change) / total * 100), ("currencyCode", tenantInfo.CurrencyCode))).ToList();
-        return Result(tenantInfo, section, request, new Dictionary<string, object?> { ["totalCollected"] = rows.Sum(x => x.Paid), ["refundedAmount"] = rows.Sum(x => x.Refunded), ["netCollected"] = total, ["transactionCount"] = rows.Sum(x => x.Count) }, records, records.Count);
+        var returns = await ReturnAdjustmentsAsync(tenantInfo, context, request, cancellationToken);
+        var returnOrderIds = returns.Select(x => x.OrderId).Distinct().ToList();
+        var taxes = await _dbContext.SalesOrderTaxes.AsNoTracking().Where(x => x.TenantId == context.TenantId
+            && (orderIds.Contains(x.SalesOrderId) || returnOrderIds.Contains(x.SalesOrderId))).ToListAsync(cancellationToken);
+        var entries = taxes.Where(x => orderIds.Contains(x.SalesOrderId)).Select(x => new TaxEntry(
+            x.TaxRateCodeSnapshot, x.TaxTreatmentSnapshot, x.TaxNameSnapshot, x.TaxRatePercent, x.TaxableAmount, 0m, x.TaxAmount, 0m)).ToList();
+        foreach (var adjustment in returns)
+        {
+            var originalTaxes = taxes.Where(x => x.SalesOrderId == adjustment.OrderId && x.SalesOrderLineId == adjustment.Line.Id).ToList();
+            // A legacy order-level tax cannot safely identify a returned line's code or rate.
+            // Keep the stored reversal visible as unallocated instead of inventing a rate.
+            if (originalTaxes.Count != 1)
+                entries.Add(new(null, "UNALLOCATED_RETURN", "Stored return tax (code unavailable)", null, 0m, adjustment.Base, 0m, adjustment.Tax));
+            else
+            {
+                var original = originalTaxes[0];
+                entries.Add(new(original.TaxRateCodeSnapshot, original.TaxTreatmentSnapshot, original.TaxNameSnapshot,
+                    original.TaxRatePercent, 0m, adjustment.Base, 0m, adjustment.Tax));
+            }
+        }
+        var rows = entries.GroupBy(x => new { x.Code, x.Treatment, x.Name, x.Rate }).Select(g => Row(
+            ("taxCode", g.Key.Code), ("taxTreatment", g.Key.Treatment), ("taxName", g.Key.Name), ("taxRate", g.Key.Rate),
+            ("taxableAmount", g.Sum(x => x.SalesBase)), ("returnBase", g.Sum(x => x.ReturnBase)),
+            ("netBase", g.Sum(x => x.SalesBase-x.ReturnBase)), ("taxAmount", g.Sum(x => x.SaleTax)),
+            ("refundedTaxAmount", g.Sum(x => x.ReturnTax)), ("netTaxAmount", g.Sum(x => x.SaleTax-x.ReturnTax)),
+            ("currencyCode", tenantInfo.CurrencyCode))).ToList();
+        return Result(tenantInfo, section, request, Row(("taxableSales", entries.Sum(x => x.SalesBase)),
+            ("taxCollected", entries.Sum(x => x.SaleTax)), ("refundedTax", entries.Sum(x => x.ReturnTax)),
+            ("netTax", entries.Sum(x => x.SaleTax-x.ReturnTax))), rows, rows.Count);
     }
 
-    private async Task<ReportResultDto> BuildTaxResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, Guid tenantId, List<Guid> orderIds, CancellationToken cancellationToken)
-    {
-        var rows = await _dbContext.SalesOrderTaxes.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && orderIds.Contains(x.SalesOrderId))
-            .GroupBy(x => new { x.TaxClassId, x.TaxClassCodeSnapshot, x.TaxRateCodeSnapshot, x.TaxNameSnapshot, x.TaxRatePercent })
-            .Select(g => new { g.Key, Taxable = g.Sum(x => x.TaxableAmount), Tax = g.Sum(x => x.TaxAmount), Transactions = g.Select(x => x.SalesOrderId).Distinct().Count() })
-            .ToListAsync(cancellationToken);
-        var records = rows.Select(x => Row(("taxClassId", x.Key.TaxClassId), ("taxClassName", x.Key.TaxClassCodeSnapshot), ("taxCode", x.Key.TaxRateCodeSnapshot), ("taxName", x.Key.TaxNameSnapshot), ("taxRate", x.Key.TaxRatePercent), ("taxableAmount", x.Taxable), ("taxAmount", x.Tax), ("refundedTaxAmount", 0m), ("netTaxAmount", x.Tax), ("transactionCount", x.Transactions), ("currencyCode", tenantInfo.CurrencyCode))).ToList();
-        return Result(tenantInfo, section, request, new Dictionary<string, object?> { ["taxableSales"] = rows.Sum(x => x.Taxable), ["taxCollected"] = rows.Sum(x => x.Tax), ["refundedTax"] = 0m, ["netTax"] = rows.Sum(x => x.Tax) }, records, records.Count);
-    }
+    private sealed record TaxEntry(string? Code, string? Treatment, string Name, decimal? Rate,
+        decimal SalesBase, decimal ReturnBase, decimal SaleTax, decimal ReturnTax);
 
     private async Task<ReportResultDto> BuildDiscountResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, Guid tenantId, List<Guid> orderIds, CancellationToken cancellationToken)
     {
@@ -641,221 +767,6 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         var records = rows.Select(x => Row(("discountPolicyId", x.Key.DiscountPolicyId), ("discountName", x.Key.DiscountNameSnapshot), ("discountCode", x.Key.DiscountCodeSnapshot), ("discountScope", x.Key.DiscountTargetScope), ("usageCount", x.Count), ("discountAmount", x.Amount), ("averageDiscountAmount", x.Count == 0 ? 0 : x.Amount / x.Count), ("manualDiscountCount", x.Manual), ("managerApprovalCount", x.Approved), ("netSalesAfterDiscount", 0m), ("currencyCode", tenantInfo.CurrencyCode))).ToList();
         return Result(tenantInfo, section, request, new Dictionary<string, object?> { ["totalDiscounts"] = rows.Sum(x => x.Amount), ["transactionsWithDiscount"] = rows.Sum(x => x.Count), ["averageDiscountAmount"] = rows.Sum(x => x.Count) == 0 ? 0 : rows.Sum(x => x.Amount) / rows.Sum(x => x.Count), ["managerApprovedDiscountCount"] = rows.Sum(x => x.Approved) }, records, records.Count);
     }
-
-    private async Task<ReportResultDto> BuildReturnsResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, TenantRequestContext context, CancellationToken cancellationToken)
-    {
-        var outletIds = await GetAccessibleOutletIdsAsync(context, cancellationToken);
-        var query = from salesReturn in _dbContext.SalesReturns.AsNoTracking()
-                    join refund in _dbContext.SalesRefunds.AsNoTracking() on salesReturn.Id equals refund.SalesReturnId into refunds
-                    from refund in refunds.DefaultIfEmpty()
-                    where salesReturn.TenantId == context.TenantId && salesReturn.OutletId != null && outletIds.Contains(salesReturn.OutletId.Value)
-                    select new { salesReturn, refund };
-        if (request.From.HasValue) query = query.Where(x => x.salesReturn.CompletedAt >= request.From.Value.ToDateTime(new TimeOnly(0, 0, 0), DateTimeKind.Utc));
-        if (request.To.HasValue) query = query.Where(x => x.salesReturn.CompletedAt < request.To.Value.AddDays(1).ToDateTime(new TimeOnly(0, 0, 0), DateTimeKind.Utc));
-        var resultRows = await query.ToListAsync(cancellationToken);
-        var rows = resultRows.Select(x => Row(("returnId", (object?)x.salesReturn.Id), ("returnNumber", (object?)x.salesReturn.ReturnNumber), ("originalOrderId", (object?)x.salesReturn.SalesOrderId), ("processingOutletId", (object?)x.salesReturn.OutletId), ("processingOutletName", (object?)x.salesReturn.ProcessingOutletNameSnapshot), ("returnReasonCode", (object?)x.salesReturn.ReturnReasonCodeSnapshot), ("returnReasonName", (object?)x.salesReturn.ReturnReasonNameSnapshot), ("requestedQuantity", (object?)x.salesReturn.TotalRequestedQty), ("receivedQuantity", (object?)x.salesReturn.TotalReceivedQty), ("approvedQuantity", (object?)x.salesReturn.TotalApprovedQty), ("approvedAmount", (object?)(x.refund == null ? 0m : x.refund.ApprovedAmount)), ("refundedAmount", (object?)(x.refund == null ? 0m : x.refund.RefundedAmount)), ("returnStatus", (object?)x.salesReturn.ReturnStatus), ("refundStatus", (object?)(x.refund == null ? null : x.refund.RefundStatus)), ("completedAt", (object?)x.salesReturn.CompletedAt), ("currencyCode", (object?)(x.refund == null ? null : x.refund.CurrencyCode)))).ToList();
-        return Result(tenantInfo, section, request, new Dictionary<string, object?> { ["returnCount"] = rows.Count, ["completedRefundAmount"] = resultRows.Sum(x => x.refund == null ? 0m : x.refund.RefundedAmount) }, rows, rows.Count);
-    }
-
-    private async Task<ReportResultDto> BuildOnlineOrdersResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, TenantRequestContext context, CancellationToken cancellationToken)
-    {
-        var outletIds = await GetAccessibleOutletIdsAsync(context, cancellationToken);
-        var query = from order in _dbContext.SalesOrders.AsNoTracking()
-                    join channel in _dbContext.SalesChannels.AsNoTracking() on order.SalesChannelId equals channel.Id
-                    join outlet in _dbContext.Outlets.AsNoTracking() on order.ReportingOutletId equals outlet.Id into outlets
-                    from outlet in outlets.DefaultIfEmpty()
-                    where order.TenantId == context.TenantId && order.OrderType != "POS_SALE" && (outlet == null || outletIds.Contains(outlet.Id))
-                    select new { order, channel, outlet };
-        if (request.From.HasValue) query = query.Where(x => x.order.BusinessDate >= request.From.Value);
-        if (request.To.HasValue) query = query.Where(x => x.order.BusinessDate <= request.To.Value);
-        var resultRows = await query.ToListAsync(cancellationToken);
-        var rows = resultRows.Select(x => Row(("orderId", (object?)x.order.Id), ("orderNumber", (object?)x.order.OrderNumber), ("businessDate", (object?)x.order.BusinessDate), ("salesChannelName", (object?)x.channel.CustomName), ("reportingOutletName", (object?)(x.outlet != null ? x.outlet.OutletName : x.order.ReportingOutletNameSnapshot)), ("customerName", (object?)x.order.CustomerNameSnapshot), ("totalAmount", (object?)x.order.TotalAmount), ("paymentStatus", (object?)x.order.PaymentStatus), ("fulfillmentStatus", (object?)x.order.FulfillmentStatus), ("orderStatus", (object?)x.order.Status), ("currencyCode", (object?)x.order.CurrencyCode))).ToList();
-        return Result(tenantInfo, section, request, new Dictionary<string, object?> { ["orderCount"] = rows.Count, ["totalSales"] = resultRows.Sum(x => x.order.TotalAmount) }, rows, rows.Count);
-    }
-
-    private async Task<ReportResultDto> BuildCollectionsResultAsync(TenantInfo tenantInfo, string section, ReportQueryRequest request, TenantRequestContext context, CancellationToken cancellationToken)
-    {
-        var outletIds = await GetAccessibleOutletIdsAsync(context, cancellationToken);
-        var query = from order in _dbContext.SalesOrders.AsNoTracking()
-                    join channel in _dbContext.SalesChannels.AsNoTracking() on order.SalesChannelId equals channel.Id
-                    join outlet in _dbContext.Outlets.AsNoTracking() on order.ReportingOutletId equals outlet.Id into outlets
-                    from outlet in outlets.DefaultIfEmpty()
-                    where order.TenantId == context.TenantId && order.OrderType == "CLICK_AND_COLLECT" && order.FulfillmentStatus != "COLLECTED" && order.FulfillmentStatus != "CANCELLED" && (outlet == null || outletIds.Contains(outlet.Id))
-                    select new { order, channel, outlet };
-        var resultRows = await query.ToListAsync(cancellationToken);
-        var rows = resultRows.Select(x => Row(("orderId", (object?)x.order.Id), ("orderNumber", (object?)x.order.OrderNumber), ("businessDate", (object?)x.order.BusinessDate), ("salesChannelName", (object?)x.channel.CustomName), ("reportingOutletName", (object?)(x.outlet != null ? x.outlet.OutletName : x.order.ReportingOutletNameSnapshot)), ("customerName", (object?)x.order.CustomerNameSnapshot), ("totalAmount", (object?)x.order.TotalAmount), ("paymentStatus", (object?)x.order.PaymentStatus), ("fulfillmentStatus", (object?)x.order.FulfillmentStatus), ("orderStatus", (object?)x.order.Status), ("currencyCode", (object?)x.order.CurrencyCode))).ToList();
-        return Result(tenantInfo, section, request, new Dictionary<string, object?> { ["orderCount"] = rows.Count, ["totalOutstanding"] = resultRows.Sum(x => x.order.TotalAmount) }, rows, rows.Count);
-    }
-
-    private async Task<ReportResultDto> BuildStockMovementsResultAsync(
-        TenantInfo tenantInfo,
-        TenantRequestContext context,
-        ReportQueryRequest request,
-        List<Guid> outletIds,
-        bool canViewValue,
-        CancellationToken cancellationToken)
-    {
-        var query =
-            from movement in _dbContext.StockMovements.AsNoTracking()
-            join balance in _dbContext.InventoryBalances.AsNoTracking() on movement.InventoryBalanceId equals balance.Id
-            join location in _dbContext.InventoryLocations.AsNoTracking() on balance.InventoryLocationId equals location.Id
-            join outlet in _dbContext.Outlets.AsNoTracking() on location.OutletId equals outlet.Id
-            join product in _dbContext.Products.AsNoTracking() on balance.ProductId equals product.Id
-            join variant in _dbContext.ProductVariants.AsNoTracking() on balance.ProductVariantId equals variant.Id into variants
-            from variant in variants.DefaultIfEmpty()
-            join batch in _dbContext.ProductBatches.AsNoTracking() on balance.ProductBatchId equals batch.Id into batches
-            from batch in batches.DefaultIfEmpty()
-            join user in _dbContext.TenantUsers.AsNoTracking() on movement.CreatedByTenantUserId equals user.Id into users
-            from user in users.DefaultIfEmpty()
-            where movement.TenantId == context.TenantId &&
-                  outletIds.Contains(location.OutletId) &&
-                  (!request.OutletId.HasValue || location.OutletId == request.OutletId.Value) &&
-                  (!request.InventoryLocationId.HasValue || location.Id == request.InventoryLocationId.Value) &&
-                  (!request.ProductId.HasValue || balance.ProductId == request.ProductId.Value) &&
-                  (!request.ProductVariantId.HasValue || balance.ProductVariantId == request.ProductVariantId.Value) &&
-                  (!string.IsNullOrWhiteSpace(request.MovementType) ? movement.MovementType == request.MovementType : true) &&
-                  (!string.IsNullOrWhiteSpace(request.BatchNumber) ? batch != null && batch.BatchNumber.Contains(request.BatchNumber) : true) &&
-                  (!string.IsNullOrWhiteSpace(request.Search) ? movement.MovementNumber.Contains(request.Search) || product.ProductName.Contains(request.Search) : true)
-            select new { movement, balance, location, outlet, product, variant, batch, user };
-        if (request.From.HasValue)
-        {
-            var range = ReportBusinessDateCalculator.ToUtcRange(request.From.Value, request.From.Value, tenantInfo.Timezone);
-            query = query.Where(x => x.movement.OccurredAt >= range.FromUtc);
-        }
-        if (request.To.HasValue)
-        {
-            var range = ReportBusinessDateCalculator.ToUtcRange(request.To.Value, request.To.Value, tenantInfo.Timezone);
-            query = query.Where(x => x.movement.OccurredAt < range.ToUtcExclusive);
-        }
-
-        var total = await query.CountAsync(cancellationToken);
-        var page = await query.OrderByDescending(x => x.movement.OccurredAt)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
-            .ToListAsync(cancellationToken);
-        var records = page.Select(x => Row(("stockMovementId", x.movement.Id), ("movementNumber", x.movement.MovementNumber),
-            ("movementAt", x.movement.OccurredAt), ("productId", x.product.Id), ("productName", x.product.ProductName),
-            ("productVariantId", x.variant?.Id), ("variantName", x.variant?.VariantName), ("outletId", x.outlet.Id),
-            ("outletName", x.outlet.OutletName), ("inventoryLocationId", x.location.Id), ("inventoryLocationName", x.location.LocationName),
-            ("productBatchId", x.batch?.Id), ("batchNumber", x.batch?.BatchNumber), ("movementType", x.movement.MovementType),
-            ("quantityBefore", x.movement.QuantityBefore), ("quantityChange", x.movement.QuantityChange), ("quantityAfter", x.movement.QuantityAfter),
-            ("unitCost", canViewValue ? x.movement.UnitCost : null), ("totalCost", canViewValue ? x.movement.TotalCost : null),
-            ("referenceType", null), ("referenceNumber", x.movement.ReferenceNumberSnapshot), ("reasonCode", x.movement.ReasonCode),
-            ("reason", x.movement.MovementNote), ("notes", x.movement.MovementNote), ("performedByUserId", x.movement.CreatedByTenantUserId),
-            ("performedByUserName", x.user == null ? null : x.user.DisplayName ?? x.user.FullName), ("currencyCode", tenantInfo.CurrencyCode))).ToList();
-            
-        // Calculate Reconciliation
-        var allMovements = await query.ToListAsync(cancellationToken);
-        
-        var openingQuantity = 0m;
-        if (request.From.HasValue)
-        {
-            var range = ReportBusinessDateCalculator.ToUtcRange(request.From.Value, request.From.Value, tenantInfo.Timezone);
-            var openingQuery =
-                from movement in _dbContext.StockMovements.AsNoTracking()
-                join balance in _dbContext.InventoryBalances.AsNoTracking() on movement.InventoryBalanceId equals balance.Id
-                join location in _dbContext.InventoryLocations.AsNoTracking() on balance.InventoryLocationId equals location.Id
-                where movement.TenantId == context.TenantId &&
-                      outletIds.Contains(location.OutletId) &&
-                      (!request.OutletId.HasValue || location.OutletId == request.OutletId.Value) &&
-                      (!request.InventoryLocationId.HasValue || location.Id == request.InventoryLocationId.Value) &&
-                      (!request.ProductId.HasValue || balance.ProductId == request.ProductId.Value) &&
-                      (!request.ProductVariantId.HasValue || balance.ProductVariantId == request.ProductVariantId.Value) &&
-                      movement.OccurredAt < range.FromUtc
-                select movement;
-            openingQuantity = await openingQuery.SumAsync(x => x.QuantityChange, cancellationToken);
-        }
-        else 
-        {
-            // If no from date is specified, opening is 0 (beginning of time)
-            openingQuantity = 0m;
-        }
-        var receipts = allMovements.Where(x => x.movement.MovementType == "STOCK_IN").Sum(x => x.movement.QuantityChange);
-        var stockIssues = allMovements.Where(x => x.movement.MovementType == "STOCK_OUT").Sum(x => -x.movement.QuantityChange);
-        var restockableReturns = allMovements.Where(x => x.movement.MovementType == "RETURN").Sum(x => x.movement.QuantityChange);
-        var signedAdjustments = allMovements.Where(x => x.movement.MovementType == "ADJUSTMENT").Sum(x => x.movement.QuantityChange);
-        var transferIn = allMovements.Where(x => x.movement.MovementType == "TRANSFER" && x.movement.QuantityChange > 0).Sum(x => x.movement.QuantityChange);
-        var transferOut = allMovements.Where(x => x.movement.MovementType == "TRANSFER" && x.movement.QuantityChange < 0).Sum(x => -x.movement.QuantityChange);
-        
-        var netMovement = receipts + transferIn + restockableReturns - stockIssues - transferOut + signedAdjustments;
-        var closingQuantity = openingQuantity + netMovement;
-
-        return Result(tenantInfo, "movements", request, new Dictionary<string, object?> { 
-            ["movementCount"] = total,
-            ["openingQuantity"] = openingQuantity,
-            ["receipts"] = receipts,
-            ["stockIssues"] = stockIssues,
-            ["restockableReturns"] = restockableReturns,
-            ["signedAdjustments"] = signedAdjustments,
-            ["transferIn"] = transferIn,
-            ["transferOut"] = transferOut,
-            ["netMovement"] = netMovement,
-            ["closingQuantity"] = closingQuantity
-        }, records, total);
-    }
-
-    private async Task<ReportResultDto> BuildTillSummaryResultAsync(
-        TenantInfo tenantInfo,
-        TenantRequestContext context,
-        ReportQueryRequest request,
-        CancellationToken cancellationToken)
-    {
-        var outletIds = await GetAccessibleOutletIdsAsync(context, cancellationToken);
-        var (tillIds, tillScope) = await GetAccessibleTillIdsAsync(context, outletIds, cancellationToken);
-        var query =
-            from session in _dbContext.TillSessions.AsNoTracking()
-            join outlet in _dbContext.Outlets.AsNoTracking() on session.OutletId equals outlet.Id
-            join till in _dbContext.Tills.AsNoTracking() on session.TillId equals till.Id
-            join summary in _dbContext.TillSessionSummaries.AsNoTracking() on session.Id equals summary.TillSessionId into summaries
-            from summary in summaries.DefaultIfEmpty()
-            join cashier in _dbContext.TenantUsers.AsNoTracking() on session.OpenedByTenantUserId equals cashier.Id into cashiers
-            from cashier in cashiers.DefaultIfEmpty()
-            where session.TenantId == context.TenantId &&
-                  outletIds.Contains(session.OutletId) &&
-                  tillIds.Contains(session.TillId) &&
-                  (!request.OutletId.HasValue || session.OutletId == request.OutletId.Value) &&
-                  (!request.TillId.HasValue || session.TillId == request.TillId.Value) &&
-                  (!request.CashierId.HasValue || session.OpenedByTenantUserId == request.CashierId.Value)
-            select new { session, outlet, till, summary, cashier };
-        if (request.From.HasValue) query = query.Where(x => x.session.BusinessDate >= request.From.Value);
-        if (request.To.HasValue) query = query.Where(x => x.session.BusinessDate <= request.To.Value);
-
-        var total = await query.CountAsync(cancellationToken);
-        var page = await query.OrderByDescending(x => x.session.BusinessDate)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
-            .ToListAsync(cancellationToken);
-        var sessionIds = page.Select(x => x.session.Id).ToList();
-        var cashMovements = await _dbContext.TillCashMovements.AsNoTracking()
-            .Where(x => x.TenantId == context.TenantId && sessionIds.Contains(x.TillSessionId))
-            .GroupBy(x => new { x.TillSessionId, x.MovementType })
-            .Select(g => new { g.Key.TillSessionId, g.Key.MovementType, Amount = g.Sum(x => x.Amount) })
-            .ToListAsync(cancellationToken);
-        decimal Cash(Guid sessionId, params string[] movementTypes) =>
-            cashMovements.Where(x => x.TillSessionId == sessionId && movementTypes.Contains(x.MovementType)).Sum(x => x.Amount);
-
-        var records = page.Select(x => Row(("tillSessionId", x.session.Id), ("sessionNumber", x.session.SessionNumber),
-            ("businessDate", x.session.BusinessDate), ("outletId", x.outlet.Id), ("outletName", x.outlet.OutletName),
-            ("tillId", x.till.Id), ("tillCode", x.till.TillCode), ("tillName", x.till.TillName),
-            ("cashierId", x.session.OpenedByTenantUserId), ("cashierName", x.cashier == null ? null : x.cashier.DisplayName ?? x.cashier.FullName),
-            ("openedAt", x.session.OpenedAt), ("closedAt", x.session.ClosedAt),
-            ("openingCashAmount", x.summary == null ? x.session.OpeningFloatAmount : x.summary.OpeningCashAmount),
-            ("cashInAmount", Cash(x.session.Id, "CASH_IN")), ("cashDropAmount", Cash(x.session.Id, "CASH_DROP", "CASH_OUT")),
-            ("expectedCashAmount", x.summary == null ? null : x.summary.ExpectedCashAmount),
-            ("countedCashAmount", x.summary == null ? null : x.summary.CountedCashAmount),
-            ("cashDifference", x.summary == null ? null : x.summary.CashDifferenceAmount),
-            ("grossSalesAmount", x.summary == null ? 0 : x.summary.GrossSalesAmount),
-            ("discountAmount", x.summary == null ? 0 : x.summary.DiscountAmount),
-            ("taxAmount", x.summary == null ? 0 : x.summary.TaxAmount),
-            ("netSalesAmount", x.summary == null ? 0 : x.summary.NetSalesAmount),
-            ("refundAmount", x.summary == null ? 0 : x.summary.RefundAmount),
-            ("voidCount", x.summary == null ? 0 : x.summary.VoidCount),
-            ("orderCount", x.summary == null ? 0 : x.summary.OrderCount),
-            ("sessionStatus", x.session.Status), ("approvalStatus", x.summary != null && x.summary.ApprovedAt != null ? "APPROVED" : "PENDING"),
-            ("currencyCode", x.session.CurrencyCode))).ToList();
-        return Result(tenantInfo, "tills", request, new Dictionary<string, object?> { ["sessionCount"] = total }, records, total);
-    }
-
     private static IReadOnlyDictionary<string, object?> BuildSalesSummary(IReadOnlyList<OrderProjection> orders)
     {
         var gross = orders.Sum(x => x.SubtotalAmount);
@@ -878,14 +789,13 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
     private static IReadOnlyList<IReadOnlyDictionary<string, object?>> BuildOutletPerformance(IReadOnlyList<OrderProjection> orders) =>
         orders.GroupBy(x => new { x.ReportingOutletId, x.OutletName }).Select(g => Row(("outletId", g.Key.ReportingOutletId), ("outletName", g.Key.OutletName), ("grossSalesAmount", g.Sum(x => x.SubtotalAmount)), ("netSalesAmount", g.Sum(x => x.TotalAmount - x.RefundedAmount)), ("transactionCount", g.Count()), ("averageOrderValue", g.Count() == 0 ? 0 : g.Sum(x => x.TotalAmount - x.RefundedAmount) / g.Count()), ("currencyCode", g.First().CurrencyCode))).ToList();
 
-    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BuildPaymentBreakdownAsync(TenantRequestContext context, ReportQueryRequest request, List<Guid> orderIds, CancellationToken cancellationToken) =>
-        (await (from payment in _dbContext.SalesPayments.AsNoTracking()
-                join method in _dbContext.PaymentMethods.AsNoTracking() on payment.PaymentMethodId equals method.Id
-                where payment.TenantId == context.TenantId && orderIds.Contains(payment.SalesOrderId) && payment.PaymentStatus != "FAILED"
-                group payment by method.MethodName into g
-                select new { Method = g.Key, Amount = g.Sum(x => x.PaidAmount - x.RefundedAmount - x.ChangeAmount) })
-            .ToListAsync(cancellationToken))
-        .Select(x => Row(("paymentMethodName", x.Method), ("amount", x.Amount))).ToList();
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BuildPaymentBreakdownAsync(TenantRequestContext context, ReportQueryRequest request, List<Guid> orderIds, CancellationToken cancellationToken)
+    {
+        var tenant = await GetTenantInfoAsync(context.TenantId, cancellationToken);
+        var report = await BuildPaymentEventsAsync(tenant, "payments", request with { Page = 1, PageSize = int.MaxValue }, context, cancellationToken);
+        return report.Records.Select(x => (IReadOnlyDictionary<string, object?>)Row(
+            ("paymentMethodName", x["paymentMethodName"]), ("amount", x["netCollectedAmount"]))).ToList();
+    }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BuildTopProductsAsync(Guid tenantId, List<Guid> orderIds, CancellationToken cancellationToken) =>
         (await _dbContext.SalesOrderLines.AsNoTracking()
@@ -993,12 +903,29 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         return (assignedTills.Intersect(await tillsInOutlets.ToListAsync(cancellationToken)).ToList(), user.TillAccessScope);
     }
 
-    private async Task<IReadOnlyList<ReportFilterOptionDto>> GetCashierOptionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
-        await _dbContext.TenantUsers.AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.AccountStatus == ActiveStatus)
+    /// <summary>
+    /// Cashiers visible to the caller: users granted a role/permission at one of the caller's outlets,
+    /// or who have recorded sales there. Email is not exposed as an option label.
+    /// </summary>
+    private async Task<IReadOnlyList<ReportFilterOptionDto>> GetCashierOptionsAsync(TenantRequestContext context,
+        List<Guid> accessibleOutletIds, Guid? outletId, CancellationToken cancellationToken)
+    {
+        var outlets = outletId.HasValue ? accessibleOutletIds.Where(x => x == outletId.Value).ToList() : accessibleOutletIds;
+        var tenantId = context.TenantId;
+        var outletUsers = _dbContext.OutletUserRoles.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.RevokedAt == null && outlets.Contains(x.OutletId)).Select(x => x.TenantUserId)
+            .Union(_dbContext.OutletUserPermissions.AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.RevokedAt == null && outlets.Contains(x.OutletId)).Select(x => x.TenantUserId))
+            .Union(_dbContext.SalesOrders.AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.CreatedByTenantUserId != null && x.ReportingOutletId != null && outlets.Contains(x.ReportingOutletId.Value))
+                .Select(x => x.CreatedByTenantUserId!.Value));
+        var ids = await outletUsers.Distinct().ToListAsync(cancellationToken);
+        return await _dbContext.TenantUsers.AsNoTracking()
+            .Where(x => x.TenantId == tenantId && ids.Contains(x.Id))
             .OrderBy(x => x.FullName)
-            .Select(x => new ReportFilterOptionDto(x.Id.ToString(), null, x.DisplayName ?? x.FullName, x.AccountStatus, null, x.Email, x.AccountStatus == ActiveStatus))
+            .Select(x => new ReportFilterOptionDto(x.Id.ToString(), x.StaffCode, x.DisplayName ?? x.FullName, x.AccountStatus, null, null, x.AccountStatus == ActiveStatus))
             .ToListAsync(cancellationToken);
+    }
 
     private static IReadOnlyList<ReportFilterOptionDto> StaticOptions(params string[] values) =>
         values.Select(x => new ReportFilterOptionDto(null, x, x, ActiveStatus, null, null, true)).ToList();
@@ -1017,6 +944,13 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         public DateOnly? BusinessDate { get; init; }
         public DateTimeOffset? PlacedAt { get; init; }
         public DateTimeOffset? CompletedAt { get; init; }
+        public DateTimeOffset? PostingAt { get; init; }
+        public string OrderType { get; init; } = string.Empty;
+        public DateTimeOffset? RequestedCollectionAt { get; init; }
+        public DateTimeOffset? CancelledAt { get; init; }
+        public Guid? UpdatedByUserId { get; init; }
+        public string? ChannelCode { get; init; }
+        public string? TillType { get; init; }
         public Guid SalesChannelId { get; init; }
         public string SalesChannelName { get; init; } = string.Empty;
         public Guid? ReportingOutletId { get; init; }
@@ -1047,6 +981,7 @@ public sealed class TenantAdminReportsRepository : ITenantAdminReportsRepository
         public string? InternalNote { get; init; }
     }
 }
+
 
 
 
