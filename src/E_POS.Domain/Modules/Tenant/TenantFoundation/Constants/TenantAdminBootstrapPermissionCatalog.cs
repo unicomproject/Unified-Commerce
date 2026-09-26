@@ -3,6 +3,7 @@ using E_POS.Domain.Modules.ECommerce.Storefront.Constants;
 using E_POS.Domain.Modules.Tenant.AccessControl.Constants;
 using E_POS.Domain.Modules.Tenant.OutletTillDevice.Constants;
 using E_POS.Domain.Modules.ECommerce.FulfilmentPickup.Constants;
+using E_POS.Domain.Modules.Tenant.Reports.Constants;
 
 namespace E_POS.Domain.Modules.Tenant.TenantFoundation.Constants;
 
@@ -67,9 +68,11 @@ public static class TenantAdminBootstrapPermissionCatalog
             [
                 "inventory.stock.view"
             ],
+            // Reporting Release 1: the API enforces TenantAdminReportPermissions; customer PII is never bootstrapped.
             [PlatformTenantFeatureCodes.SalesReports] =
             [
-                "reports.sales.view"
+                "reports.sales.view",
+                .. TenantAdminReportPermissions.All.Where(code => code != TenantAdminReportPermissions.CustomerPiiView)
             ],
             [PlatformTenantFeatureCodes.OnlineStore] =
             [
